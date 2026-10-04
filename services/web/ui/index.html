@@ -612,7 +612,7 @@
             <!-- Navigation Tabs -->
             <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-feeds">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-feeds" onclick="loadFeeds()">
                         <i class="bi bi-collection-play me-1"></i> Podcasts (<span id="feeds-count">0</span>)
                     </button>
                 </li>
@@ -1367,208 +1367,7 @@
                 });
 
                 if (res.ok) {
-            
-        // Downloader & Cookies Management
-        let downloaderConfig = null;
-
-        async function loadDownloaderConfig() {
-            try {
-                const res = await fetch('/api/v1/downloader');
-                if (!res.ok) throw new Error('Failed to load downloader config');
-                downloaderConfig = await res.json();
-                renderDownloaderConfig();
-
-                // Also load cookies content
-                const cookiesRes = await fetch('/api/v1/downloader/cookies');
-                if (cookiesRes.ok) {
-                    const data = await cookiesRes.json();
-                    document.getElementById('dl-cookies-content').value = data.content || '';
-                }
-            } catch (e) {
-                console.error('Error loading downloader config:', e);
-            }
-        }
-
-        function renderDownloaderConfig() {
-            if (!downloaderConfig) return;
-
-            document.getElementById('dl-timeout').value = downloaderConfig.timeout || 10;
-            document.getElementById('dl-proxy').value = downloaderConfig.proxy || '';
-            document.getElementById('dl-custom-binary').value = downloaderConfig.custom_binary || '';
-            document.getElementById('dl-self-update').checked = !!downloaderConfig.self_update;
-
-            // Browser cookies parse
-            const browserVal = downloaderConfig.cookies_from_browser || '';
-            let browser = '', profile = '';
-            if (browserVal.includes(':')) {
-                const parts = browserVal.split(':');
-                browser = parts[0];
-                profile = parts.slice(1).join(':');
-            } else {
-                browser = browserVal;
-            }
-            document.getElementById('dl-browser-select').value = browser;
-            document.getElementById('dl-browser-profile').value = profile;
-
-            // Status Badge
-            const badgeText = document.getElementById('dl-badge-text');
-            if (downloaderConfig.binary_version) {
-                badgeText.innerText = `yt-dlp ${downloaderConfig.binary_version}`;
-            } else if (downloaderConfig.binary_path) {
-                badgeText.innerText = 'yt-dlp Ready';
-            }
-
-            // Cookies file status
-            const statusInd = document.getElementById('cookies-status-indicator');
-            const pathElem = document.getElementById('cookies-file-path');
-            const sizeElem = document.getElementById('cookies-file-size');
-            const linesElem = document.getElementById('cookies-file-lines');
-            const modElem = document.getElementById('cookies-last-mod');
-
-            if (downloaderConfig.has_cookies_file) {
-                statusInd.className = 'badge bg-success';
-                statusInd.innerText = 'Cookies Active';
-                pathElem.innerText = downloaderConfig.cookies_file || 'data/cookies.txt';
-                sizeElem.innerText = formatBytes(downloaderConfig.cookies_file_size || 0);
-                linesElem.innerText = `${downloaderConfig.cookies_file_lines || 0} lines`;
-                modElem.innerText = downloaderConfig.cookies_last_modified || '-';
-            } else {
-                statusInd.className = 'badge bg-secondary';
-                statusInd.innerText = 'Not Installed';
-                pathElem.innerText = downloaderConfig.cookies_file || 'None configured';
-                sizeElem.innerText = '-';
-                linesElem.innerText = '-';
-                modElem.innerText = '-';
-            }
-        }
-
-        async function saveDownloaderSettings(e) {
-            e.preventDefault();
-            const timeout = parseInt(document.getElementById('dl-timeout').value, 10) || 10;
-            const proxy = document.getElementById('dl-proxy').value.trim();
-            const customBinary = document.getElementById('dl-custom-binary').value.trim();
-            const selfUpdate = document.getElementById('dl-self-update').checked;
-
-            const browser = document.getElementById('dl-browser-select').value;
-            const profile = document.getElementById('dl-browser-profile').value.trim();
-            let browserVal = browser;
-            if (browser && profile) {
-                browserVal = `${browser}:${profile}`;
-            }
-
-            try {
-                const res = await fetch('/api/v1/downloader', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        timeout: timeout,
-                        proxy: proxy,
-                        custom_binary: customBinary,
-                        self_update: selfUpdate,
-                        cookies_from_browser: browserVal,
-                    })
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Failed to update downloader settings');
-                }
-                alert('Downloader settings saved successfully!');
-                await loadDownloaderConfig();
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        async function saveCookiesContent() {
-            const content = document.getElementById('dl-cookies-content').value;
-            try {
-                const res = await fetch('/api/v1/downloader/cookies', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: content })
-                });
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Failed to save cookies');
-                }
-                alert('Cookies saved and applied successfully!');
-                await loadDownloaderConfig();
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        async function clearCookiesContent() {
-            if (!confirm('Are you sure you want to clear/delete the cookies file?')) return;
-            try {
-                const res = await fetch('/api/v1/downloader/cookies', { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete cookies');
-                document.getElementById('dl-cookies-content').value = '';
-                alert('Cookies cleared successfully.');
-                await loadDownloaderConfig();
-            } catch (err) {
-                alert('Error: ' + err.message);
-            }
-        }
-
-        function uploadCookiesFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                document.getElementById('dl-cookies-content').value = e.target.result;
-                await saveCookiesContent();
-            };
-            reader.readAsText(file);
-        }
-
-        async function testDownloaderLive() {
-            const urlInput = document.getElementById('dl-test-url');
-            const url = urlInput.value.trim();
-            const btn = document.getElementById('btn-test-downloader');
-            const spinner = document.getElementById('test-dl-spinner');
-            const resultContainer = document.getElementById('dl-test-result');
-
-            btn.disabled = true;
-            spinner.classList.remove('d-none');
-            resultContainer.className = 'd-none';
-
-            try {
-                const res = await fetch('/api/v1/downloader/test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: url })
-                });
-                const data = await res.json();
-                resultContainer.classList.remove('d-none');
-
-                if (data.success) {
-                    resultContainer.className = 'alert alert-success mt-3 small shadow-sm';
-                    resultContainer.innerHTML = `
-                        <div class="fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i> Success! yt-dlp extracted video metadata:</div>
-                        <div><strong>Title:</strong> ${escapeHtml(data.title || 'Unknown')}</div>
-                        <div><strong>Channel:</strong> ${escapeHtml(data.channel || 'Unknown')}</div>
-                        <div class="text-muted mt-1 small">Cookies &amp; proxy verified. YouTube bot protection bypassed successfully!</div>
-                    `;
-                } else {
-                    resultContainer.className = 'alert alert-danger mt-3 small shadow-sm';
-                    resultContainer.innerHTML = `
-                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> yt-dlp reported an error:</div>
-                        <pre class="bg-dark text-warning p-2 rounded my-1 font-monospace" style="max-height: 200px; overflow-y: auto;">${escapeHtml(data.error || 'Unknown error')}</pre>
-                        <div class="mt-1 small">Tip: Ensure your <code>cookies.txt</code> is fresh and exported while logged into YouTube.</div>
-                    `;
-                }
-            } catch (err) {
-                resultContainer.classList.remove('d-none');
-                resultContainer.className = 'alert alert-danger mt-3 small shadow-sm';
-                resultContainer.innerHTML = `<strong>Error:</strong> ${escapeHtml(err.message)}`;
-            } finally {
-                btn.disabled = false;
-                spinner.classList.add('d-none');
-            }
-        }
-
-        checkAuth();
+                    checkAuth();
                 } else {
                     const data = await res.json();
                     errBox.innerText = data.error || 'Login failed';
@@ -1760,25 +1559,47 @@
             const btn = document.getElementById(`btn-update-${feedId}`);
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Queued...`;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Updating...`;
             }
 
             try {
                 const res = await fetch(`/api/v1/feeds/${feedId}/update`, { method: 'POST' });
                 if (res.ok) {
                     showToast(`Update triggered for ${feedId}`);
+                    // Poll feeds list every 2s for 30s to update status when background download completes
+                    let count = 0;
+                    const interval = setInterval(async () => {
+                        count++;
+                        await loadFeeds();
+                        // If episodes modal is currently open, refresh it as well
+                        const epModal = document.getElementById('episodesModal');
+                        if (epModal && epModal.classList.contains('show')) {
+                            const title = document.getElementById('episodes-feed-title');
+                            if (title && title.innerText.includes(feedId)) {
+                                await showEpisodes(feedId, false);
+                            }
+                        }
+                        if (count >= 15) {
+                            clearInterval(interval);
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
+                            }
+                        }
+                    }, 2000);
                 } else {
                     showToast(`Failed to trigger update: ${await res.text()}`);
-                }
-            } catch (err) {
-                showToast(`Network error: ${err.message}`);
-            } finally {
-                setTimeout(() => {
                     if (btn) {
                         btn.disabled = false;
                         btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
                     }
-                }, 2000);
+                }
+            } catch (err) {
+                showToast(`Network error: ${err.message}`);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
+                }
             }
         }
 
@@ -1873,15 +1694,20 @@
         });
 
         // Episodes
-        async function showEpisodes(feedId) {
+        async function showEpisodes(feedId, openModal = true) {
             const modalEl = document.getElementById('episodesModal');
-            const modal = new bootstrap.Modal(modalEl);
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) {
+                modal = new bootstrap.Modal(modalEl);
+            }
             const listEl = document.getElementById('episodes-list');
 
             document.getElementById('episodes-feed-title').innerText = `Podcast: ${feedId}`;
-            document.getElementById('episodes-feed-subtitle').innerText = 'Loading episodes...';
-            listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
-            modal.show();
+            if (openModal) {
+                document.getElementById('episodes-feed-subtitle').innerText = 'Loading episodes...';
+                listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
+                modal.show();
+            }
 
             try {
                 const res = await fetch(`/api/v1/feeds/${feedId}`);

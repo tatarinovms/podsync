@@ -10,9 +10,10 @@ import (
 
 // AdminConfig holds configuration for the admin web panel
 type AdminConfig struct {
-	Enabled  bool   `toml:"enabled"`
-	Username string `toml:"username"`
-	Password string `toml:"password"`
+	Enabled    bool   `toml:"enabled"`
+	Username   string `toml:"username"`
+	Password   string `toml:"password"`
+	ConfigPath string `toml:"-"`
 }
 
 // FeedSummary contains high-level information about a feed formatted for the admin UI

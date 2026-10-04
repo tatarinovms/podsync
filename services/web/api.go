@@ -1,8 +1,12 @@
 package web
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,6 +52,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("/api/v1/tokens", s.handleTokens)
 	mux.HandleFunc("/api/v1/system", s.handleSystem)
+	mux.Handle("/api/v1/mcp/config", s.authMiddleware(http.HandlerFunc(s.handleMCPConfig)))
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) {
@@ -364,4 +369,38 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, http.StatusOK, stats)
+}
+
+func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath = "podsync"
+	}
+
+	authStr := fmt.Sprintf("%s:%s", s.cfg.Admin.Username, s.cfg.Admin.Password)
+	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(authStr))
+
+	configPath := s.cfg.Admin.ConfigPath
+	if configPath == "" {
+		configPath = "config.toml"
+	}
+	if absPath, err := filepath.Abs(configPath); err == nil {
+		configPath = absPath
+	}
+
+	s.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"username":          s.cfg.Admin.Username,
+		"password":          s.cfg.Admin.Password,
+		"basic_auth_header": basicAuthHeader,
+		"binary_path":       execPath,
+		"config_path":       configPath,
+		"port":              s.cfg.Port,
+		"hostname":          s.cfg.Hostname,
+		"mcp_enabled":       true,
+	})
 }

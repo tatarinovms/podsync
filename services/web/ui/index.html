@@ -453,6 +453,11 @@
                         <i class="bi bi-hdd-network me-1"></i> System & Storage
                     </button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mcp" onclick="loadMCPConfig()">
+                        <i class="bi bi-robot me-1"></i> MCP Server
+                    </button>
+                </li>
             </ul>
 
             <!-- Tab Content -->
@@ -586,6 +591,233 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. MCP Server Tab -->
+                <div class="tab-pane fade" id="tab-mcp">
+                    <!-- Header Banner -->
+                    <div class="card mb-4 border-0 shadow-sm" style="background: var(--brand-gradient); color: #fff;">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <div>
+                                    <h4 class="fw-bold mb-1"><i class="bi bi-robot me-2"></i>Model Context Protocol (MCP) Server</h4>
+                                    <p class="mb-0 opacity-75">Connect AI assistants (OpenCode v2, Claude Desktop, Cursor, Cline, Antigravity) to manage feeds and retry episodes directly.</p>
+                                </div>
+                                <span class="badge bg-white text-dark px-3 py-2 fs-6 shadow-sm"><i class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Credentials & Endpoints -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-6">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-header bg-transparent py-3">
+                                    <h6 class="mb-0 fw-bold"><i class="bi bi-shield-lock me-2 text-primary"></i>Credentials &amp; Endpoints</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-muted">SSE Stream Endpoint</label>
+                                        <div class="input-group">
+                                            <input type="text" id="mcp-sse-url" class="form-control font-monospace form-control-sm" readonly>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-sse-url', this)"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold text-muted">Admin Username</label>
+                                            <div class="input-group">
+                                                <input type="text" id="mcp-username" class="form-control form-control-sm" readonly>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-username', this)"><i class="bi bi-clipboard"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold text-muted">Admin Password</label>
+                                            <div class="input-group">
+                                                <input type="password" id="mcp-password" class="form-control form-control-sm" readonly>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i class="bi bi-eye"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-password', this)" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold text-muted">HTTP Basic Auth Header</label>
+                                        <div class="input-group">
+                                            <input type="text" id="mcp-basic-auth" class="form-control font-monospace form-control-sm" readonly>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-basic-auth', this)"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-header bg-transparent py-3">
+                                    <h6 class="mb-0 fw-bold"><i class="bi bi-terminal me-2 text-primary"></i>Local Stdio Execution</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-muted">Executable Path</label>
+                                        <div class="input-group">
+                                            <input type="text" id="mcp-binary-path" class="form-control font-monospace form-control-sm" readonly>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-binary-path', this)"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-muted">Config File Path</label>
+                                        <div class="input-group">
+                                            <input type="text" id="mcp-config-path" class="form-control font-monospace form-control-sm" readonly>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-config-path', this)"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold text-muted">Command Line</label>
+                                        <div class="input-group">
+                                            <input type="text" id="mcp-cmdline" class="form-control font-monospace form-control-sm" readonly>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-cmdline', this)"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Client Configuration Snippets -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-code-slash me-2 text-primary"></i>Ready-to-Use Client Configurations</h6>
+                            <ul class="nav nav-pills" id="clientTabs" role="tablist">
+                                <li class="nav-item">
+                                    <button class="nav-link active py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-opencode">OpenCode v2</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-claude">Claude Desktop</button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-cursor">Cursor / Cline</button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body">
+                            <div class="tab-content">
+                                <!-- OpenCode v2 -->
+                                <div class="tab-pane fade show active" id="client-opencode">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <span class="small text-muted">Add to <code>opencode.json</code> (Project root or <code>~/.config/opencode/opencode.json</code>):</span>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" id="btn-opencode-remote" class="btn btn-primary" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
+                                                <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary" onclick="setOpencodeMode('local')">Local (Stdio)</button>
+                                            </div>
+                                            <button class="btn btn-brand btn-sm" onclick="copyPre('opencode-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                        </div>
+                                    </div>
+                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
+                                </div>
+
+                                <!-- Claude Desktop -->
+                                <div class="tab-pane fade" id="client-claude">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <span class="small text-muted">Add to <code>claude_desktop_config.json</code> under <code>"mcpServers"</code>:</span>
+                                        <button class="btn btn-brand btn-sm" onclick="copyPre('claude-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                    </div>
+                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
+                                </div>
+
+                                <!-- Cursor / Cline -->
+                                <div class="tab-pane fade" id="client-cursor">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <span class="small text-muted">Add under <strong>Cursor Settings &gt; Features &gt; MCP</strong>:</span>
+                                        <button class="btn btn-brand btn-sm" onclick="copyPre('cursor-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy Config</button>
+                                    </div>
+                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Skill Card -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-transparent py-3">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightning-charge me-2 text-warning"></i>Agent Skill (Ready to feed to Autonomous Agents)</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">
+                                A specialized skill file is prepared in the repository. You can feed this skill directly to autonomous operational agents (Antigravity, OpenCode, Claude Code, Gemini CLI) so they know exactly when to call Podsync MCP tools:
+                            </p>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text small bg-light">Skill Path</span>
+                                <input type="text" id="mcp-skill-path" class="form-control font-monospace form-control-sm" readonly>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-skill-path', this)"><i class="bi bi-clipboard"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Available Tools Reference -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-transparent py-3">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-tools me-2 text-primary"></i>Exposed MCP Tools &amp; Actions</h6>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 small">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 180px;">Tool Name</th>
+                                        <th>Description</th>
+                                        <th style="width: 220px;">Key Arguments</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>list_feeds</code></td>
+                                        <td>List all podcast channels, episode counts, disk size, and RSS links</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_feed</code></td>
+                                        <td>Inspect specific feed metadata and episodes with download status</td>
+                                        <td><code>feed_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>add_feed</code></td>
+                                        <td>Subscribe to YouTube/VK Video/Vimeo channel and save to config.toml</td>
+                                        <td><code>url</code>, <code>format</code>, <code>quality</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>delete_feed</code></td>
+                                        <td>Remove a podcast feed with optional disk cleanup</td>
+                                        <td><code>feed_id</code>, <code>delete_files</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_feed</code></td>
+                                        <td>Trigger immediate update check &amp; download cycle for a channel</td>
+                                        <td><code>feed_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>retry_episode</code></td>
+                                        <td>Reset failed episode status to retry downloading</td>
+                                        <td><code>feed_id</code>, <code>episode_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_system_stats</code></td>
+                                        <td>RAM usage, disk space (free/used), yt-dlp &amp; ffmpeg status</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_tokens</code></td>
+                                        <td>Check configured API keys (masked) for all providers</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_tokens</code></td>
+                                        <td>Update API keys (supports Round-Robin key rotation)</td>
+                                        <td><code>provider</code>, <code>tokens[]</code></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -802,6 +1034,7 @@
             loadFeeds();
             loadTokens();
             loadSystem();
+            loadMCPConfig();
         }
 
         // Feeds
@@ -1337,6 +1570,199 @@
 
         // Init
         checkAuth();
+
+        // MCP Configuration & Generators
+        let mcpConfigData = null;
+        let currentOpencodeMode = 'remote';
+
+        async function loadMCPConfig() {
+            try {
+                const res = await fetch('/api/v1/mcp/config');
+                if (!res.ok) throw new Error('Failed to load MCP config');
+                mcpConfigData = await res.json();
+                renderMCPConfig();
+            } catch (e) {
+                console.error('Error loading MCP config:', e);
+            }
+        }
+
+        function renderMCPConfig() {
+            if (!mcpConfigData) return;
+            const origin = window.location.origin;
+            const sseUrl = `${origin}/mcp/sse`;
+            const username = mcpConfigData.username || 'admin';
+            const password = mcpConfigData.password || '';
+            const basicAuth = mcpConfigData.basic_auth_header || ('Basic ' + btoa(username + ':' + password));
+            const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
+            const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
+            const cmdLine = `${binPath} --config ${cfgPath} --mcp`;
+
+            const sseElem = document.getElementById('mcp-sse-url');
+            if (sseElem) sseElem.value = sseUrl;
+
+            const userElem = document.getElementById('mcp-username');
+            if (userElem) userElem.value = username;
+
+            const passElem = document.getElementById('mcp-password');
+            if (passElem) passElem.value = password;
+
+            const authElem = document.getElementById('mcp-basic-auth');
+            if (authElem) authElem.value = basicAuth;
+
+            const binElem = document.getElementById('mcp-binary-path');
+            if (binElem) binElem.value = binPath;
+
+            const cfgElem = document.getElementById('mcp-config-path');
+            if (cfgElem) cfgElem.value = cfgPath;
+
+            const cmdElem = document.getElementById('mcp-cmdline');
+            if (cmdElem) cmdElem.value = cmdLine;
+
+            // Skill path
+            let projectDir = cfgPath;
+            if (projectDir.lastIndexOf('/') !== -1) {
+                projectDir = projectDir.substring(0, projectDir.lastIndexOf('/'));
+            } else if (projectDir.lastIndexOf('\\') !== -1) {
+                projectDir = projectDir.substring(0, projectDir.lastIndexOf('\\'));
+            }
+            const skillPath = `${projectDir}/.agents/skills/podsync/SKILL.md`;
+            const skillElem = document.getElementById('mcp-skill-path');
+            if (skillElem) skillElem.value = skillPath;
+
+            // Render client snippets
+            renderOpencodeSnippet();
+            renderClaudeSnippet();
+            renderCursorSnippet();
+        }
+
+        function setOpencodeMode(mode) {
+            currentOpencodeMode = mode;
+            const btnRemote = document.getElementById('btn-opencode-remote');
+            const btnLocal = document.getElementById('btn-opencode-local');
+            if (btnRemote && btnLocal) {
+                if (mode === 'remote') {
+                    btnRemote.className = 'btn btn-primary';
+                    btnLocal.className = 'btn btn-outline-secondary';
+                } else {
+                    btnRemote.className = 'btn btn-outline-secondary';
+                    btnLocal.className = 'btn btn-primary';
+                }
+            }
+            renderOpencodeSnippet();
+        }
+
+        function renderOpencodeSnippet() {
+            if (!mcpConfigData) return;
+            const origin = window.location.origin;
+            const sseUrl = `${origin}/mcp/sse`;
+            const basicAuth = mcpConfigData.basic_auth_header || ('Basic ' + btoa((mcpConfigData.username || 'admin') + ':' + (mcpConfigData.password || '')));
+            const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
+            const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
+
+            let configObj = {};
+            if (currentOpencodeMode === 'remote') {
+                configObj = {
+                    "$schema": "https://opencode.ai/config.json",
+                    "mcp": {
+                        "servers": {
+                            "podsync": {
+                                "type": "remote",
+                                "url": sseUrl,
+                                "headers": {
+                                    "Authorization": basicAuth
+                                },
+                                "enabled": true
+                            }
+                        }
+                    }
+                };
+            } else {
+                configObj = {
+                    "$schema": "https://opencode.ai/config.json",
+                    "mcp": {
+                        "servers": {
+                            "podsync": {
+                                "type": "local",
+                                "command": [binPath, "--config", cfgPath, "--mcp"],
+                                "enabled": true
+                            }
+                        }
+                    }
+                };
+            }
+            const snippet = document.getElementById('opencode-snippet');
+            if (snippet) snippet.innerText = JSON.stringify(configObj, null, 2);
+        }
+
+        function renderClaudeSnippet() {
+            if (!mcpConfigData) return;
+            const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
+            const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
+            const claudeObj = {
+                "mcpServers": {
+                    "podsync": {
+                        "command": binPath,
+                        "args": [
+                            "--config",
+                            cfgPath,
+                            "--mcp"
+                        ]
+                    }
+                }
+            };
+            const snippet = document.getElementById('claude-snippet');
+            if (snippet) snippet.innerText = JSON.stringify(claudeObj, null, 2);
+        }
+
+        function renderCursorSnippet() {
+            if (!mcpConfigData) return;
+            const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
+            const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
+            const cursorObj = {
+                "name": "podsync",
+                "type": "command",
+                "command": `${binPath} --config ${cfgPath} --mcp`
+            };
+            const snippet = document.getElementById('cursor-snippet');
+            if (snippet) snippet.innerText = JSON.stringify(cursorObj, null, 2);
+        }
+
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+            } else {
+                input.type = 'password';
+                btn.innerHTML = '<i class="bi bi-eye"></i>';
+            }
+        }
+
+        function copyInput(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            navigator.clipboard.writeText(input.value).then(() => {
+                showCopyFeedback(btn);
+            });
+        }
+
+        function copyPre(preId, btn) {
+            const pre = document.getElementById(preId);
+            if (!pre) return;
+            navigator.clipboard.writeText(pre.innerText).then(() => {
+                showCopyFeedback(btn);
+            });
+        }
+
+        function showCopyFeedback(btn) {
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2 text-success"></i> Copied!';
+            setTimeout(() => {
+                btn.innerHTML = origHTML;
+            }, 1500);
+        }
+
     </script>
 </body>
 </html>

@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -264,4 +265,39 @@ func TestMCPHandlerRouting(t *testing.T) {
 	srv.Handler.ServeHTTP(recAuth, reqAuth)
 	assert.Equal(t, http.StatusOK, recAuth.Code)
 	assert.Contains(t, recAuth.Body.String(), "mcp-ok")
+}
+
+
+func TestMCPConfigEndpoint(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:    true,
+			Username:   "mycustomadmin",
+			Password:   "mysecretpass123",
+			ConfigPath: "/custom/path/config.toml",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+
+	// Unauthenticated request should return 401
+	reqUnauth := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/config", nil)
+	recUnauth := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(recUnauth, reqUnauth)
+	assert.Equal(t, http.StatusUnauthorized, recUnauth.Code)
+
+	// Authenticated request should return 200 with credentials
+	reqAuth := httptest.NewRequest(http.MethodGet, "/api/v1/mcp/config", nil)
+	reqAuth.SetBasicAuth("mycustomadmin", "mysecretpass123")
+	recAuth := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(recAuth, reqAuth)
+	assert.Equal(t, http.StatusOK, recAuth.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(recAuth.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, "mycustomadmin", resp["username"])
+	assert.Equal(t, "mysecretpass123", resp["password"])
+	assert.Contains(t, resp["basic_auth_header"], "Basic ")
+	assert.Contains(t, resp["config_path"], "config.toml")
 }

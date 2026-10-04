@@ -307,6 +307,7 @@ func main() {
 	}
 
 	// Run web server
+	cfg.Server.Admin.ConfigPath = opts.ConfigPath
 	srv := web.New(cfg.Server, storage, database)
 
 	feedManager := NewAppFeedManager(

@@ -93,8 +93,8 @@ vkvideo = "YOUR_VK_TOKEN"   # Or set via PODSYNC_VKVIDEO_API_KEY
 youtube = "YOUR_YOUTUBE_KEY" # Or set via PODSYNC_YOUTUBE_API_KEY
 
 [feeds]
-  [feeds.CLANBEAVER]
-  url = "https://vkvideo.ru/@clanbeaver"
+  [feeds.LABELCOM]
+  url = "https://vkvideo.ru/@labelcom"
   page_size = 10
   quality = "high"
   format = "video"

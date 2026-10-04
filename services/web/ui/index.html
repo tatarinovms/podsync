@@ -234,6 +234,47 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         }
 
+        /* Nav Pills (Client Selector Tabs: OpenCode v2, Claude Desktop, Cursor) */
+        .nav-pills {
+            background-color: var(--ctp-crust) !important;
+            border: 1px solid var(--card-border) !important;
+            border-radius: 8px !important;
+            padding: 0.25rem !important;
+            gap: 0.25rem !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+
+        .nav-pills .nav-link {
+            color: var(--ctp-subtext0) !important;
+            font-weight: 600 !important;
+            border: 1px solid transparent !important;
+            background: transparent !important;
+            border-radius: 6px !important;
+            padding: 0.35rem 0.85rem !important;
+            transition: all 0.15s ease-in-out !important;
+        }
+
+        .nav-pills .nav-link:hover {
+            color: var(--ctp-text) !important;
+            background-color: var(--tab-hover-bg) !important;
+        }
+
+        .nav-pills .nav-link.active {
+            background-color: var(--tab-active-bg) !important;
+            color: var(--tab-active-text) !important;
+            border: 1px solid var(--ctp-surface2) !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        }
+
+        /* Bootstrap Text Utilities mapped strictly to Catppuccin */
+        .text-primary { color: var(--ctp-mauve) !important; }
+        .text-info { color: var(--ctp-blue) !important; }
+        .text-success { color: var(--ctp-green) !important; }
+        .text-warning { color: var(--ctp-peach) !important; }
+        .text-danger { color: var(--ctp-red) !important; }
+        .text-muted, .text-secondary { color: var(--ctp-subtext0) !important; }
+
         /* 2. Buttons: Primary (Mauve), Secondary (Ghost/Surface2), Danger (Red) */
         .btn-primary, .btn-brand {
             background-color: var(--btn-primary-bg) !important;

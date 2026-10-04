@@ -292,7 +292,7 @@
             color: var(--btn-primary-text) !important;
         }
 
-        .btn-secondary, .btn-outline-secondary, .btn-light, .btn-mcp-copy, .deep-link-btn {
+        .btn-secondary, .btn-outline-secondary, .btn-light, .btn-mcp-copy {
             background-color: transparent !important;
             border: 1px solid var(--btn-secondary-border) !important;
             color: var(--ctp-text) !important;
@@ -300,11 +300,45 @@
             border-radius: 8px;
             transition: all 0.15s ease-in-out;
         }
-        .btn-secondary:hover, .btn-outline-secondary:hover, .btn-light:hover, .btn-mcp-copy:hover, .deep-link-btn:hover,
-        .btn-secondary:focus, .btn-outline-secondary:focus, .btn-light:focus, .btn-mcp-copy:focus, .deep-link-btn:focus {
+        .btn-secondary:hover, .btn-outline-secondary:hover, .btn-light:hover, .btn-mcp-copy:hover,
+        .btn-secondary:focus, .btn-outline-secondary:focus, .btn-light:focus, .btn-mcp-copy:focus {
             background-color: var(--btn-secondary-hover-bg) !important;
             border-color: var(--btn-secondary-border) !important;
             color: var(--ctp-text) !important;
+        }
+
+        /* Deep Link Buttons (Apple, Pocket Casts, Overcast, XML) */
+        .deep-link-btn {
+            font-size: 0.78rem !important;
+            padding: 0.25rem 0.55rem !important;
+            border-radius: 6px !important;
+            text-decoration: none !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0.35rem !important;
+            white-space: nowrap !important;
+            line-height: 1.25 !important;
+            font-weight: 500 !important;
+            background-color: transparent !important;
+            border: 1px solid var(--btn-secondary-border) !important;
+            color: var(--ctp-text) !important;
+            transition: all 0.15s ease-in-out !important;
+        }
+        .deep-link-btn i {
+            font-size: 0.9rem !important;
+            line-height: 1 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            vertical-align: middle !important;
+        }
+        .deep-link-btn:hover, .deep-link-btn:focus {
+            background-color: var(--btn-secondary-hover-bg) !important;
+            border-color: var(--btn-secondary-border) !important;
+            color: var(--ctp-text) !important;
+            text-decoration: none !important;
         }
 
         .btn-danger, .btn-outline-danger {
@@ -1505,16 +1539,16 @@
 
                                 <!-- Deep Links for Podcast Apps -->
                                 <div class="d-flex flex-wrap gap-1 mb-3">
-                                    <a href="${feed.apple_url}" class="deep-link-btn btn-outline-secondary border">
+                                    <a href="${feed.apple_url}" class="deep-link-btn border">
                                         <i class="bi bi-apple"></i> Apple
                                     </a>
-                                    <a href="${feed.pocketcasts_url}" class="deep-link-btn btn-outline-secondary border">
+                                    <a href="${feed.pocketcasts_url}" class="deep-link-btn border">
                                         <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
                                     </a>
-                                    <a href="${feed.overcast_url}" class="deep-link-btn btn-outline-secondary border">
+                                    <a href="${feed.overcast_url}" class="deep-link-btn border">
                                         <i class="bi bi-soundwave text-warning"></i> Overcast
                                     </a>
-                                    <a href="${feed.feed_url}" target="_blank" class="deep-link-btn btn-outline-secondary border">
+                                    <a href="${feed.feed_url}" target="_blank" class="deep-link-btn border">
                                         <i class="bi bi-box-arrow-up-right"></i> XML
                                     </a>
                                 </div>

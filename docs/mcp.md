@@ -18,6 +18,9 @@ The MCP server exposes:
 - **`get_system_stats`**: Retrieve live system health, RAM usage, disk usage (`data_dir`), and availability of `yt-dlp` and `ffmpeg`.
 - **`get_tokens`**: View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch.
 - **`update_tokens`**: Update API tokens (supports multiple tokens for automatic round-robin rotation).
+- **`get_downloader_config`**: Get yt-dlp downloader configuration, cookies status, and proxy settings.
+- **`update_downloader_config`**: Update yt-dlp downloader options such as timeout, proxy, or cookies_from_browser.
+- **`test_downloader`**: Test yt-dlp downloader against a video URL to verify cookies and connectivity.
 
 ### Resources
 - **`podsync://feeds`**: Live JSON snapshot of all podcast feeds.

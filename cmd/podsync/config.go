@@ -253,6 +253,20 @@ func (c *Config) applyEnv() {
 		}
 	}
 
+	// Downloader environment variables
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_COOKIES_FILE"); ok {
+		c.Downloader.CookiesFile = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_COOKIES_FROM_BROWSER"); ok {
+		c.Downloader.CookiesFromBrowser = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY"); ok {
+		c.Downloader.Proxy = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_CUSTOM_BINARY"); ok {
+		c.Downloader.CustomBinary = val
+	}
+
 	// Admin panel environment variables
 	if val, ok := os.LookupEnv("PODSYNC_ADMIN_ENABLED"); ok {
 		c.Server.Admin.Enabled = val == "true" || val == "1"

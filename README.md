@@ -126,6 +126,10 @@ Podsync supports the following environment variables for configuration and API k
 | `PODSYNC_VIMEO_API_KEY`      | Vimeo API key(s), space-separated for rotation                                            | `key1` or `key1 key2`                         |
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation                                       | `soundcloud_key1 soundcloud_key2`             |
 | `PODSYNC_TWITCH_API_KEY`     | Twitch API credentials in the format `CLIENT_ID:CLIENT_SECRET`, space-separated for multi | `id1:secret1 id2:secret2`                     |
+| `PODSYNC_DOWNLOADER_COOKIES_FILE` | Path to Netscape cookies.txt file for yt-dlp (bypasses YouTube bot checks)          | `/app/data/cookies.txt`                       |
+| `PODSYNC_DOWNLOADER_COOKIES_FROM_BROWSER` | Browser name to extract cookies from (e.g. chrome, firefox, safari, brave)       | `chrome` or `firefox:Default`                 |
+| `PODSYNC_DOWNLOADER_PROXY`        | HTTP/HTTPS/SOCKS5 proxy URL for yt-dlp downloader traffic                               | `socks5://127.0.0.1:1080`                     |
+| `PODSYNC_DOWNLOADER_CUSTOM_BINARY` | Custom binary path for yt-dlp / youtube-dl                                             | `/usr/local/bin/yt-dlp`                       |
 
 ## Web Admin Console & REST API
 
@@ -150,6 +154,12 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/tokens` | Get masked API tokens for all providers |
 | `POST` | `/api/v1/tokens` | Update API tokens (supports key rotation) |
 | `GET` | `/api/v1/system` | System metrics (RAM, uptime, disk space, yt-dlp/ffmpeg status) |
+| `GET` | `/api/v1/downloader` | Get yt-dlp downloader settings, cookie status, and proxy |
+| `POST` | `/api/v1/downloader` | Update downloader settings (timeout, proxy, browser, self-update) |
+| `GET` | `/api/v1/downloader/cookies` | Get Netscape cookies.txt content |
+| `POST` | `/api/v1/downloader/cookies` | Save or upload new Netscape cookies.txt content |
+| `DELETE` | `/api/v1/downloader/cookies` | Clear and delete installed cookies.txt file |
+| `POST` | `/api/v1/downloader/test` | Test URL extraction with yt-dlp and configured cookies/proxy |
 
 ## Model Context Protocol (MCP) Server
 

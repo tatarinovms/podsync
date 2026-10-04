@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -300,4 +302,117 @@ func TestMCPConfigEndpoint(t *testing.T) {
 	assert.Equal(t, "mysecretpass123", resp["password"])
 	assert.Contains(t, resp["basic_auth_header"], "Basic ")
 	assert.Contains(t, resp["config_path"], "config.toml")
+}
+
+
+type mockDownloaderAdminMgr struct {
+	dlCfg        DownloaderConfigInfo
+	cookies      string
+	testResponse TestDownloaderResult
+}
+
+func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) { return nil, nil }
+func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error) { return nil, nil, nil }
+func (m *mockDownloaderAdminMgr) AddFeed(ctx context.Context, cfg *feed.Config) error { return nil }
+func (m *mockDownloaderAdminMgr) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error { return nil }
+func (m *mockDownloaderAdminMgr) TriggerUpdate(ctx context.Context, id string) error { return nil }
+func (m *mockDownloaderAdminMgr) RetryEpisode(ctx context.Context, feedID, episodeID string) error { return nil }
+func (m *mockDownloaderAdminMgr) GetTokens(ctx context.Context) []TokenInfo { return nil }
+func (m *mockDownloaderAdminMgr) UpdateTokens(ctx context.Context, provider string, tokens []string) error { return nil }
+func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemStats, error) { return nil, nil }
+
+func (m *mockDownloaderAdminMgr) GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error) {
+	return &m.dlCfg, nil
+}
+
+func (m *mockDownloaderAdminMgr) UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error {
+	if cfg.Timeout != nil {
+		m.dlCfg.Timeout = *cfg.Timeout
+	}
+	if cfg.Proxy != nil {
+		m.dlCfg.Proxy = *cfg.Proxy
+	}
+	return nil
+}
+
+func (m *mockDownloaderAdminMgr) GetCookiesContent(ctx context.Context) (string, error) {
+	return m.cookies, nil
+}
+
+func (m *mockDownloaderAdminMgr) UpdateCookiesContent(ctx context.Context, content string) error {
+	m.cookies = content
+	return nil
+}
+
+func (m *mockDownloaderAdminMgr) TestDownloader(ctx context.Context, testURL string) (*TestDownloaderResult, error) {
+	return &m.testResponse, nil
+}
+
+func TestDownloaderEndpoints(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{
+		dlCfg: DownloaderConfigInfo{
+			Timeout: 15,
+			Proxy:   "http://proxy:8080",
+		},
+		cookies: "# Netscape HTTP Cookie File",
+		testResponse: TestDownloaderResult{
+			Success: true,
+			Title:   "Sample Video",
+			Channel: "Sample Channel",
+		},
+	}
+	srv.SetAdminManager(mgr)
+
+	// 1. GET /api/v1/downloader
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/downloader", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "http://proxy:8080")
+
+	// 2. POST /api/v1/downloader
+	updateJSON := `{"timeout": 25, "proxy": "http://newproxy:8080"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader", strings.NewReader(updateJSON))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 25, mgr.dlCfg.Timeout)
+	assert.Equal(t, "http://newproxy:8080", mgr.dlCfg.Proxy)
+
+	// 3. GET /api/v1/downloader/cookies
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/downloader/cookies", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Netscape HTTP Cookie File")
+
+	// 4. POST /api/v1/downloader/cookies
+	cookiesJSON := `{"content": "# Updated cookies"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader/cookies", strings.NewReader(cookiesJSON))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "# Updated cookies", mgr.cookies)
+
+	// 5. POST /api/v1/downloader/test
+	testJSON := `{"url": "https://youtube.com/watch?v=123"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader/test", strings.NewReader(testJSON))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Sample Video")
 }

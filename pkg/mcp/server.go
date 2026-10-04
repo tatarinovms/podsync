@@ -309,6 +309,48 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "get_downloader_config",
+			Description: "Get yt-dlp downloader configuration, cookies status, and proxy settings",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "update_downloader_config",
+			Description: "Update yt-dlp downloader options such as timeout, proxy, or cookies_from_browser",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"timeout": {
+						Type:        "integer",
+						Description: "Download timeout in minutes",
+					},
+					"proxy": {
+						Type:        "string",
+						Description: "Proxy URL (e.g. http://proxy:8080 or socks5://127.0.0.1:1080)",
+					},
+					"cookies_from_browser": {
+						Type:        "string",
+						Description: "Browser to extract cookies from (e.g. chrome, firefox, safari, brave)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "test_downloader",
+			Description: "Test yt-dlp downloader against a video URL to verify cookies and connectivity",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"url": {
+						Type:        "string",
+						Description: "URL to test (optional, defaults to YouTube sample video)",
+					},
+				},
+			},
+		},
+		{
 			Name:        "update_tokens",
 			Description: "Update API tokens for a provider. Supports multiple tokens for automatic round-robin rotation",
 			InputSchema: InputSchema{

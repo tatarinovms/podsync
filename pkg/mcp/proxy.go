@@ -153,3 +153,44 @@ func (c *HTTPClientManager) GetSystemStats(ctx context.Context) (*web.SystemStat
 	}
 	return &result, nil
 }
+
+
+func (c *HTTPClientManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
+	var result web.DownloaderConfigInfo
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/downloader", nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClientManager) UpdateDownloaderConfig(ctx context.Context, cfg *web.DownloaderConfigUpdate) error {
+	return c.doRequest(ctx, http.MethodPost, "/api/v1/downloader", cfg, nil)
+}
+
+func (c *HTTPClientManager) GetCookiesContent(ctx context.Context) (string, error) {
+	var result web.CookiesPayload
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/downloader/cookies", nil, &result)
+	if err != nil {
+		return "", err
+	}
+	return result.Content, nil
+}
+
+func (c *HTTPClientManager) UpdateCookiesContent(ctx context.Context, content string) error {
+	payload := web.CookiesPayload{Content: content}
+	if content == "" {
+		return c.doRequest(ctx, http.MethodDelete, "/api/v1/downloader/cookies", nil, nil)
+	}
+	return c.doRequest(ctx, http.MethodPost, "/api/v1/downloader/cookies", payload, nil)
+}
+
+func (c *HTTPClientManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {
+	payload := map[string]string{"url": testURL}
+	var result web.TestDownloaderResult
+	err := c.doRequest(ctx, http.MethodPost, "/api/v1/downloader/test", payload, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

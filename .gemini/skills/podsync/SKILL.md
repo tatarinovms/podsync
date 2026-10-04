@@ -80,6 +80,23 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
   - `tokens` *(array of strings, required)*: List of API keys.
 
+### 10. `get_downloader_config`
+- **Purpose**: Retrieves yt-dlp binary path, version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).
+- **Arguments**: None `{}`.
+- **When to use**: Diagnosing YouTube download failures such as bot verification blocks or rate limits.
+
+### 11. `update_downloader_config`
+- **Purpose**: Updates yt-dlp downloader configuration (download timeout, proxy URL, or browser cookie extraction).
+- **Arguments**:
+  - `timeout` *(integer, optional)*: Timeout in minutes.
+  - `proxy` *(string, optional)*: Proxy URL (e.g. `socks5://127.0.0.1:1080` or `http://proxy:8080`).
+  - `cookies_from_browser` *(string, optional)*: Browser name to extract session cookies from (e.g. `chrome`, `firefox`).
+
+### 12. `test_downloader`
+- **Purpose**: Tests yt-dlp connectivity and cookie verification against a video URL without downloading the file.
+- **Arguments**:
+  - `url` *(string, optional)*: Video URL to test (defaults to YouTube sample video).
+
 ---
 
 ## MCP Resources

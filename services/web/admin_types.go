@@ -66,6 +66,46 @@ type TokenInfo struct {
 	FromEnv  bool     `json:"from_env"`
 }
 
+// DownloaderConfigInfo contains current yt-dlp / downloader settings and cookie status
+type DownloaderConfigInfo struct {
+	Timeout            int    `json:"timeout"`
+	SelfUpdate         bool   `json:"self_update"`
+	CustomBinary       string `json:"custom_binary"`
+	CookiesFile        string `json:"cookies_file"`
+	CookiesFromBrowser string `json:"cookies_from_browser"`
+	Proxy              string `json:"proxy"`
+	HasCookiesFile     bool   `json:"has_cookies_file"`
+	CookiesFileSize    int64  `json:"cookies_file_size"`
+	CookiesFileLines   int    `json:"cookies_file_lines"`
+	CookiesLastMod     string `json:"cookies_last_modified"`
+	BinaryPath         string `json:"binary_path"`
+	BinaryVersion      string `json:"binary_version"`
+}
+
+// DownloaderConfigUpdate contains fields to update downloader settings
+type DownloaderConfigUpdate struct {
+	Timeout            *int    `json:"timeout"`
+	SelfUpdate         *bool   `json:"self_update"`
+	CustomBinary       *string `json:"custom_binary"`
+	CookiesFile        *string `json:"cookies_file"`
+	CookiesFromBrowser *string `json:"cookies_from_browser"`
+	Proxy              *string `json:"proxy"`
+}
+
+// CookiesPayload holds cookies file content
+type CookiesPayload struct {
+	Content string `json:"content"`
+}
+
+// TestDownloaderResult holds the test execution outcome
+type TestDownloaderResult struct {
+	Success bool   `json:"success"`
+	Title   string `json:"title,omitempty"`
+	Channel string `json:"channel,omitempty"`
+	Output  string `json:"output,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
@@ -77,4 +117,9 @@ type AdminManager interface {
 	GetTokens(ctx context.Context) []TokenInfo
 	UpdateTokens(ctx context.Context, provider string, tokens []string) error
 	GetSystemStats(ctx context.Context) (*SystemStats, error)
+	GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error)
+	UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error
+	GetCookiesContent(ctx context.Context) (string, error)
+	UpdateCookiesContent(ctx context.Context, content string) error
+	TestDownloader(ctx context.Context, testURL string) (*TestDownloaderResult, error)
 }

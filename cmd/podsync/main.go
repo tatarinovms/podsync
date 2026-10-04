@@ -315,6 +315,7 @@ func main() {
 		cfg,
 		cfg.Feeds,
 		cfg.Tokens,
+		downloader,
 		c,
 		m,
 		updates,

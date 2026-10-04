@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -23,6 +24,7 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
 )
@@ -33,6 +35,7 @@ type AppFeedManager struct {
 	cfg         *Config
 	feeds       map[string]*feed.Config
 	tokens      map[model.Provider]StringSlice
+	downloader  *ytdl.YoutubeDl
 	cron        *cron.Cron
 	cronEntries map[string]cron.EntryID
 	updates     chan *feed.Config
@@ -50,6 +53,7 @@ func NewAppFeedManager(
 	cfg *Config,
 	feeds map[string]*feed.Config,
 	tokens map[model.Provider]StringSlice,
+	downloader *ytdl.YoutubeDl,
 	c *cron.Cron,
 	cronEntries map[string]cron.EntryID,
 	updates chan *feed.Config,
@@ -63,6 +67,7 @@ func NewAppFeedManager(
 		cfg:         cfg,
 		feeds:       feeds,
 		tokens:      tokens,
+		downloader:  downloader,
 		cron:        c,
 		cronEntries: cronEntries,
 		updates:     updates,
@@ -490,5 +495,245 @@ func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
 	defer file.Close()
 
 	_, err = tree.WriteTo(file)
+	return err
+}
+
+
+func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var dlCfg ytdl.Config
+	var binPath, binVer string
+
+	if m.downloader != nil {
+		dlCfg = m.downloader.GetConfig()
+		binPath = m.downloader.GetBinaryPath()
+		if ver, err := m.downloader.GetVersion(ctx); err == nil {
+			binVer = strings.TrimSpace(ver)
+		}
+	} else {
+		dlCfg = m.cfg.Downloader
+	}
+
+	cookiesPath := dlCfg.CookiesFile
+	if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
+		defaultPath := filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+		if _, err := os.Stat(defaultPath); err == nil {
+			cookiesPath = defaultPath
+		}
+	}
+
+	hasCookies := false
+	var cookiesSize int64
+	var cookiesLines int
+	var cookiesMod string
+
+	if cookiesPath != "" {
+		if fi, err := os.Stat(cookiesPath); err == nil {
+			hasCookies = true
+			cookiesSize = fi.Size()
+			cookiesMod = fi.ModTime().Format("2006-01-02 15:04:05")
+			if data, err := os.ReadFile(cookiesPath); err == nil {
+				cookiesLines = len(strings.Split(string(data), "\n"))
+			}
+		}
+	}
+
+	return &web.DownloaderConfigInfo{
+		Timeout:            dlCfg.Timeout,
+		SelfUpdate:         dlCfg.SelfUpdate,
+		CustomBinary:       dlCfg.CustomBinary,
+		CookiesFile:        dlCfg.CookiesFile,
+		CookiesFromBrowser: dlCfg.CookiesFromBrowser,
+		Proxy:              dlCfg.Proxy,
+		HasCookiesFile:     hasCookies,
+		CookiesFileSize:    cookiesSize,
+		CookiesFileLines:   cookiesLines,
+		CookiesLastMod:     cookiesMod,
+		BinaryPath:         binPath,
+		BinaryVersion:      binVer,
+	}, nil
+}
+
+func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web.DownloaderConfigUpdate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if update.Timeout != nil && *update.Timeout > 0 {
+		m.cfg.Downloader.Timeout = *update.Timeout
+	}
+	if update.SelfUpdate != nil {
+		m.cfg.Downloader.SelfUpdate = *update.SelfUpdate
+	}
+	if update.CustomBinary != nil {
+		m.cfg.Downloader.CustomBinary = *update.CustomBinary
+	}
+	if update.CookiesFile != nil {
+		m.cfg.Downloader.CookiesFile = *update.CookiesFile
+	}
+	if update.CookiesFromBrowser != nil {
+		m.cfg.Downloader.CookiesFromBrowser = *update.CookiesFromBrowser
+	}
+	if update.Proxy != nil {
+		m.cfg.Downloader.Proxy = *update.Proxy
+	}
+
+	if m.downloader != nil {
+		m.downloader.UpdateConfig(m.cfg.Downloader)
+	}
+
+	return m.saveDownloaderToConfig(&m.cfg.Downloader)
+}
+
+func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	cookiesPath := m.cfg.Downloader.CookiesFile
+	if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
+		cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+	}
+
+	if cookiesPath == "" {
+		return "", nil
+	}
+
+	data, err := os.ReadFile(cookiesPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return string(data), nil
+}
+
+func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	cookiesPath := m.cfg.Downloader.CookiesFile
+	if cookiesPath == "" {
+		if m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
+			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+		} else {
+			cookiesPath = "cookies.txt"
+		}
+	}
+
+	content = strings.TrimSpace(content)
+	if content == "" {
+		// Remove cookies file
+		_ = os.Remove(cookiesPath)
+		m.cfg.Downloader.CookiesFile = ""
+		if m.downloader != nil {
+			m.downloader.SetCookiesFile("")
+		}
+		return m.saveDownloaderToConfig(&m.cfg.Downloader)
+	}
+
+	// Ensure parent directory exists
+	dir := filepath.Dir(cookiesPath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return errors.Wrap(err, "failed to create cookies directory")
+		}
+	}
+
+	if err := os.WriteFile(cookiesPath, []byte(content+"\n"), 0600); err != nil {
+		return errors.Wrap(err, "failed to save cookies file")
+	}
+
+	m.cfg.Downloader.CookiesFile = cookiesPath
+	if m.downloader != nil {
+		m.downloader.SetCookiesFile(cookiesPath)
+	}
+
+	return m.saveDownloaderToConfig(&m.cfg.Downloader)
+}
+
+func (m *AppFeedManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {
+	if m.downloader == nil {
+		return nil, errors.New("downloader not initialized")
+	}
+
+	out, err := m.downloader.TestURL(ctx, testURL)
+	if err != nil {
+		cleanErr := out
+		if cleanErr == "" {
+			cleanErr = err.Error()
+		}
+		return &web.TestDownloaderResult{
+			Success: false,
+			Error:   cleanErr,
+			Output:  out,
+		}, nil
+	}
+
+	// Try parsing JSON metadata
+	var meta struct {
+		Title    string `json:"title"`
+		Uploader string `json:"uploader"`
+		Channel  string `json:"channel"`
+	}
+	_ = json.Unmarshal([]byte(out), &meta)
+
+	channel := meta.Channel
+	if channel == "" {
+		channel = meta.Uploader
+	}
+
+	return &web.TestDownloaderResult{
+		Success: true,
+		Title:   meta.Title,
+		Channel: channel,
+		Output:  out,
+	}, nil
+}
+
+func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
+	if m.configPath == "" {
+		return nil
+	}
+
+	tree, err := toml.LoadFile(m.configPath)
+	if err != nil {
+		return err
+	}
+
+	if cfg.Timeout > 0 {
+		tree.Set("downloader.timeout", int64(cfg.Timeout))
+	}
+	tree.Set("downloader.self_update", cfg.SelfUpdate)
+	if cfg.CustomBinary != "" {
+		tree.Set("downloader.custom_binary", cfg.CustomBinary)
+	} else {
+		tree.Delete("downloader.custom_binary")
+	}
+	if cfg.CookiesFile != "" {
+		tree.Set("downloader.cookies_file", cfg.CookiesFile)
+	} else {
+		tree.Delete("downloader.cookies_file")
+	}
+	if cfg.CookiesFromBrowser != "" {
+		tree.Set("downloader.cookies_from_browser", cfg.CookiesFromBrowser)
+	} else {
+		tree.Delete("downloader.cookies_from_browser")
+	}
+	if cfg.Proxy != "" {
+		tree.Set("downloader.proxy", cfg.Proxy)
+	} else {
+		tree.Delete("downloader.proxy")
+	}
+
+	f, err := os.Create(m.configPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = tree.WriteTo(f)
 	return err
 }

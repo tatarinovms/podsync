@@ -124,6 +124,15 @@ Log in using the configured username and password.
   - **Server Uptime**: How long the Podsync daemon has been running.
   - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
 
+### 6. Downloader & Cookies Configuration (yt-dlp)
+- The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
+  - **Bypassing Bot Verification**: Overcomes the `Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication` error.
+  - **Netscape Cookies (`cookies.txt`)**: Paste or upload exported browser cookies directly into the web UI. Stored automatically in `data/cookies.txt`.
+  - **Cookies from Browser**: On local desktop installations, select your installed browser (Chrome, Firefox, Safari, Brave, Edge) to automatically extract session cookies.
+  - **HTTP/SOCKS5 Proxy**: Configure custom proxy routing (`--proxy`) for yt-dlp traffic.
+  - **Engine Options**: Configure download timeouts and 24h automatic self-update.
+  - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
+
 ---
 
 ## REST API Endpoints
@@ -146,3 +155,9 @@ All endpoints require authentication (Session Cookie or HTTP Basic Auth).
 | `/api/v1/tokens` | `GET` | Get masked tokens for all providers |
 | `/api/v1/tokens` | `POST` | Update tokens for a provider |
 | `/api/v1/system` | `GET` | Get system metrics, disk usage, and dependencies |
+| `/api/v1/downloader` | `GET` | Get yt-dlp downloader configuration, cookies status, and proxy |
+| `/api/v1/downloader` | `POST` | Update downloader settings (timeout, proxy, browser, self-update) |
+| `/api/v1/downloader/cookies` | `GET` | Get Netscape cookies.txt content |
+| `/api/v1/downloader/cookies` | `POST` | Save or upload new Netscape cookies.txt content |
+| `/api/v1/downloader/cookies` | `DELETE` | Clear and delete installed cookies.txt file |
+| `/api/v1/downloader/test` | `POST` | Test URL extraction with yt-dlp and configured cookies/proxy |

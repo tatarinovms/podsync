@@ -129,3 +129,24 @@ func TestBuildArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildArgsWithCookiesAndProxy(t *testing.T) {
+	dl := &YoutubeDl{
+		cookiesFromBrowser: "chrome",
+		proxy:              "http://proxy:8080",
+	}
+
+	feedCfg := &feed.Config{
+		Format:  model.FormatAudio,
+		Quality: model.QualityHigh,
+	}
+	ep := &model.Episode{
+		VideoURL: "https://youtube.com/watch?v=123",
+	}
+
+	args := dl.buildArgs(feedCfg, ep, "/tmp/out.mp3")
+	assert.Contains(t, args, "--cookies-from-browser")
+	assert.Contains(t, args, "chrome")
+	assert.Contains(t, args, "--proxy")
+	assert.Contains(t, args, "http://proxy:8080")
+}

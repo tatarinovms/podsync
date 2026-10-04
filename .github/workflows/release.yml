@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -47,7 +48,7 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest, ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
-      - name: 🚧️ Make release
+      - name: 🚧 Make release
         uses: goreleaser/goreleaser-action@v7
         if: startsWith(github.ref, 'refs/tags/')
         env:

@@ -567,6 +567,44 @@ no_index = true
 	})
 }
 
+func TestAdminOverrideConfig(t *testing.T) {
+	const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = false
+username = "admin"
+password = "password"
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`
+	path := setup(t, file)
+	defer os.Remove(path)
+
+	t.Run("no override retains config value", func(t *testing.T) {
+		cfg, err := LoadConfig(path)
+		assert.NoError(t, err)
+		assert.False(t, cfg.Server.Admin.Enabled)
+	})
+
+	t.Run("admin override true enables console", func(t *testing.T) {
+		override := true
+		cfg, err := LoadConfigWithOptions(path, &override)
+		assert.NoError(t, err)
+		assert.True(t, cfg.Server.Admin.Enabled)
+	})
+
+	t.Run("admin override false disables console", func(t *testing.T) {
+		override := false
+		cfg, err := LoadConfigWithOptions(path, &override)
+		assert.NoError(t, err)
+		assert.False(t, cfg.Server.Admin.Enabled)
+	})
+}
+
 func setup(t *testing.T, file string) string {
 	t.Helper()
 

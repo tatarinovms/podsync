@@ -57,6 +57,11 @@ type Log struct {
 
 // LoadConfig loads TOML configuration from a file path
 func LoadConfig(path string) (*Config, error) {
+	return LoadConfigWithOptions(path, nil)
+}
+
+// LoadConfigWithOptions loads TOML configuration from a file path with optional overrides
+func LoadConfigWithOptions(path string, adminOverride *bool) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read config file: %s", path)
@@ -73,6 +78,10 @@ func LoadConfig(path string) (*Config, error) {
 
 	config.applyDefaults(path)
 	config.applyEnv()
+
+	if adminOverride != nil {
+		config.Server.Admin.Enabled = *adminOverride
+	}
 
 	if err := config.validate(); err != nil {
 		return nil, errors.Wrap(err, "failed to validate config")

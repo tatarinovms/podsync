@@ -34,10 +34,11 @@ no_listing = false
 # Web Admin Console (available at /admin)
 # Allows viewing podcast feeds, generating direct podcast links, QR codes,
 # adding/removing channels, retrying failed downloads, managing API tokens, and monitoring system stats.
-# Can also be configured via environment variables:
-#   PODSYNC_ADMIN_ENABLED=true
-#   PODSYNC_ADMIN_USERNAME=admin
-#   PODSYNC_ADMIN_PASSWORD=secret
+# Can also be overridden at runtime via:
+#   CLI flags:             --admin / --no-admin
+#   Environment variables: PODSYNC_ADMIN_ENABLED=true/false
+#                          PODSYNC_ADMIN_USERNAME=admin
+#                          PODSYNC_ADMIN_PASSWORD=secret
 [server.admin]
 enabled = false
 username = "admin"

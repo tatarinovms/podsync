@@ -55,6 +55,21 @@ services:
       - ./db:/app/db
 ```
 
+### 3. Override via CLI Flags
+
+You can override the admin console setting at runtime using command-line flags:
+
+```bash
+# Force-enable admin console (/admin) regardless of config.toml / ENV:
+./bin/podsync --config config.toml --admin
+
+# Force-disable admin console (/admin) completely:
+./bin/podsync --config config.toml --no-admin
+```
+
+> [!NOTE]
+> CLI flags (`--admin` / `--no-admin`) have the highest priority and override both environment variables (`PODSYNC_ADMIN_ENABLED`) and `config.toml` (`[server.admin] enabled = ...`).
+
 ---
 
 ## Accessing the Console

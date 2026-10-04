@@ -148,6 +148,10 @@ Make sure you have created the file `config.toml`. Also note the location of the
 ```bash
 make
 ./bin/podsync --config config.toml
+
+# Optional CLI flags for admin console:
+# ./bin/podsync --config config.toml --admin     # Force enable web admin console (/admin)
+# ./bin/podsync --config config.toml --no-admin  # Force disable web admin console (/admin)
 ```
 
 ### One-time filename migration

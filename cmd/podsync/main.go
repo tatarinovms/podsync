@@ -30,6 +30,8 @@ type Opts struct {
 	Headless               bool   `long:"headless"`
 	MigrateFilenames       bool   `long:"migrate-filenames" description:"Migrate existing downloaded filenames to current filename_template and exit"`
 	MigrateFilenamesDryRun bool   `long:"migrate-filenames-dry-run" description:"Preview filename migration without writing changes (requires --migrate-filenames)"`
+	Admin                  bool   `long:"admin" description:"Force enable web admin console (/admin) regardless of configuration"`
+	NoAdmin                bool   `long:"no-admin" description:"Force disable web admin console (/admin) regardless of configuration"`
 	Debug                  bool   `long:"debug"`
 	NoBanner               bool   `long:"no-banner"`
 }
@@ -72,6 +74,9 @@ func main() {
 		log.WithError(err).Fatal("failed to parse command line arguments")
 	}
 
+	if opts.Admin && opts.NoAdmin {
+		log.Fatal("cannot specify both --admin and --no-admin")
+	}
 	if opts.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -90,9 +95,18 @@ func main() {
 		"arch":    arch,
 	}).Info("running podsync")
 
-	// Load TOML file
+	// Load TOML file with optional CLI admin overrides
+	var adminOverride *bool
+	if opts.Admin {
+		val := true
+		adminOverride = &val
+	} else if opts.NoAdmin {
+		val := false
+		adminOverride = &val
+	}
+
 	log.Debugf("loading configuration %q", opts.ConfigPath)
-	cfg, err := LoadConfig(opts.ConfigPath)
+	cfg, err := LoadConfigWithOptions(opts.ConfigPath, adminOverride)
 	if err != nil {
 		log.WithError(err).Fatal("failed to load configuration file")
 	}

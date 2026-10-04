@@ -14,11 +14,13 @@ any device in podcast client.
 
 This fork extends the original `mxpv/podsync` with:
 - **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use podcast RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), API key management, and system metrics (disk usage, memory, uptime, binary dependencies). See [Web Admin Guide](./docs/web_admin.md).
+- **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations.
+- **Model Context Protocol (MCP) Server**: Built-in MCP server for AI coding assistants (**OpenCode v2**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **VK Video support**: Convert VK Video channels, communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
-- **yt-dlp integration**: Native preference and support for `yt-dlp` for improved download speed and stability.
+- **yt-dlp integration**: Native preference and support for `yt-dlp` for improved download speed and stability, including Netscape cookies management to bypass bot verification.
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-time filename migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
-- **Extended environment variables**: `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`), `PODSYNC_ADMIN_ENABLED`, `PODSYNC_ADMIN_USERNAME`, `PODSYNC_ADMIN_PASSWORD`.
+- **Extended environment variables**: `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`), `PODSYNC_ADMIN_ENABLED`, `PODSYNC_ADMIN_USERNAME`, `PODSYNC_ADMIN_PASSWORD`, `PODSYNC_DOWNLOADER_COOKIES_FILE`, `PODSYNC_DOWNLOADER_COOKIES_FROM_BROWSER`, `PODSYNC_DOWNLOADER_PROXY`.
 
 ## Features
 
@@ -48,6 +50,7 @@ brew install yt-dlp ffmpeg go
 ## Documentation
 
 - [Web Admin Console Guide](./docs/web_admin.md)
+- [Model Context Protocol (MCP) Guide](./docs/mcp.md)
 - [How to get VK API token](./docs/how_to_get_vk_token.md)
 - [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
 - [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
@@ -90,8 +93,8 @@ vkvideo = "YOUR_VK_TOKEN"   # Or set via PODSYNC_VKVIDEO_API_KEY
 youtube = "YOUR_YOUTUBE_KEY" # Or set via PODSYNC_YOUTUBE_API_KEY
 
 [feeds]
-  [feeds.LABELCOM]
-  url = "https://vkvideo.ru/@labelcom"
+  [feeds.CLANBEAVER]
+  url = "https://vkvideo.ru/@clanbeaver"
   page_size = 10
   quality = "high"
   format = "video"
@@ -163,7 +166,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 
 ## Model Context Protocol (MCP) Server
 
-Podsync includes a built-in **MCP Server** that allows AI assistants (such as **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, and check system health.
+Podsync includes a built-in **MCP Server** that allows AI assistants (such as **OpenCode v2**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, and check system health. An agent skill definition is also provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md).
 
 See the [MCP Guide](./docs/mcp.md) for complete details and tool specifications.
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -153,21 +153,21 @@
             <div class="text-center mb-4">
                 <i class="bi bi-broadcast fs-1 text-primary"></i>
                 <h3 class="fw-bold mt-2 navbar-brand-gradient">Podsync Admin</h3>
-                <p class="text-muted small">Управление подкастами и API</p>
+                <p class="text-muted small">Podcast and API Management</p>
             </div>
             <div id="login-error" class="alert alert-danger d-none py-2 small" role="alert"></div>
             <form id="login-form">
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold">Имя пользователя</label>
+                    <label class="form-label small fw-semibold">Username</label>
                     <input type="text" id="login-username" class="form-control" required autocomplete="username" placeholder="admin">
                 </div>
                 <div class="mb-4">
-                    <label class="form-label small fw-semibold">Пароль</label>
+                    <label class="form-label small fw-semibold">Password</label>
                     <input type="password" id="login-password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
                 </div>
                 <button type="submit" id="login-btn" class="btn btn-brand w-100 py-2">
                     <span id="login-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
-                    Войти в консоль
+                    Sign in to Console
                 </button>
             </form>
         </div>
@@ -194,7 +194,7 @@
                             <span id="nav-username" class="fw-semibold">Admin</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                            <li><button class="dropdown-item text-danger" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Выйти</button></li>
+                            <li><button class="dropdown-item text-danger" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Sign out</button></li>
                         </ul>
                     </div>
                 </div>
@@ -206,17 +206,17 @@
             <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
                 <li class="nav-item">
                     <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-feeds">
-                        <i class="bi bi-collection-play me-1"></i> Подкасты (<span id="feeds-count">0</span>)
+                        <i class="bi bi-collection-play me-1"></i> Podcasts (<span id="feeds-count">0</span>)
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tokens">
-                        <i class="bi bi-key me-1"></i> API Ключи
+                        <i class="bi bi-key me-1"></i> API Keys
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system">
-                        <i class="bi bi-hdd-network me-1"></i> Система & Диск
+                        <i class="bi bi-hdd-network me-1"></i> System & Storage
                     </button>
                 </li>
             </ul>
@@ -230,12 +230,12 @@
                         <div class="d-flex gap-2 flex-grow-1" style="max-width: 450px;">
                             <div class="input-group">
                                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                                <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Поиск по названию или ID..." oninput="filterFeeds()">
+                                <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Search by title or ID..." oninput="filterFeeds()">
                             </div>
                         </div>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Обновить список</button>
-                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Добавить подкаст</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
+                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
                         </div>
                     </div>
 
@@ -243,7 +243,7 @@
                     <div id="feeds-container" class="row g-3">
                         <div class="col-12 text-center py-5 text-muted">
                             <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
-                            <div>Загрузка подкастов...</div>
+                            <div>Loading podcasts...</div>
                         </div>
                     </div>
                 </div>
@@ -253,9 +253,9 @@
                     <div class="row g-4">
                         <div class="col-12 col-xl-8">
                             <div class="card p-4">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2 text-primary"></i>Настройка API ключей</h5>
+                                <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2 text-primary"></i>API Keys Configuration</h5>
                                 <p class="text-muted small mb-4">
-                                    Ключи используются для запроса списка видео и альбомов. Если ключ задан через переменную окружения (ENV), он имеет наивысший приоритет.
+                                    API keys are used to query video and playlist metadata. If a key is defined via an environment variable (ENV), it takes the highest priority.
                                 </p>
                                 <div id="tokens-list" class="d-flex flex-column gap-3">
                                     <!-- Rendered dynamically -->
@@ -264,7 +264,7 @@
                         </div>
                         <div class="col-12 col-xl-4">
                             <div class="card p-4 bg-light">
-                                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Инструкции по получению</h6>
+                                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Instructions</h6>
                                 <ul class="list-unstyled small d-flex flex-column gap-3 mb-0">
                                     <li>
                                         <div class="d-flex align-items-center mb-1">
@@ -273,10 +273,10 @@
                                         <div class="ms-4 d-flex flex-column gap-1">
                                             <div>
                                                 <a href="https://vkhost.github.io" target="_blank" class="fw-bold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>vkhost.github.io</a>
-                                                <span class="text-muted">(рекомендуется &mdash; выберите Kate Mobile и нажмите «Разрешить»)</span>
+                                                <span class="text-muted">(recommended &mdash; select Kate Mobile and click "Allow")</span>
                                             </div>
                                             <div class="text-muted small">
-                                                или <a href="https://oauth.vk.ru/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.ru/blank.html&display=page&response_type=token&revoke=1" target="_blank">прямая ссылка OAuth</a>
+                                                or <a href="https://oauth.vk.ru/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.ru/blank.html&display=page&response_type=token&revoke=1" target="_blank">direct OAuth link</a>
                                             </div>
                                         </div>
                                     </li>
@@ -286,7 +286,7 @@
                                 </ul>
                                 <div class="mt-3 p-2 bg-white rounded border small text-muted">
                                     <i class="bi bi-info-circle text-primary me-1"></i>
-                                    <strong>Подсказка для VK:</strong> после перехода и авторизации откроется белая страница. Предупреждение <em>«Пожалуйста, не копируйте данные из адресной строки...»</em> &mdash; это <strong>не ошибка</strong>, а стандартное сообщение VK. Скопируйте токен прямо из адресной строки браузера (значение между <code>#access_token=</code> и <code>&expires_in</code>). Если прямая ссылка выдает ошибку шлюза/домена, используйте <strong>vkhost.github.io</strong>.
+                                    <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. Copy the token directly from your browser's address bar (value between <code>#access_token=</code> and <code>&expires_in</code>). If the direct link encounters gateway issues, use <strong>vkhost.github.io</strong>.
                                 </div>
                             </div>
                         </div>
@@ -298,36 +298,36 @@
                     <div class="row g-4">
                         <div class="col-12 col-md-6 col-xl-4">
                             <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Хранилище эпизодов</h6>
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Episode Storage</h6>
                                 <h3 id="disk-used-text" class="fw-bold mb-1">-</h3>
-                                <p class="text-muted small mb-3">из <span id="disk-total-text">-</span> свободно</p>
+                                <p class="text-muted small mb-3">free of <span id="disk-total-text">-</span></p>
                                 <div class="progress mb-2" style="height: 8px;">
                                     <div id="disk-progress" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
                                 </div>
                                 <div class="small text-muted d-flex justify-content-between">
-                                    <span>Каталог: <code id="sys-datadir">/app/data</code></span>
+                                    <span>Directory: <code id="sys-datadir">/app/data</code></span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="col-12 col-md-6 col-xl-4">
                             <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Статус сервиса</h6>
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Service Status</h6>
                                 <div class="d-flex flex-column gap-2">
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Время работы (Uptime):</span>
+                                        <span class="text-muted">Uptime:</span>
                                         <span id="sys-uptime" class="fw-semibold">-</span>
                                     </div>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Память (RAM):</span>
+                                        <span class="text-muted">Memory (RAM):</span>
                                         <span id="sys-ram" class="fw-semibold">-</span>
                                     </div>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Горутины:</span>
+                                        <span class="text-muted">Goroutines:</span>
                                         <span id="sys-goroutines" class="fw-semibold">-</span>
                                     </div>
                                     <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Тип хранилища:</span>
+                                        <span class="text-muted">Storage Type:</span>
                                         <span id="sys-storage" class="fw-semibold">-</span>
                                     </div>
                                 </div>
@@ -336,15 +336,15 @@
 
                         <div class="col-12 col-md-6 col-xl-4">
                             <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Зависимости и окружение</h6>
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Dependencies & Environment</h6>
                                 <div class="d-flex flex-column gap-3">
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>yt-dlp</span>
-                                        <span id="badge-ytdlp" class="badge bg-secondary">Проверка...</span>
+                                        <span id="badge-ytdlp" class="badge bg-secondary">Checking...</span>
                                     </div>
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>ffmpeg</span>
-                                        <span id="badge-ffmpeg" class="badge bg-secondary">Проверка...</span>
+                                        <span id="badge-ffmpeg" class="badge bg-secondary">Checking...</span>
                                     </div>
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>Podsync Version</span>
@@ -365,59 +365,59 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Добавить подкаст</h5>
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Podcast</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="add-feed-form">
                     <div class="modal-body">
                         <div id="add-feed-error" class="alert alert-danger d-none py-2 small"></div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">URL источника (VK Video / YouTube / Vimeo / etc)</label>
+                            <label class="form-label small fw-semibold">Source URL (VK Video / YouTube / Vimeo / etc)</label>
                             <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@labelcom" oninput="suggestFeedId(this.value)">
-                            <div class="form-text small">Поддерживаются каналы, сообщества, пользователи, плейлисты.</div>
+                            <div class="form-text small">Channels, communities, users, and playlists are supported.</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">ID фида (будет в адресе XML)</label>
+                            <label class="form-label small fw-semibold">Feed ID (used in XML URL)</label>
                             <input type="text" id="new-feed-id" class="form-control" required placeholder="LABELCOM">
-                            <div class="form-text small">Только латиница, цифры и знаки подчеркивания.</div>
+                            <div class="form-text small">Letters, digits, and underscores only.</div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small fw-semibold">Формат</label>
+                                <label class="form-label small fw-semibold">Format</label>
                                 <select id="new-feed-format" class="form-select">
-                                    <option value="video" selected>Видео</option>
-                                    <option value="audio">Аудио (MP3)</option>
+                                    <option value="video" selected>Video</option>
+                                    <option value="audio">Audio (MP3)</option>
                                 </select>
                             </div>
                             <div class="col-6">
-                                <label class="form-label small fw-semibold">Качество</label>
+                                <label class="form-label small fw-semibold">Quality</label>
                                 <select id="new-feed-quality" class="form-select">
-                                    <option value="high" selected>Высокое (High)</option>
-                                    <option value="low">Низкое (Low)</option>
+                                    <option value="high" selected>High</option>
+                                    <option value="low">Low</option>
                                 </select>
                             </div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label small fw-semibold">Кол-во эпизодов (Page size)</label>
+                                <label class="form-label small fw-semibold">Page Size (episodes per query)</label>
                                 <input type="number" id="new-feed-pagesize" class="form-control" value="20" min="1" max="100">
                             </div>
                             <div class="col-6">
-                                <label class="form-label small fw-semibold">Хранить последних (Clean)</label>
-                                <input type="number" id="new-feed-keeplast" class="form-control" value="0" min="0" placeholder="0 = без лимита">
+                                <label class="form-label small fw-semibold">Keep Last Episodes (Clean)</label>
+                                <input type="number" id="new-feed-keeplast" class="form-control" value="0" min="0" placeholder="0 = keep all">
                             </div>
                         </div>
                         <div class="mb-2">
-                            <label class="form-label small fw-semibold">Фильтр по названию (необязательно)</label>
-                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm mb-1" placeholder="Включать только содержащие...">
-                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm" placeholder="Исключать содержащие (например: Shorts)...">
+                            <label class="form-label small fw-semibold">Title Filter (optional)</label>
+                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm mb-1" placeholder="Include only titles containing...">
+                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm" placeholder="Exclude titles containing (e.g. Shorts)...">
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
                             <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
-                            Создать и запустить
+                            Create & Start
                         </button>
                     </div>
                 </form>
@@ -429,13 +429,13 @@
     <div class="modal fade" id="qrModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content text-center p-4">
-                <h5 class="fw-bold mb-1" id="qr-feed-title">Подкаст</h5>
-                <p class="text-muted small mb-3">Наведите камеру смартфона, чтобы открыть в плеере</p>
+                <h5 class="fw-bold mb-1" id="qr-feed-title">Podcast</h5>
+                <p class="text-muted small mb-3">Scan with your smartphone camera to open in podcast app</p>
                 <div class="d-flex justify-content-center mb-3">
                     <canvas id="qr-canvas"></canvas>
                 </div>
                 <div class="rss-box text-break small mb-3" id="qr-feed-url"></div>
-                <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -446,7 +446,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
-                        <h5 class="modal-title fw-bold" id="episodes-feed-title">Список эпизодов</h5>
+                        <h5 class="modal-title fw-bold" id="episodes-feed-title">Episode List</h5>
                         <p class="text-muted small mb-0" id="episodes-feed-subtitle"></p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -457,7 +457,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -467,7 +467,7 @@
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="app-toast" class="toast align-items-center text-white bg-dark border-0" role="alert">
             <div class="d-flex">
-                <div class="toast-body" id="toast-message">Ссылка скопирована!</div>
+                <div class="toast-body" id="toast-message">Link copied to clipboard!</div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         </div>
@@ -501,8 +501,8 @@
                         <div class="min-vh-100 d-flex align-items-center justify-content-center p-3 text-center">
                             <div>
                                 <i class="bi bi-lock-fill text-muted display-1"></i>
-                                <h3 class="fw-bold mt-3">Панель управления отключена</h3>
-                                <p class="text-muted">Включите секцию [server.admin] enabled = true в config.toml</p>
+                                <h3 class="fw-bold mt-3">Admin Console is Disabled</h3>
+                                <p class="text-muted">Enable [server.admin] enabled = true in config.toml</p>
                             </div>
                         </div>`;
                     return;
@@ -546,11 +546,11 @@
                     checkAuth();
                 } else {
                     const data = await res.json();
-                    errBox.innerText = data.error || 'Ошибка входа';
+                    errBox.innerText = data.error || 'Login failed';
                     errBox.classList.remove('d-none');
                 }
             } catch (err) {
-                errBox.innerText = 'Сетевая ошибка: ' + err.message;
+                errBox.innerText = 'Network error: ' + err.message;
                 errBox.classList.remove('d-none');
             } finally {
                 spinner.classList.add('d-none');
@@ -580,7 +580,7 @@
                 document.getElementById('feeds-count').innerText = allFeeds.length;
                 renderFeeds(allFeeds);
             } catch (err) {
-                container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Ошибка загрузки фидов: ${err.message}</div>`;
+                container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to load feeds: ${err.message}</div>`;
             }
         }
 
@@ -598,8 +598,8 @@
                 container.innerHTML = `
                     <div class="col-12 text-center py-5">
                         <i class="bi bi-inbox text-muted display-4"></i>
-                        <h5 class="fw-bold mt-3">Нет настроенных подкастов</h5>
-                        <p class="text-muted small">Нажмите «Добавить подкаст», чтобы подключить канал VK Video или YouTube</p>
+                        <h5 class="fw-bold mt-3">No configured podcasts</h5>
+                        <p class="text-muted small">Click "Add podcast" to configure a VK Video, YouTube, or Vimeo feed</p>
                     </div>`;
                 return;
             }
@@ -629,10 +629,10 @@
                                 <!-- RSS URL Box with Copy and QR -->
                                 <div class="d-flex align-items-center gap-1 mb-2">
                                     <div class="rss-box flex-grow-1 text-truncate">${feed.feed_url}</div>
-                                    <button class="btn btn-light btn-sm border" title="Скопировать ссылку" onclick="copyToClipboard('${feed.feed_url}')">
+                                    <button class="btn btn-light btn-sm border" title="Copy link" onclick="copyToClipboard('${feed.feed_url}')">
                                         <i class="bi bi-clipboard"></i>
                                     </button>
-                                    <button class="btn btn-light btn-sm border" title="Показать QR-код" onclick="showQRCode('${feed.title || feed.id}', '${feed.feed_url}')">
+                                    <button class="btn btn-light btn-sm border" title="Show QR code" onclick="showQRCode('${feed.title || feed.id}', '${feed.feed_url}')">
                                         <i class="bi bi-qr-code"></i>
                                     </button>
                                 </div>
@@ -656,18 +656,18 @@
                                 <!-- Stats and Action Buttons -->
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
                                     <div class="d-flex align-items-center gap-3">
-                                        <span class="stat-badge"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} эп.</span>
+                                        <span class="stat-badge"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.</span>
                                         <span class="stat-badge"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
-                                        ${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} сбоев</span>` : ''}
+                                        ${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ''}
                                     </div>
                                     <div class="d-flex gap-1">
-                                        <button class="btn btn-light btn-sm border" title="Просмотр эпизодов" onclick="showEpisodes('${feed.id}')">
-                                            <i class="bi bi-list-ul"></i> Эпизоды
+                                        <button class="btn btn-light btn-sm border" title="View episodes" onclick="showEpisodes('${feed.id}')">
+                                            <i class="bi bi-list-ul"></i> Episodes
                                         </button>
-                                        <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Обновить ленту сейчас" onclick="triggerUpdate('${feed.id}')">
-                                            <i class="bi bi-arrow-repeat"></i> Обновить
+                                        <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Update feed now" onclick="triggerUpdate('${feed.id}')">
+                                            <i class="bi bi-arrow-repeat"></i> Update
                                         </button>
-                                        <button class="btn btn-light btn-sm border text-danger" title="Удалить подкаст" onclick="deleteFeed('${feed.id}')">
+                                        <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" onclick="deleteFeed('${feed.id}')">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>
@@ -697,7 +697,7 @@
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                showToast("Ссылка скопирована в буфер обмена!");
+                showToast("Link copied to clipboard!");
             }).catch(err => {
                 // Fallback
                 const input = document.createElement('textarea');
@@ -706,7 +706,7 @@
                 input.select();
                 document.execCommand('copy');
                 document.body.removeChild(input);
-                showToast("Ссылка скопирована!");
+                showToast("Link copied to clipboard!");
             });
         }
 
@@ -734,42 +734,42 @@
             const btn = document.getElementById(`btn-update-${feedId}`);
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Очередь...`;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Queued...`;
             }
 
             try {
                 const res = await fetch(`/api/v1/feeds/${feedId}/update`, { method: 'POST' });
                 if (res.ok) {
-                    showToast(`Обновление для ${feedId} запущено`);
+                    showToast(`Update triggered for ${feedId}`);
                 } else {
-                    showToast(`Ошибка запуска обновления: ${await res.text()}`);
+                    showToast(`Failed to trigger update: ${await res.text()}`);
                 }
             } catch (err) {
-                showToast(`Сетевая ошибка: ${err.message}`);
+                showToast(`Network error: ${err.message}`);
             } finally {
                 setTimeout(() => {
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Обновить`;
+                        btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
                     }
                 }, 2000);
             }
         }
 
         async function deleteFeed(feedId) {
-            if (!confirm(`Вы действительно хотите удалить подкаст "${feedId}"?`)) return;
-            const deleteFiles = confirm(`Удалить также скачанные медиафайлы подкаста "${feedId}" с диска?`);
+            if (!confirm(`Are you sure you want to delete podcast "${feedId}"?`)) return;
+            const deleteFiles = confirm(`Also delete downloaded media files for podcast "${feedId}" from disk?`);
 
             try {
                 const res = await fetch(`/api/v1/feeds/${feedId}?delete_files=${deleteFiles}`, { method: 'DELETE' });
                 if (res.ok) {
-                    showToast(`Подкаст ${feedId} удален`);
+                    showToast(`Podcast ${feedId} deleted`);
                     loadFeeds();
                 } else {
-                    alert(`Ошибка удаления: ${await res.text()}`);
+                    alert(`Failed to delete: ${await res.text()}`);
                 }
             } catch (err) {
-                alert(`Сетевая ошибка: ${err.message}`);
+                alert(`Network error: ${err.message}`);
             }
         }
 
@@ -830,15 +830,15 @@
                     bootstrap.Modal.getInstance(document.getElementById('addFeedModal')).hide();
                     document.getElementById('add-feed-form').reset();
                     document.getElementById('new-feed-id').dataset.manual = 'false';
-                    showToast(`Подкаст ${payload.id} успешно добавлен!`);
+                    showToast(`Podcast ${payload.id} successfully added!`);
                     loadFeeds();
                 } else {
                     const data = await res.json();
-                    errBox.innerText = data.error || 'Ошибка добавления фида';
+                    errBox.innerText = data.error || 'Failed to add feed';
                     errBox.classList.remove('d-none');
                 }
             } catch (err) {
-                errBox.innerText = 'Сетевая ошибка: ' + err.message;
+                errBox.innerText = 'Network error: ' + err.message;
                 errBox.classList.remove('d-none');
             } finally {
                 spinner.classList.add('d-none');
@@ -852,9 +852,9 @@
             const modal = new bootstrap.Modal(modalEl);
             const listEl = document.getElementById('episodes-list');
 
-            document.getElementById('episodes-feed-title').innerText = `Подкаст: ${feedId}`;
-            document.getElementById('episodes-feed-subtitle').innerText = 'Загрузка списка эпизодов...';
-            listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Загрузка...</div></div>`;
+            document.getElementById('episodes-feed-title').innerText = `Podcast: ${feedId}`;
+            document.getElementById('episodes-feed-subtitle').innerText = 'Loading episodes...';
+            listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
             modal.show();
 
             try {
@@ -863,10 +863,10 @@
                 const data = await res.json();
                 const episodes = data.episodes || [];
 
-                document.getElementById('episodes-feed-subtitle').innerText = `Всего эпизодов: ${episodes.length}`;
+                document.getElementById('episodes-feed-subtitle').innerText = `Total episodes: ${episodes.length}`;
 
                 if (episodes.length === 0) {
-                    listEl.innerHTML = `<div class="p-4 text-center text-muted">В базе данных еще нет скачанных эпизодов для этого фида.</div>`;
+                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No downloaded episodes in database for this feed yet.</div>`;
                     return;
                 }
 
@@ -875,14 +875,14 @@
                     let retryBtn = '';
 
                     if (ep.status === 'downloaded') {
-                        statusBadge = '<span class="badge bg-success">Скачан</span>';
+                        statusBadge = '<span class="badge bg-success">Downloaded</span>';
                     } else if (ep.status === 'new') {
-                        statusBadge = '<span class="badge bg-primary">В очереди</span>';
+                        statusBadge = '<span class="badge bg-primary">Queued</span>';
                     } else if (ep.status === 'error') {
-                        statusBadge = '<span class="badge bg-danger">Ошибка</span>';
-                        retryBtn = `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" onclick="retryEpisode('${feedId}', '${ep.id}')"><i class="bi bi-arrow-clockwise"></i> Повторить</button>`;
+                        statusBadge = '<span class="badge bg-danger">Error</span>';
+                        retryBtn = `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" onclick="retryEpisode('${feedId}', '${ep.id}')"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
                     } else if (ep.status === 'cleaned') {
-                        statusBadge = '<span class="badge bg-light text-muted border">Очищен (удален с диска)</span>';
+                        statusBadge = '<span class="badge bg-light text-muted border">Cleaned (deleted from disk)</span>';
                     }
 
                     return `
@@ -905,7 +905,7 @@
                 }).join('');
 
             } catch (err) {
-                listEl.innerHTML = `<div class="p-4 text-center text-danger">Ошибка: ${err.message}</div>`;
+                listEl.innerHTML = `<div class="p-4 text-center text-danger">Error: ${err.message}</div>`;
             }
         }
 
@@ -913,13 +913,13 @@
             try {
                 const res = await fetch(`/api/v1/feeds/${feedId}/episodes/${episodeId}/retry`, { method: 'POST' });
                 if (res.ok) {
-                    showToast("Статус сброшен, эпизод будет загружен при следующем обновлении");
+                    showToast("Status reset, episode will be retried on next update");
                     showEpisodes(feedId);
                 } else {
-                    alert("Ошибка retry: " + await res.text());
+                    alert("Retry failed: " + await res.text());
                 }
             } catch (e) {
-                alert("Ошибка сети: " + e.message);
+                alert("Network error: " + e.message);
             }
         }
 
@@ -960,20 +960,20 @@
                                 <span class="fw-bold">${item.provider.toUpperCase()}</span>
                                 ${hasTokens 
                                     ? `<span class="badge bg-success ms-2 font-monospace">${maskedStr}</span>` 
-                                    : '<span class="badge bg-secondary ms-2">Не задан</span>'
+                                    : '<span class="badge bg-secondary ms-2">Not set</span>'
                                 }
                             </div>
-                            ${item.from_env ? '<span class="badge bg-info text-dark">Из переменных ENV</span>' : '<span class="badge bg-light text-muted border">Из config.toml</span>'}
+                            ${item.from_env ? '<span class="badge bg-info text-dark">From ENV</span>' : '<span class="badge bg-light text-muted border">From config.toml</span>'}
                         </div>
                         <div class="d-flex gap-2">
-                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${hasTokens ? 'Введите новый токен для замены...' : 'Введите токен...'}" ${item.from_env ? 'disabled' : ''}>
-                            ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Сохранить</button>` : ''}
+                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${hasTokens ? 'Enter new token to replace...' : 'Enter token...'}" ${item.from_env ? 'disabled' : ''}>
+                            ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Save</button>` : ''}
                         </div>
                     </div>
                 `;
                 }).join('');
             } catch (err) {
-                listEl.innerHTML = `<div class="text-danger small">Ошибка загрузки токенов: ${err.message}</div>`;
+                listEl.innerHTML = `<div class="text-danger small">Failed to load tokens: ${err.message}</div>`;
             }
         }
 
@@ -981,7 +981,7 @@
             const input = document.getElementById(`token-input-${provider}`);
             const val = input.value.trim();
             if (!val) {
-                alert('Введите токен перед сохранением');
+                alert('Please enter a token before saving');
                 return;
             }
             const tokens = val.split(/\s+/).filter(Boolean);
@@ -994,14 +994,14 @@
                 });
 
                 if (res.ok) {
-                    showToast(`Токен для ${provider} сохранен`);
+                    showToast(`Token for ${provider} saved`);
                     input.value = '';
                     loadTokens();
                 } else {
-                    alert(`Ошибка сохранения: ${await res.text()}`);
+                    alert(`Failed to save: ${await res.text()}`);
                 }
             } catch (err) {
-                alert(`Ошибка: ${err.message}`);
+                alert(`Error: ${err.message}`);
             }
         }
 
@@ -1025,7 +1025,7 @@
                 const free = data.disk_free_bytes || 0;
                 const pct = Math.round((used / total) * 100);
 
-                document.getElementById('disk-used-text').innerText = formatBytes(used) + ' занято';
+                document.getElementById('disk-used-text').innerText = formatBytes(used) + ' used';
                 document.getElementById('disk-total-text').innerText = formatBytes(free);
                 const pbar = document.getElementById('disk-progress');
                 pbar.style.width = pct + '%';
@@ -1041,19 +1041,19 @@
                 const ytdlpBadge = document.getElementById('badge-ytdlp');
                 if (data.has_ytdlp) {
                     ytdlpBadge.className = 'badge bg-success';
-                    ytdlpBadge.innerText = 'Доступен';
+                    ytdlpBadge.innerText = 'Available';
                 } else {
                     ytdlpBadge.className = 'badge bg-danger';
-                    ytdlpBadge.innerText = 'Не найден';
+                    ytdlpBadge.innerText = 'Not found';
                 }
 
                 const ffmpegBadge = document.getElementById('badge-ffmpeg');
                 if (data.has_ffmpeg) {
                     ffmpegBadge.className = 'badge bg-success';
-                    ffmpegBadge.innerText = 'Доступен';
+                    ffmpegBadge.innerText = 'Available';
                 } else {
                     ffmpegBadge.className = 'badge bg-danger';
-                    ffmpegBadge.innerText = 'Не найден';
+                    ffmpegBadge.innerText = 'Not found';
                 }
 
             } catch (err) {

@@ -1,46 +1,46 @@
 # How to get VK API token
 
-ВКонтакте убрал создание standalone-приложений из новой панели разработчиков. Поэтому получить токен доступа пользователя (`video`, `offline`) можно либо через проверенный сервис генерации токенов, либо напрямую через официальный OAuth ВКонтакте:
+VK has removed standalone app creation from their new developer portal. Therefore, obtaining a user access token (`video`, `offline`) can be done either via a direct official VK OAuth link or through a trusted token generator service:
 
-### Способ 1: Прямая OAuth-ссылка ВКонтакте (oauth.vk.ru)
+### Method 1: Direct VK OAuth link (oauth.vk.ru)
 
-1. Откройте в браузере следующую ссылку авторизации:
+1. Open the following authorization link in your browser:
    ```text
    https://oauth.vk.ru/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.ru/blank.html&display=page&response_type=token&revoke=1
    ```
 
-2. Нажмите кнопку **«Разрешить»** (выдаются права на доступ к видеозаписям и бессрочный доступ `offline`).
+2. Click the **"Allow"** button (grants access to video files and indefinite `offline` access).
 
-3. Браузер перенаправит вас на техническую страницу-заглушку. В адресной строке появится URL вида:
+3. The browser will redirect you to a technical placeholder page. The address bar will display a URL like:
    ```text
    https://oauth.vk.ru/blank.html#access_token=vk1.a.XXXXXXXXXXXX...&expires_in=0&user_id=12345678
    ```
 
 > [!NOTE]
-> Текст на белой странице: *«Пожалуйста, не копируйте данные из адресной строки для сторонних сайтов...»* — это **не ошибка**, а штатное предупреждение безопасности ВКонтакте. Токен уже сформирован и находится в адресной строке браузера.
+> The text on the blank page: *"Please do not copy data from the address bar for third-party sites..."* is **not an error**, but a standard VK security warning. The token has already been generated and is present in your browser's address bar.
 
-4. Скопируйте значение `access_token` (начиная с `vk1.a...` и до `&expires_in=0`).
+4. Copy the `access_token` value (starting from `vk1.a...` up to `&expires_in=0`).
 
-### Способ 2: Через генератор vkhost.github.io
+### Method 2: Using vkhost.github.io generator
 
-Если прямая ссылка по какой-либо причине блокируется браузером или провайдером:
+If the direct link is blocked by your browser or network provider:
 
-1. Перейдите на сайт [vkhost.github.io](https://vkhost.github.io).
-2. Нажмите на плитку **Kate Mobile** (или **VK Admin**).
-3. Нажмите кнопку **«Разрешить»** в окне авторизации ВКонтакте.
-4. Откроется белая страница. Скопируйте токен доступа из адресной строки браузера (значение от `access_token=` до `&expires_in`).
+1. Navigate to [vkhost.github.io](https://vkhost.github.io).
+2. Click on the **Kate Mobile** (or **VK Admin**) tile.
+3. Click the **"Allow"** button on the VK authorization page.
+4. A blank page will open. Copy the access token from the browser's address bar (value from `access_token=` up to `&expires_in`).
 
-### Настройка токена в Podsync
+### Configuring token in Podsync
 
-Полученный токен можно сохранить несколькими способами:
+The obtained token can be configured in several ways:
 
-1. **Через веб-панель Podsync**: откройте вкладку **«Настройка API ключей»**, вставьте токен в поле для **VKVIDEO** и нажмите **«Сохранить»**.
-2. **Через `config.toml`**:
+1. **Via Podsync Web Admin UI**: Open the **"API Keys"** tab, enter the token in the **VKVIDEO** field, and click **"Save"**.
+2. **Via `config.toml`**:
    ```toml
    [tokens]
    vkvideo = "vk1.a.XXXXXXXXXXXX..."
    ```
-3. **Через переменную окружения**:
+3. **Via environment variable**:
    ```sh
    export PODSYNC_VKVIDEO_API_KEY="vk1.a.XXXXXXXXXXXX..."
    ```

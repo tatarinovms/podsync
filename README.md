@@ -10,7 +10,7 @@ remembering last played position, sync between devices and offline listening. Th
 on YouTube, Vimeo and VK Video. So the aim of Podsync is to make your life easier and enable you to view/listen to content on
 any device in podcast client.
 
-## 🍴 Fork Features
+## Fork Features
 
 This fork extends the original `mxpv/podsync` with:
 - **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use podcast RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), API key management, and system metrics (disk usage, memory, uptime, binary dependencies). See [Web Admin Guide](./docs/web_admin.md).
@@ -20,7 +20,7 @@ This fork extends the original `mxpv/podsync` with:
 - **One-time filename migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
 - **Extended environment variables**: `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`), `PODSYNC_ADMIN_ENABLED`, `PODSYNC_ADMIN_USERNAME`, `PODSYNC_ADMIN_PASSWORD`.
 
-## ✨ Features
+## Features
 
 - Works with YouTube, Vimeo, VK Video, SoundCloud, and Twitch.
 - Supports feeds configuration: video/audio, high/low quality, max video height, etc.
@@ -35,7 +35,7 @@ This fork extends the original `mxpv/podsync` with:
 - Supports ARM architectures.
 - Supports API keys rotation.
 
-## 📋 Dependencies
+## Dependencies
 
 If you're running the CLI as a binary (e.g. not via Docker), make sure dependencies are available on
 your system: `yt-dlp`, `ffmpeg`, and `go`.
@@ -45,7 +45,7 @@ On macOS:
 brew install yt-dlp ffmpeg go
 ```
 
-## 📖 Documentation
+## Documentation
 
 - [Web Admin Console Guide](./docs/web_admin.md)
 - [How to get VK API token](./docs/how_to_get_vk_token.md)
@@ -54,7 +54,7 @@ brew install yt-dlp ffmpeg go
 - [Podsync on QNAP NAS Guide](./docs/how_to_setup_podsync_on_qnap_nas.md)
 - [Schedule updates with cron](./docs/cron.md)
 
-### 🔑 Access tokens
+### Access tokens
 
 In order to query YouTube, Vimeo, or VK Video API you have to obtain an API token first:
 
@@ -62,7 +62,7 @@ In order to query YouTube, Vimeo, or VK Video API you have to obtain an API toke
 - [How to get YouTube API key](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
 - [Generate an access token for Vimeo](https://developer.vimeo.com/api/guides/start#generate-access-token)
 
-## ⚙️ Configuration
+## Configuration
 
 You need to create a configuration file (for instance `config.toml`) and specify the list of feeds that you're going to host.
 See [config.toml.example](./config.toml.example) for all possible configuration keys available in Podsync.
@@ -109,7 +109,7 @@ hostname = "https://my.test.host:4443"
 
 Server will be accessible from `http://localhost:8080`, but episode links will point to `https://my.test.host:4443/ID1/...`
 
-### 🌐 Environment Variables
+### Environment Variables
 
 Podsync supports the following environment variables for configuration and API keys:
 
@@ -125,9 +125,9 @@ Podsync supports the following environment variables for configuration and API k
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation                                       | `soundcloud_key1 soundcloud_key2`             |
 | `PODSYNC_TWITCH_API_KEY`     | Twitch API credentials in the format `CLIENT_ID:CLIENT_SECRET`, space-separated for multi | `id1:secret1 id2:secret2`                     |
 
-## 🎛 Web Admin Console
+## Web Admin Console
 
-Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full setup instructions, screenshots, and REST API documentation:
+Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full setup instructions and REST API documentation:
 
 - **Feed Overview**: View all channels with custom covers, provider badges, downloaded episode counts, and disk space used.
 - **Ready Podcast Links**: Direct RSS feed URL with 1-click clipboard copy.
@@ -137,7 +137,7 @@ Podsync includes a built-in web management console accessible at `/admin`. See t
 - **Episode Status & Retry**: View download statuses and retry failed episodes with 1 click.
 - **System Monitoring**: Live disk space usage, allocated RAM, uptime, and availability of system tools (`yt-dlp`, `ffmpeg`).
 
-## 🚀 How to run
+## How to run
 
 ### Build and run as binary:
 
@@ -148,7 +148,7 @@ make
 ./bin/podsync --config config.toml
 ```
 
-### 🗂️ One-time filename migration
+### One-time filename migration
 
 If you changed `filename_template` and want to migrate already-downloaded files:
 
@@ -164,11 +164,11 @@ Preview only (no writes):
 
 Note: when `storage.type = "s3"`, only dry-run mode is supported currently. Non-dry-run migration requires readable legacy files and should be run against local storage.
 
-### 🐛 How to debug
+### How to debug
 
-Use the editor [Visual Studio Code](https://code.visualstudio.com/) and install the official [Go](https://marketplace.visualstudio.com/items?itemName=golang.go) extension. Afterwards you can execute "Run & Debug" ▶︎ "Debug Podsync" to debug the application. The required configuration is already prepared (see `.vscode/launch.json`).
+Use the editor [Visual Studio Code](https://code.visualstudio.com/) and install the official [Go](https://marketplace.visualstudio.com/items?itemName=golang.go) extension. Afterwards you can execute "Run & Debug" -> "Debug Podsync" to debug the application. The required configuration is already prepared (see `.vscode/launch.json`).
 
-### 🐳 Run via Docker:
+### Run via Docker:
 
 Build the local image and run:
 
@@ -183,7 +183,7 @@ docker run \
     localhost/podsync:latest
 ```
 
-### 🐳 Run via Docker Compose:
+### Run via Docker Compose:
 
 ```yaml
 services:
@@ -203,6 +203,6 @@ services:
 docker compose up -d
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

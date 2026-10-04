@@ -6,7 +6,7 @@ The admin console is completely self-contained (embedded in the Go binary) and r
 
 ---
 
-## 🚀 Quick Setup
+## Quick Setup
 
 ### 1. Enable via `config.toml`
 
@@ -57,7 +57,7 @@ services:
 
 ---
 
-## 🌐 Accessing the Console
+## Accessing the Console
 
 Open your web browser and navigate to:
 ```text
@@ -68,16 +68,16 @@ Log in using the configured username and password.
 
 ---
 
-## ✨ Features & Functionality
+## Features & Functionality
 
 ### 1. Podcast Feeds & One-Click Subscribing
 - **Channel Cards**: View all active channels with high-resolution artwork, provider badges (VK Video, YouTube, Vimeo, SoundCloud, Twitch), episode counts, and total disk space used.
 - **Copy RSS Link**: Copy the direct feed URL (`http://<host>:<port>/<feed_id>.xml`) into your clipboard with a single click.
 - **QR Code Generator**: Click the QR icon on any feed card to display an on-screen QR code. Scan it with your phone's camera to instantly open and subscribe in your podcast app.
 - **Player Deep-Links**: Direct links to subscribe in popular podcast players:
-  - 🍏 **Apple Podcasts** (`podcast://...`)
-  - 📱 **Pocket Casts** (`pktc://subscribe/...`)
-  - 🟣 **Overcast** (`overcast://...`)
+  - **Apple Podcasts** (`podcast://...`)
+  - **Pocket Casts** (`pktc://subscribe/...`)
+  - **Overcast** (`overcast://...`)
 
 ### 2. Feed Management
 - **Add Feed**: Click **+ Add Feed** to register a new channel, user, or playlist (VK Video, YouTube, Vimeo, etc.).
@@ -111,7 +111,7 @@ Log in using the configured username and password.
 
 ---
 
-## 🔌 REST API Endpoints
+## REST API Endpoints
 
 The admin console is powered by a JSON REST API that can also be used for automation:
 

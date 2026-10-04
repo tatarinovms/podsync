@@ -2,25 +2,18 @@
 
 ВКонтакте убрал создание standalone-приложений из новой панели разработчиков. Поэтому получить токен доступа пользователя (`video`, `offline`) можно либо через проверенный сервис генерации токенов, либо напрямую через официальный OAuth ВКонтакте:
 
-### Способ 1: Через генератор vkhost.github.io (Рекомендуется)
-
-1. Перейдите на сайт [vkhost.github.io](https://vkhost.github.io).
-2. Нажмите на плитку **Kate Mobile** (или **VK Admin**).
-3. Нажмите кнопку **«Разрешить»** в окне авторизации ВКонтакте.
-4. Откроется белая страница. Скопируйте токен доступа из адресной строки браузера (значение от `access_token=` до `&expires_in`).
-
-### Способ 2: Прямая OAuth-ссылка ВКонтакте
+### Способ 1: Прямая OAuth-ссылка ВКонтакте (oauth.vk.ru)
 
 1. Откройте в браузере следующую ссылку авторизации:
    ```text
-   https://oauth.vk.com/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.com/blank.html&display=page&response_type=token&revoke=1
+   https://oauth.vk.ru/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.ru/blank.html&display=page&response_type=token&revoke=1
    ```
 
 2. Нажмите кнопку **«Разрешить»** (выдаются права на доступ к видеозаписям и бессрочный доступ `offline`).
 
 3. Браузер перенаправит вас на техническую страницу-заглушку. В адресной строке появится URL вида:
    ```text
-   https://oauth.vk.com/blank.html#access_token=vk1.a.XXXXXXXXXXXX...&expires_in=0&user_id=12345678
+   https://oauth.vk.ru/blank.html#access_token=vk1.a.XXXXXXXXXXXX...&expires_in=0&user_id=12345678
    ```
 
 > [!NOTE]
@@ -28,8 +21,14 @@
 
 4. Скопируйте значение `access_token` (начиная с `vk1.a...` и до `&expires_in=0`).
 
-> [!TIP]
-> Если прямая ссылка выдает ошибку шлюза или неверного `redirect_uri` (из-за регионального редиректа на `oauth.vk.ru`), воспользуйтесь **Способом 1** ([vkhost.github.io](https://vkhost.github.io)).
+### Способ 2: Через генератор vkhost.github.io
+
+Если прямая ссылка по какой-либо причине блокируется браузером или провайдером:
+
+1. Перейдите на сайт [vkhost.github.io](https://vkhost.github.io).
+2. Нажмите на плитку **Kate Mobile** (или **VK Admin**).
+3. Нажмите кнопку **«Разрешить»** в окне авторизации ВКонтакте.
+4. Откроется белая страница. Скопируйте токен доступа из адресной строки браузера (значение от `access_token=` до `&expires_in`).
 
 ### Настройка токена в Podsync
 

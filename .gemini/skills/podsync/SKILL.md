@@ -17,7 +17,7 @@ This skill provides comprehensive instructions for AI agents on how to monitor, 
 
 ---
 
-## 🛠️ MCP Tools Reference
+## MCP Tools Reference
 
 When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the following tools:
 
@@ -82,7 +82,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 
 ---
 
-## 📦 MCP Resources
+## MCP Resources
 
 Agents can read live context from Podsync via resources:
 - `podsync://feeds`: JSON list of all configured podcast feeds.
@@ -91,14 +91,14 @@ Agents can read live context from Podsync via resources:
 
 ---
 
-## 💡 MCP Prompts
+## MCP Prompts
 
 - **`diagnose_podsync`**: Runs a full diagnostic scan across system metrics, tokens, and feeds to highlight errors or bottlenecks.
 - **`summarize_library`**: Produces a structured executive summary of all podcast channels and storage consumption.
 
 ---
 
-## 🌐 Fallback: REST API Usage (via curl / http)
+## Fallback: REST API Usage (via curl / http)
 
 If MCP tools are not directly loaded into the agent context, use standard HTTP requests to `http://localhost:8080/api/v1`:
 
@@ -125,7 +125,7 @@ curl -u "$USER:$PASS" "$HOST/api/v1/system"
 
 ---
 
-## 🎯 Best Practices for Agents
+## Best Practices for Agents
 
 1. **Space Management**: Before adding large feeds with video format, call `get_system_stats` to verify sufficient disk space.
 2. **Episode Retries**: If an episode has an error status, check the error message in `get_feed`. If it was an intermittent network error or YouTube rate limit, call `retry_episode`.

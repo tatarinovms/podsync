@@ -185,6 +185,44 @@
             font-size: 2rem;
         }
 
+        .mcp-status-pill {
+            background-color: #ffffff;
+            color: #1e1e2e !important;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .btn-mcp-copy {
+            background-color: #ffffff;
+            color: #1e1e2e !important;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .btn-mcp-copy:hover {
+            background-color: #f1f5f9;
+            color: #1e1e2e !important;
+        }
+
+        [data-theme="mocha"] .mcp-status-pill {
+            background-color: var(--ctp-surface0) !important;
+            color: var(--ctp-text) !important;
+            border: 1px solid var(--ctp-surface2) !important;
+        }
+
+        [data-theme="mocha"] .btn-mcp-copy {
+            background-color: var(--ctp-surface0) !important;
+            color: var(--ctp-text) !important;
+            border: 1px solid var(--ctp-surface2) !important;
+        }
+        [data-theme="mocha"] .btn-mcp-copy:hover {
+            background-color: var(--ctp-surface1) !important;
+            color: #ffffff !important;
+            border-color: var(--ctp-overlay0) !important;
+        }
+
         .btn-brand {
             background: var(--brand-gradient);
             color: white;
@@ -605,7 +643,7 @@
                                     <h4 class="fw-bold mb-1"><i class="bi bi-robot me-2"></i>Model Context Protocol (MCP) Server</h4>
                                     <p class="mb-0 opacity-75">Connect AI assistants (OpenCode v2, Claude Desktop, Cursor, Cline, Antigravity) to manage feeds and retry episodes directly.</p>
                                 </div>
-                                <span class="badge bg-white text-dark px-3 py-2 fs-6 shadow-sm"><i class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
+                                <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm"><i class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
                             </div>
                         </div>
                     </div>
@@ -712,7 +750,7 @@
                                                 <button type="button" id="btn-opencode-remote" class="btn btn-primary" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
                                                 <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary" onclick="setOpencodeMode('local')">Local (Stdio)</button>
                                             </div>
-                                            <button class="btn btn-brand btn-sm" onclick="copyPre('opencode-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                            <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                         </div>
                                     </div>
                                     <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
@@ -722,7 +760,7 @@
                                 <div class="tab-pane fade" id="client-claude">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                         <span class="small text-muted">Add to <code>claude_desktop_config.json</code> under <code>"mcpServers"</code>:</span>
-                                        <button class="btn btn-brand btn-sm" onclick="copyPre('claude-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('claude-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                     </div>
                                     <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
                                 </div>
@@ -731,7 +769,7 @@
                                 <div class="tab-pane fade" id="client-cursor">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                         <span class="small text-muted">Add under <strong>Cursor Settings &gt; Features &gt; MCP</strong>:</span>
-                                        <button class="btn btn-brand btn-sm" onclick="copyPre('cursor-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy Config</button>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('cursor-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy Config</button>
                                     </div>
                                     <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
                                 </div>

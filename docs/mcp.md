@@ -4,11 +4,11 @@ Podsync includes a built-in **MCP (Model Context Protocol)** server that enables
 
 ---
 
-## 🌟 Capabilities
+## Capabilities
 
 The MCP server exposes:
 
-### 🛠️ Tools
+### Tools
 - **`list_feeds`**: List all configured podcast feeds, episode counts, total sizes, and feed URLs.
 - **`get_feed`**: Get detailed metadata for a feed along with the list of episodes and their download statuses (`downloaded`, `new`, `error`).
 - **`add_feed`**: Add a new podcast channel/playlist (YouTube, VK Video, Vimeo, etc.) with format (`audio`/`video`), quality (`high`/`low`), and page size. Automatically updates `config.toml`.
@@ -19,18 +19,18 @@ The MCP server exposes:
 - **`get_tokens`**: View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch.
 - **`update_tokens`**: Update API tokens (supports multiple tokens for automatic round-robin rotation).
 
-### 📦 Resources
+### Resources
 - **`podsync://feeds`**: Live JSON snapshot of all podcast feeds.
 - **`podsync://system`**: System diagnostics, hardware usage, and binary paths.
 - **`podsync://tokens`**: Current API token configurations and sources (ENV vs config.toml).
 
-### 💡 Prompts
+### Prompts
 - **`diagnose_podsync`**: Comprehensive system diagnosis (missing tokens, download errors, system tools health).
 - **`summarize_library`**: Executive summary of podcast feeds, disk usage, and suggested optimizations.
 
 ---
 
-## 🚀 Running Modes
+## Running Modes
 
 The Podsync MCP server can be used in two ways:
 
@@ -124,7 +124,7 @@ In your Cursor or Cline MCP Settings:
 
 ---
 
-## 🧠 Agent Skill
+## Agent Skill
 
 A ready-to-use skill definition for AI agents is provided in:
 - [`.agents/skills/podsync/SKILL.md`](../.agents/skills/podsync/SKILL.md)

@@ -612,6 +612,15 @@
             border-width: 0.15em;
         }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spin-icon {
+            display: inline-block !important;
+            animation: spin 1s linear infinite !important;
+        }
+
         [data-theme="mocha"] .btn-close {
             filter: invert(1) grayscale(100%);
         }
@@ -1492,6 +1501,8 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
+        const updatingFeeds = new Set();
+
         function renderFeeds(feeds) {
             const container = document.getElementById('feeds-container');
             if (feeds.length === 0) {
@@ -1504,14 +1515,45 @@
                 return;
             }
 
+            // In-place update: if cards already exist for these feeds, update numbers/badges without wiping DOM or flickering images/icons
+            const existingCardIds = Array.from(container.querySelectorAll('[data-feed-id]')).map(el => el.getAttribute('data-feed-id'));
+            const feedIds = feeds.map(f => f.id);
+            const structureMatches = existingCardIds.length === feedIds.length && existingCardIds.every((id, i) => id === feedIds[i]);
+
+            if (structureMatches) {
+                feeds.forEach(feed => {
+                    const epEl = document.getElementById(`feed-ep-${feed.id}`);
+                    if (epEl) epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.`;
+
+                    const sizeEl = document.getElementById(`feed-size-${feed.id}`);
+                    if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
+
+                    const errEl = document.getElementById(`feed-err-${feed.id}`);
+                    if (errEl) {
+                        errEl.innerHTML = feed.error_count > 0 ? 
+                            `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : '';
+                    }
+
+                    const isUpdating = updatingFeeds.has(feed.id);
+                    const btn = document.getElementById(`btn-update-${feed.id}`);
+                    if (btn && !isUpdating) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                    }
+                });
+                return;
+            }
+
+            // Full render only when cards structure changes
             container.innerHTML = feeds.map(feed => {
                 const providerClass = 'provider-' + (feed.provider || 'unknown');
+                const isUpdating = updatingFeeds.has(feed.id);
                 const cover = feed.cover_art ? 
-                    `<img src="${feed.cover_art}" class="feed-cover" alt="Cover" onerror="this.outerHTML='<div class=\\'feed-cover-placeholder\\'>${feed.id[0]}</div>'">` :
-                    `<div class="feed-cover-placeholder">${feed.id[0]}</div>`;
+                    `<img src="${feed.cover_art}" class="feed-cover" alt="Cover" loading="lazy" onerror="this.outerHTML='<div class=\'feed-cover-placeholder\'>${(feed.title || feed.id)[0].toUpperCase()}</div>'">` :
+                    `<div class="feed-cover-placeholder">${(feed.title || feed.id)[0].toUpperCase()}</div>`;
 
                 return `
-                <div class="col-12 col-xl-6">
+                <div class="col-12 col-xl-6" data-feed-id="${feed.id}">
                     <div class="card feed-card p-3 h-100">
                         <div class="d-flex gap-3">
                             ${cover}
@@ -1556,16 +1598,16 @@
                                 <!-- Stats and Action Buttons -->
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
                                     <div class="d-flex align-items-center gap-3">
-                                        <span class="stat-badge"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.</span>
-                                        <span class="stat-badge"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
-                                        ${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ''}
+                                        <span class="stat-badge" id="feed-ep-${feed.id}"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.</span>
+                                        <span class="stat-badge" id="feed-size-${feed.id}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
+                                        <span id="feed-err-${feed.id}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ''}</span>
                                     </div>
                                     <div class="d-flex gap-1">
                                         <button class="btn btn-light btn-sm border" title="View episodes" onclick="showEpisodes('${feed.id}')">
                                             <i class="bi bi-list-ul"></i> Episodes
                                         </button>
-                                        <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Update feed now" onclick="triggerUpdate('${feed.id}')">
-                                            <i class="bi bi-arrow-repeat"></i> Update
+                                        <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Update feed now" onclick="triggerUpdate('${feed.id}')" ${isUpdating ? 'disabled' : ''}>
+                                            <i class="bi bi-arrow-repeat me-1 ${isUpdating ? 'spin-icon' : ''}"></i> ${isUpdating ? 'Updating...' : 'Update'}
                                         </button>
                                         <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" onclick="deleteFeed('${feed.id}')">
                                             <i class="bi bi-trash"></i>
@@ -1632,9 +1674,11 @@
 
         async function triggerUpdate(feedId) {
             const btn = document.getElementById(`btn-update-${feedId}`);
+            updatingFeeds.add(feedId);
+
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Updating...`;
+                btn.innerHTML = `<i class="bi bi-arrow-repeat spin-icon me-1"></i> Updating...`;
             }
 
             try {
@@ -1656,24 +1700,28 @@
                         }
                         if (count >= 15) {
                             clearInterval(interval);
-                            if (btn) {
-                                btn.disabled = false;
-                                btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
+                            updatingFeeds.delete(feedId);
+                            const b = document.getElementById(`btn-update-${feedId}`);
+                            if (b) {
+                                b.disabled = false;
+                                b.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
                             }
                         }
                     }, 2000);
                 } else {
                     showToast(`Failed to trigger update: ${await res.text()}`);
+                    updatingFeeds.delete(feedId);
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
+                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
                     }
                 }
             } catch (err) {
                 showToast(`Network error: ${err.message}`);
+                updatingFeeds.delete(feedId);
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Update`;
+                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
                 }
             }
         }

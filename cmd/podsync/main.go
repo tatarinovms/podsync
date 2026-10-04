@@ -35,12 +35,12 @@ type Opts struct {
 }
 
 const banner = `
- _______  _______  ______   _______           _        _______ 
+ _______  _______  ______   _______           _        _______
 (  ____ )(  ___  )(  __  \ (  ____ \|\     /|( (    /|(  ____ \
 | (    )|| (   ) || (  \  )| (    \/( \   / )|  \  ( || (    \/
-| (____)|| |   | || |   ) || (_____  \ (_) / |   \ | || |      
-|  _____)| |   | || |   | |(_____  )  \   /  | (\ \) || |      
-| (      | |   | || |   ) |      ) |   ) (   | | \   || |      
+| (____)|| |   | || |   ) || (_____  \ (_) / |   \ | || |
+|  _____)| |   | || |   | |(_____  )  \   /  | (\ \) || |
+| (      | |   | || |   ) |      ) |   ) (   | | \   || |
 | )      | (___) || (__/  )/\____) |   | |   | )  \  || (____/\
 |/       (_______)(______/ \_______)   \_/   |/    )_)(_______/
 `
@@ -271,6 +271,23 @@ func main() {
 
 	// Run web server
 	srv := web.New(cfg.Server, storage, database)
+
+	feedManager := NewAppFeedManager(
+		opts.ConfigPath,
+		cfg,
+		cfg.Feeds,
+		cfg.Tokens,
+		c,
+		m,
+		updates,
+		manager,
+		database,
+		storage,
+		version,
+		commit,
+		date,
+	)
+	srv.SetAdminManager(feedManager)
 
 	group.Go(func() error {
 		log.Infof("running listener at %s", srv.Addr)

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podsync Management Console</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #8b5cf6;
+            --brand-primary-hover: #7c3aed;
+            --brand-gradient: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            --bg-light: #f8fafc;
+            --card-border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-light);
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        .navbar-brand-gradient {
+            background: var(--brand-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .nav-tabs .nav-link {
+            color: #64748b;
+            font-weight: 600;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 2px solid transparent;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--brand-primary);
+            border-bottom: 2px solid var(--brand-primary);
+            background: transparent;
+        }
+
+        .card {
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .feed-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .feed-cover {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 10px;
+            background-color: #e2e8f0;
+        }
+
+        .feed-cover-placeholder {
+            width: 80px;
+            height: 80px;
+            border-radius: 10px;
+            background: var(--brand-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+        }
+
+        .btn-brand {
+            background: var(--brand-gradient);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+        .btn-brand:hover {
+            opacity: 0.95;
+            color: white;
+        }
+
+        .badge-provider {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+            font-weight: 600;
+            border-radius: 6px;
+        }
+        .provider-youtube { background-color: #fee2e2; color: #dc2626; }
+        .provider-vkvideo { background-color: #dbeafe; color: #2563eb; }
+        .provider-vimeo { background-color: #e0e7ff; color: #4f46e5; }
+        .provider-soundcloud { background-color: #ffedd5; color: #ea580c; }
+        .provider-twitch { background-color: #f3e8ff; color: #9333ea; }
+
+        .deep-link-btn {
+            font-size: 0.8rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+        }
+
+        .rss-box {
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 0.4rem 0.75rem;
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            color: #334155;
+            user-select: all;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-badge {
+            font-size: 0.8rem;
+            color: #64748b;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        #qr-canvas {
+            max-width: 250px;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            background: white;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login View (Hidden when authenticated) -->
+    <div id="login-view" class="d-none min-vh-100 d-flex align-items-center justify-content-center p-3">
+        <div class="card p-4 p-md-5 shadow-lg" style="max-width: 420px; width: 100%;">
+            <div class="text-center mb-4">
+                <i class="bi bi-broadcast fs-1 text-primary"></i>
+                <h3 class="fw-bold mt-2 navbar-brand-gradient">Podsync Admin</h3>
+                <p class="text-muted small">Управление подкастами и API</p>
+            </div>
+            <div id="login-error" class="alert alert-danger d-none py-2 small" role="alert"></div>
+            <form id="login-form">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Имя пользователя</label>
+                    <input type="text" id="login-username" class="form-control" required autocomplete="username" placeholder="admin">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Пароль</label>
+                    <input type="password" id="login-password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-brand w-100 py-2">
+                    <span id="login-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+                    Войти в консоль
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Dashboard View -->
+    <div id="dashboard-view" class="d-none">
+        <!-- Top Navbar -->
+        <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top py-2">
+            <div class="container-fluid px-4">
+                <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                    <i class="bi bi-broadcast text-primary fs-4"></i>
+                    <span class="navbar-brand-gradient fs-4">Podsync</span>
+                    <span class="badge bg-light text-secondary border fs-6 fw-normal ms-1" id="nav-version">v2.8.0</span>
+                </a>
+                
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <a href="/podsync.opml" target="_blank" class="btn btn-outline-secondary btn-sm d-none d-sm-inline-flex align-items-center gap-1">
+                        <i class="bi bi-file-earmark-code"></i> OPML
+                    </a>
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-sm border dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                            <span id="nav-username" class="fw-semibold">Admin</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li><button class="dropdown-item text-danger" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Выйти</button></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container-fluid px-4 py-4">
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-feeds">
+                        <i class="bi bi-collection-play me-1"></i> Подкасты (<span id="feeds-count">0</span>)
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tokens">
+                        <i class="bi bi-key me-1"></i> API Ключи
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system">
+                        <i class="bi bi-hdd-network me-1"></i> Система & Диск
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                
+                <!-- 1. Feeds Tab -->
+                <div class="tab-pane fade show active" id="tab-feeds">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                        <div class="d-flex gap-2 flex-grow-1" style="max-width: 450px;">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                                <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Поиск по названию или ID..." oninput="filterFeeds()">
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Обновить список</button>
+                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Добавить подкаст</button>
+                        </div>
+                    </div>
+
+                    <!-- Feeds List Grid -->
+                    <div id="feeds-container" class="row g-3">
+                        <div class="col-12 text-center py-5 text-muted">
+                            <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+                            <div>Загрузка подкастов...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Tokens Tab -->
+                <div class="tab-pane fade" id="tab-tokens">
+                    <div class="row g-4">
+                        <div class="col-12 col-xl-8">
+                            <div class="card p-4">
+                                <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2 text-primary"></i>Настройка API ключей</h5>
+                                <p class="text-muted small mb-4">
+                                    Ключи используются для запроса списка видео и альбомов. Если ключ задан через переменную окружения (ENV), он имеет наивысший приоритет.
+                                </p>
+                                <div id="tokens-list" class="d-flex flex-column gap-3">
+                                    <!-- Rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-xl-4">
+                            <div class="card p-4 bg-light">
+                                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Инструкции по получению</h6>
+                                <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>VK Video:</strong> <a href="https://oauth.vk.com/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token" target="_blank">Получить токен (через Kate Mobile)</a></li>
+                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console -> YouTube Data API v3</li>
+                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Vimeo:</strong> Developer App Access Token</li>
+                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Twitch:</strong> Twitch Developer Console (ID:SECRET)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. System Tab -->
+                <div class="tab-pane fade" id="tab-system">
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Хранилище эпизодов</h6>
+                                <h3 id="disk-used-text" class="fw-bold mb-1">-</h3>
+                                <p class="text-muted small mb-3">из <span id="disk-total-text">-</span> свободно</p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div id="disk-progress" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <div class="small text-muted d-flex justify-content-between">
+                                    <span>Каталог: <code id="sys-datadir">/app/data</code></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Статус сервиса</h6>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Время работы (Uptime):</span>
+                                        <span id="sys-uptime" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Память (RAM):</span>
+                                        <span id="sys-ram" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Горутины:</span>
+                                        <span id="sys-goroutines" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Тип хранилища:</span>
+                                        <span id="sys-storage" class="fw-semibold">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Зависимости и окружение</h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>yt-dlp</span>
+                                        <span id="badge-ytdlp" class="badge bg-secondary">Проверка...</span>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>ffmpeg</span>
+                                        <span id="badge-ffmpeg" class="badge bg-secondary">Проверка...</span>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>Podsync Version</span>
+                                        <span id="sys-ver" class="badge bg-light text-dark border">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Feed -->
+    <div class="modal fade" id="addFeedModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Добавить подкаст</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="add-feed-form">
+                    <div class="modal-body">
+                        <div id="add-feed-error" class="alert alert-danger d-none py-2 small"></div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">URL источника (VK Video / YouTube / Vimeo / etc)</label>
+                            <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@labelcom" oninput="suggestFeedId(this.value)">
+                            <div class="form-text small">Поддерживаются каналы, сообщества, пользователи, плейлисты.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">ID фида (будет в адресе XML)</label>
+                            <input type="text" id="new-feed-id" class="form-control" required placeholder="LABELCOM">
+                            <div class="form-text small">Только латиница, цифры и знаки подчеркивания.</div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Формат</label>
+                                <select id="new-feed-format" class="form-select">
+                                    <option value="video" selected>Видео</option>
+                                    <option value="audio">Аудио (MP3)</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Качество</label>
+                                <select id="new-feed-quality" class="form-select">
+                                    <option value="high" selected>Высокое (High)</option>
+                                    <option value="low">Низкое (Low)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Кол-во эпизодов (Page size)</label>
+                                <input type="number" id="new-feed-pagesize" class="form-control" value="20" min="1" max="100">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Хранить последних (Clean)</label>
+                                <input type="number" id="new-feed-keeplast" class="form-control" value="0" min="0" placeholder="0 = без лимита">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Фильтр по названию (необязательно)</label>
+                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm mb-1" placeholder="Включать только содержащие...">
+                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm" placeholder="Исключать содержащие (например: Shorts)...">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
+                            <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+                            Создать и запустить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: QR Code -->
+    <div class="modal fade" id="qrModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content text-center p-4">
+                <h5 class="fw-bold mb-1" id="qr-feed-title">Подкаст</h5>
+                <p class="text-muted small mb-3">Наведите камеру смартфона, чтобы открыть в плеере</p>
+                <div class="d-flex justify-content-center mb-3">
+                    <canvas id="qr-canvas"></canvas>
+                </div>
+                <div class="rss-box text-break small mb-3" id="qr-feed-url"></div>
+                <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Episodes Viewer -->
+    <div class="modal fade" id="episodesModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold" id="episodes-feed-title">Список эпизодов</h5>
+                        <p class="text-muted small mb-0" id="episodes-feed-subtitle"></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="episodes-list" class="list-group list-group-flush">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container for feedback -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="app-toast" class="toast align-items-center text-white bg-dark border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body" id="toast-message">Ссылка скопирована!</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Lightweight standalone QR Code generator (qrious) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+
+    <script>
+        // State
+        let allFeeds = [];
+        let qrInstance = null;
+        const toastEl = new bootstrap.Toast(document.getElementById('app-toast'), { delay: 2500 });
+
+        function showToast(msg) {
+            document.getElementById('toast-message').innerText = msg;
+            toastEl.show();
+        }
+
+        // Auth
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/v1/auth/status');
+                const data = await res.json();
+                if (!data.enabled) {
+                    // Admin is not enabled
+                    document.body.innerHTML = `
+                        <div class="min-vh-100 d-flex align-items-center justify-content-center p-3 text-center">
+                            <div>
+                                <i class="bi bi-lock-fill text-muted display-1"></i>
+                                <h3 class="fw-bold mt-3">Панель управления отключена</h3>
+                                <p class="text-muted">Включите секцию [server.admin] enabled = true в config.toml</p>
+                            </div>
+                        </div>`;
+                    return;
+                }
+
+                if (data.authenticated) {
+                    document.getElementById('login-view').classList.add('d-none');
+                    document.getElementById('dashboard-view').classList.remove('d-none');
+                    document.getElementById('nav-username').innerText = data.username || 'Admin';
+                    loadDashboard();
+                } else {
+                    document.getElementById('login-view').classList.remove('d-none');
+                    document.getElementById('dashboard-view').classList.add('d-none');
+                }
+            } catch (err) {
+                console.error("Auth check failed:", err);
+            }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const spinner = document.getElementById('login-spinner');
+            const errBox = document.getElementById('login-error');
+
+            errBox.classList.add('d-none');
+            spinner.classList.remove('d-none');
+            btn.disabled = true;
+
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const res = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.ok) {
+                    checkAuth();
+                } else {
+                    const data = await res.json();
+                    errBox.innerText = data.error || 'Ошибка входа';
+                    errBox.classList.remove('d-none');
+                }
+            } catch (err) {
+                errBox.innerText = 'Сетевая ошибка: ' + err.message;
+                errBox.classList.remove('d-none');
+            } finally {
+                spinner.classList.add('d-none');
+                btn.disabled = false;
+            }
+        });
+
+        async function logout() {
+            await fetch('/api/v1/auth/logout', { method: 'POST' });
+            location.reload();
+        }
+
+        // Dashboard Data
+        function loadDashboard() {
+            loadFeeds();
+            loadTokens();
+            loadSystem();
+        }
+
+        // Feeds
+        async function loadFeeds() {
+            const container = document.getElementById('feeds-container');
+            try {
+                const res = await fetch('/api/v1/feeds');
+                if (!res.ok) throw new Error(await res.text());
+                allFeeds = await res.json();
+                document.getElementById('feeds-count').innerText = allFeeds.length;
+                renderFeeds(allFeeds);
+            } catch (err) {
+                container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Ошибка загрузки фидов: ${err.message}</div>`;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function renderFeeds(feeds) {
+            const container = document.getElementById('feeds-container');
+            if (feeds.length === 0) {
+                container.innerHTML = `
+                    <div class="col-12 text-center py-5">
+                        <i class="bi bi-inbox text-muted display-4"></i>
+                        <h5 class="fw-bold mt-3">Нет настроенных подкастов</h5>
+                        <p class="text-muted small">Нажмите «Добавить подкаст», чтобы подключить канал VK Video или YouTube</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = feeds.map(feed => {
+                const providerClass = 'provider-' + (feed.provider || 'unknown');
+                const cover = feed.cover_art ? 
+                    `<img src="${feed.cover_art}" class="feed-cover" alt="Cover" onerror="this.outerHTML='<div class=\\'feed-cover-placeholder\\'>${feed.id[0]}</div>'">` :
+                    `<div class="feed-cover-placeholder">${feed.id[0]}</div>`;
+
+                return `
+                <div class="col-12 col-xl-6">
+                    <div class="card feed-card p-3 h-100">
+                        <div class="d-flex gap-3">
+                            ${cover}
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <h6 class="fw-bold mb-0 text-truncate" title="${feed.title || feed.id}">
+                                        ${feed.title || feed.id}
+                                    </h6>
+                                    <span class="badge badge-provider ${providerClass}">${(feed.provider || '').toUpperCase()}</span>
+                                </div>
+                                <div class="text-muted small text-truncate mb-2">
+                                    ${feed.author ? `<span>${feed.author} • </span>` : ''}ID: <code>${feed.id}</code>
+                                </div>
+
+                                <!-- RSS URL Box with Copy and QR -->
+                                <div class="d-flex align-items-center gap-1 mb-2">
+                                    <div class="rss-box flex-grow-1 text-truncate">${feed.feed_url}</div>
+                                    <button class="btn btn-light btn-sm border" title="Скопировать ссылку" onclick="copyToClipboard('${feed.feed_url}')">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                    <button class="btn btn-light btn-sm border" title="Показать QR-код" onclick="showQRCode('${feed.title || feed.id}', '${feed.feed_url}')">
+                                        <i class="bi bi-qr-code"></i>
+                                    </button>
+                                </div>
+
+                                <!-- Deep Links for Podcast Apps -->
+                                <div class="d-flex flex-wrap gap-1 mb-3">
+                                    <a href="${feed.apple_url}" class="deep-link-btn btn-outline-secondary border">
+                                        <i class="bi bi-apple"></i> Apple
+                                    </a>
+                                    <a href="${feed.pocketcasts_url}" class="deep-link-btn btn-outline-secondary border">
+                                        <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
+                                    </a>
+                                    <a href="${feed.overcast_url}" class="deep-link-btn btn-outline-secondary border">
+                                        <i class="bi bi-soundwave text-warning"></i> Overcast
+                                    </a>
+                                    <a href="${feed.feed_url}" target="_blank" class="deep-link-btn btn-outline-secondary border">
+                                        <i class="bi bi-box-arrow-up-right"></i> XML
+                                    </a>
+                                </div>
+
+                                <!-- Stats and Action Buttons -->
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="stat-badge"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} эп.</span>
+                                        <span class="stat-badge"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
+                                        ${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} сбоев</span>` : ''}
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-light btn-sm border" title="Просмотр эпизодов" onclick="showEpisodes('${feed.id}')">
+                                            <i class="bi bi-list-ul"></i> Эпизоды
+                                        </button>
+                                        <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Обновить ленту сейчас" onclick="triggerUpdate('${feed.id}')">
+                                            <i class="bi bi-arrow-repeat"></i> Обновить
+                                        </button>
+                                        <button class="btn btn-light btn-sm border text-danger" title="Удалить подкаст" onclick="deleteFeed('${feed.id}')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function filterFeeds() {
+            const query = document.getElementById('feed-search').value.toLowerCase().trim();
+            if (!query) {
+                renderFeeds(allFeeds);
+                return;
+            }
+            const filtered = allFeeds.filter(f => 
+                (f.id && f.id.toLowerCase().includes(query)) ||
+                (f.title && f.title.toLowerCase().includes(query)) ||
+                (f.author && f.author.toLowerCase().includes(query)) ||
+                (f.provider && f.provider.toLowerCase().includes(query))
+            );
+            renderFeeds(filtered);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Ссылка скопирована в буфер обмена!");
+            }).catch(err => {
+                // Fallback
+                const input = document.createElement('textarea');
+                input.value = text;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast("Ссылка скопирована!");
+            });
+        }
+
+        function showQRCode(title, url) {
+            document.getElementById('qr-feed-title').innerText = title;
+            document.getElementById('qr-feed-url').innerText = url;
+            
+            const canvas = document.getElementById('qr-canvas');
+            if (!qrInstance) {
+                qrInstance = new QRious({
+                    element: canvas,
+                    size: 220,
+                    value: url,
+                    level: 'M'
+                });
+            } else {
+                qrInstance.set({ value: url });
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('qrModal'));
+            modal.show();
+        }
+
+        async function triggerUpdate(feedId) {
+            const btn = document.getElementById(`btn-update-${feedId}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Очередь...`;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/feeds/${feedId}/update`, { method: 'POST' });
+                if (res.ok) {
+                    showToast(`Обновление для ${feedId} запущено`);
+                } else {
+                    showToast(`Ошибка запуска обновления: ${await res.text()}`);
+                }
+            } catch (err) {
+                showToast(`Сетевая ошибка: ${err.message}`);
+            } finally {
+                setTimeout(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<i class="bi bi-arrow-repeat"></i> Обновить`;
+                    }
+                }, 2000);
+            }
+        }
+
+        async function deleteFeed(feedId) {
+            if (!confirm(`Вы действительно хотите удалить подкаст "${feedId}"?`)) return;
+            const deleteFiles = confirm(`Удалить также скачанные медиафайлы подкаста "${feedId}" с диска?`);
+
+            try {
+                const res = await fetch(`/api/v1/feeds/${feedId}?delete_files=${deleteFiles}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast(`Подкаст ${feedId} удален`);
+                    loadFeeds();
+                } else {
+                    alert(`Ошибка удаления: ${await res.text()}`);
+                }
+            } catch (err) {
+                alert(`Сетевая ошибка: ${err.message}`);
+            }
+        }
+
+        // Add Feed
+        function suggestFeedId(url) {
+            if (!url) return;
+            const idInput = document.getElementById('new-feed-id');
+            if (idInput.value && idInput.dataset.manual === 'true') return;
+
+            // Extract sensible slug
+            try {
+                const parsed = new URL(url);
+                const path = parsed.pathname.replace(/^\/+/g, '').replace(/\/+$/g, '');
+                const parts = path.split('/');
+                let slug = parts[parts.length - 1] || '';
+                slug = slug.replace(/[@\-.]/g, '_').toUpperCase();
+                if (slug) {
+                    idInput.value = slug;
+                }
+            } catch (e) {}
+        }
+
+        document.getElementById('new-feed-id').addEventListener('input', () => {
+            document.getElementById('new-feed-id').dataset.manual = 'true';
+        });
+
+        document.getElementById('add-feed-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('add-feed-btn');
+            const spinner = document.getElementById('add-feed-spinner');
+            const errBox = document.getElementById('add-feed-error');
+
+            errBox.classList.add('d-none');
+            spinner.classList.remove('d-none');
+            btn.disabled = true;
+
+            const payload = {
+                id: document.getElementById('new-feed-id').value.trim(),
+                url: document.getElementById('new-feed-url').value.trim(),
+                format: document.getElementById('new-feed-format').value,
+                quality: document.getElementById('new-feed-quality').value,
+                page_size: parseInt(document.getElementById('new-feed-pagesize').value, 10) || 20,
+                keep_last: parseInt(document.getElementById('new-feed-keeplast').value, 10) || 0,
+                filters: {
+                    title: document.getElementById('new-feed-filter-title').value.trim(),
+                    not_title: document.getElementById('new-feed-filter-nottitle').value.trim()
+                }
+            };
+
+            try {
+                const res = await fetch('/api/v1/feeds', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('addFeedModal')).hide();
+                    document.getElementById('add-feed-form').reset();
+                    document.getElementById('new-feed-id').dataset.manual = 'false';
+                    showToast(`Подкаст ${payload.id} успешно добавлен!`);
+                    loadFeeds();
+                } else {
+                    const data = await res.json();
+                    errBox.innerText = data.error || 'Ошибка добавления фида';
+                    errBox.classList.remove('d-none');
+                }
+            } catch (err) {
+                errBox.innerText = 'Сетевая ошибка: ' + err.message;
+                errBox.classList.remove('d-none');
+            } finally {
+                spinner.classList.add('d-none');
+                btn.disabled = false;
+            }
+        });
+
+        // Episodes
+        async function showEpisodes(feedId) {
+            const modalEl = document.getElementById('episodesModal');
+            const modal = new bootstrap.Modal(modalEl);
+            const listEl = document.getElementById('episodes-list');
+
+            document.getElementById('episodes-feed-title').innerText = `Подкаст: ${feedId}`;
+            document.getElementById('episodes-feed-subtitle').innerText = 'Загрузка списка эпизодов...';
+            listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Загрузка...</div></div>`;
+            modal.show();
+
+            try {
+                const res = await fetch(`/api/v1/feeds/${feedId}`);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                const episodes = data.episodes || [];
+
+                document.getElementById('episodes-feed-subtitle').innerText = `Всего эпизодов: ${episodes.length}`;
+
+                if (episodes.length === 0) {
+                    listEl.innerHTML = `<div class="p-4 text-center text-muted">В базе данных еще нет скачанных эпизодов для этого фида.</div>`;
+                    return;
+                }
+
+                listEl.innerHTML = episodes.map(ep => {
+                    let statusBadge = '<span class="badge bg-secondary">Unknown</span>';
+                    let retryBtn = '';
+
+                    if (ep.status === 'downloaded') {
+                        statusBadge = '<span class="badge bg-success">Скачан</span>';
+                    } else if (ep.status === 'new') {
+                        statusBadge = '<span class="badge bg-primary">В очереди</span>';
+                    } else if (ep.status === 'error') {
+                        statusBadge = '<span class="badge bg-danger">Ошибка</span>';
+                        retryBtn = `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" onclick="retryEpisode('${feedId}', '${ep.id}')"><i class="bi bi-arrow-clockwise"></i> Повторить</button>`;
+                    } else if (ep.status === 'cleaned') {
+                        statusBadge = '<span class="badge bg-light text-muted border">Очищен (удален с диска)</span>';
+                    }
+
+                    return `
+                    <div class="list-group-item p-3">
+                        <div class="d-flex align-items-start justify-content-between gap-3">
+                            <div class="min-w-0">
+                                <h6 class="fw-semibold mb-1 text-break">${ep.title || ep.id}</h6>
+                                <div class="text-muted small d-flex flex-wrap gap-3">
+                                    <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
+                                    <span><i class="bi bi-hdd"></i> ${formatBytes(ep.size)}</span>
+                                    <span><i class="bi bi-calendar"></i> ${formatDate(ep.pub_date)}</span>
+                                </div>
+                            </div>
+                            <div class="text-end text-nowrap">
+                                <div>${statusBadge}</div>
+                                ${retryBtn}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+            } catch (err) {
+                listEl.innerHTML = `<div class="p-4 text-center text-danger">Ошибка: ${err.message}</div>`;
+            }
+        }
+
+        async function retryEpisode(feedId, episodeId) {
+            try {
+                const res = await fetch(`/api/v1/feeds/${feedId}/episodes/${episodeId}/retry`, { method: 'POST' });
+                if (res.ok) {
+                    showToast("Статус сброшен, эпизод будет загружен при следующем обновлении");
+                    showEpisodes(feedId);
+                } else {
+                    alert("Ошибка retry: " + await res.text());
+                }
+            } catch (e) {
+                alert("Ошибка сети: " + e.message);
+            }
+        }
+
+        function formatDuration(sec) {
+            if (!sec) return '0:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                return d.toLocaleDateString();
+            } catch (e) {
+                return dateStr;
+            }
+        }
+
+        // Tokens
+        async function loadTokens() {
+            const listEl = document.getElementById('tokens-list');
+            try {
+                const res = await fetch('/api/v1/tokens');
+                const tokens = await res.json();
+
+                listEl.innerHTML = tokens.map(item => `
+                    <div class="border rounded p-3 bg-white">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold">${item.provider.toUpperCase()}</span>
+                            ${item.from_env ? '<span class="badge bg-info text-dark">Из переменных ENV</span>' : '<span class="badge bg-light text-muted border">Из config.toml</span>'}
+                        </div>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" value="${item.tokens.join(' ')}" placeholder="Введите токен..." ${item.from_env ? 'readonly' : ''}>
+                            ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Сохранить</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                listEl.innerHTML = `<div class="text-danger small">Ошибка загрузки токенов: ${err.message}</div>`;
+            }
+        }
+
+        async function saveTokens(provider) {
+            const input = document.getElementById(`token-input-${provider}`);
+            const tokens = input.value.trim().split(/\s+/).filter(Boolean);
+
+            try {
+                const res = await fetch('/api/v1/tokens', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, tokens })
+                });
+
+                if (res.ok) {
+                    showToast(`Токен для ${provider} сохранен`);
+                    loadTokens();
+                } else {
+                    alert(`Ошибка сохранения: ${await res.text()}`);
+                }
+            } catch (err) {
+                alert(`Ошибка: ${err.message}`);
+            }
+        }
+
+        // System
+        async function loadSystem() {
+            try {
+                const res = await fetch('/api/v1/system');
+                const data = await res.json();
+
+                document.getElementById('nav-version').innerText = data.version || 'v2.8.0';
+                document.getElementById('sys-ver').innerText = `${data.version || 'v2.8.0'} (${data.commit || 'local'})`;
+                document.getElementById('sys-uptime').innerText = data.uptime || '-';
+                document.getElementById('sys-ram').innerText = (data.memory_mb || 0).toFixed(1) + ' MB';
+                document.getElementById('sys-goroutines').innerText = data.goroutines || 0;
+                document.getElementById('sys-datadir').innerText = data.data_dir || '/app/data';
+                document.getElementById('sys-storage').innerText = data.storage_type || 'local';
+
+                // Disk
+                const total = data.disk_total_bytes || 1;
+                const used = data.disk_used_bytes || 0;
+                const free = data.disk_free_bytes || 0;
+                const pct = Math.round((used / total) * 100);
+
+                document.getElementById('disk-used-text').innerText = formatBytes(used) + ' занято';
+                document.getElementById('disk-total-text').innerText = formatBytes(free);
+                const pbar = document.getElementById('disk-progress');
+                pbar.style.width = pct + '%';
+                if (pct > 85) {
+                    pbar.className = 'progress-bar bg-danger';
+                } else if (pct > 65) {
+                    pbar.className = 'progress-bar bg-warning';
+                } else {
+                    pbar.className = 'progress-bar bg-primary';
+                }
+
+                // Tools
+                const ytdlpBadge = document.getElementById('badge-ytdlp');
+                if (data.has_ytdlp) {
+                    ytdlpBadge.className = 'badge bg-success';
+                    ytdlpBadge.innerText = 'Доступен';
+                } else {
+                    ytdlpBadge.className = 'badge bg-danger';
+                    ytdlpBadge.innerText = 'Не найден';
+                }
+
+                const ffmpegBadge = document.getElementById('badge-ffmpeg');
+                if (data.has_ffmpeg) {
+                    ffmpegBadge.className = 'badge bg-success';
+                    ffmpegBadge.innerText = 'Доступен';
+                } else {
+                    ffmpegBadge.className = 'badge bg-danger';
+                    ffmpegBadge.innerText = 'Не найден';
+                }
+
+            } catch (err) {
+                console.error("System load error:", err);
+            }
+        }
+
+        // Init
+        checkAuth();
+    </script>
+</body>
+</html>

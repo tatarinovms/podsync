@@ -31,6 +31,18 @@ no_index = false
 # Optional. Disable directory listings, return 404 for folder access (e.g. GET / or GET /feedID).
 no_listing = false
 
+# Web Admin Console (available at /admin)
+# Allows viewing podcast feeds, generating direct podcast links, QR codes,
+# adding/removing channels, retrying failed downloads, managing API tokens, and monitoring system stats.
+# Can also be configured via environment variables:
+#   PODSYNC_ADMIN_ENABLED=true
+#   PODSYNC_ADMIN_USERNAME=admin
+#   PODSYNC_ADMIN_PASSWORD=secret
+[server.admin]
+enabled = false
+username = "admin"
+password = "password"
+
 # Configure where to store the episode data
 [storage]
   # Could be "local" (default) for the local file system, or "s3" for a S3-compatible storage provider (e.g. AWS S3)
@@ -173,27 +185,3 @@ vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Al
   url = "https://vkvideo.ru/@labelcom"
   page_size = 20
   update_period = "6h"
-  format = "video"
-  quality = "high"
-
-# Podsync uses local database to store feeds and episodes metadata.
-# This section is optional and usually not needed to configure unless some very specific corner cases.
-# Refer to https://dgraph.io/docs/badger/get-started/#memory-usage for documentation.
-[database]
-  badger = { truncate = true, file_io = true }
-
-# Youtube-dl specific configuration.
-[downloader]
-# Optional, auto update youtube-dl every 24 hours
-self_update = true
-# Download timeout in minutes.
-timeout = 15
-
-# Optional log config. If not specified logs to the stdout
-[log]
-filename = "podsync.log"
-max_size = 50 # MB
-max_age = 30 # days
-max_backups = 7
-compress = true
-debug = false

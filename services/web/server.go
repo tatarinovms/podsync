@@ -15,7 +15,10 @@ import (
 
 type Server struct {
 	http.Server
-	db db.Storage
+	db       db.Storage
+	cfg      Config
+	sessions *SessionManager
+	adminMgr AdminManager
 }
 
 type Config struct {
@@ -46,6 +49,12 @@ type Config struct {
 	NoIndex bool `toml:"no_index"`
 	// NoListing returns 404 for directory listings, only serving actual files (disabled by default)
 	NoListing bool `toml:"no_listing"`
+	// Admin panel configuration
+	Admin AdminConfig `toml:"admin"`
+}
+
+func (s *Server) SetAdminManager(mgr AdminManager) {
+	s.adminMgr = mgr
 }
 
 func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
@@ -60,7 +69,9 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	}
 
 	srv := Server{
-		db: database,
+		db:       database,
+		cfg:      cfg,
+		sessions: NewSessionManager(),
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", bindAddress, port)
@@ -83,6 +94,22 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 
 	// Add health check endpoint
 	mux.HandleFunc("/health", srv.healthCheckHandler)
+
+	// Admin Web UI and REST API
+	if cfg.Admin.Enabled {
+		log.Info("admin web console enabled at /admin")
+
+		// Redirect /admin to /admin/
+		mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
+		})
+
+		// Serve embedded admin SPA
+		mux.Handle("/admin/", srv.authMiddleware(srv.adminUIHandler()))
+
+		// Register API endpoints
+		srv.registerAPIRoutes(mux)
+	}
 
 	// Optionally enable debug endpoints (disabled by default for security)
 	if cfg.DebugEndpoints {

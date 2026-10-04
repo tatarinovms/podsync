@@ -13,11 +13,12 @@ any device in podcast client.
 ## 🍴 Fork Features
 
 This fork extends the original `mxpv/podsync` with:
+- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use podcast RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), API key management, and system metrics (disk usage, memory, uptime, binary dependencies).
 - **VK Video support**: Convert VK Video channels, communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
 - **yt-dlp integration**: Native preference and support for `yt-dlp` for improved download speed and stability.
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-time filename migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
-- **Extended environment variables**: `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`) for VK API access tokens.
+- **Extended environment variables**: `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`), `PODSYNC_ADMIN_ENABLED`, `PODSYNC_ADMIN_USERNAME`, `PODSYNC_ADMIN_PASSWORD`.
 
 ## ✨ Features
 
@@ -71,6 +72,11 @@ Minimal configuration:
 [server]
 port = 8080
 
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+
 [storage]
   [storage.local]
   # Don't change if you run podsync via docker
@@ -102,18 +108,33 @@ hostname = "https://my.test.host:4443"
 
 Server will be accessible from `http://localhost:8080`, but episode links will point to `https://my.test.host:4443/ID1/...`
 
-### 🌍 Environment Variables
+### 🌐 Environment Variables
 
 Podsync supports the following environment variables for configuration and API keys:
 
 | Variable Name                | Description                                                                               | Example Value(s)                              |
 |------------------------------|-------------------------------------------------------------------------------------------|-----------------------------------------------|
 | `PODSYNC_CONFIG_PATH`        | Path to the configuration file (overrides `--config` CLI flag)                            | `/app/config.toml`                            |
+| `PODSYNC_ADMIN_ENABLED`      | Enable web admin console (`true` or `false`)                                              | `true`                                        |
+| `PODSYNC_ADMIN_USERNAME`     | Admin web console username                                                                | `admin`                                       |
+| `PODSYNC_ADMIN_PASSWORD`     | Admin web console password                                                                | `secretpassword`                              |
 | `PODSYNC_VKVIDEO_API_KEY`    | VK Video access token(s), space-separated for rotation (alias: `PODSYNC_VK_API_KEY`)       | `vk_token1` or `vk_token1 vk_token2`          |
 | `PODSYNC_YOUTUBE_API_KEY`    | YouTube API key(s), space-separated for rotation                                          | `key1` or `key1 key2 key3`                    |
 | `PODSYNC_VIMEO_API_KEY`      | Vimeo API key(s), space-separated for rotation                                            | `key1` or `key1 key2`                         |
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation                                       | `soundcloud_key1 soundcloud_key2`             |
 | `PODSYNC_TWITCH_API_KEY`     | Twitch API credentials in the format `CLIENT_ID:CLIENT_SECRET`, space-separated for multi | `id1:secret1 id2:secret2`                     |
+
+## 🎛 Web Admin Console
+
+Podsync includes a built-in web management console accessible at `/admin`:
+
+- **Feed Overview**: View all channels with custom covers, provider badges, downloaded episode counts, and disk space used.
+- **Ready Podcast Links**: Direct RSS feed URL with 1-click clipboard copy.
+- **QR Codes**: Instant subscription on iOS and Android devices by scanning the feed QR code.
+- **Podcast Player Deep Links**: Open directly in Apple Podcasts (`podcast://`), Pocket Casts (`pktc://`), or Overcast.
+- **Feed Management**: Add new YouTube/VK/Vimeo feeds dynamically with instant synchronization to `config.toml`, delete feeds, or trigger immediate downloads.
+- **Episode Status & Retry**: View download statuses and retry failed episodes with 1 click.
+- **System Monitoring**: Live disk space usage, allocated RAM, uptime, and availability of system tools (`yt-dlp`, `ffmpeg`).
 
 ## 🚀 How to run
 

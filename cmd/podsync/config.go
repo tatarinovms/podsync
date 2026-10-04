@@ -75,7 +75,7 @@ func LoadConfig(path string) (*Config, error) {
 	config.applyEnv()
 
 	if err := config.validate(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to validate config")
 	}
 
 	return &config, nil
@@ -117,8 +117,14 @@ func (c *Config) validate() error {
 		result = multierror.Append(result, errors.Errorf("unknown storage type: %s", c.Storage.Type))
 	}
 
-	if len(c.Feeds) == 0 {
-		result = multierror.Append(result, errors.New("at least one feed must be specified"))
+	if len(c.Feeds) == 0 && !c.Server.Admin.Enabled {
+		result = multierror.Append(result, errors.New("at least one feed must be specified (or enable admin console)"))
+	}
+
+	if c.Server.Admin.Enabled {
+		if c.Server.Admin.Username == "" || c.Server.Admin.Password == "" {
+			result = multierror.Append(result, errors.New("server.admin.username and server.admin.password are required when admin is enabled"))
+		}
 	}
 
 	for id, f := range c.Feeds {
@@ -164,7 +170,10 @@ func (c *Config) applyDefaults(configPath string) {
 	}
 
 	if c.Database.Dir == "" {
-		c.Database.Dir = filepath.Join(filepath.Dir(configPath), "db")
+		// If database directory is not explicitly specified,
+		// use the directory where the config file is located
+		configDir := filepath.Dir(configPath)
+		c.Database.Dir = filepath.Join(configDir, "db")
 	}
 
 	for _, _feed := range c.Feeds {
@@ -233,6 +242,17 @@ func (c *Config) applyEnv() {
 				c.Tokens[model.ProviderVkVideo] = vkTokens
 			}
 		}
+	}
+
+	// Admin panel environment variables
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_ENABLED"); ok {
+		c.Server.Admin.Enabled = val == "true" || val == "1"
+	}
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_USERNAME"); ok {
+		c.Server.Admin.Username = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_PASSWORD"); ok {
+		c.Server.Admin.Password = val
 	}
 }
 

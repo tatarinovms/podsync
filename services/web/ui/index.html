@@ -1184,24 +1184,34 @@
 
                 listEl.innerHTML = list.map(item => {
                     const tokenList = Array.isArray(item.tokens) ? item.tokens : [];
-                    const hasTokens = tokenList.length > 0;
-                    const maskedStr = tokenList.join(', ');
+                    const count = tokenList.length;
+
+                    let tokensBadge = '<span class="badge bg-secondary ms-2">Not set</span>';
+                    if (count === 1) {
+                        tokensBadge = `<span class="badge bg-success ms-2 font-monospace">${tokenList[0]}</span>`;
+                    } else if (count > 1) {
+                        tokensBadge = `<span class="badge bg-primary-subtle text-primary border ms-2"><i class="bi bi-arrow-repeat me-1"></i>${count} keys (Rotation)</span>`;
+                    }
 
                     return `
                     <div class="border rounded p-3 bg-white">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <div>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <div class="d-flex flex-wrap align-items-center">
                                 <span class="fw-bold">${item.provider.toUpperCase()}</span>
-                                ${hasTokens 
-                                    ? `<span class="badge bg-success ms-2 font-monospace">${maskedStr}</span>` 
-                                    : '<span class="badge bg-secondary ms-2">Not set</span>'
-                                }
+                                ${tokensBadge}
                             </div>
                             ${item.from_env ? '<span class="badge bg-info text-dark">From ENV</span>' : '<span class="badge bg-light text-muted border">From config.toml</span>'}
                         </div>
+                        ${count > 1 ? `
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            ${tokenList.map(tok => `<span class="badge bg-success font-monospace">${tok}</span>`).join('')}
+                        </div>` : ''}
                         <div class="d-flex gap-2">
-                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${hasTokens ? 'Enter new token to replace...' : 'Enter token...'}" ${item.from_env ? 'disabled' : ''}>
+                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Enter new token(s) separated by space to replace...' : 'Enter token(s) separated by space for rotation...'}" ${item.from_env ? 'disabled' : ''}>
                             ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Save</button>` : ''}
+                        </div>
+                        <div class="form-text small text-muted mt-1">
+                            <i class="bi bi-info-circle me-1"></i>Supports multiple space-separated keys for automatic round-robin rotation.
                         </div>
                     </div>
                 `;

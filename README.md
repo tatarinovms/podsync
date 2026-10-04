@@ -127,17 +127,42 @@ Podsync supports the following environment variables for configuration and API k
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation                                       | `soundcloud_key1 soundcloud_key2`             |
 | `PODSYNC_TWITCH_API_KEY`     | Twitch API credentials in the format `CLIENT_ID:CLIENT_SECRET`, space-separated for multi | `id1:secret1 id2:secret2`                     |
 
-## Web Admin Console
+## Web Admin Console & REST API
 
-Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full setup instructions and REST API documentation:
+Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full setup instructions.
 
-- **Feed Overview**: View all channels with custom covers, provider badges, downloaded episode counts, and disk space used.
-- **Ready Podcast Links**: Direct RSS feed URL with 1-click clipboard copy.
-- **QR Codes**: Instant subscription on iOS and Android devices by scanning the feed QR code.
-- **Podcast Player Deep Links**: Open directly in Apple Podcasts (`podcast://`), Pocket Casts (`pktc://`), or Overcast.
-- **Feed Management**: Add new YouTube/VK/Vimeo feeds dynamically with instant synchronization to `config.toml`, delete feeds, or trigger immediate downloads.
-- **Episode Status & Retry**: View download statuses and retry failed episodes with 1 click.
-- **System Monitoring**: Live disk space usage, allocated RAM, uptime, and availability of system tools (`yt-dlp`, `ffmpeg`).
+### REST API Endpoints
+
+All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and browser session cookies:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check endpoint (public, unauthenticated) |
+| `GET` | `/api/v1/auth/status` | Current authentication status |
+| `POST` | `/api/v1/auth/login` | Session login with JSON credentials |
+| `POST` | `/api/v1/auth/logout` | Session logout |
+| `GET` | `/api/v1/feeds` | List all podcast feeds with episode counts and disk usage |
+| `POST` | `/api/v1/feeds` | Add new channel/playlist feed with auto-sync to `config.toml` |
+| `GET` | `/api/v1/feeds/{id}` | Detailed feed info and episode download status |
+| `DELETE` | `/api/v1/feeds/{id}` | Delete feed (`?delete_files=true` to delete media files) |
+| `POST` | `/api/v1/feeds/{id}/update` | Trigger immediate feed update and download cycle |
+| `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode status for retry |
+| `GET` | `/api/v1/tokens` | Get masked API tokens for all providers |
+| `POST` | `/api/v1/tokens` | Update API tokens (supports key rotation) |
+| `GET` | `/api/v1/system` | System metrics (RAM, uptime, disk space, yt-dlp/ffmpeg status) |
+
+## Model Context Protocol (MCP) Server
+
+Podsync includes a built-in **MCP Server** that allows AI assistants (such as **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, and check system health.
+
+See the [MCP Guide](./docs/mcp.md) for complete details and tool specifications.
+
+- **Stdio Mode (Claude Desktop, Cursor)**:
+  ```bash
+  ./bin/podsync --config config.toml --mcp
+  ```
+  *(Automatically proxies to a running Podsync instance if active, or operates standalone with the local database).*
+- **HTTP / SSE Mode**: Available at `/mcp` and `/mcp/sse` when the web server is running.
 
 ## How to run
 
@@ -149,9 +174,10 @@ Make sure you have created the file `config.toml`. Also note the location of the
 make
 ./bin/podsync --config config.toml
 
-# Optional CLI flags for admin console:
+# Optional CLI flags:
 # ./bin/podsync --config config.toml --admin     # Force enable web admin console (/admin)
 # ./bin/podsync --config config.toml --no-admin  # Force disable web admin console (/admin)
+# ./bin/podsync --config config.toml --mcp       # Run as MCP server over stdio for AI assistants
 ```
 
 ### One-time filename migration

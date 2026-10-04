@@ -22,6 +22,7 @@ import (
 
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/mcp"
 	"github.com/mxpv/podsync/pkg/ytdl"
 )
 
@@ -32,6 +33,7 @@ type Opts struct {
 	MigrateFilenamesDryRun bool   `long:"migrate-filenames-dry-run" description:"Preview filename migration without writing changes (requires --migrate-filenames)"`
 	Admin                  bool   `long:"admin" description:"Force enable web admin console (/admin) regardless of configuration"`
 	NoAdmin                bool   `long:"no-admin" description:"Force disable web admin console (/admin) regardless of configuration"`
+	MCP                    bool   `long:"mcp" description:"Run as MCP (Model Context Protocol) server over stdio"`
 	Debug                  bool   `long:"debug"`
 	NoBanner               bool   `long:"no-banner"`
 }
@@ -77,6 +79,11 @@ func main() {
 	if opts.Admin && opts.NoAdmin {
 		log.Fatal("cannot specify both --admin and --no-admin")
 	}
+	if opts.MCP {
+		opts.NoBanner = true
+		log.SetOutput(os.Stderr)
+		formatter.DisableColors = true
+	}
 	if opts.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -109,6 +116,20 @@ func main() {
 	cfg, err := LoadConfigWithOptions(opts.ConfigPath, adminOverride)
 	if err != nil {
 		log.WithError(err).Fatal("failed to load configuration file")
+	}
+
+	if opts.MCP {
+		// First check if a running Podsync instance is already accessible via HTTP
+		baseURL := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+		proxyMgr := mcp.NewHTTPClientManager(baseURL, cfg.Server.Admin.Username, cfg.Server.Admin.Password)
+		if proxyMgr.IsReachable(ctx) {
+			log.Infof("MCP: connected to running Podsync server at %s", baseURL)
+			mcpServer := mcp.NewServer(proxyMgr)
+			if err := mcp.RunStdio(ctx, mcpServer, os.Stdin, os.Stdout); err != nil {
+				log.WithError(err).Error("MCP stdio session terminated")
+			}
+			return
+		}
 	}
 
 	if cfg.Log.Filename != "" {
@@ -238,8 +259,9 @@ func main() {
 		}
 	})
 
-	// Run cron scheduler
-	group.Go(func() error {
+	// Run cron scheduler (only in daemon mode, not in MCP stdio mode)
+	if !opts.MCP {
+		group.Go(func() error {
 		var cronID cron.EntryID
 
 		for _, _feed := range cfg.Feeds {
@@ -278,6 +300,7 @@ func main() {
 			return ctx.Err()
 		}
 	})
+	}
 
 	if cfg.Storage.Type == "s3" {
 		return // S3 content is hosted externally
@@ -302,6 +325,19 @@ func main() {
 		date,
 	)
 	srv.SetAdminManager(feedManager)
+
+	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)
+	mcpServer := mcp.NewServer(feedManager)
+	srv.SetMCPHandler(mcp.NewHTTPHandler(mcpServer))
+
+	if opts.MCP {
+		log.Info("running MCP server directly over stdio")
+		if err := mcp.RunStdio(ctx, mcpServer, os.Stdin, os.Stdout); err != nil {
+			log.WithError(err).Error("MCP stdio session terminated")
+		}
+		cancel()
+		return
+	}
 
 	group.Go(func() error {
 		log.Infof("running listener at %s", srv.Addr)

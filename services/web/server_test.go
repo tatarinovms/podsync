@@ -232,3 +232,36 @@ func TestNoListingEnabledWhenConfigured(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "audio content", rec.Body.String())
 }
+
+func TestMCPHandlerRouting(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "secretpassword",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+
+	mockMCP := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"result":"mcp-ok"}`))
+	})
+	srv.SetMCPHandler(mockMCP)
+
+	// Unauthenticated request to /mcp should return 401
+	reqUnauth := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	recUnauth := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(recUnauth, reqUnauth)
+	assert.Equal(t, http.StatusUnauthorized, recUnauth.Code)
+
+	// Authenticated request to /mcp should return 200 and invoke handler
+	reqAuth := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	reqAuth.SetBasicAuth("admin", "secretpassword")
+	recAuth := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(recAuth, reqAuth)
+	assert.Equal(t, http.StatusOK, recAuth.Code)
+	assert.Contains(t, recAuth.Body.String(), "mcp-ok")
+}

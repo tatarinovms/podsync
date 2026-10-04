@@ -15,10 +15,11 @@ import (
 
 type Server struct {
 	http.Server
-	db       db.Storage
-	cfg      Config
-	sessions *SessionManager
-	adminMgr AdminManager
+	db         db.Storage
+	cfg        Config
+	sessions   *SessionManager
+	adminMgr   AdminManager
+	mcpHandler http.Handler
 }
 
 type Config struct {
@@ -55,6 +56,20 @@ type Config struct {
 
 func (s *Server) SetAdminManager(mgr AdminManager) {
 	s.adminMgr = mgr
+}
+
+func (s *Server) SetMCPHandler(h http.Handler) {
+	s.mcpHandler = h
+}
+
+func (s *Server) mcpProxyHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.mcpHandler != nil {
+			s.mcpHandler.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "MCP server not initialized", http.StatusServiceUnavailable)
+	})
 }
 
 func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
@@ -109,6 +124,10 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 
 		// Register API endpoints
 		srv.registerAPIRoutes(mux)
+
+		// Register MCP endpoints (supporting direct JSON-RPC and SSE)
+		mux.Handle("/mcp", srv.authMiddleware(srv.mcpProxyHandler()))
+		mux.Handle("/mcp/", srv.authMiddleware(srv.mcpProxyHandler()))
 	}
 
 	// Optionally enable debug endpoints (disabled by default for security)

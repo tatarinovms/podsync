@@ -22,11 +22,11 @@ builds:
 archives:
   - id: arc
     name_template: >-
-      {{- .ProjectName }}_{{.Version}}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
+      {{- .ProjectName }}_{{.Version}}_\
+      {{- title .Os }}_\
+      {{- if eq .Arch "amd64" }}x86_64\
+      {{- else if eq .Arch "386" }}i386\
+      {{- else }}{{ .Arch }}{{ end }}\
       {{- if .Arm }}v{{ .Arm }}{{ end -}}
     format_overrides:
       - goos: windows
@@ -48,11 +48,9 @@ changelog:
     - Merge branch
 
 release:
-  # We publish Docker image manually,
-  # include links to the release notes.
   footer: |
     # Docker images
     ```
-    docker pull ghcr.io/mxpv/podsync:{{ .Tag }}
-    docker pull ghcr.io/mxpv/podsync:latest
+    docker pull ghcr.io/tatarinovms/podsync:{{ .Tag }}
+    docker pull ghcr.io/tatarinovms/podsync:latest
     ```

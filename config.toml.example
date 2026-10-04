@@ -49,13 +49,14 @@ no_listing = false
   # e.g. https://example-bucket-name.s3.us-west-2.amazonaws.com/example/prefix/
   prefix = "example/prefix"
 
-# API keys to be used to access Youtube and Vimeo.
+# API keys to be used to access YouTube, Vimeo, Twitch, and VK Video.
 # These can be either specified as string parameter or array of string (so those will be rotated).
 # Alternatively, you can set the following environment variables:
 #   PODSYNC_YOUTUBE_API_KEY for YouTube
 #   PODSYNC_VIMEO_API_KEY for Vimeo
 #   PODSYNC_SOUNDCLOUD_API_KEY for Soundcloud
 #   PODSYNC_TWITCH_API_KEY for Twitch (format: CLIENT_ID:CLIENT_SECRET)
+#   PODSYNC_VKVIDEO_API_KEY for VK Video (or PODSYNC_VK_API_KEY)
 # Environment variables support multiple keys separated by spaces for API key rotation:
 #   export PODSYNC_YOUTUBE_API_KEY="key1 key2 key3"
 [tokens]
@@ -64,6 +65,7 @@ vimeo = [ # Multiple keys will be rotated.
   "VIMEO_API_KEY_1", # Vimeo developer keys. See https://developer.vimeo.com/api/guides/start#generate-access-token
   "VIMEO_API_KEY_2"
 ]
+vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Alias 'vk' also supported.
 
 # The list of data sources to be hosted by Podsync.
 # These are channels, users, playlists, etc.
@@ -71,6 +73,9 @@ vimeo = [ # Multiple keys will be rotated.
   # Each channel must have a unique identifier (in this example "ID1").
   [feeds.ID1]
   # URL address of a channel, group, user, or playlist.
+  # YouTube: https://www.youtube.com/channel/... or https://www.youtube.com/@handle or playlist
+  # Vimeo: https://vimeo.com/channels/... or user or group
+  # VK Video: https://vkvideo.ru/@handle or https://vkvideo.ru/playlist/-22822305_1 or https://vk.com/club12345
   url = "https://www.youtube.com/channel/CHANNEL_NAME_TO_HOST"
 
   # The number of episodes to query each update (keep in mind, that this might drain API token)
@@ -162,6 +167,14 @@ vimeo = [ # Multiple keys will be rotated.
   ownerEmail = "mrs@smith.org"
   # optional: this will override the default link (usually the URL address) in the generated RSS feed with another link
   link = "https://example.org"
+
+  # Example VK Video feed
+  [feeds.VK1]
+  url = "https://vkvideo.ru/@labelcom"
+  page_size = 20
+  update_period = "6h"
+  format = "video"
+  quality = "high"
 
 # Podsync uses local database to store feeds and episodes metadata.
 # This section is optional and usually not needed to configure unless some very specific corner cases.

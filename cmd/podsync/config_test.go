@@ -308,7 +308,7 @@ data_dir = "/data"
 [feeds]
   [feeds.FEED1]
   url = "https://youtube.com/channel/test1"
-  
+
   [feeds.FEED2]
   url = "https://youtube.com/channel/test2"
   clean = { keep_last = 5 }
@@ -345,7 +345,7 @@ data_dir = "/data"
 [feeds]
   [feeds.FEED1]
   url = "https://youtube.com/channel/test1"
-  
+
   [feeds.FEED2]
   url = "https://youtube.com/channel/test2"
   clean = { keep_last = 5 }
@@ -458,6 +458,73 @@ data_dir = "/data"
 
 		// Should parse multiple keys from environment variable
 		assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, config.Tokens[model.ProviderYoutube])
+	})
+
+	t.Run("vkvideo environment variable", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://vkvideo.ru/@labelcom"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_VKVIDEO_API_KEY", "vk_token_123")
+
+		config, err := LoadConfig(path)
+		assert.NoError(t, err)
+		require.NotNil(t, config)
+
+		require.Len(t, config.Tokens[model.ProviderVkVideo], 1)
+		assert.Equal(t, "vk_token_123", config.Tokens[model.ProviderVkVideo][0])
+	})
+
+	t.Run("vk environment variable alias", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://vkvideo.ru/@labelcom"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_VK_API_KEY", "vk_token_alias")
+
+		config, err := LoadConfig(path)
+		assert.NoError(t, err)
+		require.NotNil(t, config)
+
+		require.Len(t, config.Tokens[model.ProviderVkVideo], 1)
+		assert.Equal(t, "vk_token_alias", config.Tokens[model.ProviderVkVideo][0])
+	})
+
+	t.Run("vk token config alias", func(t *testing.T) {
+		const file = `
+[tokens]
+vk = "config_vk_token"
+
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://vkvideo.ru/@labelcom"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		config, err := LoadConfig(path)
+		assert.NoError(t, err)
+		require.NotNil(t, config)
+
+		require.Len(t, config.Tokens[model.ProviderVkVideo], 1)
+		assert.Equal(t, "config_vk_token", config.Tokens[model.ProviderVkVideo][0])
 	})
 }
 

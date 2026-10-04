@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Podsync is a Go-based service that converts YouTube, Vimeo, SoundCloud, and Twitch channels into podcast feeds. It downloads video/audio content and generates RSS feeds that can be consumed by podcast clients.
+Podsync is a Go-based service that converts YouTube, Vimeo, SoundCloud, Twitch, and VK Video channels into podcast feeds. It downloads video/audio content and generates RSS feeds that can be consumed by podcast clients.
 
 ## Key Architecture Components
 
@@ -13,12 +13,12 @@ Podsync is a Go-based service that converts YouTube, Vimeo, SoundCloud, and Twit
 - **config.go**: TOML configuration loading and validation with defaults
 
 ### Core Packages (`pkg/`)
-- **builder/**: Media downloaders for different platforms (YouTube, Vimeo, SoundCloud, Twitch)
+- **builder/**: Media downloaders for different platforms (YouTube, Vimeo, SoundCloud, Twitch, VK Video)
 - **feed/**: RSS/podcast feed generation and management, OPML export, hooks, API key rotation
 - **db/**: BadgerDB-based storage for metadata and state
 - **fs/**: Storage abstraction supporting local filesystem and S3-compatible storage
 - **model/**: Core data structures and domain models
-- **ytdl/**: YouTube-dl wrapper for media downloading
+- **ytdl/**: yt-dlp / youtube-dl wrapper for media downloading
 
 ### Services (`services/`)
 - **update/**: Feed update orchestration, scheduling, episode filtering via matcher.go
@@ -26,7 +26,7 @@ Podsync is a Go-based service that converts YouTube, Vimeo, SoundCloud, and Twit
 - **migrate/**: Filename migration tooling for transitioning to custom filename templates
 
 ### Key Dependencies
-- youtube-dl/yt-dlp for media downloading
+- yt-dlp / youtube-dl for media downloading
 - BadgerDB for local storage
 - go-toml for configuration
 - robfig/cron for scheduling
@@ -37,7 +37,7 @@ Podsync is a Go-based service that converts YouTube, Vimeo, SoundCloud, and Twit
 Understanding how episodes flow through the system:
 
 ### Discovery Phase
-- Episodes are discovered during feed updates via platform APIs (YouTube Data API v3, Vimeo API, SoundCloud, Twitch)
+- Episodes are discovered during feed updates via platform APIs (YouTube Data API v3, Vimeo API, SoundCloud, Twitch, VK API)
 - `updateFeed()` in `services/update/updater.go:99-154` queries the platform API
 - New episodes are stored in BadgerDB with status `EpisodeNew`
 - Episodes matching feed URL are identified by provider-specific parsing in `pkg/builder/`
@@ -107,7 +107,7 @@ playlist_sort = "desc"                 # "asc" or "desc" for playlist ordering
 filename_template = "{{id}}"           # Tokens: {{id}}, {{title}}, {{pub_date}}, {{feed_id}}
 opml = true                            # Include in OPML export
 private_feed = false                   # Don't index by podcast aggregators
-youtube_dl_args = ["--arg1", "val"]    # Additional youtube-dl arguments
+youtube_dl_args = ["--arg1", "val"]    # Additional youtube-dl/yt-dlp arguments
 
 [feeds.my_feed.custom_format]          # When format = "custom"
 youtube_dl_format = "bestvideo+bestaudio"
@@ -229,15 +229,16 @@ youtube = ["KEY1", "KEY2", "KEY3"]     # Multiple keys for rotation
 vimeo = "TOKEN"
 soundcloud = "KEY"
 twitch = "CLIENT_ID:CLIENT_SECRET"     # Must include both
+vkvideo = "VK_ACCESS_TOKEN"            # VK API User Token with 'video' scope (alias 'vk' also supported)
 ```
-Environment variables: `PODSYNC_YOUTUBE_API_KEY`, `PODSYNC_VIMEO_API_KEY`, etc. (space-separated for multiple keys)
+Environment variables: `PODSYNC_YOUTUBE_API_KEY`, `PODSYNC_VIMEO_API_KEY`, `PODSYNC_VKVIDEO_API_KEY` (or `PODSYNC_VK_API_KEY`), etc. (space-separated for multiple keys)
 
 ### Downloader Configuration
 ```toml
 [downloader]
-self_update = false                    # Auto-update youtube-dl every 24h
+self_update = false                    # Auto-update youtube-dl/yt-dlp every 24h
 timeout = 15                           # Download timeout in minutes (default 15)
-custom_binary = "/path/to/yt-dlp"      # Custom youtube-dl/yt-dlp binary
+custom_binary = "/path/to/yt-dlp"      # Custom yt-dlp/youtube-dl binary
 ```
 
 ### Global Cleanup
@@ -284,6 +285,15 @@ debug = false
 - Requires `CLIENT_ID:CLIENT_SECRET` token format
 - Max 100 videos per request
 
+### VK Video (`pkg/builder/vkvideo.go`)
+- **Supported**: Channels/Communities, Handles (`@slug`), Clubs/Publics, Users (`id12345`), Events, Playlists/Albums, Videos tab (`/videos-12345`)
+- **URLs**: `vkvideo.ru`, `vk.com`, and `vk.ru` (e.g. `vkvideo.ru/@labelcom`, `vkvideo.ru/playlist/-22822305_1`, `vk.com/videos-22822305`)
+- **Not Supported**: Live streams and Upcoming broadcasts (automatically filtered out), videos still processing
+- Requires VK User Access Token with `video` scope (configured via `[tokens] vkvideo = "..."` or `PODSYNC_VKVIDEO_API_KEY`)
+- Episodes download natively via yt-dlp using canonical video URLs `https://vk.com/video{owner_id}_{video_id}`
+- Supports playlist_sort for ordering
+- Automatic retry on VK API rate limit (error 6)
+
 ### API Key Rotation
 - All platforms support multiple keys for rotation
 - Round-robin rotation via `RotatedKeyProvider` in `pkg/feed/key.go`
@@ -320,6 +330,7 @@ debug = false
 ## Error Handling
 
 - YouTube 429 (rate limit): stops current batch, retries next cycle
+- VK Video: automatically retries upon error 6 (rate limit) with backoff
 - Download failures: episode status set to `EpisodeError`, retried next cycle
 - API failures: logged, scheduler continues with other feeds
 - Download timeout: configurable via `downloader.timeout` (default 15 minutes)
@@ -335,6 +346,7 @@ debug = false
 
 ### Platforms
 - YouTube: Live/Premiered videos skipped automatically
+- VK Video: Live streams and upcoming broadcasts skipped automatically
 - SoundCloud: Only playlist URLs supported
 - Twitch: Archives only, no clips/highlights
 
@@ -344,7 +356,7 @@ debug = false
 
 ### Performance
 - Feed updates are sequential (not parallel)
-- Large playlists paginated with 50-item batches
+- Large playlists paginated with 50-item batches (100 for VK)
 - All episodes loaded into memory when walking database
 
 ## Common Development Commands
@@ -485,6 +497,7 @@ This project uses golangci-lint with strict formatting rules configured in `.gol
 - Web server: `services/web/server.go`
 - YouTube builder: `pkg/builder/youtube.go`
 - Vimeo builder: `pkg/builder/vimeo.go`
+- VK Video builder: `pkg/builder/vkvideo.go`
 - SoundCloud builder: `pkg/builder/soundcloud.go`
 - Twitch builder: `pkg/builder/twitch.go`
 - URL parsing: `pkg/builder/url.go`

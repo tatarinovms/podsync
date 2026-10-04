@@ -3,9 +3,9 @@ package builder
 import (
 	"context"
 
-	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/pkg/errors"
 
+	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
 )
 
@@ -23,6 +23,8 @@ func New(ctx context.Context, provider model.Provider, key string, downloader Do
 		return NewSoundcloudBuilder()
 	case model.ProviderTwitch:
 		return NewTwitchBuilder(key)
+	case model.ProviderVkVideo:
+		return NewVkVideoBuilder(key, downloader)
 	default:
 		return nil, errors.Errorf("unsupported provider %q", provider)
 	}

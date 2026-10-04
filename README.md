@@ -2,24 +2,17 @@
 
 ![Podsync](docs/img/logo.png)
 
-[![](https://github.com/mxpv/podsync/workflows/CI/badge.svg)](https://github.com/mxpv/podsync/actions?query=workflow%3ACI)
-[![Nightly](https://github.com/mxpv/podsync/actions/workflows/nightly.yml/badge.svg)](https://github.com/mxpv/podsync/actions/workflows/nightly.yml)
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/mxpv/podsync)](https://github.com/mxpv/podsync/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mxpv/podsync)](https://goreportcard.com/report/github.com/mxpv/podsync)
-[![GitHub Sponsors](https://img.shields.io/github/sponsors/mxpv)](https://github.com/sponsors/mxpv)
-[![Patreon](https://img.shields.io/badge/support-patreon-E6461A.svg)](https://www.patreon.com/podsync)
-
-Podsync - is a simple, free service that lets you listen to any YouTube / Vimeo channels, playlists or user videos in
+Podsync - is a simple, free service that lets you listen to any YouTube / Vimeo / VK Video channels, playlists or user videos in
 podcast format.
 
 Podcast applications have a rich functionality for content delivery - automatic download of new episodes,
 remembering last played position, sync between devices and offline listening. This functionality is not available
-on YouTube and Vimeo. So the aim of Podsync is to make your life easier and enable you to view/listen to content on
+on YouTube, Vimeo and VK Video. So the aim of Podsync is to make your life easier and enable you to view/listen to content on
 any device in podcast client.
 
 ## ✨ Features
 
-- Works with YouTube and Vimeo.
+- Works with YouTube, Vimeo, VK Video, SoundCloud, and Twitch.
 - Supports feeds configuration: video/audio, high/low quality, max video height, etc.
 - mp3 encoding
 - Update scheduler supports cron expressions
@@ -48,6 +41,7 @@ brew install yt-dlp ffmpeg go
 
 - [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
 - [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
+- [How to get VK API token](./docs/how_to_get_vk_token.md)
 - [Podsync on QNAP NAS Guide](./docs/how_to_setup_podsync_on_qnap_nas.md)
 - [Schedule updates with cron](./docs/cron.md)
 
@@ -61,10 +55,11 @@ $ docker run -it --rm ghcr.io/mxpv/podsync:nightly
 
 ### 🔑 Access tokens
 
-In order to query YouTube or Vimeo API you have to obtain an API token first.
+In order to query YouTube, Vimeo, or VK Video API you have to obtain an API token first.
 
 - [How to get YouTube API key](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
 - [Generate an access token for Vimeo](https://developer.vimeo.com/api/guides/start#generate-access-token)
+- [How to get VK API token](./docs/how_to_get_vk_token.md)
 
 ## ⚙️ Configuration
 
@@ -111,10 +106,11 @@ Podsync supports the following environment variables for configuration and API k
 | Variable Name                | Description                                                                               | Example Value(s)                              |
 |------------------------------|-------------------------------------------------------------------------------------------|-----------------------------------------------|
 | `PODSYNC_CONFIG_PATH`        | Path to the configuration file (overrides `--config` CLI flag)                            | `/app/config.toml`                            |
-| `PODSYNC_YOUTUBE_API_KEY`    | YouTube API key(s), space-separated for rotation                                          | `key1` or `key1 key2 key3` |
-| `PODSYNC_VIMEO_API_KEY`      | Vimeo API key(s), space-separated for rotation                                            | `key1` or `key1 key2`        |
+| `PODSYNC_YOUTUBE_API_KEY`    | YouTube API key(s), space-separated for rotation                                          | `key1` or `key1 key2 key3`                    |
+| `PODSYNC_VIMEO_API_KEY`      | Vimeo API key(s), space-separated for rotation                                            | `key1` or `key1 key2`                         |
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation                                       | `soundcloud_key1 soundcloud_key2`             |
 | `PODSYNC_TWITCH_API_KEY`     | Twitch API credentials in the format `CLIENT_ID:CLIENT_SECRET`, space-separated for multi | `id1:secret1 id2:secret2`                     |
+| `PODSYNC_VKVIDEO_API_KEY`    | VK Video access token(s), space-separated for rotation (alias: `PODSYNC_VK_API_KEY`)       | `vk_token1` or `vk_token1 vk_token2`          |
 
 ## 🚀 How to run
 

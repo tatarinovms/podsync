@@ -200,25 +200,38 @@ func (c *Config) applyDefaults(configPath string) {
 }
 
 func (c *Config) applyEnv() {
-	envVars := map[model.Provider]string{
-		model.ProviderYoutube:    "PODSYNC_YOUTUBE_API_KEY",
-		model.ProviderVimeo:      "PODSYNC_VIMEO_API_KEY",
-		model.ProviderSoundcloud: "PODSYNC_SOUNDCLOUD_API_KEY",
-		model.ProviderTwitch:     "PODSYNC_TWITCH_API_KEY",
+	envVars := map[model.Provider][]string{
+		model.ProviderYoutube:    {"PODSYNC_YOUTUBE_API_KEY"},
+		model.ProviderVimeo:      {"PODSYNC_VIMEO_API_KEY"},
+		model.ProviderSoundcloud: {"PODSYNC_SOUNDCLOUD_API_KEY"},
+		model.ProviderTwitch:     {"PODSYNC_TWITCH_API_KEY"},
+		model.ProviderVkVideo:    {"PODSYNC_VKVIDEO_API_KEY", "PODSYNC_VK_API_KEY"},
 	}
 
 	// Replace API keys from config with environment variables
-	for provider, envVar := range envVars {
-		val, ok := os.LookupEnv(envVar)
-		if ok {
-			log.Infof("Found %s environment variable, replacing config token with it", envVar)
-			// If no tokens are provided in the config.toml, we need to create a new map
-			if c.Tokens == nil {
-				c.Tokens = make(map[model.Provider]StringSlice)
+	for provider, varNames := range envVars {
+		for _, envVar := range varNames {
+			val, ok := os.LookupEnv(envVar)
+			if ok {
+				log.Infof("Found %s environment variable, replacing config token with it", envVar)
+				// If no tokens are provided in the config.toml, we need to create a new map
+				if c.Tokens == nil {
+					c.Tokens = make(map[model.Provider]StringSlice)
+				}
+				// Support multiple keys separated by spaces for API key rotation
+				keys := strings.Fields(val)
+				c.Tokens[provider] = keys
+				break
 			}
-			// Support multiple keys separated by spaces for API key rotation
-			keys := strings.Fields(val)
-			c.Tokens[provider] = keys
+		}
+	}
+
+	// Also support "vk" token key alias in tokens map
+	if c.Tokens != nil {
+		if vkTokens, ok := c.Tokens[model.Provider("vk")]; ok {
+			if _, exists := c.Tokens[model.ProviderVkVideo]; !exists {
+				c.Tokens[model.ProviderVkVideo] = vkTokens
+			}
 		}
 	}
 }

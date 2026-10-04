@@ -66,12 +66,71 @@ Add this to your Claude Desktop configuration file:
 }
 ```
 
+#### Configuration for OpenCode v2
+
+OpenCode v2 configures MCP servers in `opencode.json` (or `opencode.jsonc`) placed in your project root or globally in `~/.config/opencode/opencode.json`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "podsync": {
+        "type": "local",
+        "command": [
+          "/absolute/path/to/bin/podsync",
+          "--config",
+          "/absolute/path/to/config.toml",
+          "--mcp"
+        ],
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+Or connect to an already running Podsync instance via **remote SSE**:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "podsync": {
+        "type": "remote",
+        "url": "http://localhost:8080/mcp/sse",
+        "headers": {
+          "Authorization": "Basic YWRtaW46cGFzc3dvcmQ=" // base64(admin:password)
+        },
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+Verify your setup in the terminal:
+```bash
+opencode mcp list
+```
+
 #### Configuration for Cursor / Cline
 
 In your Cursor or Cline MCP Settings:
 - **Name**: `podsync`
 - **Type**: `command`
 - **Command**: `/path/to/bin/podsync --config /path/to/config.toml --mcp`
+
+---
+
+## 🧠 Agent Skill
+
+A ready-to-use skill definition for AI agents is provided in:
+- [`.agents/skills/podsync/SKILL.md`](../.agents/skills/podsync/SKILL.md)
+- [`.gemini/skills/podsync/SKILL.md`](../.gemini/skills/podsync/SKILL.md)
+
+You can feed this skill directly to autonomous coding and operational agents (Antigravity, Gemini CLI, Claude Code, OpenCode) so the agent automatically understands when and how to call Podsync MCP tools, manage YouTube/VK subscriptions, retry failed downloads, and inspect system health.
 
 ---
 

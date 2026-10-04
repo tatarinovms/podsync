@@ -1,25 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        (function() {
+            const saved = localStorage.getItem('podsync-theme') || 
+                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'mocha' : 'latte');
+            document.documentElement.setAttribute('data-theme', saved);
+            document.documentElement.setAttribute('data-bs-theme', saved === 'mocha' ? 'dark' : 'light');
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Podsync Management Console</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root {
-            --brand-primary: #8b5cf6;
-            --brand-primary-hover: #7c3aed;
-            --brand-gradient: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-            --bg-light: #f8fafc;
-            --card-border: #e2e8f0;
+        /* Catppuccin Theme Palette (Latte & Mocha) */
+        :root, [data-theme="latte"] {
+            --ctp-rosewater: #dc8a78;
+            --ctp-flamingo: #dd7878;
+            --ctp-pink: #ea76cb;
+            --ctp-mauve: #8839ef;
+            --ctp-red: #d20f39;
+            --ctp-maroon: #e64553;
+            --ctp-peach: #fe640b;
+            --ctp-yellow: #df8e1d;
+            --ctp-green: #40a02b;
+            --ctp-teal: #179299;
+            --ctp-sky: #04a5e5;
+            --ctp-sapphire: #209fb5;
+            --ctp-blue: #1e66f5;
+            --ctp-lavender: #7287fd;
+            --ctp-text: #4c4f69;
+            --ctp-subtext1: #5c5f77;
+            --ctp-subtext0: #6c6f85;
+            --ctp-overlay2: #7c7f93;
+            --ctp-overlay1: #8c8fa1;
+            --ctp-overlay0: #9ca0b0;
+            --ctp-surface2: #acb0be;
+            --ctp-surface1: #bcc0cc;
+            --ctp-surface0: #ccd0da;
+            --ctp-base: #eff1f5;
+            --ctp-mantle: #e6e9ef;
+            --ctp-crust: #dce0e8;
+
+            --brand-primary: var(--ctp-mauve);
+            --brand-primary-hover: #7322e0;
+            --brand-gradient: linear-gradient(135deg, #8839ef 0%, #1e66f5 100%);
+            --bg-light: var(--ctp-base);
+            --card-bg: #ffffff;
+            --card-border: var(--ctp-surface0);
+            --text-color: var(--ctp-text);
+            --text-muted: var(--ctp-subtext0);
+            --input-bg: #ffffff;
+            --input-border: var(--ctp-surface1);
+            --rss-bg: var(--ctp-mantle);
+            --rss-border: var(--ctp-surface0);
+            --header-bg: #ffffff;
+            --info-card-bg: var(--ctp-mantle);
+            --btn-light-bg: #ffffff;
+            --btn-light-hover: var(--ctp-surface0);
+        }
+
+        [data-theme="mocha"] {
+            --ctp-rosewater: #f5e0dc;
+            --ctp-flamingo: #f2cdcd;
+            --ctp-pink: #f5c2e7;
+            --ctp-mauve: #cba6f7;
+            --ctp-red: #f38ba8;
+            --ctp-maroon: #eba0ac;
+            --ctp-peach: #fab387;
+            --ctp-yellow: #f9e2af;
+            --ctp-green: #a6e3a1;
+            --ctp-teal: #94e2d5;
+            --ctp-sky: #89dceb;
+            --ctp-sapphire: #74c7ec;
+            --ctp-blue: #89b4fa;
+            --ctp-lavender: #b4befe;
+            --ctp-text: #cdd6f4;
+            --ctp-subtext1: #bac2de;
+            --ctp-subtext0: #a6adc8;
+            --ctp-overlay2: #9399b2;
+            --ctp-overlay1: #7f849c;
+            --ctp-overlay0: #6c7086;
+            --ctp-surface2: #585b70;
+            --ctp-surface1: #45475a;
+            --ctp-surface0: #313244;
+            --ctp-base: #1e1e2e;
+            --ctp-mantle: #181825;
+            --ctp-crust: #11111b;
+
+            --brand-primary: var(--ctp-mauve);
+            --brand-primary-hover: #dfbfff;
+            --brand-gradient: linear-gradient(135deg, #cba6f7 0%, #89b4fa 100%);
+            --bg-light: var(--ctp-base);
+            --card-bg: var(--ctp-mantle);
+            --card-border: var(--ctp-surface0);
+            --text-color: var(--ctp-text);
+            --text-muted: var(--ctp-subtext0);
+            --input-bg: var(--ctp-surface0);
+            --input-border: var(--ctp-surface1);
+            --rss-bg: var(--ctp-crust);
+            --rss-border: var(--ctp-surface0);
+            --header-bg: var(--ctp-mantle);
+            --info-card-bg: var(--ctp-crust);
+            --btn-light-bg: var(--ctp-surface0);
+            --btn-light-hover: var(--ctp-surface1);
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: var(--bg-light);
-            color: #1e293b;
+            color: var(--text-color);
             min-height: 100vh;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+
+        .navbar {
+            background-color: var(--header-bg) !important;
+            border-color: var(--card-border) !important;
         }
 
         .navbar-brand-gradient {
@@ -30,12 +129,21 @@
             letter-spacing: -0.5px;
         }
 
+        .nav-tabs {
+            border-bottom-color: var(--card-border);
+        }
+
         .nav-tabs .nav-link {
-            color: #64748b;
+            color: var(--text-muted);
             font-weight: 600;
             border: none;
             padding: 0.75rem 1.25rem;
             border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--text-color);
         }
 
         .nav-tabs .nav-link.active {
@@ -45,6 +153,7 @@
         }
 
         .card {
+            background-color: var(--card-bg);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
@@ -52,7 +161,7 @@
         }
 
         .feed-card:hover {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
             transform: translateY(-2px);
         }
 
@@ -61,7 +170,7 @@
             height: 80px;
             object-fit: cover;
             border-radius: 10px;
-            background-color: #e2e8f0;
+            background-color: var(--ctp-surface0);
         }
 
         .feed-cover-placeholder {
@@ -83,7 +192,7 @@
             font-weight: 600;
         }
         .btn-brand:hover {
-            opacity: 0.95;
+            opacity: 0.92;
             color: white;
         }
 
@@ -93,11 +202,18 @@
             font-weight: 600;
             border-radius: 6px;
         }
-        .provider-youtube { background-color: #fee2e2; color: #dc2626; }
-        .provider-vkvideo { background-color: #dbeafe; color: #2563eb; }
-        .provider-vimeo { background-color: #e0e7ff; color: #4f46e5; }
-        .provider-soundcloud { background-color: #ffedd5; color: #ea580c; }
-        .provider-twitch { background-color: #f3e8ff; color: #9333ea; }
+        
+        [data-theme="latte"] .provider-youtube { background-color: #fee2e2; color: var(--ctp-red); }
+        [data-theme="latte"] .provider-vkvideo { background-color: #dbeafe; color: var(--ctp-blue); }
+        [data-theme="latte"] .provider-vimeo { background-color: #e0e7ff; color: var(--ctp-lavender); }
+        [data-theme="latte"] .provider-soundcloud { background-color: #ffedd5; color: var(--ctp-peach); }
+        [data-theme="latte"] .provider-twitch { background-color: #f3e8ff; color: var(--ctp-mauve); }
+
+        [data-theme="mocha"] .provider-youtube { background-color: rgba(243, 139, 168, 0.18); color: var(--ctp-red); }
+        [data-theme="mocha"] .provider-vkvideo { background-color: rgba(137, 180, 250, 0.18); color: var(--ctp-blue); }
+        [data-theme="mocha"] .provider-vimeo { background-color: rgba(180, 190, 254, 0.18); color: var(--ctp-lavender); }
+        [data-theme="mocha"] .provider-soundcloud { background-color: rgba(250, 179, 135, 0.18); color: var(--ctp-peach); }
+        [data-theme="mocha"] .provider-twitch { background-color: rgba(203, 166, 247, 0.18); color: var(--ctp-mauve); }
 
         .deep-link-btn {
             font-size: 0.8rem;
@@ -108,32 +224,118 @@
             align-items: center;
             gap: 4px;
             font-weight: 500;
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-muted);
+            transition: all 0.15s ease;
+        }
+        .deep-link-btn:hover {
+            background-color: var(--btn-light-hover);
+            color: var(--brand-primary);
+            border-color: var(--brand-primary);
         }
 
         .rss-box {
-            background-color: #f1f5f9;
+            background-color: var(--rss-bg);
             border-radius: 8px;
             padding: 0.4rem 0.75rem;
             font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 0.85rem;
-            color: #334155;
+            color: var(--text-color);
             user-select: all;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--rss-border);
         }
 
         .stat-badge {
             font-size: 0.8rem;
-            color: #64748b;
+            color: var(--text-muted);
             display: inline-flex;
             align-items: center;
             gap: 4px;
+        }
+
+        .btn-light {
+            background-color: var(--btn-light-bg);
+            border-color: var(--card-border) !important;
+            color: var(--text-color);
+        }
+        .btn-light:hover {
+            background-color: var(--btn-light-hover);
+            border-color: var(--card-border) !important;
+            color: var(--text-color);
+        }
+
+        .btn-outline-secondary {
+            border-color: var(--card-border);
+            color: var(--text-muted);
+        }
+        .btn-outline-secondary:hover {
+            background-color: var(--btn-light-hover);
+            border-color: var(--card-border);
+            color: var(--text-color);
+        }
+
+        .form-control, .form-select {
+            background-color: var(--input-bg);
+            border-color: var(--input-border);
+            color: var(--text-color);
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: var(--input-bg);
+            border-color: var(--brand-primary);
+            color: var(--text-color);
+            box-shadow: 0 0 0 0.25rem rgba(136, 57, 239, 0.2);
+        }
+        [data-theme="mocha"] .form-control:focus, [data-theme="mocha"] .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(203, 166, 247, 0.25);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-color);
+        }
+        .modal-header, .modal-footer {
+            border-color: var(--card-border);
+        }
+
+        .dropdown-menu {
+            background-color: var(--card-bg);
+            border-color: var(--card-border);
+        }
+        .dropdown-item {
+            color: var(--text-color);
+        }
+        .dropdown-item:hover {
+            background-color: var(--btn-light-hover);
+            color: var(--text-color);
+        }
+
+        .bg-light {
+            background-color: var(--info-card-bg) !important;
+        }
+        .bg-white {
+            background-color: var(--card-bg) !important;
+        }
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+        .text-primary {
+            color: var(--brand-primary) !important;
+        }
+
+        .progress {
+            background-color: var(--ctp-surface0) !important;
+        }
+        .progress-bar.bg-primary {
+            background: var(--brand-gradient) !important;
         }
 
         #qr-canvas {
             max-width: 250px;
             height: auto;
             border-radius: 8px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--card-border);
             padding: 8px;
             background: white;
         }
@@ -143,12 +345,40 @@
             height: 1rem;
             border-width: 0.15em;
         }
+
+        /* Catppuccin Mocha specific adjustments */
+        [data-theme="mocha"] .btn-close {
+            filter: invert(1) grayscale(100%);
+        }
+        [data-theme="mocha"] .badge.bg-light {
+            background-color: var(--ctp-surface0) !important;
+            color: var(--ctp-subtext1) !important;
+        }
+        [data-theme="mocha"] .badge.bg-secondary {
+            background-color: var(--ctp-surface1) !important;
+            color: var(--ctp-text) !important;
+        }
+        [data-theme="mocha"] .border {
+            border-color: var(--card-border) !important;
+        }
+        [data-theme="mocha"] .border-top {
+            border-top-color: var(--card-border) !important;
+        }
+        [data-theme="mocha"] .border-bottom {
+            border-bottom-color: var(--card-border) !important;
+        }
     </style>
 </head>
 <body>
 
     <!-- Login View (Hidden when authenticated) -->
-    <div id="login-view" class="d-none min-vh-100 d-flex align-items-center justify-content-center p-3">
+    <div id="login-view" class="d-none min-vh-100 d-flex align-items-center justify-content-center p-3 position-relative">
+        <div class="position-absolute top-0 end-0 p-3">
+            <button class="btn btn-light btn-sm border d-flex align-items-center gap-2 shadow-sm" onclick="toggleTheme()" title="Toggle Catppuccin theme (Latte / Mocha)">
+                <i class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
+                <span class="small fw-semibold theme-toggle-name">Catppuccin Latte</span>
+            </button>
+        </div>
         <div class="card p-4 p-md-5 shadow-lg" style="max-width: 420px; width: 100%;">
             <div class="text-center mb-4">
                 <i class="bi bi-broadcast fs-1 text-primary"></i>
@@ -185,6 +415,10 @@
                 </a>
                 
                 <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-light btn-sm border d-flex align-items-center gap-2" onclick="toggleTheme()" title="Toggle Catppuccin theme (Latte / Mocha)">
+                        <i class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
+                        <span class="d-none d-sm-inline small fw-semibold theme-toggle-name">Catppuccin Latte</span>
+                    </button>
                     <a href="/podsync.opml" target="_blank" class="btn btn-outline-secondary btn-sm d-none d-sm-inline-flex align-items-center gap-1">
                         <i class="bi bi-file-earmark-code"></i> OPML
                     </a>
@@ -1060,6 +1294,36 @@
                 console.error("System load error:", err);
             }
         }
+
+        
+        // Catppuccin Theme Management (Latte / Mocha)
+        function initTheme() {
+            const saved = localStorage.getItem('podsync-theme') || 
+                (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'mocha' : 'latte');
+            applyTheme(saved);
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.setAttribute('data-bs-theme', theme === 'mocha' ? 'dark' : 'light');
+            localStorage.setItem('podsync-theme', theme);
+
+            const isMocha = theme === 'mocha';
+            document.querySelectorAll('.theme-toggle-icon').forEach(el => {
+                el.className = isMocha ? 'theme-toggle-icon bi bi-moon-stars-fill text-info' : 'theme-toggle-icon bi bi-sun-fill text-warning';
+            });
+            document.querySelectorAll('.theme-toggle-name').forEach(el => {
+                el.innerText = isMocha ? 'Mocha' : 'Latte';
+            });
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme') || 'latte';
+            applyTheme(current === 'mocha' ? 'latte' : 'mocha');
+        }
+
+        // Init theme immediately
+        initTheme();
 
         // Init
         checkAuth();

@@ -265,12 +265,29 @@
                         <div class="col-12 col-xl-4">
                             <div class="card p-4 bg-light">
                                 <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Инструкции по получению</h6>
-                                <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
-                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>VK Video:</strong> <a href="https://oauth.vk.com/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.com/blank.html&response_type=token" target="_blank">Получить токен (через Kate Mobile)</a></li>
-                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console -> YouTube Data API v3</li>
+                                <ul class="list-unstyled small d-flex flex-column gap-3 mb-0">
+                                    <li>
+                                        <div class="d-flex align-items-center mb-1">
+                                            <i class="bi bi-check-circle-fill text-success me-2"></i><strong>VK Video:</strong>
+                                        </div>
+                                        <div class="ms-4 d-flex flex-column gap-1">
+                                            <div>
+                                                <a href="https://vkhost.github.io" target="_blank" class="fw-bold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>vkhost.github.io</a>
+                                                <span class="text-muted">(рекомендуется &mdash; выберите Kate Mobile и нажмите «Разрешить»)</span>
+                                            </div>
+                                            <div class="text-muted small">
+                                                или <a href="https://oauth.vk.com/authorize?client_id=2685278&scope=video,offline&redirect_uri=https://oauth.vk.com/blank.html&display=page&response_type=token&revoke=1" target="_blank">прямая ссылка OAuth</a>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console &rarr; YouTube Data API v3</li>
                                     <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Vimeo:</strong> Developer App Access Token</li>
                                     <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Twitch:</strong> Twitch Developer Console (ID:SECRET)</li>
                                 </ul>
+                                <div class="mt-3 p-2 bg-white rounded border small text-muted">
+                                    <i class="bi bi-info-circle text-primary me-1"></i>
+                                    <strong>Подсказка для VK:</strong> после перехода и авторизации откроется белая страница. Предупреждение <em>«Пожалуйста, не копируйте данные из адресной строки...»</em> &mdash; это <strong>не ошибка</strong>, а стандартное сообщение VK. Скопируйте токен прямо из адресной строки браузера (значение между <code>#access_token=</code> и <code>&expires_in</code>). Если прямая ссылка выдает ошибку шлюза/домена, используйте <strong>vkhost.github.io</strong>.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -929,8 +946,9 @@
             try {
                 const res = await fetch('/api/v1/tokens');
                 const tokens = await res.json();
+                const list = Array.isArray(tokens) ? tokens : [];
 
-                listEl.innerHTML = tokens.map(item => {
+                listEl.innerHTML = list.map(item => {
                     const tokenList = Array.isArray(item.tokens) ? item.tokens : [];
                     const hasTokens = tokenList.length > 0;
                     const maskedStr = tokenList.join(', ');

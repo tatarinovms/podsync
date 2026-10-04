@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -123,6 +124,37 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 	return &summary, episodes, nil
 }
 
+// extractCoverArtFromXML reads the generated <feed_id>.xml from storage and extracts <image><url>...</url></image>
+func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
+	xmlName := fmt.Sprintf("%s.xml", feedID)
+	file, err := m.storage.Open(xmlName)
+	if err != nil || file == nil {
+		return ""
+	}
+	defer file.Close()
+
+	buf := make([]byte, 32768)
+	n, _ := file.Read(buf)
+	if n <= 0 {
+		return ""
+	}
+
+	xmlContent := string(buf[:n])
+	// Match <image> ... <url>URL</url>
+	re := regexp.MustCompile(`(?s)<image>.*?<url>\s*([^<\s]+)\s*</url>`)
+	if match := re.FindStringSubmatch(xmlContent); len(match) > 1 {
+		return strings.TrimSpace(match[1])
+	}
+
+	// Fallback to <itunes:image href="URL"
+	itunesRe := regexp.MustCompile(`<itunes:image\s+href="([^"]+)"`)
+	if match := itunesRe.FindStringSubmatch(xmlContent); len(match) > 1 {
+		return strings.TrimSpace(match[1])
+	}
+
+	return ""
+}
+
 func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.FeedSummary {
 	summary := web.FeedSummary{
 		ID:           f.ID,
@@ -144,6 +176,11 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		if !dbFeed.UpdatedAt.IsZero() {
 			summary.LastUpdate = &dbFeed.UpdatedAt
 		}
+	}
+
+	// Always extract/override cover art from the generated XML (<image><url>...</url></image>)
+	if xmlCover := m.extractCoverArtFromXML(f.ID); xmlCover != "" {
+		summary.CoverArt = xmlCover
 	}
 
 	if summary.Provider == "" {

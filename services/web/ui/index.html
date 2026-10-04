@@ -1501,6 +1501,50 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
+                function handleCoverError(img) {
+            img.style.display = 'none';
+            const placeholder = img.parentElement ? img.parentElement.querySelector('.feed-cover-placeholder') : null;
+            if (placeholder) {
+                placeholder.classList.remove('d-none');
+            }
+        }
+
+        // Fetch cover image directly from generated podcast XML (<image><url>)
+        async function loadCoverFromXML(feedUrl, feedId) {
+            if (!feedUrl) return;
+            try {
+                const res = await fetch(feedUrl);
+                if (!res.ok) return;
+                const text = await res.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, 'text/xml');
+                const imgUrl = xmlDoc.querySelector('channel > image > url')?.textContent?.trim() ||
+                               xmlDoc.querySelector('channel > itunes\\:image, channel > image')?.getAttribute('href')?.trim();
+                if (imgUrl) {
+                    const card = document.querySelector(`[data-feed-id="${feedId}"]`);
+                    if (card) {
+                        let img = card.querySelector('img.feed-cover');
+                        const placeholder = card.querySelector('.feed-cover-placeholder');
+                        if (!img && placeholder && placeholder.parentElement) {
+                            img = document.createElement('img');
+                            img.className = 'feed-cover';
+                            img.alt = 'Cover';
+                            img.loading = 'lazy';
+                            img.onerror = () => handleCoverError(img);
+                            placeholder.parentElement.prepend(img);
+                        }
+                        if (img) {
+                            img.src = imgUrl;
+                            img.style.display = 'block';
+                            if (placeholder) placeholder.classList.add('d-none');
+                        }
+                    }
+                }
+            } catch (e) {
+                // fallback to styled letter placeholder
+            }
+        }
+
         const updatingFeeds = new Set();
 
         function renderFeeds(feeds) {
@@ -1536,21 +1580,36 @@
 
                     const isUpdating = updatingFeeds.has(feed.id);
                     const btn = document.getElementById(`btn-update-${feed.id}`);
-                    if (btn && !isUpdating) {
-                        btn.disabled = false;
-                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                    if (btn) {
+                        if (isUpdating) {
+                            btn.disabled = true;
+                            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
+                        } else {
+                            btn.disabled = false;
+                            btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                        }
                     }
                 });
                 return;
             }
 
+            // If any feed does not have cover_art in API summary, load it directly from the podcast XML
+            feeds.forEach(f => {
+                if (!f.cover_art && f.feed_url) {
+                    loadCoverFromXML(f.feed_url, f.id);
+                }
+            });
+
             // Full render only when cards structure changes
             container.innerHTML = feeds.map(feed => {
                 const providerClass = 'provider-' + (feed.provider || 'unknown');
                 const isUpdating = updatingFeeds.has(feed.id);
-                const cover = feed.cover_art ? 
-                    `<img src="${feed.cover_art}" class="feed-cover" alt="Cover" loading="lazy" onerror="this.outerHTML='<div class=\'feed-cover-placeholder\'>${(feed.title || feed.id)[0].toUpperCase()}</div>'">` :
-                    `<div class="feed-cover-placeholder">${(feed.title || feed.id)[0].toUpperCase()}</div>`;
+                const letter = (feed.title || feed.id || 'P').trim()[0].toUpperCase();
+                const cover = `
+                    <div class="flex-shrink-0" style="width: 80px; height: 80px; position: relative;">
+                        ${feed.cover_art ? `<img src="${feed.cover_art}" class="feed-cover" alt="Cover" loading="lazy" onerror="handleCoverError(this)">` : ''}
+                        <div class="feed-cover-placeholder ${feed.cover_art ? 'd-none' : ''}">${letter}</div>
+                    </div>`;
 
                 return `
                 <div class="col-12 col-xl-6" data-feed-id="${feed.id}">
@@ -1607,7 +1666,7 @@
                                             <i class="bi bi-list-ul"></i> Episodes
                                         </button>
                                         <button class="btn btn-light btn-sm border" id="btn-update-${feed.id}" title="Update feed now" onclick="triggerUpdate('${feed.id}')" ${isUpdating ? 'disabled' : ''}>
-                                            <i class="bi bi-arrow-repeat me-1 ${isUpdating ? 'spin-icon' : ''}"></i> ${isUpdating ? 'Updating...' : 'Update'}
+                                            ${isUpdating ? '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...' : '<i class="bi bi-arrow-repeat me-1"></i> Update'}
                                         </button>
                                         <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" onclick="deleteFeed('${feed.id}')">
                                             <i class="bi bi-trash"></i>
@@ -1678,7 +1737,7 @@
 
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = `<i class="bi bi-arrow-repeat spin-icon me-1"></i> Updating...`;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
             }
 
             try {

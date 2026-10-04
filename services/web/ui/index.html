@@ -930,18 +930,30 @@
                 const res = await fetch('/api/v1/tokens');
                 const tokens = await res.json();
 
-                listEl.innerHTML = tokens.map(item => `
+                listEl.innerHTML = tokens.map(item => {
+                    const tokenList = Array.isArray(item.tokens) ? item.tokens : [];
+                    const hasTokens = tokenList.length > 0;
+                    const maskedStr = tokenList.join(', ');
+
+                    return `
                     <div class="border rounded p-3 bg-white">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold">${item.provider.toUpperCase()}</span>
+                            <div>
+                                <span class="fw-bold">${item.provider.toUpperCase()}</span>
+                                ${hasTokens 
+                                    ? `<span class="badge bg-success ms-2 font-monospace">${maskedStr}</span>` 
+                                    : '<span class="badge bg-secondary ms-2">Не задан</span>'
+                                }
+                            </div>
                             ${item.from_env ? '<span class="badge bg-info text-dark">Из переменных ENV</span>' : '<span class="badge bg-light text-muted border">Из config.toml</span>'}
                         </div>
                         <div class="d-flex gap-2">
-                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" value="${item.tokens.join(' ')}" placeholder="Введите токен..." ${item.from_env ? 'readonly' : ''}>
+                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${hasTokens ? 'Введите новый токен для замены...' : 'Введите токен...'}" ${item.from_env ? 'disabled' : ''}>
                             ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Сохранить</button>` : ''}
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (err) {
                 listEl.innerHTML = `<div class="text-danger small">Ошибка загрузки токенов: ${err.message}</div>`;
             }
@@ -949,7 +961,12 @@
 
         async function saveTokens(provider) {
             const input = document.getElementById(`token-input-${provider}`);
-            const tokens = input.value.trim().split(/\s+/).filter(Boolean);
+            const val = input.value.trim();
+            if (!val) {
+                alert('Введите токен перед сохранением');
+                return;
+            }
+            const tokens = val.split(/\s+/).filter(Boolean);
 
             try {
                 const res = await fetch('/api/v1/tokens', {
@@ -960,6 +977,7 @@
 
                 if (res.ok) {
                     showToast(`Токен для ${provider} сохранен`);
+                    input.value = '';
                     loadTokens();
                 } else {
                     alert(`Ошибка сохранения: ${await res.text()}`);

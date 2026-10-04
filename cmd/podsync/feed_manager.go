@@ -337,7 +337,7 @@ func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 			rawTokens = list
 		}
 
-		var maskedTokens []string
+		maskedTokens := make([]string, 0, len(rawTokens))
 		for _, tok := range rawTokens {
 			maskedTokens = append(maskedTokens, maskToken(tok))
 		}
@@ -369,23 +369,34 @@ func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, t
 		m.tokens = make(map[model.Provider]StringSlice)
 	}
 
-	m.tokens[provider] = tokens
+	var newTokens []string
+	for _, tok := range tokens {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || strings.Contains(tok, "•") {
+			continue
+		}
+		newTokens = append(newTokens, tok)
+	}
 
-	// Save to config.toml
-	if m.configPath != "" {
-		tree, err := toml.LoadFile(m.configPath)
+	if len(newTokens) > 0 {
+		m.tokens[provider] = newTokens
+
+		// Save to config.toml
+		if m.configPath != "" {
+			tree, err := toml.LoadFile(m.configPath)
 		if err == nil {
 			key := fmt.Sprintf("tokens.%s", providerStr)
-			if len(tokens) == 1 {
-				tree.Set(key, tokens[0])
+			if len(newTokens) == 1 {
+				tree.Set(key, newTokens[0])
 			} else {
-				tree.Set(key, tokens)
+				tree.Set(key, newTokens)
 			}
 			f, err := os.Create(m.configPath)
 			if err == nil {
 				_, _ = tree.WriteTo(f)
 				_ = f.Close()
 			}
+		}
 		}
 	}
 

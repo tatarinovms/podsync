@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -66,6 +65,14 @@ func (u *Manager) Update(ctx context.Context, feedConfig *feed.Config) error {
 
 	if err := u.updateFeed(ctx, feedConfig); err != nil {
 		return errors.Wrap(err, "update failed")
+	}
+
+	// Rebuild initial XML and OPML immediately so the feed is accessible to clients right away
+	if xmlErr := u.buildXML(ctx, feedConfig); xmlErr != nil {
+		log.WithError(xmlErr).Warn("initial xml build failed")
+	}
+	if opmlErr := u.buildOPML(ctx); opmlErr != nil {
+		log.WithError(opmlErr).Warn("initial opml build failed")
 	}
 
 	// Fetch episodes for download
@@ -232,6 +239,11 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 				return err
 			}
 
+			// Rebuild XML feed immediately so this existing episode is reflected
+			if xmlErr := u.buildXML(ctx, feedConfig); xmlErr != nil {
+				logger.WithError(xmlErr).Warn("failed to rebuild XML feed for existing file")
+			}
+
 			continue
 		} else if os.IsNotExist(err) {
 			// Will download, do nothing here
@@ -318,6 +330,11 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 			return err
 		}
 
+		// Rebuild XML feed immediately so newly downloaded episode is available in RSS right away
+		if xmlErr := u.buildXML(ctx, feedConfig); xmlErr != nil {
+			logger.WithError(xmlErr).Warn("failed to rebuild XML feed after episode download")
+		}
+
 		downloaded++
 	}
 
@@ -373,69 +390,54 @@ func (u *Manager) buildOPML(ctx context.Context) error {
 func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 	var (
 		feedID = feedConfig.ID
-		logger = log.WithField("feed_id", feedID)
-		list   []*model.Episode
-		result *multierror.Error
 	)
 
 	if feedConfig.Clean == nil {
-		logger.Debug("no cleanup policy configured")
 		return nil
 	}
 
-	count := feedConfig.Clean.KeepLast
-	if count < 1 {
-		logger.Info("nothing to clean")
+	var keep = feedConfig.Clean.KeepLast
+	if keep < 1 {
 		return nil
 	}
 
-	logger.WithField("count", count).Info("running cleaner")
-	if err := u.db.WalkEpisodes(ctx, feedConfig.ID, func(episode *model.Episode) error {
+	log.Debugf("purging old episodes, leaving %d", keep)
+
+	// Episode list is already sorted by date (descending)
+	var purgeList []*model.Episode
+	err := u.db.WalkEpisodes(ctx, feedID, func(episode *model.Episode) error {
 		if episode.Status == model.EpisodeDownloaded {
-			list = append(list, episode)
+			keep--
+			if keep < 0 {
+				purgeList = append(purgeList, episode)
+			}
 		}
-		return nil
-	}); err != nil {
-		return err
-	}
 
-	if count > len(list) {
 		return nil
-	}
-
-	sort.Slice(list, func(i, j int) bool {
-		return list[i].PubDate.After(list[j].PubDate)
 	})
 
-	for _, episode := range list[count:] {
-		logger.WithField("episode_id", episode.ID).Infof("deleting %q", episode.Title)
+	if err != nil {
+		return errors.Wrap(err, "failed to build purge list")
+	}
 
-		var (
-			episodeName = feed.EpisodeName(feedConfig, episode)
-			path        = fmt.Sprintf("%s/%s", feedConfig.ID, episodeName)
-		)
+	log.Debugf("found %d episode(s) to purge", len(purgeList))
 
-		err := u.fs.Delete(ctx, path)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				logger.WithError(err).Errorf("failed to delete episode file: %s", episode.ID)
-				result = multierror.Append(result, errors.Wrapf(err, "failed to delete episode: %s", episode.ID))
-				continue
-			}
-
-			logger.WithField("episode_id", episode.ID).Info("episode was not found - file does not exist")
+	var result error
+	for _, episode := range purgeList {
+		episodeName := feed.EpisodeName(feedConfig, episode)
+		path := fmt.Sprintf("%s/%s", feedID, episodeName)
+		log.Infof("deleting %s", path)
+		if err := u.fs.Delete(ctx, path); err != nil {
+			result = multierror.Append(result, errors.Wrapf(err, "failed to delete: %s", path))
 		}
 
 		if err := u.db.UpdateEpisode(feedID, episode.ID, func(episode *model.Episode) error {
 			episode.Status = model.EpisodeCleaned
-			episode.Title = ""
-			episode.Description = ""
 			return nil
 		}); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "failed to set state for cleaned episode: %s", episode.ID))
-			continue
+			result = multierror.Append(result, errors.Wrapf(err, "failed to update episode status: %s", episode.ID))
 		}
 	}
 
-	return result.ErrorOrNil()
+	return result
 }

@@ -51,8 +51,10 @@ brew install yt-dlp ffmpeg go
 - [How to get VK API token](./docs/how_to_get_vk_token.md)
 - [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
 - [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
+- [Podsync on Synology NAS Guide](./docs/how_to_setup_podsync_on_synology_nas.md)
 - [Podsync on QNAP NAS Guide](./docs/how_to_setup_podsync_on_qnap_nas.md)
 - [Schedule updates with cron](./docs/cron.md)
+- [Filter episodes with regex](./docs/filters.md)
 
 ### Access tokens
 
@@ -170,17 +172,20 @@ Use the editor [Visual Studio Code](https://code.visualstudio.com/) and install 
 
 ### Run via Docker:
 
-Build the local image and run:
+Pull and run prebuilt container image:
 
 ```bash
-make docker
-
 docker run \
     -p 8080:8080 \
     -v $(pwd)/data:/app/data/ \
     -v $(pwd)/db:/app/db/ \
     -v $(pwd)/config.toml:/app/config.toml \
-    localhost/podsync:latest
+    ghcr.io/tatarinovms/podsync:latest
+```
+
+Or build locally:
+```bash
+make docker
 ```
 
 ### Run via Docker Compose:
@@ -188,8 +193,7 @@ docker run \
 ```yaml
 services:
   podsync:
-    build: .
-    image: localhost/podsync:latest
+    image: ghcr.io/tatarinovms/podsync:latest
     container_name: podsync
     volumes:
       - ./data:/app/data/
@@ -197,6 +201,7 @@ services:
       - ./config.toml:/app/config.toml
     ports:
       - 8080:8080
+    restart: unless-stopped
 ```
 
 ```bash

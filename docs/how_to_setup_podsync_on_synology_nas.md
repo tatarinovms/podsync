@@ -58,7 +58,7 @@ but you don't need to do this.
 5. Copy and paste the following command:
 
 ```bash
-docker pull mxpv/podsync:latest
+docker pull ghcr.io/tatarinovms/podsync:latest
 ```
 
 Docker will download the latest version of Podsync.
@@ -70,7 +70,7 @@ docker run \
     -p 9090:9090 \
     -v /volume1/web/podsync:/app/data/ \
     -v /volume1/docker/podsync/podsync-config.toml:/app/config.toml \
-    mxpv/podsync:latest
+    ghcr.io/tatarinovms/podsync:latest
 ```
 
 This will install a container in Docker and run it. Podsync will load and read your config.toml file and start downloading episodes.
@@ -78,8 +78,9 @@ This will install a container in Docker and run it. Podsync will load and read y
 7. I recommend you go into the container's settings in Container Station and set it to Auto Start.
 
 8. Once the downloads have finished for each of your feeds, you will then have an XML feed for each feed
-that you should be able to access at `https://xxxxxxxx.xxx/podsync/ID1.xml`. Paste them into your podcast app of choice,
-and you're good to go!
+and you will be able to navigate to it in your web browser and view it (e.g. `https://xxxxxxxx.xxx/podsync/ID1.xml`).
+Copy that URL, and paste it into your favorite podcast app.
 
-Note: you can validate your XML using this website:
-https://www.castfeedvalidator.com/validate.php
+If you don't have a static IP address, you'll need to use a Dynamic DNS (DDNS) service to ensure your podcast app
+can always reach your Podsync instance when you're not on your home network.
+You can use the built-in DDNS service on your Synology or a third party service like DuckDNS or No-IP.

@@ -38,7 +38,7 @@ Now you need to SSH into the QNAP using an app like Putty (on Windows - just goo
 5. Copy and paste the following command:
 
 ```bash
-docker pull mxpv/podsync:latest
+docker pull ghcr.io/tatarinovms/podsync:latest
 ```
 
 Docker will download the latest version of Podsync.
@@ -50,7 +50,7 @@ docker run \
     -p 6969:6969 \
     -v /share/CACHEDEV1_DATA/appdata/podsync:/app/data/ \
     -v /share/CACHEDEV1_DATA/appdata/podsync/config.toml:/app/config.toml \
-    mxpv/podsync:latest
+    ghcr.io/tatarinovms/podsync:latest
 ```
 
 This will install a container in Container Station and run it. Podsync will load and read your config.toml file and start downloading episodes.
@@ -58,5 +58,9 @@ This will install a container in Container Station and run it. Podsync will load
 7. I recommend you go into the container's settings in Container Station and set it to Auto Start.
 
 8. Once the downloads have finished for each of your feeds, you will then have an XML feed for each feed
-that you should be able to access at `http://ipaddressorhostname:6969/`. Paste them into your podcast app of choice,
-and you're good to go!
+and you will be able to navigate to it in your web browser and view it (e.g. `http://my.customhostname.com:6969/KFGD.xml`).
+Copy that URL, and paste it into your favorite podcast app.
+
+If you don't have a static IP address, you'll need to use a Dynamic DNS (DDNS) service to ensure your podcast app
+can always reach your Podsync instance when you're not on your home network.
+You can use the built-in DDNS service on your QNAP (myQNAPcloud) or a third party service like DuckDNS or No-IP.

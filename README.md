@@ -13,7 +13,7 @@ any device in podcast client.
 ## 🍴 Fork Features
 
 This fork extends the original `mxpv/podsync` with:
-- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use podcast RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), API key management, and system metrics (disk usage, memory, uptime, binary dependencies).
+- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use podcast RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), API key management, and system metrics (disk usage, memory, uptime, binary dependencies). See [Web Admin Guide](./docs/web_admin.md).
 - **VK Video support**: Convert VK Video channels, communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
 - **yt-dlp integration**: Native preference and support for `yt-dlp` for improved download speed and stability.
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
@@ -47,6 +47,7 @@ brew install yt-dlp ffmpeg go
 
 ## 📖 Documentation
 
+- [Web Admin Console Guide](./docs/web_admin.md)
 - [How to get VK API token](./docs/how_to_get_vk_token.md)
 - [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
 - [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
@@ -126,7 +127,7 @@ Podsync supports the following environment variables for configuration and API k
 
 ## 🎛 Web Admin Console
 
-Podsync includes a built-in web management console accessible at `/admin`:
+Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full setup instructions, screenshots, and REST API documentation:
 
 - **Feed Overview**: View all channels with custom covers, provider badges, downloaded episode counts, and disk space used.
 - **Ready Podcast Links**: Direct RSS feed URL with 1-click clipboard copy.

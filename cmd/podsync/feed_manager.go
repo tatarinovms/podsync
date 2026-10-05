@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"regexp"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -86,7 +86,7 @@ func (m *AppFeedManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, erro
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	var result []web.FeedSummary
+	result := make([]web.FeedSummary, 0, len(m.feeds))
 
 	for _, f := range m.feeds {
 		summary := m.buildSummary(ctx, f)
@@ -194,10 +194,11 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	var totalSize int64
 	_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
 		epCount++
-		if ep.Status == model.EpisodeDownloaded {
+		switch ep.Status {
+		case model.EpisodeDownloaded:
 			dlCount++
 			totalSize += ep.Size
-		} else if ep.Status == model.EpisodeError {
+		case model.EpisodeError:
 			errCount++
 		}
 		return nil
@@ -364,7 +365,7 @@ func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 		{model.ProviderTwitch, []string{"PODSYNC_TWITCH_API_KEY"}},
 	}
 
-	var result []web.TokenInfo
+	result := make([]web.TokenInfo, 0, len(providers))
 	for _, p := range providers {
 		fromEnv := false
 		for _, v := range p.envVars {
@@ -426,19 +427,19 @@ func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, t
 		// Save to config.toml
 		if m.configPath != "" {
 			tree, err := toml.LoadFile(m.configPath)
-		if err == nil {
-			key := fmt.Sprintf("tokens.%s", providerStr)
-			if len(newTokens) == 1 {
-				tree.Set(key, newTokens[0])
-			} else {
-				tree.Set(key, newTokens)
-			}
-			f, err := os.Create(m.configPath)
 			if err == nil {
-				_, _ = tree.WriteTo(f)
-				_ = f.Close()
+				key := fmt.Sprintf("tokens.%s", providerStr)
+				if len(newTokens) == 1 {
+					tree.Set(key, newTokens[0])
+				} else {
+					tree.Set(key, newTokens)
+				}
+				f, err := os.Create(m.configPath)
+				if err == nil {
+					_, _ = tree.WriteTo(f)
+					_ = f.Close()
+				}
 			}
-		}
 		}
 	}
 
@@ -534,7 +535,6 @@ func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
 	_, err = tree.WriteTo(file)
 	return err
 }
-
 
 func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	m.mu.RLock()

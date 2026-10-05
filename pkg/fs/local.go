@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -28,11 +29,16 @@ func NewLocal(rootDir string, webUIEnabled bool, noListing bool) (*Local, error)
 	return &Local{rootDir: rootDir, WebUIEnabled: webUIEnabled, NoListing: noListing}, nil
 }
 
+func (l *Local) resolvePath(name string) string {
+	cleanName := filepath.FromSlash(strings.TrimPrefix(name, "/"))
+	return filepath.Join(l.rootDir, cleanName)
+}
+
 func (l *Local) Open(name string) (http.File, error) {
 	if name == "/index.html" && l.WebUIEnabled {
 		return os.Open("./html/index.html")
 	}
-	path := filepath.Join(l.rootDir, name)
+	path := l.resolvePath(name)
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -55,7 +61,7 @@ func (l *Local) Open(name string) (http.File, error) {
 }
 
 func (l *Local) Delete(_ctx context.Context, name string) error {
-	path := filepath.Join(l.rootDir, name)
+	path := l.resolvePath(name)
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("failed to delete file %s: %w", path, err)
 	}
@@ -64,8 +70,8 @@ func (l *Local) Delete(_ctx context.Context, name string) error {
 
 func (l *Local) Create(_ctx context.Context, name string, reader io.Reader) (int64, error) {
 	var (
+		path   = l.resolvePath(name)
 		logger = log.WithField("name", name)
-		path   = filepath.Join(l.rootDir, name)
 	)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

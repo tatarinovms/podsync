@@ -408,7 +408,6 @@ func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func (s *Server) handleDownloader(w http.ResponseWriter, r *http.Request) {
 	if s.adminMgr == nil {
 		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")

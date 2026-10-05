@@ -154,7 +154,6 @@ func (c *HTTPClientManager) GetSystemStats(ctx context.Context) (*web.SystemStat
 	return &result, nil
 }
 
-
 func (c *HTTPClientManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	var result web.DownloaderConfigInfo
 	err := c.doRequest(ctx, http.MethodGet, "/api/v1/downloader", nil, &result)

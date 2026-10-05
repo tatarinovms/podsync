@@ -269,7 +269,6 @@ func TestMCPHandlerRouting(t *testing.T) {
 	assert.Contains(t, recAuth.Body.String(), "mcp-ok")
 }
 
-
 func TestMCPConfigEndpoint(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -304,22 +303,33 @@ func TestMCPConfigEndpoint(t *testing.T) {
 	assert.Contains(t, resp["config_path"], "config.toml")
 }
 
-
 type mockDownloaderAdminMgr struct {
 	dlCfg        DownloaderConfigInfo
 	cookies      string
 	testResponse TestDownloaderResult
 }
 
-func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) { return nil, nil }
-func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error) { return nil, nil, nil }
+func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) {
+	return nil, nil
+}
+func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error) {
+	return nil, nil, nil
+}
 func (m *mockDownloaderAdminMgr) AddFeed(ctx context.Context, cfg *feed.Config) error { return nil }
-func (m *mockDownloaderAdminMgr) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error { return nil }
+func (m *mockDownloaderAdminMgr) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
+	return nil
+}
 func (m *mockDownloaderAdminMgr) TriggerUpdate(ctx context.Context, id string) error { return nil }
-func (m *mockDownloaderAdminMgr) RetryEpisode(ctx context.Context, feedID, episodeID string) error { return nil }
+func (m *mockDownloaderAdminMgr) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
+	return nil
+}
 func (m *mockDownloaderAdminMgr) GetTokens(ctx context.Context) []TokenInfo { return nil }
-func (m *mockDownloaderAdminMgr) UpdateTokens(ctx context.Context, provider string, tokens []string) error { return nil }
-func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemStats, error) { return nil, nil }
+func (m *mockDownloaderAdminMgr) UpdateTokens(ctx context.Context, provider string, tokens []string) error {
+	return nil
+}
+func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemStats, error) {
+	return nil, nil
+}
 
 func (m *mockDownloaderAdminMgr) GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error) {
 	return &m.dlCfg, nil

@@ -262,44 +262,44 @@ func main() {
 	// Run cron scheduler (only in daemon mode, not in MCP stdio mode)
 	if !opts.MCP {
 		group.Go(func() error {
-		var cronID cron.EntryID
+			var cronID cron.EntryID
 
-		for _, _feed := range cfg.Feeds {
-			// Track if this feed has an explicit cron schedule
-			hasExplicitCronSchedule := _feed.CronSchedule != ""
+			for _, _feed := range cfg.Feeds {
+				// Track if this feed has an explicit cron schedule
+				hasExplicitCronSchedule := _feed.CronSchedule != ""
 
-			if _feed.CronSchedule == "" {
-				_feed.CronSchedule = fmt.Sprintf("@every %s", _feed.UpdatePeriod.String())
+				if _feed.CronSchedule == "" {
+					_feed.CronSchedule = fmt.Sprintf("@every %s", _feed.UpdatePeriod.String())
+				}
+				cronFeed := _feed
+				if cronID, err = c.AddFunc(cronFeed.CronSchedule, func() {
+					log.Debugf("adding %q to update queue", cronFeed.ID)
+					updates <- cronFeed
+				}); err != nil {
+					log.WithError(err).Fatalf("can't create cron task for feed: %s", cronFeed.ID)
+				}
+
+				m[cronFeed.ID] = cronID
+				log.Debugf("-> %s (update '%s')", cronFeed.ID, cronFeed.CronSchedule)
+
+				// Only perform initial update if no explicit cron schedule is configured
+				// This prevents unwanted updates when using fixed schedules in Docker deployments
+				if !hasExplicitCronSchedule {
+					updates <- cronFeed
+				}
 			}
-			cronFeed := _feed
-			if cronID, err = c.AddFunc(cronFeed.CronSchedule, func() {
-				log.Debugf("adding %q to update queue", cronFeed.ID)
-				updates <- cronFeed
-			}); err != nil {
-				log.WithError(err).Fatalf("can't create cron task for feed: %s", cronFeed.ID)
+
+			c.Start()
+
+			for {
+				<-ctx.Done()
+
+				log.Info("shutting down cron")
+				c.Stop()
+
+				return ctx.Err()
 			}
-
-			m[cronFeed.ID] = cronID
-			log.Debugf("-> %s (update '%s')", cronFeed.ID, cronFeed.CronSchedule)
-
-			// Only perform initial update if no explicit cron schedule is configured
-			// This prevents unwanted updates when using fixed schedules in Docker deployments
-			if !hasExplicitCronSchedule {
-				updates <- cronFeed
-			}
-		}
-
-		c.Start()
-
-		for {
-			<-ctx.Done()
-
-			log.Info("shutting down cron")
-			c.Stop()
-
-			return ctx.Err()
-		}
-	})
+		})
 	}
 
 	if cfg.Storage.Type == "s3" {

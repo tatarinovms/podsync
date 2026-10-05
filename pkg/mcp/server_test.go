@@ -78,7 +78,7 @@ func (m *mockAdminManager) GetSystemStats(ctx context.Context) (*web.SystemStats
 
 func (m *mockAdminManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	return &web.DownloaderConfigInfo{
-		Timeout: 10,
+		Timeout:        10,
 		HasCookiesFile: false,
 	}, nil
 }
@@ -98,7 +98,7 @@ func (m *mockAdminManager) UpdateCookiesContent(ctx context.Context, content str
 func (m *mockAdminManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {
 	return &web.TestDownloaderResult{
 		Success: true,
-		Title: "Test Title",
+		Title:   "Test Title",
 		Channel: "Test Channel",
 	}, nil
 }

@@ -24,18 +24,22 @@ type LoginRequest struct {
 }
 
 type AddFeedRequest struct {
-	ID           string `json:"id"`
-	URL          string `json:"url"`
-	Format       string `json:"format"`
-	Quality      string `json:"quality"`
-	PageSize     int    `json:"page_size"`
-	CronSchedule string `json:"cron_schedule"`
-	UpdatePeriod string `json:"update_period"`
-	KeepLast     int    `json:"keep_last"`
-	Filters      struct {
-		Title    string `json:"title"`
-		NotTitle string `json:"not_title"`
-	} `json:"filters"`
+	ID               string       `json:"id"`
+	URL              string       `json:"url"`
+	Format           string       `json:"format"`
+	Quality          string       `json:"quality"`
+	MaxHeight        int          `json:"max_height"`
+	PageSize         int          `json:"page_size"`
+	CronSchedule     string       `json:"cron_schedule"`
+	UpdatePeriod     string       `json:"update_period"`
+	PlaylistSort     string       `json:"playlist_sort"`
+	OPML             *bool        `json:"opml,omitempty"`
+	PrivateFeed      bool         `json:"private_feed"`
+	KeepLast         int          `json:"keep_last"`
+	Filters          feed.Filters `json:"filters"`
+	Custom           feed.Custom  `json:"custom"`
+	YouTubeDLArgs    []string     `json:"youtube_dl_args"`
+	FilenameTemplate string       `json:"filename_template"`
 }
 
 type UpdateTokensRequest struct {
@@ -245,32 +249,34 @@ func (s *Server) handleFeeds(w http.ResponseWriter, r *http.Request) {
 		}
 
 		feedCfg := &feed.Config{
-			ID:           feedID,
-			URL:          req.URL,
-			Format:       model.Format(req.Format),
-			Quality:      model.Quality(req.Quality),
-			PageSize:     req.PageSize,
-			CronSchedule: req.CronSchedule,
+			ID:               feedID,
+			URL:              req.URL,
+			Format:           model.Format(req.Format),
+			Quality:          model.Quality(req.Quality),
+			MaxHeight:        req.MaxHeight,
+			PageSize:         req.PageSize,
+			CronSchedule:     req.CronSchedule,
+			PlaylistSort:     model.Sorting(req.PlaylistSort),
+			OPML:             req.OPML,
+			PrivateFeed:      req.PrivateFeed,
+			Filters:          req.Filters,
+			Custom:           req.Custom,
+			YouTubeDLArgs:    req.YouTubeDLArgs,
+			FilenameTemplate: req.FilenameTemplate,
 		}
 
 		if feedCfg.Format == "" {
-			feedCfg.Format = model.FormatVideo
+			feedCfg.Format = model.FormatAudio
 		}
 		if feedCfg.Quality == "" {
 			feedCfg.Quality = model.QualityHigh
 		}
 		if feedCfg.PageSize <= 0 {
-			feedCfg.PageSize = 20
+			feedCfg.PageSize = 50
 		}
 		if req.KeepLast > 0 {
 			feedCfg.Clean = &feed.Cleanup{
 				KeepLast: req.KeepLast,
-			}
-		}
-		if req.Filters.Title != "" || req.Filters.NotTitle != "" {
-			feedCfg.Filters = feed.Filters{
-				Title:    req.Filters.Title,
-				NotTitle: req.Filters.NotTitle,
 			}
 		}
 

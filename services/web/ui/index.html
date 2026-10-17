@@ -1331,65 +1331,254 @@
 
     <!-- Modal: Add Feed -->
     <div class="modal fade" id="addFeedModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>Add Podcast</h5>
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">
+                            <i class="bi bi-plus-circle text-primary me-2"></i>Add Podcast
+                        </h5>
+                        <div class="text-muted small mt-1">Configure source URL, download format, schedule, and feed options</div>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form id="add-feed-form">
-                    <div class="modal-body">
-                        <div id="add-feed-error" class="alert alert-danger d-none py-2 small"></div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-semibold">Source URL (VK Video / YouTube / Vimeo / etc)</label>
-                            <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="suggestFeedId(this.value)">
-                            <div class="form-text small">Channels, communities, users, and playlists are supported.</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-semibold">Feed ID (used in XML URL)</label>
-                            <input type="text" id="new-feed-id" class="form-control" required placeholder="CLANBEAVER">
-                            <div class="form-text small">Letters, digits, and underscores only.</div>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Format</label>
-                                <select id="new-feed-format" class="form-select">
-                                    <option value="video" selected>Video</option>
-                                    <option value="audio">Audio (MP3)</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Quality</label>
-                                <select id="new-feed-quality" class="form-select">
-                                    <option value="high" selected>High</option>
-                                    <option value="low">Low</option>
-                                </select>
+                <div class="modal-body p-0">
+                    <form id="add-feed-form">
+                        <div class="p-3 border-bottom bg-body-tertiary">
+                            <div id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
+                            <div class="row g-2">
+                                <div class="col-md-7">
+                                    <label class="form-label small fw-semibold">Source URL (VK Video / YouTube / Vimeo / etc) <span class="text-danger">*</span></label>
+                                    <input type="url" id="new-feed-url" class="form-control form-control-sm" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="suggestFeedId(this.value)">
+                                    <div class="form-text small">Channels, playlists, communities, and users are supported.</div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small fw-semibold">Feed ID (URL slug) <span class="text-danger">*</span></label>
+                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER">
+                                    <div class="form-text small">Used in RSS URL: <code>/CLANBEAVER.xml</code></div>
+                                </div>
                             </div>
                         </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Page Size (episodes per query)</label>
-                                <input type="number" id="new-feed-pagesize" class="form-control" value="20" min="1" max="100">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small fw-semibold">Keep Last Episodes (Clean)</label>
-                                <input type="number" id="new-feed-keeplast" class="form-control" value="0" min="0" placeholder="0 = keep all">
+
+                        <!-- Nav tabs -->
+                        <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary" id="addFeedTabs" role="tablist">
+                            <li class="nav-item">
+                                <button type="button" class="nav-link active small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-general">
+                                    <i class="bi bi-clock me-1"></i>General &amp; Schedule
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-cleanup">
+                                    <i class="bi bi-trash3 me-1"></i>Retention
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-filters">
+                                    <i class="bi bi-funnel me-1"></i>Filters
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-custom">
+                                    <i class="bi bi-card-text me-1"></i>RSS Overrides
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-advanced">
+                                    <i class="bi bi-terminal me-1"></i>Advanced
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="p-3">
+                            <div class="tab-content">
+                                <!-- 1. General & Schedule -->
+                                <div class="tab-pane fade show active" id="af-tab-general">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Media Format</label>
+                                            <select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
+                                                <option value="audio">Audio (MP3 / M4A)</option>
+                                                <option value="video" selected>Video (MP4)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Quality</label>
+                                            <select id="new-feed-quality" class="form-select form-select-sm">
+                                                <option value="high" selected>High</option>
+                                                <option value="low">Low</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-4" id="new-feed-max-height-col">
+                                            <label class="form-label small fw-semibold">Max Height (Video)</label>
+                                            <select id="new-feed-max-height" class="form-select form-select-sm">
+                                                <option value="0" selected>Default (Original)</option>
+                                                <option value="480">480p</option>
+                                                <option value="720">720p (HD)</option>
+                                                <option value="1080">1080p (Full HD)</option>
+                                                <option value="1440">1440p (2K)</option>
+                                                <option value="2160">2160p (4K)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
+                                            <input type="number" id="new-feed-pagesize" class="form-control form-control-sm" min="1" max="500" value="50">
+                                            <div class="form-text small">Number of recent episodes to query from channel.</div>
+                                        </div>
+                                        <div class="col-sm-8">
+                                            <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
+                                            <div class="input-group input-group-sm mb-1">
+                                                <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
+                                            </div>
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 1h')">1h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 6h')">6h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 12h')">12h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 24h')">24h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('0 4 * * *')">Daily 04:00</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Playlist Sorting</label>
+                                            <select id="new-feed-playlist-sort" class="form-select form-select-sm">
+                                                <option value="" selected>Default (Source order)</option>
+                                                <option value="asc">Ascending (Oldest first)</option>
+                                                <option value="desc">Descending (Newest first)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="border rounded p-2 bg-body-tertiary">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="new-feed-opml" checked>
+                                            <label class="form-check-label small fw-semibold" for="new-feed-opml">Include in OPML export</label>
+                                            <div class="form-text small">Allows podcast apps to import this feed via the OPML button.</div>
+                                        </div>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="new-feed-private-feed">
+                                            <label class="form-check-label small fw-semibold" for="new-feed-private-feed">Private podcast (Block aggregators)</label>
+                                            <div class="form-text small">Adds &lt;itunes:block&gt;yes&lt;/itunes:block&gt; to prevent indexing in public directories.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Retention & Cleanup -->
+                                <div class="tab-pane fade" id="af-tab-cleanup">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
+                                        <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="0" placeholder="0 = unlimited (keep all episodes)">
+                                        <div class="form-text small mt-1">
+                                            <i class="bi bi-info-circle me-1"></i>Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Filters -->
+                                <div class="tab-pane fade" id="af-tab-filters">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Title Include Match (Regex)</label>
+                                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)podcast|interview">
+                                            <div class="form-text small">Only download episodes matching this regex.</div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Title Exclude Match (Regex)</label>
+                                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)short|teaser|live">
+                                            <div class="form-text small">Skip episodes matching this regex.</div>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Description Include (Regex)</label>
+                                            <input type="text" id="new-feed-filter-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Description Exclude (Regex)</label>
+                                            <input type="text" id="new-feed-filter-notdesc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Min Duration (Seconds)</label>
+                                            <input type="number" id="new-feed-min-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 600 (10 min)">
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Max Duration (Seconds)</label>
+                                            <input type="number" id="new-feed-max-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 7200 (2 hours)">
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Max Age (Days)</label>
+                                            <input type="number" id="new-feed-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 4. Custom RSS Overrides -->
+                                <div class="tab-pane fade" id="af-tab-custom">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Custom Title</label>
+                                            <input type="text" id="new-feed-custom-title" class="form-control form-control-sm" placeholder="Overrides source channel title">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Custom Author</label>
+                                            <input type="text" id="new-feed-custom-author" class="form-control form-control-sm" placeholder="Overrides source channel author">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Custom Description</label>
+                                        <textarea id="new-feed-custom-desc" class="form-control form-control-sm" rows="2" placeholder="Custom podcast description for RSS feed"></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
+                                        <input type="url" id="new-feed-custom-cover" class="form-control form-control-sm" placeholder="https://example.com/cover.jpg">
+                                        <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Category (iTunes)</label>
+                                            <input type="text" id="new-feed-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Language Code</label>
+                                            <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. en, ru">
+                                        </div>
+                                        <div class="col-sm-4 d-flex align-items-end pb-1">
+                                            <div class="form-check form-switch mb-1">
+                                                <input class="form-check-input" type="checkbox" id="new-feed-custom-explicit">
+                                                <label class="form-check-label small fw-semibold" for="new-feed-custom-explicit">Explicit content</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 5. Advanced -->
+                                <div class="tab-pane fade" id="af-tab-advanced">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Extra yt-dlp Arguments</label>
+                                        <input type="text" id="new-feed-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --geo-bypass --write-sub --sub-lang en">
+                                        <div class="form-text small">Space-separated arguments passed directly to yt-dlp at download time.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Filename Template</label>
+                                        <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
+                                        <div class="form-text small">Supported tokens: <code>{{id}}</code>, <code>{{title}}</code>, <code>{{pub_date}}</code>, <code>{{feed_id}}</code>. Leave empty for default.</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label small fw-semibold">Title Filter (optional)</label>
-                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm mb-1" placeholder="Include only titles containing...">
-                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm" placeholder="Exclude titles containing (e.g. Shorts)...">
+
+                        <div class="modal-footer border-top px-3 py-2">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
+                                <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+                                <i class="bi bi-plus-circle me-1"></i>Create &amp; Start
+                            </button>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
-                            <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
-                            Create & Start
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -2369,6 +2558,18 @@
             } catch (e) {}
         }
 
+        function toggleAddMaxHeight() {
+            const format = document.getElementById('new-feed-format').value;
+            const col = document.getElementById('new-feed-max-height-col');
+            if (col) {
+                col.style.display = format === 'video' ? 'block' : 'none';
+            }
+        }
+
+        function setAddPresetCron(val) {
+            document.getElementById('new-feed-cron-schedule').value = val;
+        }
+
         document.getElementById('new-feed-id').addEventListener('input', () => {
             document.getElementById('new-feed-id').dataset.manual = 'true';
         });
@@ -2383,17 +2584,41 @@
             spinner.classList.remove('d-none');
             btn.disabled = true;
 
+            const ytdlArgsVal = (document.getElementById('new-feed-ytdl-args') ? document.getElementById('new-feed-ytdl-args').value.trim() : '');
+            const ytdlArgs = ytdlArgsVal ? ytdlArgsVal.split(/\s+/).filter(Boolean) : [];
+
             const payload = {
                 id: document.getElementById('new-feed-id').value.trim(),
                 url: document.getElementById('new-feed-url').value.trim(),
                 format: document.getElementById('new-feed-format').value,
                 quality: document.getElementById('new-feed-quality').value,
-                page_size: parseInt(document.getElementById('new-feed-pagesize').value, 10) || 20,
+                max_height: parseInt(document.getElementById('new-feed-max-height').value) || 0,
+                page_size: parseInt(document.getElementById('new-feed-pagesize').value, 10) || 50,
+                cron_schedule: document.getElementById('new-feed-cron-schedule').value.trim(),
+                playlist_sort: document.getElementById('new-feed-playlist-sort').value,
+                opml: document.getElementById('new-feed-opml').checked,
+                private_feed: document.getElementById('new-feed-private-feed').checked,
                 keep_last: parseInt(document.getElementById('new-feed-keeplast').value, 10) || 0,
                 filters: {
                     title: document.getElementById('new-feed-filter-title').value.trim(),
-                    not_title: document.getElementById('new-feed-filter-nottitle').value.trim()
-                }
+                    not_title: document.getElementById('new-feed-filter-nottitle').value.trim(),
+                    description: (document.getElementById('new-feed-filter-desc') ? document.getElementById('new-feed-filter-desc').value.trim() : ''),
+                    not_description: (document.getElementById('new-feed-filter-notdesc') ? document.getElementById('new-feed-filter-notdesc').value.trim() : ''),
+                    min_duration: parseInt(document.getElementById('new-feed-min-duration').value) || 0,
+                    max_duration: parseInt(document.getElementById('new-feed-max-duration').value) || 0,
+                    max_age: parseInt(document.getElementById('new-feed-max-age').value) || 0
+                },
+                custom: {
+                    title: document.getElementById('new-feed-custom-title').value.trim(),
+                    author: document.getElementById('new-feed-custom-author').value.trim(),
+                    description: document.getElementById('new-feed-custom-desc').value.trim(),
+                    cover_art: document.getElementById('new-feed-custom-cover').value.trim(),
+                    category: document.getElementById('new-feed-custom-category').value.trim(),
+                    lang: document.getElementById('new-feed-custom-lang').value.trim(),
+                    explicit: document.getElementById('new-feed-custom-explicit').checked
+                },
+                youtube_dl_args: ytdlArgs,
+                filename_template: document.getElementById('new-feed-filename-template').value.trim()
             };
 
             try {
@@ -2407,7 +2632,11 @@
                     bootstrap.Modal.getInstance(document.getElementById('addFeedModal')).hide();
                     document.getElementById('add-feed-form').reset();
                     document.getElementById('new-feed-id').dataset.manual = 'false';
-                    showToast(`Podcast ${payload.id} successfully added!`);
+                    const firstTab = document.querySelector('#addFeedTabs button[data-bs-target="#af-tab-general"]');
+                    if (firstTab) {
+                        bootstrap.Tab.getOrCreateInstance(firstTab).show();
+                    }
+                    showToast('Podcast ' + payload.id + ' successfully added!');
                     loadFeeds();
                 } else {
                     const data = await res.json();

@@ -27,7 +27,8 @@ func TestBuildOPML(t *testing.T) {
 	dbMock := NewMockfeedProvider(ctrl)
 	dbMock.EXPECT().GetFeed(gomock.Any(), "1").Return(&model.Feed{Title: "1", Description: "desc"}, nil)
 
-	feeds := map[string]*Config{"any": {ID: "1", OPML: true}}
+	include := true
+	feeds := map[string]*Config{"any": {ID: "1", OPML: &include}}
 	out, err := BuildOPML(context.Background(), feeds, dbMock, "https://url/")
 	assert.NoError(t, err)
 	assert.Equal(t, expected, out)

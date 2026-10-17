@@ -27,7 +27,7 @@ func BuildOPML(ctx context.Context, feeds map[string]*Config, db feedProvider, h
 			return "", errors.Wrapf(err, "failed to query feed %q", feed.ID)
 		}
 
-		if !feed.OPML {
+		if feed.OPML != nil && !*feed.OPML {
 			continue
 		}
 

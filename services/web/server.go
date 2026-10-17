@@ -105,6 +105,11 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	}
 
 	log.Debugf("handle path: %s", mountPath)
+	mux.HandleFunc("/podsync.opml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment; filename="podsync.opml"`)
+		fileServer.ServeHTTP(w, r)
+	})
 	mux.Handle(mountPath, fileServer)
 
 	// Add health check endpoint

@@ -53,8 +53,8 @@ type Config struct {
 	//   command = ["curl", "-X", "POST", "-d", "Download failed: $ERROR_MESSAGE", "https://webhook.example.com/notify"]
 	//   timeout = 30
 	OnEpisodeDownloadError []*ExecHook `toml:"on_episode_download_error"`
-	// Included in OPML file
-	OPML bool `toml:"opml"`
+	// Included in OPML file (defaults to true if omitted)
+	OPML *bool `toml:"opml"`
 	// Private feed (not indexed by podcast aggregators)
 	PrivateFeed bool `toml:"private_feed"`
 	// Playlist sort

@@ -168,7 +168,21 @@ type vkAPIClient struct {
 	apiVersion string
 }
 
+func cleanVKToken(token string) string {
+	token = strings.TrimSpace(token)
+	token = strings.Trim(token, "\"'")
+	if idx := strings.Index(token, "access_token="); idx != -1 {
+		sub := token[idx+len("access_token="):]
+		if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
+			return sub[:end]
+		}
+		return sub
+	}
+	return token
+}
+
 func newVKAPIClient(token string) *vkAPIClient {
+	token = cleanVKToken(token)
 	return &vkAPIClient{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		token:      token,

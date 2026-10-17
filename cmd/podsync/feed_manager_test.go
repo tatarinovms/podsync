@@ -169,3 +169,22 @@ func TestUpdateFeed_LanguageChangeRedownload(t *testing.T) {
 	// Update queued
 	assert.Len(t, updates, 1)
 }
+
+func TestCleanTokenExtraction(t *testing.T) {
+	mgr := &AppFeedManager{
+		tokens: make(map[model.Provider]StringSlice),
+	}
+
+	rawVKURL := "https://oauth.vk.ru/blank.html#access_token=1234&expires_in=0&user_id=12345&email=mail@mail.com"
+	err := mgr.AddTokens(context.Background(), "vkvideo", []string{rawVKURL})
+	assert.NoError(t, err)
+
+	assert.Equal(t, []string{"1234"}, []string(mgr.tokens[model.Provider("vkvideo")]))
+
+	// UpdateTokens with another URL
+	rawVKURL2 := "https://oauth.vk.com/blank.html#access_token=vk1.a.secret_key&expires_in=86400"
+	err = mgr.UpdateTokens(context.Background(), "vkvideo", []string{rawVKURL2})
+	assert.NoError(t, err)
+
+	assert.Equal(t, []string{"vk1.a.secret_key"}, []string(mgr.tokens[model.Provider("vkvideo")]))
+}

@@ -922,7 +922,7 @@
                                 </ul>
                                 <div class="mt-3 p-2 rounded border small text-muted" style="background-color: var(--ctp-crust);">
                                     <i class="bi bi-info-circle text-primary me-1"></i>
-                                    <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. Copy the token directly from your browser's address bar (value between <code>#access_token=</code> and <code>&expires_in</code>).
+                                    <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. You can copy the entire URL from your browser's address bar (or just the token) — Podsync will automatically extract the token for you!
                                 </div>
                             </div>
                         </div>
@@ -3189,7 +3189,7 @@
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-body-secondary"><i class="bi bi-key"></i></span>
-                                <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Add another key to rotation...' : 'Enter API key(s) separated by space...'}" onkeydown="if(event.key==='Enter')addToken('${item.provider}')">
+                                <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Add another key to rotation...' : (item.provider === 'vkvideo' ? 'Paste full URL from address bar or token...' : 'Enter API key(s) separated by space...')}" oninput="handleTokenInput(this, '${item.provider}')" onpaste="setTimeout(() => handleTokenInput(this, '${item.provider}'), 10)" onkeydown="if(event.key==='Enter')addToken('${item.provider}')">
                                 <button class="btn btn-primary btn-sm" onclick="addToken('${item.provider}')">
                                     <i class="bi bi-plus-lg me-1"></i>Add
                                 </button>
@@ -3259,14 +3259,34 @@
             }
         }
 
+        function extractAccessToken(val) {
+            if (!val) return '';
+            val = val.trim();
+            const match = val.match(/(?:[#?&]|\b)access_token=([^& \t\r\n#]+)/i);
+            if (match) {
+                return match[1];
+            }
+            return val;
+        }
+
+        function handleTokenInput(input, provider) {
+            if (!input || !input.value) return;
+            const original = input.value;
+            const extracted = extractAccessToken(original);
+            if (extracted !== original) {
+                input.value = extracted;
+                showToast(`Extracted ${provider.toUpperCase()} access token automatically!`);
+            }
+        }
+
         async function addToken(provider) {
             const input = document.getElementById(`token-input-${provider}`);
-            const val = input.value.trim();
+            let val = input.value.trim();
             if (!val) {
                 alert('Please enter a token before adding');
                 return;
             }
-            const tokens = val.split(/\s+/).filter(Boolean);
+            const tokens = val.split(/\s+/).map(t => extractAccessToken(t)).filter(Boolean);
 
             try {
                 const res = await fetch('/api/v1/tokens', {

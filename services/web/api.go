@@ -73,6 +73,21 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/mcp/config", s.authMiddleware(http.HandlerFunc(s.handleMCPConfig)))
 }
 
+func cleanToken(providerStr, tok string) string {
+	tok = strings.TrimSpace(tok)
+	tok = strings.Trim(tok, "\"'")
+	if strings.EqualFold(providerStr, "vkvideo") || strings.EqualFold(providerStr, "vk") || strings.Contains(tok, "access_token=") {
+		if idx := strings.Index(tok, "access_token="); idx != -1 {
+			sub := tok[idx+len("access_token="):]
+			if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
+				return sub[:end]
+			}
+			return sub
+		}
+	}
+	return tok
+}
+
 func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -429,6 +444,9 @@ func (s *Server) handleTokens(w http.ResponseWriter, r *http.Request) {
 		if req.Provider == "" {
 			s.writeError(w, http.StatusBadRequest, "provider is required")
 			return
+		}
+		for i, tok := range req.Tokens {
+			req.Tokens[i] = cleanToken(req.Provider, tok)
 		}
 		if req.Append {
 			if err := s.adminMgr.AddTokens(r.Context(), req.Provider, req.Tokens); err != nil {

@@ -483,13 +483,28 @@ func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []str
 	return nil
 }
 
+func cleanToken(providerStr, tok string) string {
+	tok = strings.TrimSpace(tok)
+	tok = strings.Trim(tok, "\"'")
+	if strings.EqualFold(providerStr, "vkvideo") || strings.EqualFold(providerStr, "vk") || strings.Contains(tok, "access_token=") {
+		if idx := strings.Index(tok, "access_token="); idx != -1 {
+			sub := tok[idx+len("access_token="):]
+			if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
+				return sub[:end]
+			}
+			return sub
+		}
+	}
+	return tok
+}
+
 func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	var newTokens []string
 	for _, tok := range tokens {
-		tok = strings.TrimSpace(tok)
+		tok = cleanToken(providerStr, tok)
 		if tok == "" || strings.Contains(tok, "•") {
 			continue
 		}
@@ -505,7 +520,7 @@ func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, toke
 
 	var validTokens []string
 	for _, tok := range tokens {
-		tok = strings.TrimSpace(tok)
+		tok = cleanToken(providerStr, tok)
 		if tok == "" || strings.Contains(tok, "•") {
 			continue
 		}

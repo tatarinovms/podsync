@@ -15,6 +15,47 @@ import (
 	"github.com/mxpv/podsync/pkg/model"
 )
 
+func TestCleanVKToken(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "https://oauth.vk.ru/blank.html#access_token=1234&expires_in=0&user_id=12345&email=mail@mail.com",
+			expected: "1234",
+		},
+		{
+			input:    "https://oauth.vk.com/blank.html#access_token=vk1.a.secret_key&expires_in=86400",
+			expected: "vk1.a.secret_key",
+		},
+		{
+			input:    "access_token=token999&expires_in=0",
+			expected: "token999",
+		},
+		{
+			input:    "access_token=single_token",
+			expected: "single_token",
+		},
+		{
+			input:    "plain_token_abc",
+			expected: "plain_token_abc",
+		},
+		{
+			input:    "\"access_token=quoted_tok&expires_in=0\"",
+			expected: "quoted_tok",
+		},
+	}
+
+	for _, tt := range tests {
+		actual := cleanVKToken(tt.input)
+		require.Equal(t, tt.expected, actual)
+
+		builder, err := NewVkVideoBuilder(tt.input, nil)
+		require.NoError(t, err)
+		require.Equal(t, tt.expected, builder.client.token)
+	}
+}
+
 func TestVkVideoBuilder_MissingToken(t *testing.T) {
 	b, err := NewVkVideoBuilder("", nil)
 	require.NoError(t, err)

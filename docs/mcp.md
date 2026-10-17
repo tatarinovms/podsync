@@ -48,11 +48,11 @@ The MCP server provides 17 specialized tools:
 |---|---|---|
 | **`list_feeds`** | `{}` | List all configured podcast feeds, episode counts, total sizes, and feed URLs. |
 | **`get_feed`** | `feed_id` *(req)* | Get detailed metadata for a feed along with the list of episodes and statuses (`downloaded`, `new`, `error`). |
-| **`add_feed`** | `url` *(req)*, `format`, `quality`, `page_size`, `update_period` | Add a new podcast channel/playlist (YouTube, VK Video, Vimeo, etc.). Automatically updates `config.toml`. |
+| **`add_feed`** | `url` *(req)*, `format`, `quality`, `page_size`, `update_period`, `language` | Add a new podcast channel/playlist (YouTube, VK Video, Vimeo, etc.). Automatically updates `config.toml`. |
 | **`delete_feed`** | `feed_id` *(req)*, `delete_files` *(opt, def: false)* | Remove a feed and optionally delete its downloaded media files from disk. |
 | **`update_feed`** | `feed_id` *(req)* | Trigger an immediate update check and download cycle for a feed. |
 | **`update_all_feeds`** | `{}` | Trigger an immediate update check and download cycle for all configured feeds. |
-| **`update_feed_config`** | `feed_id` *(req)*, `cron_schedule`, `format`, `quality`, `page_size`, `keep_last`, `max_height`, `playlist_sort`, `private_feed` | Update settings for an existing podcast feed and save to `config.toml`. |
+| **`update_feed_config`** | `feed_id` *(req)*, `cron_schedule`, `format`, `quality`, `page_size`, `keep_last`, `max_height`, `playlist_sort`, `private_feed`, `language` | Update settings for an existing podcast feed and save to `config.toml`. |
 | **`retry_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Reset an episode that failed to download so Podsync attempts downloading it again. |
 
 ### Downloader & Authentication

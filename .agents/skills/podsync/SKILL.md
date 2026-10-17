@@ -43,6 +43,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `quality` *(string, optional)*: `"high"` (default) or `"low"`.
   - `page_size` *(integer, optional)*: How many recent episodes to fetch/keep (default: 50).
   - `update_period` *(string, optional)*: Update interval (e.g. `"1h"`, `"6h"`, `"12h"`, or cron expression).
+  - `language` *(string, optional)*: Preferred audio track language code (e.g. `"ru"`, `"en"`) for multi-audio videos and YouTube dubbing.
 - **When to use**: Adding a new show or channel. Always confirm the feed ID and URL with the user.
 
 ### 4. `delete_feed`
@@ -63,8 +64,8 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **Arguments**: None `{}`.
 - **When to use**: When the user says *"Update all podcasts"*, *"Sync everything"*, or wants a bulk update.
 
-### 6. `update_feed_config`
-- **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed) and saves changes to `config.toml`.
+### 7. `update_feed_config`
+- **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed, language) and saves changes to `config.toml`.
 - **Arguments**:
   - `feed_id` *(string, required)*: Feed identifier.
   - `cron_schedule` *(string, optional)*: Cron expression or interval (e.g. `"@every 6h"`).
@@ -75,6 +76,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `max_height` *(integer, optional)*: Video resolution limit (e.g. `720`, `1080`).
   - `playlist_sort` *(string, optional)*: `"asc"` or `"desc"`.
   - `private_feed` *(boolean, optional)*: Mark feed private.
+  - `language` *(string, optional)*: Preferred audio track language code (e.g. `"ru"`, `"en"`) for multi-audio videos and YouTube dubbing.
 - **When to use**: Changing how often a podcast updates, switching from audio to video, setting retention limits, or adjusting download parameters.
 
 ### 8. `retry_episode`
@@ -112,11 +114,12 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **When to use**: Diagnosing YouTube download failures such as bot verification blocks or rate limits.
 
 ### 13. `update_downloader_config`
-- **Purpose**: Updates yt-dlp downloader configuration (download timeout, proxy URL, or browser cookie extraction).
+- **Purpose**: Updates yt-dlp downloader configuration (download timeout, proxy URL, preferred audio language, or browser cookie extraction).
 - **Arguments**:
   - `timeout` *(integer, optional)*: Timeout in minutes.
   - `proxy` *(string, optional)*: Proxy URL (e.g. `socks5://127.0.0.1:1080` or `http://proxy:8080`).
   - `cookies_from_browser` *(string, optional)*: Browser name to extract session cookies from (e.g. `chrome`, `firefox`).
+  - `language` *(string, optional)*: Global preferred audio track language code (e.g. `"ru"`, `"en"`) for multi-audio videos and YouTube dubbing.
 
 ### 14. `test_downloader`
 - **Purpose**: Tests yt-dlp connectivity and cookie verification against a video URL without downloading the file.

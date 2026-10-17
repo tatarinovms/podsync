@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides comprehensive architecture guidance, development workflows, and behavioral rules for autonomous AI coding agents (Antigravity, Claude Code, OpenCode, Cursor, Cline) working on this repository.
+This file provides comprehensive architecture guidance, development workflows, and behavioral rules for autonomous AI coding agents (Antigravity, Claude Code, OpenCode, Hermes Agent, Cursor, Cline) working on this repository.
 
 ---
 
@@ -49,6 +49,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── update/               # Feed update orchestrator and regex episode matcher
 │   └── migrate/              # Tooling for media filename migration
 ├── docs/                     # Guides, token setup instructions, and MCP specs
+│   └── deployment_guide_agents.md # Linux systemd service & Docker deployment for OpenCode and Hermes
 ├── .agents/skills/podsync/   # Standard agent skill definition for MCP
 ├── Dockerfile                # Multi-stage Docker build (Go builder + Alpine runtime with yt-dlp)
 ├── docker-compose.yml        # Docker compose configuration for running Podsync

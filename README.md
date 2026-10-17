@@ -49,6 +49,7 @@ brew install yt-dlp ffmpeg go
 
 ## Documentation
 
+- [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
 - [Web Admin Console Guide](./docs/web_admin.md)
 - [Model Context Protocol (MCP) Guide](./docs/mcp.md)
 - [How to get VK API token](./docs/how_to_get_vk_token.md)

@@ -439,6 +439,7 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 
 		if err := u.db.UpdateEpisode(feedID, episode.ID, func(episode *model.Episode) error {
 			episode.Status = model.EpisodeCleaned
+			episode.Size = 0
 			return nil
 		}); err != nil {
 			result = multierror.Append(result, errors.Wrapf(err, "failed to update episode status: %s", episode.ID))

@@ -2394,7 +2394,12 @@
             if (structureMatches) {
                 feeds.forEach(feed => {
                     const epEl = document.getElementById(`feed-ep-${feed.id}`);
-                    if (epEl) epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.`;
+                    const dlCount = feed.downloaded_count ?? 0;
+                    const totalCount = feed.episode_count ?? 0;
+                    if (epEl) {
+                        epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${dlCount} ep.`;
+                        epEl.title = `${dlCount} downloaded on disk${totalCount > dlCount ? ` (${totalCount} total in feed)` : ""}`;
+                    }
 
                     const sizeEl = document.getElementById(`feed-size-${feed.id}`);
                     if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
@@ -2511,7 +2516,7 @@
                                 <!-- Stats and Action Buttons -->
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
                                     <div class="d-flex align-items-center gap-3">
-                                        <span class="stat-badge" id="feed-ep-${feed.id}"><i class="bi bi-file-earmark-music"></i> ${feed.episode_count} ep.</span>
+                                        <span class="stat-badge" id="feed-ep-${feed.id}" title="${feed.downloaded_count ?? 0} downloaded on disk${(feed.episode_count ?? 0) > (feed.downloaded_count ?? 0) ? ` (${feed.episode_count} total in feed)` : ""}"><i class="bi bi-file-earmark-music"></i> ${feed.downloaded_count ?? 0} ep.</span>
                                         <span class="stat-badge" id="feed-size-${feed.id}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
                                         <span id="feed-err-${feed.id}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ''}</span>
                                     </div>
@@ -3061,26 +3066,39 @@
                 const data = await res.json();
                 const episodes = data.episodes || [];
 
-                document.getElementById('episodes-feed-subtitle').innerText = `Total episodes: ${episodes.length}`;
+                const downloadedCount = episodes.filter(e => e.status === 'downloaded').length;
+                const cleanedCount = episodes.filter(e => e.status === 'cleaned').length;
+                const errorCount = episodes.filter(e => e.status === 'error').length;
+                const queuedCount = episodes.filter(e => e.status === 'new').length;
+
+                const subtitleParts = [`Downloaded: ${downloadedCount}`];
+                if (cleanedCount > 0) subtitleParts.push(`Cleaned: ${cleanedCount}`);
+                if (errorCount > 0) subtitleParts.push(`Errors: ${errorCount}`);
+                if (queuedCount > 0) subtitleParts.push(`Queued: ${queuedCount}`);
+                if (episodes.length !== downloadedCount) subtitleParts.push(`Total: ${episodes.length}`);
+                document.getElementById('episodes-feed-subtitle').innerText = subtitleParts.join(' • ');
 
                 if (episodes.length === 0) {
-                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No downloaded episodes in database for this feed yet.</div>`;
+                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No episodes in database for this feed yet.</div>`;
                     return;
                 }
 
                 listEl.innerHTML = episodes.map(ep => {
                     let statusBadge = '<span class="badge bg-secondary">Unknown</span>';
                     let retryBtn = '';
+                    let sizeDisplay = `<i class="bi bi-hdd"></i> ${formatBytes(ep.size)}`;
 
                     if (ep.status === 'downloaded') {
                         statusBadge = '<span class="badge bg-success">Downloaded</span>';
                     } else if (ep.status === 'new') {
                         statusBadge = '<span class="badge bg-primary">Queued</span>';
+                        sizeDisplay = '<i class="bi bi-hourglass-split"></i> Pending';
                     } else if (ep.status === 'error') {
                         statusBadge = '<span class="badge bg-danger">Error</span>';
                         retryBtn = `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" onclick="retryEpisode('${feedId}', '${ep.id}')"><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
                     } else if (ep.status === 'cleaned') {
                         statusBadge = '<span class="badge bg-light text-muted border">Cleaned (deleted from disk)</span>';
+                        sizeDisplay = '<i class="bi bi-trash"></i> 0 B (deleted)';
                     }
 
                     const errorAlert = ep.error ? `<div class="mt-2 p-2 rounded bg-danger-subtle border border-danger-subtle text-danger small font-monospace"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${escapeHtml(ep.error)}</div>` : "";
@@ -3092,7 +3110,7 @@
                                 <h6 class="fw-semibold mb-1 text-break">${escapeHtml(ep.title || ep.id)}</h6>
                                 <div class="text-muted small d-flex flex-wrap gap-3">
                                     <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
-                                    <span><i class="bi bi-hdd"></i> ${formatBytes(ep.size)}</span>
+                                    <span>${sizeDisplay}</span>
                                     <span><i class="bi bi-calendar"></i> ${formatDate(ep.pub_date)}</span>
                                 </div>
                                 ${errorAlert}

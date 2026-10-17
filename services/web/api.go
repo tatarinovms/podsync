@@ -63,6 +63,10 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/system/errors", s.handleSystemErrors)
 	mux.HandleFunc("/api/v1/system/recent", s.handleSystemRecent)
 	mux.HandleFunc("/api/v1/system/status", s.handleSystemStatus)
+	mux.HandleFunc("/api/v1/system/logs", s.handleSystemLogs)
+	mux.HandleFunc("/api/v1/system/logs/level", s.handleSystemLogLevel)
+	mux.HandleFunc("/api/v1/system/logs/download", s.handleSystemLogsDownload)
+
 	mux.Handle("/api/v1/downloader", s.authMiddleware(http.HandlerFunc(s.handleDownloader)))
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
 	mux.Handle("/api/v1/downloader/test", s.authMiddleware(http.HandlerFunc(s.handleDownloaderTest)))
@@ -683,4 +687,112 @@ func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeJSON(w, http.StatusOK, status)
+}
+
+func (s *Server) handleSystemLogs(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		limit := 200
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			if val, err := strconv.Atoi(raw); err == nil && val > 0 {
+				limit = val
+			}
+		}
+		var sinceID int64
+		if raw := r.URL.Query().Get("since_id"); raw != "" {
+			if val, err := strconv.ParseInt(raw, 10, 64); err == nil {
+				sinceID = val
+			}
+		}
+
+		filter := LogFilter{
+			Level:   r.URL.Query().Get("level"),
+			Search:  r.URL.Query().Get("search"),
+			FeedID:  r.URL.Query().Get("feed_id"),
+			Limit:   limit,
+			SinceID: sinceID,
+		}
+
+		res, err := s.adminMgr.GetSystemLogs(r.Context(), filter)
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, res)
+
+	case http.MethodDelete:
+		if err := s.adminMgr.ClearSystemLogs(r.Context()); err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleSystemLogLevel(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		level := s.adminMgr.GetLogLevel(r.Context())
+		s.writeJSON(w, http.StatusOK, map[string]string{"level": level})
+
+	case http.MethodPost:
+		var req struct {
+			Level string `json:"level"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if req.Level == "" {
+			s.writeError(w, http.StatusBadRequest, "level is required")
+			return
+		}
+		newLevel, err := s.adminMgr.SetLogLevel(r.Context(), req.Level)
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]string{"level": newLevel})
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleSystemLogsDownload(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	content, filename, err := s.adminMgr.DownloadLogs(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if filename == "" {
+		filename = "podsync.log"
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content)
 }

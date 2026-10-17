@@ -691,6 +691,70 @@
                 [data-theme="mocha"] .btn-close {
             filter: invert(1) grayscale(100%);
         }
+
+        /* Log Terminal & Badges */
+        .log-terminal {
+            background-color: var(--ctp-crust) !important;
+            border: 1px solid var(--ctp-surface1) !important;
+            border-radius: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            min-height: 520px;
+            max-height: calc(100vh - 310px);
+            overflow-y: auto;
+            color: var(--ctp-text);
+            padding: 12px 16px;
+        }
+        .log-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(var(--ctp-surface1-rgb), 0.25);
+            word-break: break-word;
+        }
+        .log-line:hover {
+            background-color: rgba(var(--ctp-surface0-rgb), 0.4);
+        }
+        .log-time {
+            color: var(--ctp-subtext0);
+            flex-shrink: 0;
+            user-select: none;
+            font-size: 0.78rem;
+        }
+        .log-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15em 0.55em;
+            border-radius: 4px;
+            text-transform: uppercase;
+            flex-shrink: 0;
+            letter-spacing: 0.5px;
+        }
+        .log-badge-error { background: rgba(var(--ctp-red-rgb), 0.2); color: var(--ctp-red); border: 1px solid rgba(var(--ctp-red-rgb), 0.4); }
+        .log-badge-warn  { background: rgba(var(--ctp-yellow-rgb), 0.2); color: var(--ctp-yellow); border: 1px solid rgba(var(--ctp-yellow-rgb), 0.4); }
+        .log-badge-info  { background: rgba(var(--ctp-blue-rgb), 0.2); color: var(--ctp-blue); border: 1px solid rgba(var(--ctp-blue-rgb), 0.4); }
+        .log-badge-debug { background: rgba(var(--ctp-lavender-rgb), 0.2); color: var(--ctp-lavender); border: 1px solid rgba(var(--ctp-lavender-rgb), 0.4); }
+        .log-msg {
+            flex-grow: 1;
+            white-space: pre-wrap;
+        }
+        .log-tag {
+            display: inline-block;
+            background: rgba(var(--ctp-surface2-rgb), 0.25);
+            color: var(--ctp-subtext1);
+            font-size: 0.72rem;
+            padding: 0.1em 0.4em;
+            border-radius: 4px;
+            margin-right: 4px;
+            border: 1px solid rgba(var(--ctp-surface2-rgb), 0.4);
+            cursor: pointer;
+        }
+        .log-tag:hover {
+            border-color: var(--ctp-blue);
+            color: var(--ctp-blue);
+        }
     </style>
 </head>
 <body>
@@ -787,6 +851,12 @@
                 <li class="nav-item">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mcp" onclick="loadMCPConfig()">
                         <i class="bi bi-robot me-1"></i> MCP Server
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-logs" onclick="loadLogs()">
+                        <i class="bi bi-terminal me-1"></i> Logs
+                        <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-1 d-none">0</span>
                     </button>
                 </li>
             </ul>
@@ -1374,8 +1444,103 @@
                                         <td>Test yt-dlp connectivity and cookie verification against a video URL without downloading</td>
                                         <td><code>url</code> <em>(optional)</em></td>
                                     </tr>
+                                    <tr>
+                                        <td><code>get_system_logs</code></td>
+                                        <td>Inspect recent server logs, filter by level (error, warn, info, debug) or search string</td>
+                                        <td><code>limit</code>, <code>level</code>, <code>search</code>, <code>feed_id</code></td>
+                                    </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. Logs Tab -->
+                <div class="tab-pane fade" id="tab-logs">
+                    <div class="card p-3 mb-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <!-- Left: Filter by level buttons -->
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="small fw-semibold text-muted me-1">Level:</span>
+                                <div class="btn-group btn-group-sm" role="group" id="logs-level-group">
+                                    <button type="button" class="btn btn-outline-secondary active" onclick="setLogsLevel('all')">All</button>
+                                    <button type="button" class="btn btn-outline-danger" onclick="setLogsLevel('error')">Error</button>
+                                    <button type="button" class="btn btn-outline-warning" onclick="setLogsLevel('warn')">Warn</button>
+                                    <button type="button" class="btn btn-outline-primary" onclick="setLogsLevel('info')">Info</button>
+                                    <button type="button" class="btn btn-outline-info" onclick="setLogsLevel('debug')">Debug</button>
+                                </div>
+
+                                <div class="input-group input-group-sm ms-md-2" style="max-width: 280px;">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="logs-search-input" class="form-control" placeholder="Search logs (e.g. error, vk, download)..." oninput="debounceLogsFilter()">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearLogsSearch()" title="Clear search"><i class="bi bi-x-lg"></i></button>
+                                </div>
+
+                                <div class="input-group input-group-sm" style="max-width: 190px;">
+                                    <span class="input-group-text"><i class="bi bi-funnel"></i> Feed:</span>
+                                    <select id="logs-feed-select" class="form-select" onchange="onLogsFeedChange()">
+                                        <option value="">All Feeds</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Right: Toggles & Actions -->
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <div class="d-flex align-items-center me-2">
+                                    <span id="logs-live-dot" class="spinner-grow spinner-grow-sm text-success me-1 d-none" style="width: 8px; height: 8px;" role="status"></span>
+                                    <label class="form-label small mb-0 me-1 text-muted">Auto-refresh:</label>
+                                    <select id="logs-autorefresh-select" class="form-select form-select-sm" style="width: 100px;" onchange="setLogsAutoRefresh(this.value)">
+                                        <option value="0">Off</option>
+                                        <option value="2000" selected>Every 2s</option>
+                                        <option value="5000">Every 5s</option>
+                                    </select>
+                                </div>
+
+                                <div class="d-flex align-items-center me-2">
+                                    <label class="form-label small mb-0 me-1 text-muted">Lines:</label>
+                                    <select id="logs-limit-select" class="form-select form-select-sm" style="width: 85px;" onchange="loadLogs()">
+                                        <option value="100">100</option>
+                                        <option value="250" selected>250</option>
+                                        <option value="500">500</option>
+                                        <option value="1000">1000</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-check form-switch me-2 mb-0">
+                                    <input class="form-check-input" type="checkbox" id="logs-autoscroll" checked>
+                                    <label class="form-check-label small" for="logs-autoscroll">Autoscroll</label>
+                                </div>
+
+                                <div class="form-check form-switch me-2 mb-0" title="Dynamically enable verbose debug logs on the server">
+                                    <input class="form-check-input" type="checkbox" id="logs-server-debug" onchange="toggleServerDebug(this.checked)">
+                                    <label class="form-check-label small" for="logs-server-debug">Debug Mode</label>
+                                </div>
+
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary" onclick="loadLogs(true)" title="Refresh logs"><i class="bi bi-arrow-repeat"></i></button>
+                                    <button class="btn btn-outline-secondary" onclick="copyLogsToClipboard()" title="Copy logs to clipboard"><i class="bi bi-clipboard"></i></button>
+                                    <a class="btn btn-outline-secondary" href="/api/v1/system/logs/download" target="_blank" title="Download .log file"><i class="bi bi-download"></i></a>
+                                    <button class="btn btn-outline-danger" onclick="clearLogsBuffer()" title="Clear log buffer"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Log Output Terminal -->
+                    <div class="card p-0 overflow-hidden shadow-sm">
+                        <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-body-tertiary">
+                            <div class="d-flex align-items-center gap-2 small">
+                                <span class="badge bg-secondary font-monospace" id="logs-count-badge">0 entries</span>
+                                <span class="text-muted" id="logs-status-text">Ready</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 small text-muted">
+                                <span id="logs-server-level-label">Server log level: <strong>INFO</strong></span>
+                            </div>
+                        </div>
+                        <div id="logs-terminal" class="log-terminal">
+                            <div class="text-muted text-center py-5">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div> Loading logs...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2240,6 +2405,20 @@
                             `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : '';
                     }
 
+                    const lastErrEl = document.getElementById(`feed-lasterr-${feed.id}`);
+                    if (lastErrEl) {
+                        lastErrEl.innerHTML = feed.last_error ? `
+                            <div class="mt-2 p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
+                                <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
+                                    <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                                    <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" onclick="showLogsForFeed('${escapeHtml(feed.id)}')">
+                                    View Logs
+                                </button>
+                            </div>` : '';
+                    }
+
                     const isUpdating = updatingFeeds.has(feed.id);
                     const btn = document.getElementById(`btn-update-${feed.id}`);
                     if (btn) {
@@ -2301,7 +2480,7 @@
                                 </div>
 
                                 <!-- Deep Links for Podcast Apps -->
-                                <div class="d-flex flex-wrap gap-1 mb-3">
+                                <div class="d-flex flex-wrap gap-1 mb-2">
                                     <a href="${feed.apple_url}" class="deep-link-btn border">
                                         <i class="bi bi-apple"></i> Apple
                                     </a>
@@ -2314,6 +2493,19 @@
                                     <a href="${feed.feed_url}" target="_blank" class="deep-link-btn border">
                                         <i class="bi bi-box-arrow-up-right"></i> XML
                                     </a>
+                                </div>
+
+                                <div id="feed-lasterr-${feed.id}" class="mb-2">
+                                    ${feed.last_error ? `
+                                    <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
+                                        <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
+                                            <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                                            <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" onclick="showLogsForFeed('${escapeHtml(feed.id)}')">
+                                            View Logs
+                                        </button>
+                                    </div>` : ''}
                                 </div>
 
                                 <!-- Stats and Action Buttons -->
@@ -3586,6 +3778,290 @@
             }, 1500);
         }
 
+
+        // Logs Management State & Logic
+        let logsAutoRefreshTimer = null;
+        let logsDebounceTimer = null;
+        let currentLogsLevel = 'all';
+        let currentLogsFeed = '';
+        let lastLoadedLogEntries = [];
+
+        function setLogsLevel(lvl) {
+            currentLogsLevel = lvl;
+            const group = document.getElementById('logs-level-group');
+            if (group) {
+                Array.from(group.querySelectorAll('button')).forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const activeBtn = group.querySelector(`button[onclick*="'${lvl}'"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+            loadLogs(true);
+        }
+
+        function onLogsFeedChange() {
+            currentLogsFeed = document.getElementById('logs-feed-select').value;
+            loadLogs(true);
+        }
+
+        function debounceLogsFilter() {
+            clearTimeout(logsDebounceTimer);
+            logsDebounceTimer = setTimeout(() => {
+                loadLogs(true);
+            }, 300);
+        }
+
+        function clearLogsSearch() {
+            const input = document.getElementById('logs-search-input');
+            if (input) input.value = '';
+            loadLogs(true);
+        }
+
+        function setLogsAutoRefresh(intervalMs) {
+            if (logsAutoRefreshTimer) {
+                clearInterval(logsAutoRefreshTimer);
+                logsAutoRefreshTimer = null;
+            }
+            const dot = document.getElementById('logs-live-dot');
+            const ms = parseInt(intervalMs, 10);
+            if (ms > 0) {
+                if (dot) dot.classList.remove('d-none');
+                logsAutoRefreshTimer = setInterval(() => {
+                    const logsTab = document.getElementById('tab-logs');
+                    if (logsTab && logsTab.classList.contains('active')) {
+                        loadLogs(false);
+                    }
+                }, ms);
+            } else {
+                if (dot) dot.classList.add('d-none');
+            }
+        }
+
+        async function loadLogs(manual = false) {
+            const terminal = document.getElementById('logs-terminal');
+            const countBadge = document.getElementById('logs-count-badge');
+            const statusText = document.getElementById('logs-status-text');
+            const levelLabel = document.getElementById('logs-server-level-label');
+            const debugSwitch = document.getElementById('logs-server-debug');
+            const searchInput = document.getElementById('logs-search-input');
+            const limitSelect = document.getElementById('logs-limit-select');
+            const feedSelect = document.getElementById('logs-feed-select');
+
+            if (feedSelect && feedSelect.options.length <= 1 && allFeeds.length > 0) {
+                allFeeds.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f.id;
+                    opt.innerText = f.title ? `${f.title} (${f.id})` : f.id;
+                    feedSelect.appendChild(opt);
+                });
+                if (currentLogsFeed) {
+                    feedSelect.value = currentLogsFeed;
+                }
+            }
+
+            const limit = limitSelect ? limitSelect.value : 250;
+            const search = searchInput ? searchInput.value.trim() : '';
+            const feedId = feedSelect ? feedSelect.value : currentLogsFeed;
+
+            let query = `?limit=${limit}`;
+            if (currentLogsLevel && currentLogsLevel !== 'all') {
+                query += `&level=${encodeURIComponent(currentLogsLevel)}`;
+            }
+            if (search) {
+                query += `&search=${encodeURIComponent(search)}`;
+            }
+            if (feedId) {
+                query += `&feed_id=${encodeURIComponent(feedId)}`;
+            }
+
+            if (statusText) statusText.innerText = manual ? 'Refreshing...' : 'Updating...';
+
+            try {
+                const res = await fetch(`/api/v1/system/logs${query}`);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+
+                const entries = data.entries || [];
+                lastLoadedLogEntries = entries;
+
+                if (countBadge) {
+                    countBadge.innerText = `${entries.length} entries` + (data.total ? ` (buffer: ${data.total})` : '');
+                }
+
+                if (levelLabel && data.current_level) {
+                    levelLabel.innerHTML = `Server log level: <strong class="text-uppercase ${data.current_level === 'debug' ? 'text-info' : 'text-primary'}">${data.current_level}</strong>`;
+                }
+
+                if (debugSwitch) {
+                    debugSwitch.checked = (data.current_level === 'debug');
+                }
+
+                let errorCount = 0;
+                entries.forEach(e => {
+                    if (e.level === 'error' || e.level === 'fatal' || e.level === 'panic') {
+                        errorCount++;
+                    }
+                });
+                const navBadge = document.getElementById('nav-logs-badge');
+                if (navBadge) {
+                    if (errorCount > 0) {
+                        navBadge.innerText = errorCount;
+                        navBadge.classList.remove('d-none');
+                    } else {
+                        navBadge.classList.add('d-none');
+                    }
+                }
+
+                if (entries.length === 0) {
+                    terminal.innerHTML = `
+                        <div class="text-muted text-center py-5">
+                            <i class="bi bi-journal-x fs-1 mb-2 d-block opacity-50"></i>
+                            <div>No log entries found matching criteria.</div>
+                            <div class="small mt-1">Try changing level, clearing search filter, or re-triggering podcast update.</div>
+                        </div>`;
+                } else {
+                    const linesHtml = entries.map(e => {
+                        const lvl = (e.level || 'info').toLowerCase();
+                        let badgeClass = 'log-badge-info';
+                        if (lvl === 'error' || lvl === 'fatal' || lvl === 'panic') badgeClass = 'log-badge-error';
+                        else if (lvl === 'warn' || lvl === 'warning') badgeClass = 'log-badge-warn';
+                        else if (lvl === 'debug') badgeClass = 'log-badge-debug';
+
+                        const timeStr = formatLogTimestamp(e.timestamp);
+
+                        let fieldsHtml = '';
+                        if (e.fields && Object.keys(e.fields).length > 0) {
+                            fieldsHtml = Object.entries(e.fields).map(([k, v]) => {
+                                return `<span class="log-tag" onclick="filterByTag('${escapeHtml(k)}', '${escapeHtml(String(v))}')" title="Filter by ${escapeHtml(k)}">${escapeHtml(k)}=${escapeHtml(String(v))}</span>`;
+                            }).join('');
+                        }
+
+                        return `
+                            <div class="log-line">
+                                <span class="log-time font-monospace">${timeStr}</span>
+                                <span class="log-badge ${badgeClass}">${escapeHtml(lvl)}</span>
+                                <div class="log-msg">
+                                    ${fieldsHtml}
+                                    <span class="log-text">${escapeHtml(e.message)}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    terminal.innerHTML = linesHtml;
+
+                    const autoscroll = document.getElementById('logs-autoscroll');
+                    if (autoscroll && autoscroll.checked) {
+                        terminal.scrollTop = terminal.scrollHeight;
+                    }
+                }
+
+                if (statusText) statusText.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
+
+            } catch (err) {
+                if (statusText) statusText.innerText = 'Error: ' + err.message;
+                if (manual) {
+                    showToast('Failed to load logs: ' + err.message);
+                }
+            }
+        }
+
+        function formatLogTimestamp(isoStr) {
+            if (!isoStr) return '';
+            try {
+                const d = new Date(isoStr);
+                const pad = (n) => n < 10 ? '0' + n : n;
+                return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+            } catch (e) {
+                return isoStr;
+            }
+        }
+
+        function filterByTag(key, val) {
+            if (key === 'feed_id') {
+                const feedSelect = document.getElementById('logs-feed-select');
+                if (feedSelect) {
+                    feedSelect.value = val;
+                    currentLogsFeed = val;
+                }
+            } else {
+                const searchInput = document.getElementById('logs-search-input');
+                if (searchInput) {
+                    searchInput.value = val;
+                }
+            }
+            loadLogs(true);
+        }
+
+        function showLogsForFeed(feedId) {
+            const triggerEl = document.querySelector('button[data-bs-target="#tab-logs"]');
+            if (triggerEl) {
+                bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+            }
+            currentLogsFeed = feedId;
+            const feedSelect = document.getElementById('logs-feed-select');
+            if (feedSelect) {
+                feedSelect.value = feedId;
+            }
+            currentLogsLevel = 'all';
+            const group = document.getElementById('logs-level-group');
+            if (group) {
+                Array.from(group.querySelectorAll('button')).forEach(b => b.classList.remove('active'));
+                const allBtn = group.querySelector('button');
+                if (allBtn) allBtn.classList.add('active');
+            }
+            loadLogs(true);
+        }
+
+        async function toggleServerDebug(enabled) {
+            const level = enabled ? 'debug' : 'info';
+            try {
+                const res = await fetch('/api/v1/system/logs/level', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ level: level })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                showToast(`Server log level changed to ${level.toUpperCase()}`);
+                loadLogs(true);
+            } catch (err) {
+                alert('Failed to change log level: ' + err.message);
+                const debugSwitch = document.getElementById('logs-server-debug');
+                if (debugSwitch) debugSwitch.checked = !enabled;
+            }
+        }
+
+        async function clearLogsBuffer() {
+            if (!confirm('Are you sure you want to clear the in-memory log buffer?')) return;
+            try {
+                const res = await fetch('/api/v1/system/logs', { method: 'DELETE' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Log buffer cleared');
+                loadLogs(true);
+            } catch (err) {
+                alert('Failed to clear logs: ' + err.message);
+            }
+        }
+
+        function copyLogsToClipboard() {
+            if (lastLoadedLogEntries.length === 0) {
+                showToast('No logs to copy');
+                return;
+            }
+            const lines = lastLoadedLogEntries.map(e => {
+                let fieldsStr = '';
+                if (e.fields && Object.keys(e.fields).length > 0) {
+                    fieldsStr = ' (' + Object.entries(e.fields).map(([k, v]) => `${k}=${v}`).join(' ') + ')';
+                }
+                return `${e.timestamp} [${(e.level || 'info').toUpperCase()}]${fieldsStr} ${e.message}`;
+            }).join('\n');
+
+            navigator.clipboard.writeText(lines).then(() => {
+                showToast(`Copied ${lastLoadedLogEntries.length} log lines to clipboard!`);
+            }).catch(err => {
+                alert('Could not copy: ' + err.message);
+            });
+        }
     </script>
 </body>
 </html>

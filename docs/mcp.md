@@ -33,7 +33,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 17 specialized tools:
+The MCP server provides 18 specialized tools:
 
 ### Monitoring & Status
 | Tool Name | Arguments | Description |
@@ -42,6 +42,7 @@ The MCP server provides 17 specialized tools:
 | **`get_download_errors`** | `feed_id` *(opt)*, `limit` *(opt, def: 20)* | List failed episode downloads with cleaned diagnostic causes (e.g., bot detection, 429 rate limits, private videos) and recommendations. |
 | **`get_recent_downloads`** | `feed_id` *(opt)*, `limit` *(opt, def: 10)* | List recent successfully downloaded episodes with file sizes, publication dates, and direct media URLs. |
 | **`get_system_stats`** | `{}` | Retrieve live system health, RAM usage, disk usage (`data_dir`), and availability of `yt-dlp` and `ffmpeg`. |
+| **`get_system_logs`** | `level` *(opt)*, `search` *(opt)*, `feed_id` *(opt)*, `limit` *(opt, def: 50)* | Fetch recent system log entries from in-memory ring buffer, filterable by severity or query. |
 
 ### Feed Management
 | Tool Name | Arguments | Description |

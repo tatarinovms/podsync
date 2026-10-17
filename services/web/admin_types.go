@@ -35,6 +35,8 @@ type FeedSummary struct {
 	ErrorCount      int          `json:"error_count"`
 	TotalSize       int64        `json:"total_size"`
 	LastUpdate      *time.Time   `json:"last_update,omitempty"`
+	LastError       string       `json:"last_error,omitempty"`
+	LastErrorAt     *time.Time   `json:"last_error_at,omitempty"`
 	FeedURL         string       `json:"feed_url"`
 	AppleURL        string       `json:"apple_url"`
 	PocketCastsURL  string       `json:"pocketcasts_url"`
@@ -184,6 +186,34 @@ type SyncStatusInfo struct {
 	Feeds              []SyncStatusFeedInfo `json:"feeds"`
 }
 
+// LogEntry represents a single structured log line.
+type LogEntry struct {
+	ID        int64                  `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Fields    map[string]interface{} `json:"fields,omitempty"`
+	Caller    string                 `json:"caller,omitempty"`
+}
+
+// LogFilter specifies criteria for querying logs.
+type LogFilter struct {
+	Level   string `json:"level"`
+	Search  string `json:"search"`
+	FeedID  string `json:"feed_id"`
+	Limit   int    `json:"limit"`
+	SinceID int64  `json:"since_id"`
+}
+
+// LogResult represents the queried logs response.
+type LogResult struct {
+	Entries       []LogEntry `json:"entries"`
+	Total         int        `json:"total"`
+	FilteredTotal int        `json:"filtered_total"`
+	MaxID         int64      `json:"max_id"`
+	CurrentLevel  string     `json:"current_level"`
+}
+
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
@@ -208,4 +238,11 @@ type AdminManager interface {
 	GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]RecentDownloadItem, error)
 	GetSyncStatus(ctx context.Context) (*SyncStatusInfo, error)
 	ChangePassword(ctx context.Context, oldPassword, newPassword string) error
+
+	// Logs management
+	GetSystemLogs(ctx context.Context, filter LogFilter) (*LogResult, error)
+	ClearSystemLogs(ctx context.Context) error
+	SetLogLevel(ctx context.Context, level string) (string, error)
+	GetLogLevel(ctx context.Context) string
+	DownloadLogs(ctx context.Context) ([]byte, string, error)
 }

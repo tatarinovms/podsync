@@ -148,6 +148,15 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **Arguments**: None `{}`.
 - **When to use**: General status checks (*"Is Podsync working?"*, *"When is the next sync?"*).
 
+### 18. `get_system_logs`
+- **Purpose**: Retrieves recent system and application logs from Podsync's in-memory ring buffer, filterable by severity level (`error`, `warn`, `info`, `debug`) or search query.
+- **Arguments**:
+  - `limit` *(integer, optional, default: 50, max: 200)*: Number of log entries to retrieve.
+  - `level` *(string, optional, default: "all")*: Filter by severity (`"all"`, `"error"`, `"warn"`, `"info"`, `"debug"`).
+  - `search` *(string, optional)*: Case-insensitive search string (e.g. `"vk"`, `"token"`, `"youtube"`).
+  - `feed_id` *(string, optional)*: Filter logs for a specific feed ID.
+- **When to use**: Diagnosing issues when feed updates fail, missing API tokens, network problems, or yt-dlp execution failures.
+
 ## MCP Resources
 
 Agents can read live context from Podsync via resources:

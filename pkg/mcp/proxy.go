@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -63,8 +64,8 @@ func (c *HTTPClientManager) doRequest(ctx context.Context, method, path string, 
 		bodyReader = bytes.NewReader(data)
 	}
 
-	url := c.baseURL + path
-	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	reqURL := c.baseURL + path
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bodyReader)
 	if err != nil {
 		return err
 	}
@@ -268,4 +269,69 @@ func (c *HTTPClientManager) ChangePassword(ctx context.Context, oldPassword, new
 		"new_password": newPassword,
 	}
 	return c.doRequest(ctx, http.MethodPost, "/api/v1/auth/password", payload, nil)
+}
+
+func (c *HTTPClientManager) GetSystemLogs(ctx context.Context, filter web.LogFilter) (*web.LogResult, error) {
+	path := fmt.Sprintf("/api/v1/system/logs?limit=%d", filter.Limit)
+	if filter.Level != "" {
+		path += "&level=" + url.QueryEscape(filter.Level)
+	}
+	if filter.Search != "" {
+		path += "&search=" + url.QueryEscape(filter.Search)
+	}
+	if filter.FeedID != "" {
+		path += "&feed_id=" + url.QueryEscape(filter.FeedID)
+	}
+	if filter.SinceID > 0 {
+		path += fmt.Sprintf("&since_id=%d", filter.SinceID)
+	}
+	var result web.LogResult
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClientManager) ClearSystemLogs(ctx context.Context) error {
+	return c.doRequest(ctx, http.MethodDelete, "/api/v1/system/logs", nil, nil)
+}
+
+func (c *HTTPClientManager) SetLogLevel(ctx context.Context, level string) (string, error) {
+	payload := map[string]string{"level": level}
+	var res map[string]string
+	err := c.doRequest(ctx, http.MethodPost, "/api/v1/system/logs/level", payload, &res)
+	if err != nil {
+		return "", err
+	}
+	return res["level"], nil
+}
+
+func (c *HTTPClientManager) GetLogLevel(ctx context.Context) string {
+	var res map[string]string
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/system/logs/level", nil, &res)
+	if err != nil {
+		return "info"
+	}
+	return res["level"]
+}
+
+func (c *HTTPClientManager) DownloadLogs(ctx context.Context) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/system/logs/download", nil)
+	if err != nil {
+		return nil, "", err
+	}
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, "podsync.log", nil
 }

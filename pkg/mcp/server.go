@@ -503,6 +503,32 @@ func (s *Server) getToolDefinitions() []Tool {
 				Properties: map[string]PropertyDef{},
 			},
 		},
+		{
+			Name:        "get_system_logs",
+			Description: "Fetch recent system log entries from Podsync in-memory ring buffer, optionally filtered by level (error, warn, info, debug) or search string",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"limit": {
+						Type:        "integer",
+						Description: "Maximum number of log entries to retrieve (default: 50, max: 200)",
+					},
+					"level": {
+						Type:        "string",
+						Description: "Log level filter: 'all', 'error', 'warn', 'info', 'debug' (default: 'all')",
+						Enum:        []string{"all", "error", "warn", "info", "debug"},
+					},
+					"search": {
+						Type:        "string",
+						Description: "Optional case-insensitive substring search across log messages and fields (e.g. 'vk', 'error', 'youtube')",
+					},
+					"feed_id": {
+						Type:        "string",
+						Description: "Optional filter to match logs for a specific feed ID",
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -830,6 +856,40 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 			return CallToolResult{}, err
 		}
 		data, _ := json.MarshalIndent(res, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "get_system_logs":
+		limit := 50
+		if l, ok := args["limit"].(float64); ok && int(l) > 0 {
+			limit = int(l)
+			if limit > 200 {
+				limit = 200
+			}
+		}
+		level := "all"
+		if lvl, ok := args["level"].(string); ok && lvl != "" {
+			level = lvl
+		}
+		search := ""
+		if s, ok := args["search"].(string); ok {
+			search = s
+		}
+		feedID := ""
+		if fid, ok := args["feed_id"].(string); ok {
+			feedID = fid
+		}
+		logsRes, err := s.mgr.GetSystemLogs(ctx, web.LogFilter{
+			Level:  level,
+			Search: search,
+			FeedID: feedID,
+			Limit:  limit,
+		})
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(logsRes, "", "  ")
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil

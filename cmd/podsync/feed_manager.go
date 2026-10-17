@@ -24,11 +24,17 @@ import (
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/logbuffer"
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
 )
+
+type feedErrorEntry struct {
+	Error string
+	Time  time.Time
+}
 
 type AppFeedManager struct {
 	mu          sync.RWMutex
@@ -47,6 +53,8 @@ type AppFeedManager struct {
 	version     string
 	commit      string
 	buildDate   string
+	logBuffer   *logbuffer.Buffer
+	feedErrors  map[string]feedErrorEntry
 }
 
 func NewAppFeedManager(
@@ -62,6 +70,7 @@ func NewAppFeedManager(
 	database db.Storage,
 	storage fs.Storage,
 	version, commit, buildDate string,
+	logBuffer *logbuffer.Buffer,
 ) *AppFeedManager {
 	return &AppFeedManager{
 		configPath:  configPath,
@@ -79,6 +88,8 @@ func NewAppFeedManager(
 		version:     version,
 		commit:      commit,
 		buildDate:   buildDate,
+		logBuffer:   logBuffer,
+		feedErrors:  make(map[string]feedErrorEntry),
 	}
 }
 
@@ -209,6 +220,11 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	summary.DownloadedCount = dlCount
 	summary.ErrorCount = errCount
 	summary.TotalSize = totalSize
+
+	if errEntry, ok := m.feedErrors[f.ID]; ok {
+		summary.LastError = errEntry.Error
+		summary.LastErrorAt = &errEntry.Time
+	}
 
 	// Generate URLs
 	host := m.cfg.Server.Hostname
@@ -1176,6 +1192,26 @@ func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID str
 			}
 			return nil
 		})
+
+		if feedErr, hasErr := m.feedErrors[feedConfig.ID]; hasErr {
+			rec := "Check logs or API configuration"
+			errLower := strings.ToLower(feedErr.Error)
+			if strings.Contains(errLower, "token is required") || strings.Contains(errLower, "not loaded") || strings.Contains(errLower, "api token") {
+				rec = "Add the required API token for " + provider + " in the API Tokens tab"
+			}
+			errItem := web.DownloadErrorItem{
+				FeedID:         feedConfig.ID,
+				FeedTitle:      feedTitle,
+				FeedProvider:   provider,
+				EpisodeID:      "feed_update",
+				EpisodeTitle:   "Feed Update Failure",
+				VideoURL:       feedConfig.URL,
+				Error:          feedErr.Error,
+				ErrorAt:        &feedErr.Time,
+				Recommendation: rec,
+			}
+			items = append(items, errItem)
+		}
 	}
 
 	if targetFeedID != "" {
@@ -1417,4 +1453,101 @@ func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPas
 	}
 
 	return nil
+}
+
+func (m *AppFeedManager) RecordFeedUpdateError(feedID string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.feedErrors == nil {
+		m.feedErrors = make(map[string]feedErrorEntry)
+	}
+	if err != nil {
+		m.feedErrors[feedID] = feedErrorEntry{
+			Error: err.Error(),
+			Time:  time.Now(),
+		}
+	} else {
+		delete(m.feedErrors, feedID)
+	}
+}
+
+func (m *AppFeedManager) ClearFeedUpdateError(feedID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.feedErrors != nil {
+		delete(m.feedErrors, feedID)
+	}
+}
+
+func (m *AppFeedManager) GetSystemLogs(ctx context.Context, filter web.LogFilter) (*web.LogResult, error) {
+	if m.logBuffer == nil {
+		return &web.LogResult{
+			CurrentLevel: log.GetLevel().String(),
+		}, nil
+	}
+
+	res := m.logBuffer.Query(logbuffer.Filter{
+		Level:   filter.Level,
+		Search:  filter.Search,
+		FeedID:  filter.FeedID,
+		Limit:   filter.Limit,
+		SinceID: filter.SinceID,
+	})
+
+	entries := make([]web.LogEntry, len(res.Entries))
+	for i, e := range res.Entries {
+		entries[i] = web.LogEntry{
+			ID:        e.ID,
+			Timestamp: e.Timestamp,
+			Level:     e.Level,
+			Message:   e.Message,
+			Fields:    e.Fields,
+			Caller:    e.Caller,
+		}
+	}
+
+	return &web.LogResult{
+		Entries:       entries,
+		Total:         res.Total,
+		FilteredTotal: res.FilteredTotal,
+		MaxID:         res.MaxID,
+		CurrentLevel:  res.CurrentLevel,
+	}, nil
+}
+
+func (m *AppFeedManager) ClearSystemLogs(ctx context.Context) error {
+	if m.logBuffer != nil {
+		m.logBuffer.Clear()
+	}
+	return nil
+}
+
+func (m *AppFeedManager) SetLogLevel(ctx context.Context, levelStr string) (string, error) {
+	lvl, err := log.ParseLevel(levelStr)
+	if err != nil {
+		return "", errors.Wrapf(err, "invalid log level %q", levelStr)
+	}
+	log.SetLevel(lvl)
+	log.Infof("system log level dynamically set to %s", lvl.String())
+	return lvl.String(), nil
+}
+
+func (m *AppFeedManager) GetLogLevel(ctx context.Context) string {
+	return log.GetLevel().String()
+}
+
+func (m *AppFeedManager) DownloadLogs(ctx context.Context) ([]byte, string, error) {
+	if m.cfg != nil && m.cfg.Log.Filename != "" {
+		if data, err := os.ReadFile(m.cfg.Log.Filename); err == nil && len(data) > 0 {
+			filename := filepath.Base(m.cfg.Log.Filename)
+			return data, filename, nil
+		}
+	}
+
+	if m.logBuffer != nil {
+		content := m.logBuffer.FormatPlainText(logbuffer.Filter{Limit: 2000})
+		return []byte(content), "podsync.log", nil
+	}
+
+	return []byte("No logs available\n"), "podsync.log", nil
 }

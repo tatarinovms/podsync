@@ -150,6 +150,32 @@ func (m *mockAdminManager) ChangePassword(ctx context.Context, oldPassword, newP
 	return nil
 }
 
+func (m *mockAdminManager) GetSystemLogs(ctx context.Context, filter web.LogFilter) (*web.LogResult, error) {
+	return &web.LogResult{
+		Entries: []web.LogEntry{
+			{ID: 1, Level: "info", Message: "mock log entry"},
+		},
+		Total:        1,
+		CurrentLevel: "info",
+	}, nil
+}
+
+func (m *mockAdminManager) ClearSystemLogs(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockAdminManager) SetLogLevel(ctx context.Context, level string) (string, error) {
+	return level, nil
+}
+
+func (m *mockAdminManager) GetLogLevel(ctx context.Context) string {
+	return "info"
+}
+
+func (m *mockAdminManager) DownloadLogs(ctx context.Context) ([]byte, string, error) {
+	return []byte("mock log content\n"), "podsync.log", nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{
@@ -403,6 +429,23 @@ func TestToolsCall(t *testing.T) {
 		_ = json.Unmarshal(resData, &callResult)
 		assert.False(t, callResult.IsError)
 		assert.Contains(t, callResult.Content[0].Text, "Successfully deleted token #1")
+	})
+
+	t.Run("get_system_logs", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"get_system_logs","arguments":{"level":"info","limit":20}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "mock log entry")
 	})
 }
 

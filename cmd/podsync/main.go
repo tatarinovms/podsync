@@ -22,6 +22,7 @@ import (
 
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/logbuffer"
 	"github.com/mxpv/podsync/pkg/mcp"
 	"github.com/mxpv/podsync/pkg/ytdl"
 )
@@ -62,6 +63,8 @@ func main() {
 		FullTimestamp:   true,
 	}
 	log.SetFormatter(formatter)
+	logBuffer := logbuffer.New(2000)
+	log.AddHook(logBuffer)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -221,7 +224,7 @@ func main() {
 	if opts.Headless {
 		for _, _feed := range cfg.Feeds {
 			if err := manager.Update(ctx, _feed); err != nil {
-				log.WithError(err).Errorf("failed to update feed: %s", _feed.URL)
+				log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 			}
 		}
 		return
@@ -231,6 +234,28 @@ func main() {
 	updates := make(chan *feed.Config, 16)
 	defer close(updates)
 
+	// Create Cron
+	c := cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DiscardLogger)))
+	m := make(map[string]cron.EntryID)
+
+	feedManager := NewAppFeedManager(
+		opts.ConfigPath,
+		cfg,
+		cfg.Feeds,
+		cfg.Tokens,
+		downloader,
+		c,
+		m,
+		updates,
+		manager,
+		database,
+		storage,
+		version,
+		commit,
+		date,
+		logBuffer,
+	)
+
 	group, ctx := errgroup.WithContext(ctx)
 	defer func() {
 		if err := group.Wait(); err != nil && (err != context.Canceled && err != http.ErrServerClosed) {
@@ -239,19 +264,17 @@ func main() {
 		log.Info("gracefully stopped")
 	}()
 
-	// Create Cron
-	c := cron.New(cron.WithChain(cron.SkipIfStillRunning(cron.DiscardLogger)))
-	m := make(map[string]cron.EntryID)
-
 	// Run updates listener
 	group.Go(func() error {
 		for {
 			select {
 			case _feed := <-updates:
 				if err := manager.Update(ctx, _feed); err != nil {
-					log.WithError(err).Errorf("failed to update feed: %s", _feed.URL)
+					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
+					feedManager.RecordFeedUpdateError(_feed.ID, err)
 				} else {
-					log.Infof("next update of %s: %s", _feed.ID, c.Entry(m[_feed.ID]).Next)
+					feedManager.ClearFeedUpdateError(_feed.ID)
+					log.WithField("feed_id", _feed.ID).Infof("next update of %s: %s", _feed.ID, c.Entry(m[_feed.ID]).Next)
 				}
 			case <-ctx.Done():
 				return ctx.Err()
@@ -309,23 +332,6 @@ func main() {
 	// Run web server
 	cfg.Server.Admin.ConfigPath = opts.ConfigPath
 	srv := web.New(cfg.Server, storage, database)
-
-	feedManager := NewAppFeedManager(
-		opts.ConfigPath,
-		cfg,
-		cfg.Feeds,
-		cfg.Tokens,
-		downloader,
-		c,
-		m,
-		updates,
-		manager,
-		database,
-		storage,
-		version,
-		commit,
-		date,
-	)
 	srv.SetAdminManager(feedManager)
 
 	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)

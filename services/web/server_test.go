@@ -405,6 +405,32 @@ func (m *mockDownloaderAdminMgr) ChangePassword(ctx context.Context, oldPassword
 	return nil
 }
 
+func (m *mockDownloaderAdminMgr) GetSystemLogs(ctx context.Context, filter LogFilter) (*LogResult, error) {
+	return &LogResult{
+		Entries: []LogEntry{
+			{ID: 1, Level: "info", Message: "test log"},
+		},
+		Total:        1,
+		CurrentLevel: "info",
+	}, nil
+}
+
+func (m *mockDownloaderAdminMgr) ClearSystemLogs(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockDownloaderAdminMgr) SetLogLevel(ctx context.Context, level string) (string, error) {
+	return level, nil
+}
+
+func (m *mockDownloaderAdminMgr) GetLogLevel(ctx context.Context) string {
+	return "info"
+}
+
+func (m *mockDownloaderAdminMgr) DownloadLogs(ctx context.Context) ([]byte, string, error) {
+	return []byte("test log content\n"), "podsync.log", nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -591,4 +617,59 @@ func TestTriggerUpdateAllAPI(t *testing.T) {
 	rec = httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestSystemLogsEndpoints(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	// 1. GET /api/v1/system/logs
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/system/logs?limit=50", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "test log")
+
+	// 2. DELETE /api/v1/system/logs
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/system/logs", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "cleared")
+
+	// 3. GET /api/v1/system/logs/level
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/system/logs/level", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"level":"info"`)
+
+	// 4. POST /api/v1/system/logs/level
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/system/logs/level", strings.NewReader(`{"level":"debug"}`))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"level":"debug"`)
+
+	// 5. GET /api/v1/system/logs/download
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/system/logs/download", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "test log content")
+	assert.Contains(t, rec.Header().Get("Content-Disposition"), "podsync.log")
 }

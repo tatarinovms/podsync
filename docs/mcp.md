@@ -131,7 +131,6 @@ In your Cursor or Cline MCP Settings:
 
 A ready-to-use skill definition for AI agents is provided in:
 - [`.agents/skills/podsync/SKILL.md`](../.agents/skills/podsync/SKILL.md)
-- [`.gemini/skills/podsync/SKILL.md`](../.gemini/skills/podsync/SKILL.md)
 
 You can feed this skill directly to autonomous coding and operational agents (Antigravity, Gemini CLI, Claude Code, OpenCode) so the agent automatically understands when and how to call Podsync MCP tools, manage YouTube/VK subscriptions, retry failed downloads, and inspect system health.
 

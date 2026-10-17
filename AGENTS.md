@@ -86,7 +86,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 - Accessible at `/admin` (SPA embedded into the binary via `//go:embed ui/*` from `services/web/ui/index.html`).
 - **Embedded UI & Brand Color System**:
   - The UI uses **Catppuccin Mocha** (dark theme) and **Latte** (light theme) palettes.
-  - **Strict adherence to brand colors**: All UI components, buttons, and badges must use the project's CSS variables (`--ctp-*`, `--btn-primary-bg`, `--btn-danger-bg`, etc.) and classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`). Never use raw Bootstrap default colors (such as default blue `#0d6efd` or bare unstyled `btn-outline-primary`). Primary save/action buttons must always use `.btn-primary` or `.btn-brand`.
+  - **Strict adherence to brand colors (Catppuccin Mocha & Latte)**: All UI components, buttons, badges, switches, and backgrounds must strictly adhere to the Catppuccin palette via CSS variables (`--ctp-*`, `--btn-primary-bg`, `--btn-danger-bg`, etc.). Never allow raw Bootstrap defaults to leak through (such as default blue `#0d6efd`, slate-green `#2b3035` on `.bg-body-tertiary`, or unstyled `btn-outline-primary`). Primary save/action buttons must always use `.btn-primary` or `.btn-brand` (Mauve).
 - Secured by HTTP Basic Auth and session cookies (`cfg.Server.Admin`).
 - REST API mounted under `/api/v1`:
   - `/api/v1/feeds` (GET, POST)
@@ -167,7 +167,11 @@ docker compose up -d
 3. **Always run `-race` tests**: After modifying any Go code, always run `go test -race ./...` to verify there are no data races or regressions.
 4. **Clean up resources**: Background processes, test databases, and temporary download folders must always be safely terminated and cleaned up.
 5. **No obsolete files**: Do not add unused IDE settings, duplicate skill files, or dead configuration templates to the root of the repository.
-6. **Strict Brand & Theme Compliance (Catppuccin)**: When modifying the embedded Web UI (`services/web/ui/index.html`), strictly adhere to the brand colors and design system (Catppuccin Mocha/Latte). Use project CSS variables (`--ctp-*`) and standard button classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`). Never introduce unstyled Bootstrap colors (like default blue `#0d6efd` or bare `btn-outline-primary`). Primary action/save buttons must always be styled with `--btn-primary-bg` / `--btn-brand`.
+6. **Strict Brand & Theme Compliance (Catppuccin Mocha & Latte)**:
+   - When modifying or creating UI components in the embedded Web UI (`services/web/ui/index.html`), strictly adhere to the **Catppuccin Mocha** (dark theme) and **Catppuccin Latte** (light theme) design system.
+   - Always use project CSS variables (`--ctp-*`, `--ctp-base`, `--ctp-mantle`, `--ctp-crust`, `--ctp-surface0`, `--ctp-surface1`, `--ctp-surface2`, `--ctp-mauve`, `--ctp-text`, `--ctp-subtext0`, etc.) and standard styled classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`).
+   - **Never allow Bootstrap default colors to leak**: Raw Bootstrap 5 utility classes (e.g. `.bg-body-tertiary`, `.bg-body-secondary`, `.form-check-input`, `.form-switch`, unstyled focus rings, or default badges) carry hardcoded Bootstrap colors like slate-green `#2b3035` or blue `#0d6efd`. In Catppuccin Mocha/Latte, these appear as jarring, mismatched tints (e.g. greenish or bright blue patches). Ensure all container backgrounds, modal navigation tabs, switches (`.form-check-input:checked`), and utility backgrounds are explicitly mapped to the corresponding Catppuccin tokens (`--ctp-crust`, `--ctp-surface0`, `--ctp-mauve`).
+   - Primary action/save buttons must always be styled with `--btn-primary-bg` / `--btn-brand` (Mauve), never unstyled blue Bootstrap buttons (`.btn-primary` without custom variable mapping or raw `btn-outline-primary`).
 7. **Proper Agent Skill Formatting (`SKILL.md`)**:
    - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`), especially `description`, to prevent YAML parse errors when colons (`: `) or special characters are present (`mapping values are not allowed here`).
    - Never fabricate or hallucinate skill content: always read the real implementation and actual files in the repository (`.agents/skills/podsync/SKILL.md`) as the canonical source.

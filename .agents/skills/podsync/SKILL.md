@@ -1,6 +1,6 @@
 ---
 name: podsync
-description: Manage Podsync podcast generator: subscribe to YouTube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys.
+description: "Manage Podsync podcast generator: subscribe to YouTube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
 version: 1.0.0
 triggers:
   - podsync

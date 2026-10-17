@@ -1240,6 +1240,21 @@
                                 </thead>
                                 <tbody>
                                     <tr>
+                                        <td><code>get_sync_status</code></td>
+                                        <td>High-level status snapshot: active feeds, cron schedule, next update, 24h count, and disk space</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_download_errors</code></td>
+                                        <td>List failed episode downloads with cleaned diagnostic causes (bot check, 429, private) and recommendations</td>
+                                        <td><code>feed_id</code> <em>(optional)</em>, <code>limit</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_recent_downloads</code></td>
+                                        <td>List recent successfully downloaded podcast episodes with file sizes, media URLs, and timestamps</td>
+                                        <td><code>feed_id</code> <em>(optional)</em>, <code>limit</code></td>
+                                    </tr>
+                                    <tr>
                                         <td><code>list_feeds</code></td>
                                         <td>List all podcast channels, episode counts, disk size, and RSS links</td>
                                         <td><span class="badge bg-light text-muted border">None</span></td>
@@ -1283,6 +1298,21 @@
                                         <td><code>update_tokens</code></td>
                                         <td>Update API keys (supports Round-Robin key rotation)</td>
                                         <td><code>provider</code>, <code>tokens[]</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_downloader_config</code></td>
+                                        <td>Inspect yt-dlp binary version, path, cookies file stats, and proxy setting</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_downloader_config</code></td>
+                                        <td>Update yt-dlp download timeout, proxy URL, or cookies_from_browser</td>
+                                        <td><code>timeout</code>, <code>proxy</code>, <code>cookies_from_browser</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>test_downloader</code></td>
+                                        <td>Test yt-dlp connectivity and cookie verification against a video URL without downloading</td>
+                                        <td><code>url</code> <em>(optional)</em></td>
                                     </tr>
                                 </tbody>
                             </table>

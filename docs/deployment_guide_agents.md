@@ -52,17 +52,42 @@ sudo chown -R podsync:podsync /etc/podsync
 ---
 
 ### Step 1.3: Install Podsync Binary
-Download the precompiled binary from GitHub Releases (or build with `make build` if Go is installed):
+
+#### Option A: Download Precompiled Release Binary (One-Liner for Agents)
+Agents can auto-detect CPU architecture (`x86_64` vs `arm64`) and fetch the latest binary from GitHub Releases without needing Go installed:
 
 ```bash
-# Architecture: amd64 or arm64
-ARCH="x86_64" # or arm64
-VERSION="v2.9.0"
+# Auto-detect architecture and fetch latest release tag
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64) GORELEASER_ARCH="x86_64" ;;
+  aarch64|arm64) GORELEASER_ARCH="arm64" ;;
+  armv7l|armhf) GORELEASER_ARCH="armv7" ;;
+  *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+esac
 
-# If downloading release archive:
-# curl -L "https://github.com/tatarinovms/podsync/releases/download/${VERSION}/Podsync_${VERSION}_Linux_${ARCH}.tar.gz" | sudo tar -xz -C /opt/podsync/bin podsync
+# Get latest release version from GitHub API (or set fixed VERSION="v2.10.0")
+LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+if [ -z "$LATEST_TAG" ]; then
+  LATEST_TAG="v2.10.0"
+fi
+VERSION_NUM="${LATEST_TAG#v}"
 
-# Or copy local built binary:
+echo "Downloading Podsync $LATEST_TAG for Linux $GORELEASER_ARCH..."
+TAR_URL="https://github.com/tatarinovms/podsync/releases/download/${LATEST_TAG}/Podsync_${VERSION_NUM}_Linux_${GORELEASER_ARCH}.tar.gz"
+
+# Download and extract binary directly into /opt/podsync/bin
+curl -sSL "$TAR_URL" | sudo tar -xz -C /opt/podsync/bin podsync
+sudo chmod +x /opt/podsync/bin/podsync
+
+# Verify binary
+/opt/podsync/bin/podsync --version || /opt/podsync/bin/podsync --help
+```
+
+#### Option B: Build from Source
+If building directly from cloned repository source:
+```bash
+make build
 sudo cp bin/podsync /opt/podsync/bin/podsync
 sudo chmod +x /opt/podsync/bin/podsync
 ```

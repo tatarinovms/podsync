@@ -180,7 +180,16 @@ See the [MCP Guide](./docs/mcp.md) for complete details and tool specifications.
 
 ## How to run
 
-### Build and run as binary:
+### Download prebuilt binary:
+
+Download precompiled release archive for your OS/architecture from [GitHub Releases](https://github.com/tatarinovms/podsync/releases):
+
+```bash
+# Automated download script for Linux (x86_64 / arm64)
+curl -sSL https://raw.githubusercontent.com/tatarinovms/podsync/main/docs/deployment_guide_agents.md
+```
+
+### Build from source:
 
 Make sure you have created the file `config.toml`. Also note the location of the `data_dir`. Depending on the operating system, you may have to choose a different location since `/app/data` might be not writable.
 

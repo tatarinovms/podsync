@@ -303,6 +303,23 @@ func TestToolsCall(t *testing.T) {
 		assert.False(t, callResult.IsError)
 		assert.Contains(t, callResult.Content[0].Text, "downloaded_episodes")
 	})
+
+	t.Run("delete_tokens", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"delete_tokens","arguments":{"provider":"youtube"}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Successfully deleted API tokens")
+	})
 }
 
 func TestResources(t *testing.T) {

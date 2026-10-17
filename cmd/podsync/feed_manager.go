@@ -425,22 +425,26 @@ func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, t
 
 	if len(newTokens) > 0 {
 		m.tokens[provider] = newTokens
+	} else {
+		delete(m.tokens, provider)
+	}
 
-		// Save to config.toml
-		if m.configPath != "" {
-			tree, err := toml.LoadFile(m.configPath)
+	// Save to config.toml
+	if m.configPath != "" {
+		tree, err := toml.LoadFile(m.configPath)
+		if err == nil {
+			key := fmt.Sprintf("tokens.%s", providerStr)
+			if len(newTokens) == 0 {
+				tree.Delete(key)
+			} else if len(newTokens) == 1 {
+				tree.Set(key, newTokens[0])
+			} else {
+				tree.Set(key, newTokens)
+			}
+			f, err := os.Create(m.configPath)
 			if err == nil {
-				key := fmt.Sprintf("tokens.%s", providerStr)
-				if len(newTokens) == 1 {
-					tree.Set(key, newTokens[0])
-				} else {
-					tree.Set(key, newTokens)
-				}
-				f, err := os.Create(m.configPath)
-				if err == nil {
-					_, _ = tree.WriteTo(f)
-					_ = f.Close()
-				}
+				_, _ = tree.WriteTo(f)
+				_ = f.Close()
 			}
 		}
 	}

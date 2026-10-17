@@ -370,6 +370,21 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "delete_tokens",
+			Description: "Delete and clear configured API tokens for a provider from config.toml",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"provider": {
+						Type:        "string",
+						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch'",
+						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch"},
+					},
+				},
+				Required: []string{"provider"},
+			},
+		},
+		{
 			Name:        "get_download_errors",
 			Description: "Get list of failed podcast episode downloads across all feeds or for a specific feed, with detailed error causes and diagnostic recommendations",
 			InputSchema: InputSchema{
@@ -557,14 +572,28 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		} else if rawStr, ok := args["tokens"].(string); ok {
 			tokens = strings.Fields(rawStr)
 		}
-		if len(tokens) == 0 {
-			return CallToolResult{}, fmt.Errorf("at least one token required")
-		}
 		if err := s.mgr.UpdateTokens(ctx, provider, tokens); err != nil {
 			return CallToolResult{}, err
 		}
+		if len(tokens) == 0 {
+			return CallToolResult{
+				Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully cleared tokens for provider %q", provider)}},
+			}, nil
+		}
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully updated %d token(s) for provider %q", len(tokens), provider)}},
+		}, nil
+
+	case "delete_tokens":
+		provider, ok := args["provider"].(string)
+		if !ok || strings.TrimSpace(provider) == "" {
+			return CallToolResult{}, fmt.Errorf("provider parameter is required")
+		}
+		if err := s.mgr.UpdateTokens(ctx, provider, []string{}); err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully deleted API tokens for provider %q from configuration", provider)}},
 		}, nil
 
 	case "get_download_errors":

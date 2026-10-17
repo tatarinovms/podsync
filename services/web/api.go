@@ -390,6 +390,18 @@ func (s *Server) handleTokens(w http.ResponseWriter, r *http.Request) {
 		}
 		s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 
+	case http.MethodDelete:
+		provider := r.URL.Query().Get("provider")
+		if provider == "" {
+			s.writeError(w, http.StatusBadRequest, "provider query parameter is required")
+			return
+		}
+		if err := s.adminMgr.UpdateTokens(r.Context(), provider, []string{}); err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+
 	default:
 		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}

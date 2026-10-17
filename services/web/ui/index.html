@@ -1300,6 +1300,11 @@
                                         <td><code>provider</code>, <code>tokens[]</code></td>
                                     </tr>
                                     <tr>
+                                        <td><code>delete_tokens</code></td>
+                                        <td>Delete and clear configured API tokens for a provider from config.toml</td>
+                                        <td><code>provider</code></td>
+                                    </tr>
+                                    <tr>
                                         <td><code>get_downloader_config</code></td>
                                         <td>Inspect yt-dlp binary version, path, cookies file stats, and proxy setting</td>
                                         <td><span class="badge bg-light text-muted border">None</span></td>
@@ -2158,7 +2163,10 @@
                         </div>` : ''}
                         <div class="d-flex gap-2">
                             <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Enter new token(s) separated by space to replace...' : 'Enter token(s) separated by space for rotation...'}" ${item.from_env ? 'disabled' : ''}>
-                            ${!item.from_env ? `<button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')">Save</button>` : ''}
+                            ${!item.from_env ? `
+                                <button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')"><i class="bi bi-check-lg me-1"></i>Save</button>
+                                ${count > 0 ? `<button class="btn btn-outline-danger btn-sm" onclick="deleteTokens('${item.provider}')" title="Delete configured tokens for ${item.provider}"><i class="bi bi-trash3 me-1"></i>Clear</button>` : ''}
+                            ` : ''}
                         </div>
                         <div class="form-text small text-muted mt-1">
                             <i class="bi bi-info-circle me-1"></i>Supports multiple space-separated keys for automatic round-robin rotation.
@@ -2168,6 +2176,30 @@
                 }).join('');
             } catch (err) {
                 listEl.innerHTML = `<div class="text-danger small">Failed to load tokens: ${err.message}</div>`;
+            }
+        }
+
+        
+        async function deleteTokens(provider) {
+            if (!confirm(`Are you sure you want to delete and clear configured API token(s) for ${provider.toUpperCase()}?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/tokens?provider=${encodeURIComponent(provider)}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    showToast(`Tokens for ${provider.toUpperCase()} cleared`);
+                    const input = document.getElementById(`token-input-${provider}`);
+                    if (input) input.value = '';
+                    loadTokens();
+                } else {
+                    alert(`Failed to delete token: ${await res.text()}`);
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
             }
         }
 

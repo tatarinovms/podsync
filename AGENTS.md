@@ -168,3 +168,7 @@ docker compose up -d
 4. **Clean up resources**: Background processes, test databases, and temporary download folders must always be safely terminated and cleaned up.
 5. **No obsolete files**: Do not add unused IDE settings, duplicate skill files, or dead configuration templates to the root of the repository.
 6. **Strict Brand & Theme Compliance (Catppuccin)**: When modifying the embedded Web UI (`services/web/ui/index.html`), strictly adhere to the brand colors and design system (Catppuccin Mocha/Latte). Use project CSS variables (`--ctp-*`) and standard button classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`). Never introduce unstyled Bootstrap colors (like default blue `#0d6efd` or bare `btn-outline-primary`). Primary action/save buttons must always be styled with `--btn-primary-bg` / `--btn-brand`.
+7. **Proper Agent Skill Formatting (`SKILL.md`)**:
+   - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`), especially `description`, to prevent YAML parse errors when colons (`: `) or special characters are present (`mapping values are not allowed here`).
+   - Never fabricate or hallucinate skill content: always read the real implementation and actual files in the repository (`.agents/skills/podsync/SKILL.md`) as the canonical source.
+   - When updating tools, endpoints, or arguments, keep `.agents/skills/podsync/SKILL.md` and user skill directories in sync.

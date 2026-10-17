@@ -145,6 +145,23 @@ func (c *HTTPClientManager) UpdateTokens(ctx context.Context, provider string, t
 	return c.doRequest(ctx, http.MethodPost, "/api/v1/tokens", payload, nil)
 }
 
+func (c *HTTPClientManager) AddTokens(ctx context.Context, provider string, tokens []string) error {
+	payload := map[string]interface{}{
+		"provider": provider,
+		"tokens":   tokens,
+		"append":   true,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/api/v1/tokens", payload, nil)
+}
+
+func (c *HTTPClientManager) DeleteToken(ctx context.Context, provider string, index int) error {
+	path := fmt.Sprintf("/api/v1/tokens?provider=%s", provider)
+	if index >= 0 {
+		path += fmt.Sprintf("&index=%d", index)
+	}
+	return c.doRequest(ctx, http.MethodDelete, path, nil, nil)
+}
+
 func (c *HTTPClientManager) GetSystemStats(ctx context.Context) (*web.SystemStats, error) {
 	var result web.SystemStats
 	err := c.doRequest(ctx, http.MethodGet, "/api/v1/system", nil, &result)

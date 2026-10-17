@@ -405,22 +405,10 @@ func maskToken(s string) string {
 	return s[:4] + "••••" + s[len(s)-4:]
 }
 
-func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []string) error {
 	provider := model.Provider(providerStr)
 	if m.tokens == nil {
 		m.tokens = make(map[model.Provider]StringSlice)
-	}
-
-	var newTokens []string
-	for _, tok := range tokens {
-		tok = strings.TrimSpace(tok)
-		if tok == "" || strings.Contains(tok, "•") {
-			continue
-		}
-		newTokens = append(newTokens, tok)
 	}
 
 	if len(newTokens) > 0 {
@@ -450,6 +438,69 @@ func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, t
 	}
 
 	return nil
+}
+
+func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var newTokens []string
+	for _, tok := range tokens {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || strings.Contains(tok, "•") {
+			continue
+		}
+		newTokens = append(newTokens, tok)
+	}
+
+	return m.persistTokensLocked(providerStr, newTokens)
+}
+
+func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, tokens []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var validTokens []string
+	for _, tok := range tokens {
+		tok = strings.TrimSpace(tok)
+		if tok == "" || strings.Contains(tok, "•") {
+			continue
+		}
+		validTokens = append(validTokens, tok)
+	}
+	if len(validTokens) == 0 {
+		return nil
+	}
+
+	provider := model.Provider(providerStr)
+	current := m.tokens[provider]
+	combined := append([]string(current), validTokens...)
+
+	return m.persistTokensLocked(providerStr, combined)
+}
+
+func (m *AppFeedManager) DeleteToken(ctx context.Context, providerStr string, index int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if index < 0 {
+		return m.persistTokensLocked(providerStr, nil)
+	}
+
+	provider := model.Provider(providerStr)
+	current := m.tokens[provider]
+	if index >= len(current) {
+		return fmt.Errorf("token index %d out of bounds (total tokens: %d)", index, len(current))
+	}
+
+	var remaining []string
+	for i, tok := range current {
+		if i != index {
+			remaining = append(remaining, tok)
+		}
+	}
+
+	return m.persistTokensLocked(providerStr, remaining)
 }
 
 func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, error) {

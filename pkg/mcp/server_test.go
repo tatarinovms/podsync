@@ -72,6 +72,14 @@ func (m *mockAdminManager) UpdateTokens(ctx context.Context, provider string, to
 	return m.updTokenErr
 }
 
+func (m *mockAdminManager) AddTokens(ctx context.Context, provider string, tokens []string) error {
+	return m.updTokenErr
+}
+
+func (m *mockAdminManager) DeleteToken(ctx context.Context, provider string, index int) error {
+	return m.updTokenErr
+}
+
 func (m *mockAdminManager) GetSystemStats(ctx context.Context) (*web.SystemStats, error) {
 	return m.stats, nil
 }
@@ -304,7 +312,7 @@ func TestToolsCall(t *testing.T) {
 		assert.Contains(t, callResult.Content[0].Text, "downloaded_episodes")
 	})
 
-	t.Run("delete_tokens", func(t *testing.T) {
+	t.Run("delete_tokens_all", func(t *testing.T) {
 		req := `{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"delete_tokens","arguments":{"provider":"youtube"}}}`
 		respBytes, err := server.HandleMessage(ctx, []byte(req))
 		require.NoError(t, err)
@@ -318,7 +326,24 @@ func TestToolsCall(t *testing.T) {
 		resData, _ := json.Marshal(resp.Result)
 		_ = json.Unmarshal(resData, &callResult)
 		assert.False(t, callResult.IsError)
-		assert.Contains(t, callResult.Content[0].Text, "Successfully deleted API tokens")
+		assert.Contains(t, callResult.Content[0].Text, "Successfully deleted all API tokens")
+	})
+
+	t.Run("delete_tokens_single_index", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"delete_tokens","arguments":{"provider":"youtube","index":1}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Successfully deleted token #1")
 	})
 }
 

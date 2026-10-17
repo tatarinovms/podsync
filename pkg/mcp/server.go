@@ -371,7 +371,7 @@ func (s *Server) getToolDefinitions() []Tool {
 		},
 		{
 			Name:        "delete_tokens",
-			Description: "Delete and clear configured API tokens for a provider from config.toml",
+			Description: "Delete a specific API token by index or clear all configured API tokens for a provider from config.toml",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertyDef{
@@ -379,6 +379,10 @@ func (s *Server) getToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch'",
 						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch"},
+					},
+					"index": {
+						Type:        "integer",
+						Description: "Optional 0-based index of the specific token to delete. If omitted or negative, all tokens for the provider are removed.",
 					},
 				},
 				Required: []string{"provider"},
@@ -589,11 +593,25 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		if !ok || strings.TrimSpace(provider) == "" {
 			return CallToolResult{}, fmt.Errorf("provider parameter is required")
 		}
-		if err := s.mgr.UpdateTokens(ctx, provider, []string{}); err != nil {
+		idx := -1
+		if rawIdx, ok := args["index"]; ok && rawIdx != nil {
+			switch v := rawIdx.(type) {
+			case float64:
+				idx = int(v)
+			case int:
+				idx = v
+			}
+		}
+		if err := s.mgr.DeleteToken(ctx, provider, idx); err != nil {
 			return CallToolResult{}, err
 		}
+		if idx >= 0 {
+			return CallToolResult{
+				Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully deleted token #%d for provider %q", idx, provider)}},
+			}, nil
+		}
 		return CallToolResult{
-			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully deleted API tokens for provider %q from configuration", provider)}},
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully deleted all API tokens for provider %q from configuration", provider)}},
 		}, nil
 
 	case "get_download_errors":

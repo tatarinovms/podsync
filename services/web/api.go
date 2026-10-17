@@ -41,6 +41,7 @@ type AddFeedRequest struct {
 type UpdateTokensRequest struct {
 	Provider string   `json:"provider"`
 	Tokens   []string `json:"tokens"`
+	Append   bool     `json:"append,omitempty"`
 }
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
@@ -384,9 +385,16 @@ func (s *Server) handleTokens(w http.ResponseWriter, r *http.Request) {
 			s.writeError(w, http.StatusBadRequest, "provider is required")
 			return
 		}
-		if err := s.adminMgr.UpdateTokens(r.Context(), req.Provider, req.Tokens); err != nil {
-			s.writeError(w, http.StatusInternalServerError, err.Error())
-			return
+		if req.Append {
+			if err := s.adminMgr.AddTokens(r.Context(), req.Provider, req.Tokens); err != nil {
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+		} else {
+			if err := s.adminMgr.UpdateTokens(r.Context(), req.Provider, req.Tokens); err != nil {
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
 		}
 		s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 
@@ -396,7 +404,16 @@ func (s *Server) handleTokens(w http.ResponseWriter, r *http.Request) {
 			s.writeError(w, http.StatusBadRequest, "provider query parameter is required")
 			return
 		}
-		if err := s.adminMgr.UpdateTokens(r.Context(), provider, []string{}); err != nil {
+		idx := -1
+		if indexStr := r.URL.Query().Get("index"); indexStr != "" {
+			var err error
+			idx, err = strconv.Atoi(indexStr)
+			if err != nil {
+				s.writeError(w, http.StatusBadRequest, "invalid index parameter")
+				return
+			}
+		}
+		if err := s.adminMgr.DeleteToken(r.Context(), provider, idx); err != nil {
 			s.writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

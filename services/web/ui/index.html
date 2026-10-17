@@ -1301,8 +1301,8 @@
                                     </tr>
                                     <tr>
                                         <td><code>delete_tokens</code></td>
-                                        <td>Delete and clear configured API tokens for a provider from config.toml</td>
-                                        <td><code>provider</code></td>
+                                        <td>Delete specific API token by index or clear all tokens for a provider from config.toml</td>
+                                        <td><code>provider</code>, <code>index</code> <em>(optional)</em></td>
                                     </tr>
                                     <tr>
                                         <td><code>get_downloader_config</code></td>
@@ -2157,20 +2157,43 @@
                             </div>
                             ${item.from_env ? '<span class="badge bg-info text-dark">From ENV</span>' : '<span class="badge bg-light text-muted border">From config.toml</span>'}
                         </div>
-                        ${count > 1 ? `
-                        <div class="d-flex flex-wrap gap-1 mb-2">
-                            ${tokenList.map(tok => `<span class="badge bg-success font-monospace">${tok}</span>`).join('')}
+
+                        ${count > 0 ? `
+                        <div class="d-flex flex-column gap-1 mb-2">
+                            ${tokenList.map((tok, idx) => `
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text font-monospace small bg-body-secondary text-muted" style="min-width: 44px;">#${idx + 1}</span>
+                                    <input type="text" class="form-control form-control-sm font-monospace text-body-secondary" value="${tok}" readonly>
+                                    ${!item.from_env ? `
+                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteSingleToken('${item.provider}', ${idx}, '${tok}')" title="Delete token #${idx + 1} (${tok})">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
                         </div>` : ''}
+
+                        ${!item.from_env ? `
                         <div class="d-flex gap-2">
-                            <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Enter new token(s) separated by space to replace...' : 'Enter token(s) separated by space for rotation...'}" ${item.from_env ? 'disabled' : ''}>
-                            ${!item.from_env ? `
-                                <button class="btn btn-primary btn-sm" onclick="saveTokens('${item.provider}')"><i class="bi bi-check-lg me-1"></i>Save</button>
-                                ${count > 0 ? `<button class="btn btn-outline-danger btn-sm" onclick="deleteTokens('${item.provider}')" title="Delete configured tokens for ${item.provider}"><i class="bi bi-trash3 me-1"></i>Clear</button>` : ''}
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-body-secondary"><i class="bi bi-key"></i></span>
+                                <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Add another key to rotation...' : 'Enter API key(s) separated by space...'}" onkeydown="if(event.key==='Enter')addToken('${item.provider}')">
+                                <button class="btn btn-primary btn-sm" onclick="addToken('${item.provider}')">
+                                    <i class="bi bi-plus-lg me-1"></i>Add
+                                </button>
+                            </div>
+                            ${count > 0 ? `
+                                <button class="btn btn-outline-danger btn-sm text-nowrap" onclick="deleteTokens('${item.provider}')" title="Delete all tokens for ${item.provider}">
+                                    <i class="bi bi-trash3 me-1"></i>Clear All
+                                </button>
                             ` : ''}
                         </div>
                         <div class="form-text small text-muted mt-1">
-                            <i class="bi bi-info-circle me-1"></i>Supports multiple space-separated keys for automatic round-robin rotation.
-                        </div>
+                            <i class="bi bi-info-circle me-1"></i>Add single key or multiple space-separated keys for automatic round-robin rotation.
+                        </div>` : `
+                        <div class="text-muted small">
+                            <i class="bi bi-lock me-1"></i>Tokens are configured via environment variable (${item.provider.toUpperCase()}_API_KEY) and cannot be edited via web UI.
+                        </div>`}
                     </div>
                 `;
                 }).join('');
@@ -2180,8 +2203,29 @@
         }
 
         
+        async function deleteSingleToken(provider, index, maskedVal) {
+            if (!confirm(`Are you sure you want to delete key #${index + 1} (${maskedVal || ''}) for ${provider.toUpperCase()}?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/v1/tokens?provider=${encodeURIComponent(provider)}&index=${index}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    showToast(`Key #${index + 1} for ${provider.toUpperCase()} deleted`);
+                    loadTokens();
+                } else {
+                    alert(`Failed to delete key: ${await res.text()}`);
+                }
+            } catch (err) {
+                alert(`Error: ${err.message}`);
+            }
+        }
+
         async function deleteTokens(provider) {
-            if (!confirm(`Are you sure you want to delete and clear configured API token(s) for ${provider.toUpperCase()}?`)) {
+            if (!confirm(`Are you sure you want to delete and clear ALL configured API tokens for ${provider.toUpperCase()}?`)) {
                 return;
             }
 
@@ -2191,23 +2235,23 @@
                 });
 
                 if (res.ok) {
-                    showToast(`Tokens for ${provider.toUpperCase()} cleared`);
+                    showToast(`All tokens for ${provider.toUpperCase()} cleared`);
                     const input = document.getElementById(`token-input-${provider}`);
                     if (input) input.value = '';
                     loadTokens();
                 } else {
-                    alert(`Failed to delete token: ${await res.text()}`);
+                    alert(`Failed to delete tokens: ${await res.text()}`);
                 }
             } catch (err) {
                 alert(`Error: ${err.message}`);
             }
         }
 
-        async function saveTokens(provider) {
+        async function addToken(provider) {
             const input = document.getElementById(`token-input-${provider}`);
             const val = input.value.trim();
             if (!val) {
-                alert('Please enter a token before saving');
+                alert('Please enter a token before adding');
                 return;
             }
             const tokens = val.split(/\s+/).filter(Boolean);
@@ -2216,19 +2260,23 @@
                 const res = await fetch('/api/v1/tokens', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provider, tokens })
+                    body: JSON.stringify({ provider, tokens, append: true })
                 });
 
                 if (res.ok) {
-                    showToast(`Token for ${provider} saved`);
+                    showToast(`Token for ${provider.toUpperCase()} added`);
                     input.value = '';
                     loadTokens();
                 } else {
-                    alert(`Failed to save: ${await res.text()}`);
+                    alert(`Failed to add: ${await res.text()}`);
                 }
             } catch (err) {
                 alert(`Error: ${err.message}`);
             }
+        }
+
+        function saveTokens(provider) {
+            return addToken(provider);
         }
 
         // System

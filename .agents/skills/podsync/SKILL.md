@@ -81,10 +81,11 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `tokens` *(array of strings, required)*: List of API keys.
 
 ### 10. `delete_tokens`
-- **Purpose**: Deletes and clears all configured API tokens for a specific provider from `config.toml` and resets the provider to unconfigured.
+- **Purpose**: Deletes a specific API token by index, or clears all configured API tokens for a provider from `config.toml`.
 - **Arguments**:
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
-- **When to use**: Removing invalid, revoked, or unnecessary API keys.
+  - `index` *(integer, optional)*: 0-based index of a specific token to delete. If omitted or negative, all tokens for the provider are removed.
+- **When to use**: Removing invalid, revoked, or unnecessary API keys (either a single key from rotation or the entire provider).
 
 ### 11. `get_downloader_config`
 - **Purpose**: Retrieves yt-dlp binary path, version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).

@@ -304,9 +304,13 @@ func TestMCPConfigEndpoint(t *testing.T) {
 }
 
 type mockDownloaderAdminMgr struct {
-	dlCfg        DownloaderConfigInfo
-	cookies      string
-	testResponse TestDownloaderResult
+	dlCfg         DownloaderConfigInfo
+	cookies       string
+	testResponse  TestDownloaderResult
+	lastProvider  string
+	lastTokens    []string
+	lastDeleteIdx int
+	wasAppend     bool
 }
 
 func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) {
@@ -325,6 +329,20 @@ func (m *mockDownloaderAdminMgr) RetryEpisode(ctx context.Context, feedID, episo
 }
 func (m *mockDownloaderAdminMgr) GetTokens(ctx context.Context) []TokenInfo { return nil }
 func (m *mockDownloaderAdminMgr) UpdateTokens(ctx context.Context, provider string, tokens []string) error {
+	m.lastProvider = provider
+	m.lastTokens = tokens
+	m.wasAppend = false
+	return nil
+}
+func (m *mockDownloaderAdminMgr) AddTokens(ctx context.Context, provider string, tokens []string) error {
+	m.lastProvider = provider
+	m.lastTokens = tokens
+	m.wasAppend = true
+	return nil
+}
+func (m *mockDownloaderAdminMgr) DeleteToken(ctx context.Context, provider string, index int) error {
+	m.lastProvider = provider
+	m.lastDeleteIdx = index
 	return nil
 }
 func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemStats, error) {
@@ -441,4 +459,55 @@ func TestDownloaderEndpoints(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Sample Video")
+}
+
+func TestAdminTokensAPI(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	// 1. POST /api/v1/tokens (replace)
+	body := `{"provider":"youtube","tokens":["k1","k2"]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tokens", strings.NewReader(body))
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "youtube", mgr.lastProvider)
+	assert.Equal(t, []string{"k1", "k2"}, mgr.lastTokens)
+	assert.False(t, mgr.wasAppend)
+
+	// 2. POST /api/v1/tokens (append)
+	body = `{"provider":"youtube","tokens":["k3"],"append":true}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/tokens", strings.NewReader(body))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, []string{"k3"}, mgr.lastTokens)
+	assert.True(t, mgr.wasAppend)
+
+	// 3. DELETE /api/v1/tokens with index
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/tokens?provider=youtube&index=1", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 1, mgr.lastDeleteIdx)
+
+	// 4. DELETE /api/v1/tokens without index (all)
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/tokens?provider=youtube", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, -1, mgr.lastDeleteIdx)
 }

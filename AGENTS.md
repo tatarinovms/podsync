@@ -93,7 +93,7 @@ This file provides comprehensive architecture guidance, development workflows, a
   - `/api/v1/feeds/{id}` (GET, DELETE)
   - `/api/v1/feeds/{id}/update` (POST)
   - `/api/v1/feeds/{id}/episodes/{ep_id}/retry` (POST)
-  - `/api/v1/tokens` (GET, POST, DELETE)
+  - `/api/v1/tokens` (GET, POST with optional append, DELETE with optional `?index={idx}`)
   - `/api/v1/auth/password` (POST)
   - `/api/v1/system` (GET)
   - `/api/v1/downloader` (GET, POST)

@@ -172,6 +172,8 @@ type AdminManager interface {
 	RetryEpisode(ctx context.Context, feedID, episodeID string) error
 	GetTokens(ctx context.Context) []TokenInfo
 	UpdateTokens(ctx context.Context, provider string, tokens []string) error
+	AddTokens(ctx context.Context, provider string, tokens []string) error
+	DeleteToken(ctx context.Context, provider string, index int) error
 	GetSystemStats(ctx context.Context) (*SystemStats, error)
 	GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error)
 	UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error

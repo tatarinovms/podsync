@@ -61,7 +61,7 @@ The MCP server provides 15 specialized tools:
 | **`test_downloader`** | `url` *(opt)* | Test yt-dlp downloader against a video URL to verify cookies and connectivity. |
 | **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |
-| **`delete_tokens`** | `provider` *(req)* | Delete and clear configured API tokens for a provider from `config.toml`. |
+| **`delete_tokens`** | `provider` *(req)*, `index` *(opt)* | Delete a specific API token by index, or clear all configured tokens for a provider from `config.toml`. |
 
 ### Resources & Prompts
 - **`podsync://feeds`**: Live JSON snapshot of all podcast feeds.

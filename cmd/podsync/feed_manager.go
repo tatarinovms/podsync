@@ -569,6 +569,15 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		return errors.Errorf("feed %q not found", id)
 	}
 
+	oldLang := strings.TrimSpace(f.Custom.Language)
+	newLang := strings.TrimSpace(update.Custom.Language)
+	if update.Language != "" && newLang == "" {
+		newLang = strings.TrimSpace(update.Language)
+		update.Custom.Language = newLang
+	}
+	languageChanged := (oldLang != newLang) && (oldLang != "" || newLang != "")
+	shouldRedownload := update.Redownload || languageChanged
+
 	if update.PageSize > 0 {
 		f.PageSize = update.PageSize
 	}
@@ -617,6 +626,36 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 			} else {
 				log.WithError(err).Warnf("failed to re-register cron for feed %q", id)
 			}
+		}
+	}
+
+	if shouldRedownload && m.db != nil {
+		log.Infof("redownload triggered for feed %q (language changed: %v, explicit redownload: %v, old: %q, new: %q)", id, languageChanged, update.Redownload, oldLang, newLang)
+		_ = m.db.WalkEpisodes(ctx, id, func(ep *model.Episode) error {
+			if ep.Status == model.EpisodeDownloaded {
+				if m.storage != nil {
+					_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s", id, feed.EpisodeName(f, ep)))
+					_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s", id, feed.LegacyEpisodeName(f, ep)))
+					for _, ext := range []string{"mp4", "mp3", "m4a", "webm"} {
+						_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s.%s", id, ep.ID, ext))
+					}
+				}
+				_ = m.db.UpdateEpisode(id, ep.ID, func(e *model.Episode) error {
+					e.Status = model.EpisodeNew
+					e.Size = 0
+					e.Error = ""
+					e.ErrorAt = nil
+					return nil
+				})
+			}
+			return nil
+		})
+
+		select {
+		case m.updates <- f:
+			log.Infof("queued immediate update for feed %q after redownload reset", id)
+		default:
+			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
 		}
 	}
 

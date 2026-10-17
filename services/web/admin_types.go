@@ -54,6 +54,7 @@ type FeedConfigUpdate struct {
 	PrivateFeed      bool         `json:"private_feed"`
 	KeepLast         int          `json:"keep_last"`
 	Language         string       `json:"language,omitempty"`
+	Redownload       bool         `json:"redownload,omitempty"`
 	Filters          feed.Filters `json:"filters"`
 	Custom           feed.Custom  `json:"custom"`
 	YouTubeDLArgs    []string     `json:"youtube_dl_args"`

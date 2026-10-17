@@ -242,6 +242,10 @@ func (s *Server) getToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "Optional preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos",
 					},
+					"redownload": {
+						Type:        "boolean",
+						Description: "Whether to delete existing downloaded episodes and redownload them with new settings/language (automatically true if language changed)",
+					},
 				},
 				Required: []string{"url"},
 			},
@@ -641,6 +645,9 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		if rawLang, ok := args["language"].(string); ok {
 			update.Custom.Language = strings.TrimSpace(rawLang)
+		}
+		if rawRedownload, ok := args["redownload"].(bool); ok {
+			update.Redownload = rawRedownload
 		}
 		if err := s.mgr.UpdateFeed(ctx, feedID, &update); err != nil {
 			return CallToolResult{}, err

@@ -1800,6 +1800,13 @@
                                         <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
                                     </div>
                                 </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="fs-redownload">
+                                    <label class="form-check-label small fw-semibold" for="fs-redownload">
+                                        Redownload existing episodes with new language
+                                    </label>
+                                    <div class="form-text small">Clears previously downloaded media files for this feed and downloads them again using the new language. (Auto-selected when language is modified).</div>
+                                </div>
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
                                         <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
@@ -2563,6 +2570,20 @@
             document.getElementById('fs-custom-lang').value = custom.lang || '';
             document.getElementById('fs-custom-explicit').checked = !!custom.explicit;
 
+            window._initialFeedLanguage = custom.lang || '';
+            const redownloadCb = document.getElementById('fs-redownload');
+            if (redownloadCb) {
+                redownloadCb.checked = false;
+            }
+            const langInput = document.getElementById('fs-custom-lang');
+            if (langInput) {
+                langInput.oninput = function() {
+                    if (redownloadCb && this.value.trim() !== window._initialFeedLanguage) {
+                        redownloadCb.checked = true;
+                    }
+                };
+            }
+
             // Advanced
             const args = cfg.youtube_dl_args || [];
             document.getElementById('fs-ytdl-args').value = Array.isArray(args) ? args.join(' ') : (args || '');
@@ -2630,6 +2651,7 @@
                 private_feed: document.getElementById('fs-private-feed').checked,
                 keep_last: parseInt(document.getElementById('fs-keep-last').value) || 0,
                 language: document.getElementById('fs-custom-lang').value.trim(),
+                redownload: document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false,
                 filters: {
                     title: document.getElementById('fs-filter-title').value.trim(),
                     not_title: document.getElementById('fs-filter-not-title').value.trim(),
@@ -2660,7 +2682,28 @@
                 });
 
                 if (res.ok) {
-                    showToast(`Settings for ${feedId} saved`);
+                    const isRedownloading = document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false;
+                    if (isRedownloading) {
+                        showToast(`Settings for ${feedId} saved. Redownloading episodes with updated language...`);
+                        updatingFeeds.add(feedId);
+                        const b = document.getElementById(`btn-update-${feedId}`);
+                        if (b) {
+                            b.disabled = true;
+                            b.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
+                        }
+                        let pollCount = 0;
+                        const pollInterval = setInterval(async () => {
+                            pollCount++;
+                            await loadFeeds();
+                            if (pollCount >= 15) {
+                                clearInterval(pollInterval);
+                                updatingFeeds.delete(feedId);
+                                await loadFeeds();
+                            }
+                        }, 2000);
+                    } else {
+                        showToast(`Settings for ${feedId} saved`);
+                    }
                     const modalEl = document.getElementById('feedSettingsModal');
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     if (modal) modal.hide();

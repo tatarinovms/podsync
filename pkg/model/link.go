@@ -8,6 +8,7 @@ const (
 	TypeUser     = Type("user")
 	TypeGroup    = Type("group")
 	TypeHandle   = Type("handle")
+	TypeVideo    = Type("video")
 )
 
 type Provider string
@@ -18,6 +19,7 @@ const (
 	ProviderSoundcloud = Provider("soundcloud")
 	ProviderTwitch     = Provider("twitch")
 	ProviderVkVideo    = Provider("vkvideo")
+	ProviderRutube     = Provider("rutube")
 )
 
 // Info represents data extracted from URL

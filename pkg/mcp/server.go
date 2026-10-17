@@ -431,8 +431,8 @@ func (s *Server) getToolDefinitions() []Tool {
 				Properties: map[string]PropertyDef{
 					"provider": {
 						Type:        "string",
-						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch'",
-						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch"},
+						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch', 'rutube'",
+						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch", "rutube"},
 					},
 					"tokens": {
 						Type:        "array",
@@ -450,8 +450,8 @@ func (s *Server) getToolDefinitions() []Tool {
 				Properties: map[string]PropertyDef{
 					"provider": {
 						Type:        "string",
-						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch'",
-						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch"},
+						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch', 'rutube'",
+						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch", "rutube"},
 					},
 					"index": {
 						Type:        "integer",

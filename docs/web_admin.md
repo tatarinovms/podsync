@@ -111,6 +111,7 @@ Log in using the configured username and password.
 - The **API Keys** tab displays current tokens for all providers:
   - **VK Video** (`PODSYNC_VKVIDEO_API_KEY` / `PODSYNC_VK_API_KEY`)
   - **YouTube** (`PODSYNC_YOUTUBE_API_KEY`)
+  - **Rutube** (`PODSYNC_RUTUBE_API_KEY`, optional — Rutube is public)
   - **Vimeo** (`PODSYNC_VIMEO_API_KEY`)
   - **SoundCloud** (`PODSYNC_SOUNDCLOUD_API_KEY`)
   - **Twitch** (`PODSYNC_TWITCH_API_KEY`)

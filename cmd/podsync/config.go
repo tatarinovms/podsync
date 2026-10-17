@@ -224,6 +224,7 @@ func (c *Config) applyEnv() {
 		model.ProviderSoundcloud: {"PODSYNC_SOUNDCLOUD_API_KEY"},
 		model.ProviderTwitch:     {"PODSYNC_TWITCH_API_KEY"},
 		model.ProviderVkVideo:    {"PODSYNC_VKVIDEO_API_KEY", "PODSYNC_VK_API_KEY"},
+		model.ProviderRutube:     {"PODSYNC_RUTUBE_API_KEY"},
 	}
 
 	// Replace API keys from config with environment variables

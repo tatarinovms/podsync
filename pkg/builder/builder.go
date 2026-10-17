@@ -25,6 +25,8 @@ func New(ctx context.Context, provider model.Provider, key string, downloader Do
 		return NewTwitchBuilder(key)
 	case model.ProviderVkVideo:
 		return NewVkVideoBuilder(key, downloader)
+	case model.ProviderRutube:
+		return NewRutubeBuilder(downloader)
 	default:
 		return nil, errors.Errorf("unsupported provider %q", provider)
 	}

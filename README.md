@@ -17,6 +17,7 @@ This fork extends the original `mxpv/podsync` with:
 - **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations.
 - **Model Context Protocol (MCP) Server**: Built-in MCP server for AI coding assistants (**OpenCode v2**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **VK Video support**: Convert VK Video channels, communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
+- **Rutube support**: Convert Rutube channels, playlists, user profiles, and individual videos into podcast feeds (`rutube.ru/channel/...`, `rutube.ru/plst/...`, `rutube.ru/u/...`, `rutube.ru/video/...`) with native yt-dlp downloading and zero required API keys.
 - **yt-dlp integration**: Native preference and support for `yt-dlp` for improved download speed and stability, including Netscape cookies management to bypass bot verification.
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-time filename migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
@@ -24,7 +25,7 @@ This fork extends the original `mxpv/podsync` with:
 
 ## Features
 
-- Works with YouTube, Vimeo, VK Video, SoundCloud, and Twitch.
+- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, and Twitch.
 - Supports feeds configuration: video/audio, high/low quality, max video height, etc.
 - mp3 encoding
 - Update scheduler supports cron expressions

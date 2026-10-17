@@ -325,3 +325,81 @@ func TestParseURL_VkVideo(t *testing.T) {
 	require.Equal(t, model.TypeChannel, info.LinkType)
 	require.Equal(t, "-22822305", info.ItemID)
 }
+
+func TestParseRutubeURL_AllVariants(t *testing.T) {
+	// Playlist
+	link, _ := url.ParseRequestURI("https://rutube.ru/plst/1444174/")
+	kind, id, err := parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypePlaylist, kind)
+	require.Equal(t, "1444174", id)
+
+	// Channel
+	link, _ = url.ParseRequestURI("https://rutube.ru/channel/25758171/")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeChannel, kind)
+	require.Equal(t, "25758171", id)
+
+	// Channel with section
+	link, _ = url.ParseRequestURI("https://rutube.ru/channel/25758171/videos/")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeChannel, kind)
+	require.Equal(t, "25758171", id)
+
+	// User by slug
+	link, _ = url.ParseRequestURI("https://rutube.ru/u/rutube/")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeUser, kind)
+	require.Equal(t, "rutube", id)
+
+	// Person by ID
+	link, _ = url.ParseRequestURI("https://rutube.ru/video/person/25758171/")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeUser, kind)
+	require.Equal(t, "25758171", id)
+
+	// Video
+	link, _ = url.ParseRequestURI("https://rutube.ru/video/6459e556582749f8fb4c697b9b90cb8a/")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeVideo, kind)
+	require.Equal(t, "6459e556582749f8fb4c697b9b90cb8a", id)
+
+	// Video with query
+	link, _ = url.ParseRequestURI("https://rutube.ru/video/6459e556582749f8fb4c697b9b90cb8a/?r=plwd")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeVideo, kind)
+	require.Equal(t, "6459e556582749f8fb4c697b9b90cb8a", id)
+
+	// Embed
+	link, _ = url.ParseRequestURI("https://rutube.ru/play/embed/6459e556582749f8fb4c697b9b90cb8a")
+	kind, id, err = parseRutubeURL(link)
+	require.NoError(t, err)
+	require.Equal(t, model.TypeVideo, kind)
+	require.Equal(t, "6459e556582749f8fb4c697b9b90cb8a", id)
+}
+
+func TestParseURL_Rutube(t *testing.T) {
+	info, err := ParseURL("https://rutube.ru/channel/25758171/")
+	require.NoError(t, err)
+	require.Equal(t, model.ProviderRutube, info.Provider)
+	require.Equal(t, model.TypeChannel, info.LinkType)
+	require.Equal(t, "25758171", info.ItemID)
+
+	info, err = ParseURL("https://rutube.ru/plst/1444174/")
+	require.NoError(t, err)
+	require.Equal(t, model.ProviderRutube, info.Provider)
+	require.Equal(t, model.TypePlaylist, info.LinkType)
+	require.Equal(t, "1444174", info.ItemID)
+
+	info, err = ParseURL("https://rutube.ru/video/6459e556582749f8fb4c697b9b90cb8a/?r=plwd")
+	require.NoError(t, err)
+	require.Equal(t, model.ProviderRutube, info.Provider)
+	require.Equal(t, model.TypeVideo, info.LinkType)
+	require.Equal(t, "6459e556582749f8fb4c697b9b90cb8a", info.ItemID)
+}

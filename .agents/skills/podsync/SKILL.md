@@ -1,12 +1,13 @@
 ---
 name: podsync
-description: "Manage Podsync podcast generator: subscribe to YouTube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
+description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
 version: 1.0.0
 triggers:
   - podsync
   - podcast
   - youtube podcast
   - vk video podcast
+  - rutube podcast
   - retry episode
   - feed update
 ---
@@ -38,7 +39,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 ### 3. `add_feed`
 - **Purpose**: Subscribes to a new video or audio channel/playlist/user and generates a podcast RSS feed for it. Automatically appends the feed to `config.toml`.
 - **Arguments**:
-  - `url` *(string, required)*: Source channel or playlist URL (e.g. YouTube, VK Video, Vimeo, SoundCloud).
+  - `url` *(string, required)*: Source channel or playlist URL (e.g. YouTube, Rutube, VK Video, Vimeo, SoundCloud).
   - `format` *(string, optional)*: `"audio"` (default, MP3/M4A) or `"video"` (MP4).
   - `quality` *(string, optional)*: `"high"` (default) or `"low"`.
   - `page_size` *(integer, optional)*: How many recent episodes to fetch/keep (default: 50).

@@ -408,6 +408,7 @@ func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 		{model.ProviderVimeo, []string{"PODSYNC_VIMEO_API_KEY"}},
 		{model.ProviderSoundcloud, []string{"PODSYNC_SOUNDCLOUD_API_KEY"}},
 		{model.ProviderTwitch, []string{"PODSYNC_TWITCH_API_KEY"}},
+		{model.ProviderRutube, []string{"PODSYNC_RUTUBE_API_KEY"}},
 	}
 
 	result := make([]web.TokenInfo, 0, len(providers))

@@ -83,6 +83,19 @@ func ParseURL(link string) (model.Info, error) {
 		return info, nil
 	}
 
+	if strings.HasSuffix(parsed.Host, "rutube.ru") {
+		kind, id, err := parseRutubeURL(parsed)
+		if err != nil {
+			return model.Info{}, err
+		}
+
+		info.Provider = model.ProviderRutube
+		info.LinkType = kind
+		info.ItemID = id
+
+		return info, nil
+	}
+
 	return model.Info{}, errors.New("unsupported URL host")
 }
 
@@ -402,4 +415,61 @@ func isDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+func parseRutubeURL(parsed *url.URL) (model.Type, string, error) {
+	path := strings.Trim(parsed.EscapedPath(), "/")
+	if path == "" {
+		return "", "", errors.New("empty rutube URL path")
+	}
+
+	parts := strings.Split(path, "/")
+
+	// 1. Playlist: /plst/<id>
+	if parts[0] == "plst" {
+		if len(parts) < 2 || parts[1] == "" {
+			return "", "", errors.New("invalid playlist link: missing playlist ID")
+		}
+		return model.TypePlaylist, parts[1], nil
+	}
+
+	// 2. Channel: /channel/<id>[/videos|/shorts|/playlists]
+	if parts[0] == "channel" {
+		if len(parts) < 2 || parts[1] == "" {
+			return "", "", errors.New("invalid channel link: missing channel ID")
+		}
+		return model.TypeChannel, parts[1], nil
+	}
+
+	// 3. Person: /video/person/<id>
+	if len(parts) >= 3 && parts[0] == "video" && parts[1] == "person" {
+		if parts[2] == "" {
+			return "", "", errors.New("invalid person link: missing ID")
+		}
+		return model.TypeUser, parts[2], nil
+	}
+
+	// 4. User by slug: /u/<slug>[/videos|/shorts|/playlists]
+	if parts[0] == "u" {
+		if len(parts) < 2 || parts[1] == "" {
+			return "", "", errors.New("invalid user link: missing username")
+		}
+		return model.TypeUser, parts[1], nil
+	}
+
+	// 5. Video: /video/<id> or /play/embed/<id>
+	if parts[0] == "video" {
+		if len(parts) < 2 || parts[1] == "" {
+			return "", "", errors.New("invalid video link: missing video ID")
+		}
+		return model.TypeVideo, parts[1], nil
+	}
+	if parts[0] == "play" && len(parts) >= 3 && parts[1] == "embed" {
+		if parts[2] == "" {
+			return "", "", errors.New("invalid embed link: missing video ID")
+		}
+		return model.TypeVideo, parts[2], nil
+	}
+
+	return "", "", errors.Errorf("unsupported rutube URL format: %s", parsed.String())
 }

@@ -347,6 +347,18 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 				"episodes": episodes,
 			})
 
+		case http.MethodPut, http.MethodPatch, http.MethodPost:
+			var req FeedConfigUpdate
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				s.writeError(w, http.StatusBadRequest, "invalid request")
+				return
+			}
+			if err := s.adminMgr.UpdateFeed(r.Context(), feedID, &req); err != nil {
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+
 		case http.MethodDelete:
 			deleteFiles := r.URL.Query().Get("delete_files") == "true"
 			if err := s.adminMgr.DeleteFeed(r.Context(), feedID, deleteFiles); err != nil {

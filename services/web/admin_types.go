@@ -18,27 +18,45 @@ type AdminConfig struct {
 
 // FeedSummary contains high-level information about a feed formatted for the admin UI
 type FeedSummary struct {
-	ID              string     `json:"id"`
-	URL             string     `json:"url"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description"`
-	Author          string     `json:"author"`
-	CoverArt        string     `json:"cover_art"`
-	Provider        string     `json:"provider"`
-	Format          string     `json:"format"`
-	Quality         string     `json:"quality"`
-	PageSize        int        `json:"page_size"`
-	CronSchedule    string     `json:"cron_schedule"`
-	UpdatePeriod    string     `json:"update_period"`
-	EpisodeCount    int        `json:"episode_count"`
-	DownloadedCount int        `json:"downloaded_count"`
-	ErrorCount      int        `json:"error_count"`
-	TotalSize       int64      `json:"total_size"`
-	LastUpdate      *time.Time `json:"last_update,omitempty"`
-	FeedURL         string     `json:"feed_url"`
-	AppleURL        string     `json:"apple_url"`
-	PocketCastsURL  string     `json:"pocketcasts_url"`
-	OvercastURL     string     `json:"overcast_url"`
+	ID              string       `json:"id"`
+	URL             string       `json:"url"`
+	Title           string       `json:"title"`
+	Description     string       `json:"description"`
+	Author          string       `json:"author"`
+	CoverArt        string       `json:"cover_art"`
+	Provider        string       `json:"provider"`
+	Format          string       `json:"format"`
+	Quality         string       `json:"quality"`
+	PageSize        int          `json:"page_size"`
+	CronSchedule    string       `json:"cron_schedule"`
+	UpdatePeriod    string       `json:"update_period"`
+	EpisodeCount    int          `json:"episode_count"`
+	DownloadedCount int          `json:"downloaded_count"`
+	ErrorCount      int          `json:"error_count"`
+	TotalSize       int64        `json:"total_size"`
+	LastUpdate      *time.Time   `json:"last_update,omitempty"`
+	FeedURL         string       `json:"feed_url"`
+	AppleURL        string       `json:"apple_url"`
+	PocketCastsURL  string       `json:"pocketcasts_url"`
+	OvercastURL     string       `json:"overcast_url"`
+	Config          *feed.Config `json:"config,omitempty"`
+}
+
+// FeedConfigUpdate contains all configurable parameters for an existing feed
+type FeedConfigUpdate struct {
+	PageSize         int          `json:"page_size"`
+	CronSchedule     string       `json:"cron_schedule"`
+	Quality          string       `json:"quality"`
+	Format           string       `json:"format"`
+	MaxHeight        int          `json:"max_height"`
+	PlaylistSort     string       `json:"playlist_sort"`
+	OPML             *bool        `json:"opml,omitempty"`
+	PrivateFeed      bool         `json:"private_feed"`
+	KeepLast         int          `json:"keep_last"`
+	Filters          feed.Filters `json:"filters"`
+	Custom           feed.Custom  `json:"custom"`
+	YouTubeDLArgs    []string     `json:"youtube_dl_args"`
+	FilenameTemplate string       `json:"filename_template"`
 }
 
 // SystemStats contains runtime statistics and server metrics
@@ -167,6 +185,7 @@ type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
 	GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error)
 	AddFeed(ctx context.Context, cfg *feed.Config) error
+	UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error
 	DeleteFeed(ctx context.Context, id string, deleteFiles bool) error
 	TriggerUpdate(ctx context.Context, id string) error
 	RetryEpisode(ctx context.Context, feedID, episodeID string) error

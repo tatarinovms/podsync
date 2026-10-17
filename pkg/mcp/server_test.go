@@ -52,6 +52,10 @@ func (m *mockAdminManager) AddFeed(ctx context.Context, cfg *feed.Config) error 
 	return nil
 }
 
+func (m *mockAdminManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
+	return m.updFeedErr
+}
+
 func (m *mockAdminManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
 	return m.delFeedErr
 }

@@ -164,6 +164,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		PageSize:     f.PageSize,
 		CronSchedule: f.CronSchedule,
 		UpdatePeriod: f.UpdatePeriod.String(),
+		Config:       f,
 	}
 
 	// Try to get enriched metadata from DB
@@ -533,6 +534,66 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 	return stats, nil
 }
 
+func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	f, exists := m.feeds[id]
+	if !exists {
+		return errors.Errorf("feed %q not found", id)
+	}
+
+	if update.PageSize > 0 {
+		f.PageSize = update.PageSize
+	}
+	if update.Format != "" {
+		f.Format = model.Format(update.Format)
+	}
+	if update.Quality != "" {
+		f.Quality = model.Quality(update.Quality)
+	}
+	f.MaxHeight = update.MaxHeight
+	f.PlaylistSort = model.Sorting(update.PlaylistSort)
+	if update.OPML != nil {
+		f.OPML = update.OPML
+	}
+	f.PrivateFeed = update.PrivateFeed
+
+	if update.KeepLast > 0 {
+		f.Clean = &feed.Cleanup{KeepLast: update.KeepLast}
+	} else if update.KeepLast == 0 {
+		f.Clean = nil
+	}
+
+	f.Filters = update.Filters
+	f.Custom = update.Custom
+	f.YouTubeDLArgs = update.YouTubeDLArgs
+	f.FilenameTemplate = update.FilenameTemplate
+
+	// Reschedule cron if cron_schedule changed
+	if update.CronSchedule != "" && update.CronSchedule != f.CronSchedule {
+		f.CronSchedule = update.CronSchedule
+		if m.cron != nil {
+			if oldID, ok := m.cronEntries[id]; ok {
+				m.cron.Remove(oldID)
+				delete(m.cronEntries, id)
+			}
+			feedToCron := f
+			cronID, err := m.cron.AddFunc(f.CronSchedule, func() {
+				log.Debugf("cron triggered for dynamic feed %q", feedToCron.ID)
+				m.updates <- feedToCron
+			})
+			if err == nil {
+				m.cronEntries[id] = cronID
+			} else {
+				log.WithError(err).Warnf("failed to re-register cron for feed %q", id)
+			}
+		}
+	}
+
+	return m.saveFeedToConfig(f)
+}
+
 func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 	if m.configPath == "" {
 		return nil
@@ -545,20 +606,126 @@ func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 
 	prefix := fmt.Sprintf("feeds.%s", f.ID)
 	tree.Set(prefix+".url", f.URL)
-	tree.Set(prefix+".format", string(f.Format))
-	tree.Set(prefix+".quality", string(f.Quality))
-	tree.Set(prefix+".page_size", int64(f.PageSize))
+	if f.Format != "" {
+		tree.Set(prefix+".format", string(f.Format))
+	}
+	if f.Quality != "" {
+		tree.Set(prefix+".quality", string(f.Quality))
+	}
+	if f.PageSize > 0 {
+		tree.Set(prefix+".page_size", int64(f.PageSize))
+	}
 	if f.CronSchedule != "" {
 		tree.Set(prefix+".cron_schedule", f.CronSchedule)
 	}
+	if f.MaxHeight > 0 {
+		tree.Set(prefix+".max_height", int64(f.MaxHeight))
+	} else {
+		tree.Delete(prefix + ".max_height")
+	}
+	if f.PlaylistSort != "" {
+		tree.Set(prefix+".playlist_sort", string(f.PlaylistSort))
+	} else {
+		tree.Delete(prefix + ".playlist_sort")
+	}
+	if f.OPML != nil {
+		tree.Set(prefix+".opml", *f.OPML)
+	}
+	if f.PrivateFeed {
+		tree.Set(prefix+".private_feed", true)
+	} else {
+		tree.Delete(prefix + ".private_feed")
+	}
 	if f.Clean != nil && f.Clean.KeepLast > 0 {
 		tree.Set(prefix+".clean.keep_last", int64(f.Clean.KeepLast))
+	} else {
+		tree.Delete(prefix + ".clean")
 	}
+
+	// Filters
 	if f.Filters.Title != "" {
 		tree.Set(prefix+".filters.title", f.Filters.Title)
+	} else {
+		tree.Delete(prefix + ".filters.title")
 	}
 	if f.Filters.NotTitle != "" {
 		tree.Set(prefix+".filters.not_title", f.Filters.NotTitle)
+	} else {
+		tree.Delete(prefix + ".filters.not_title")
+	}
+	if f.Filters.Description != "" {
+		tree.Set(prefix+".filters.description", f.Filters.Description)
+	} else {
+		tree.Delete(prefix + ".filters.description")
+	}
+	if f.Filters.NotDescription != "" {
+		tree.Set(prefix+".filters.not_description", f.Filters.NotDescription)
+	} else {
+		tree.Delete(prefix + ".filters.not_description")
+	}
+	if f.Filters.MinDuration > 0 {
+		tree.Set(prefix+".filters.min_duration", f.Filters.MinDuration)
+	} else {
+		tree.Delete(prefix + ".filters.min_duration")
+	}
+	if f.Filters.MaxDuration > 0 {
+		tree.Set(prefix+".filters.max_duration", f.Filters.MaxDuration)
+	} else {
+		tree.Delete(prefix + ".filters.max_duration")
+	}
+	if f.Filters.MaxAge > 0 {
+		tree.Set(prefix+".filters.max_age", int64(f.Filters.MaxAge))
+	} else {
+		tree.Delete(prefix + ".filters.max_age")
+	}
+
+	// Custom
+	if f.Custom.Title != "" {
+		tree.Set(prefix+".custom.title", f.Custom.Title)
+	} else {
+		tree.Delete(prefix + ".custom.title")
+	}
+	if f.Custom.Description != "" {
+		tree.Set(prefix+".custom.description", f.Custom.Description)
+	} else {
+		tree.Delete(prefix + ".custom.description")
+	}
+	if f.Custom.Author != "" {
+		tree.Set(prefix+".custom.author", f.Custom.Author)
+	} else {
+		tree.Delete(prefix + ".custom.author")
+	}
+	if f.Custom.CoverArt != "" {
+		tree.Set(prefix+".custom.cover_art", f.Custom.CoverArt)
+	} else {
+		tree.Delete(prefix + ".custom.cover_art")
+	}
+	if f.Custom.Category != "" {
+		tree.Set(prefix+".custom.category", f.Custom.Category)
+	} else {
+		tree.Delete(prefix + ".custom.category")
+	}
+	if f.Custom.Language != "" {
+		tree.Set(prefix+".custom.lang", f.Custom.Language)
+	} else {
+		tree.Delete(prefix + ".custom.lang")
+	}
+	if f.Custom.Explicit {
+		tree.Set(prefix+".custom.explicit", true)
+	} else {
+		tree.Delete(prefix + ".custom.explicit")
+	}
+
+	// Advanced
+	if len(f.YouTubeDLArgs) > 0 {
+		tree.Set(prefix+".youtube_dl_args", f.YouTubeDLArgs)
+	} else {
+		tree.Delete(prefix + ".youtube_dl_args")
+	}
+	if f.FilenameTemplate != "" {
+		tree.Set(prefix+".filename_template", f.FilenameTemplate)
+	} else {
+		tree.Delete(prefix + ".filename_template")
 	}
 
 	file, err := os.Create(m.configPath)

@@ -304,13 +304,15 @@ func TestMCPConfigEndpoint(t *testing.T) {
 }
 
 type mockDownloaderAdminMgr struct {
-	dlCfg         DownloaderConfigInfo
-	cookies       string
-	testResponse  TestDownloaderResult
-	lastProvider  string
-	lastTokens    []string
-	lastDeleteIdx int
-	wasAppend     bool
+	dlCfg          DownloaderConfigInfo
+	cookies        string
+	testResponse   TestDownloaderResult
+	lastProvider   string
+	lastTokens     []string
+	lastDeleteIdx  int
+	wasAppend      bool
+	lastFeedID     string
+	lastFeedUpdate *FeedConfigUpdate
 }
 
 func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) {
@@ -320,6 +322,11 @@ func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (
 	return nil, nil, nil
 }
 func (m *mockDownloaderAdminMgr) AddFeed(ctx context.Context, cfg *feed.Config) error { return nil }
+func (m *mockDownloaderAdminMgr) UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error {
+	m.lastFeedID = id
+	m.lastFeedUpdate = update
+	return nil
+}
 func (m *mockDownloaderAdminMgr) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
 	return nil
 }
@@ -510,4 +517,31 @@ func TestAdminTokensAPI(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, -1, mgr.lastDeleteIdx)
+}
+
+func TestUpdateFeedAPI(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	body := `{"page_size": 25, "quality": "low", "keep_last": 5, "cron_schedule": "@every 6h"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/feeds/FEED123", strings.NewReader(body))
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "FEED123", mgr.lastFeedID)
+	require.NotNil(t, mgr.lastFeedUpdate)
+	assert.Equal(t, 25, mgr.lastFeedUpdate.PageSize)
+	assert.Equal(t, "low", mgr.lastFeedUpdate.Quality)
+	assert.Equal(t, 5, mgr.lastFeedUpdate.KeepLast)
+	assert.Equal(t, "@every 6h", mgr.lastFeedUpdate.CronSchedule)
 }

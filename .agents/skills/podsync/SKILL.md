@@ -58,48 +58,62 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `feed_id` *(string, required)*: ID of the feed to update.
 - **When to use**: When the user says *"Check for new episodes now"* or *"Update my podcast"*.
 
-### 6. `retry_episode`
+### 6. `update_feed_config`
+- **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed) and saves changes to `config.toml`.
+- **Arguments**:
+  - `feed_id` *(string, required)*: Feed identifier.
+  - `cron_schedule` *(string, optional)*: Cron expression or interval (e.g. `"@every 6h"`).
+  - `page_size` *(integer, optional)*: Fetch count (e.g. `50`).
+  - `format` *(string, optional)*: `"audio"` or `"video"`.
+  - `quality` *(string, optional)*: `"high"` or `"low"`.
+  - `keep_last` *(integer, optional)*: Retention policy (e.g. `10` to keep last 10 episodes on disk).
+  - `max_height` *(integer, optional)*: Video resolution limit (e.g. `720`, `1080`).
+  - `playlist_sort` *(string, optional)*: `"asc"` or `"desc"`.
+  - `private_feed` *(boolean, optional)*: Mark feed private.
+- **When to use**: Changing how often a podcast updates, switching from audio to video, setting retention limits, or adjusting download parameters.
+
+### 8. `retry_episode`
 - **Purpose**: Clears the error state of an episode that failed to download (e.g. due to temporary network error or rate limit) so Podsync re-attempts downloading it.
 - **Arguments**:
   - `feed_id` *(string, required)*: Feed identifier.
   - `episode_id` *(string, required)*: Episode identifier.
 - **When to use**: Fixing failed episodes reported in `get_feed` or `diagnose_podsync`.
 
-### 7. `get_system_stats`
+### 8. `get_system_stats`
 - **Purpose**: Returns memory usage, disk space (total, used, free on `data_dir`), uptime, and whether `ffmpeg` and `yt-dlp` are installed and functioning.
 - **Arguments**: None `{}`.
 - **When to use**: Health checks, checking remaining disk capacity, or troubleshooting download failures.
 
-### 8. `get_tokens`
+### 9. `get_tokens`
 - **Purpose**: Returns masked API keys for all providers (`youtube`, `vkvideo`, `vimeo`, `soundcloud`, `twitch`) and indicates if they are loaded from ENV or `config.toml`.
 - **Arguments**: None `{}`.
 
-### 9. `update_tokens`
+### 10. `update_tokens`
 - **Purpose**: Updates API keys for a provider in `config.toml`. Accepts multiple keys to enable automatic Round-Robin quota rotation (especially useful for YouTube API).
 - **Arguments**:
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
   - `tokens` *(array of strings, required)*: List of API keys.
 
-### 10. `delete_tokens`
+### 11. `delete_tokens`
 - **Purpose**: Deletes a specific API token by index, or clears all configured API tokens for a provider from `config.toml`.
 - **Arguments**:
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
   - `index` *(integer, optional)*: 0-based index of a specific token to delete. If omitted or negative, all tokens for the provider are removed.
 - **When to use**: Removing invalid, revoked, or unnecessary API keys (either a single key from rotation or the entire provider).
 
-### 11. `get_downloader_config`
+### 12. `get_downloader_config`
 - **Purpose**: Retrieves yt-dlp binary path, version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).
 - **Arguments**: None `{}`.
 - **When to use**: Diagnosing YouTube download failures such as bot verification blocks or rate limits.
 
-### 12. `update_downloader_config`
+### 13. `update_downloader_config`
 - **Purpose**: Updates yt-dlp downloader configuration (download timeout, proxy URL, or browser cookie extraction).
 - **Arguments**:
   - `timeout` *(integer, optional)*: Timeout in minutes.
   - `proxy` *(string, optional)*: Proxy URL (e.g. `socks5://127.0.0.1:1080` or `http://proxy:8080`).
   - `cookies_from_browser` *(string, optional)*: Browser name to extract session cookies from (e.g. `chrome`, `firefox`).
 
-### 13. `test_downloader`
+### 14. `test_downloader`
 - **Purpose**: Tests yt-dlp connectivity and cookie verification against a video URL without downloading the file.
 - **Arguments**:
   - `url` *(string, optional)*: Video URL to test (defaults to YouTube sample video).
@@ -107,21 +121,21 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 ---
 
 
-### 14. `get_download_errors`
+### 15. `get_download_errors`
 - **Purpose**: Returns a diagnostic list of all failed podcast episodes across all feeds or for a specific feed, with exact error causes (e.g. YouTube bot verification, private video, 429 rate limits, ffmpeg errors) and actionable recommendations.
 - **Arguments**:
   - `feed_id` *(string, optional)*: Filter errors by feed ID.
   - `limit` *(integer, optional, default: 20, max: 100)*: Maximum error records to return.
 - **When to use**: Answering *"Are there any download errors?"*, *"Why did download fail on channel X?"*, or before proposing retries.
 
-### 15. `get_recent_downloads`
+### 16. `get_recent_downloads`
 - **Purpose**: Returns the most recently downloaded podcast episodes across all channels or for a single feed, complete with file sizes, durations, publication dates, and playable audio/video URLs.
 - **Arguments**:
   - `feed_id` *(string, optional)*: Filter recent downloads by feed ID.
   - `limit` *(integer, optional, default: 10, max: 100)*: Number of episodes to return.
 - **When to use**: Answering *"What was downloaded recently?"*, *"Show me latest episodes from channel X"*, or checking if a new episode is already available.
 
-### 16. `get_sync_status`
+### 17. `get_sync_status`
 - **Purpose**: Returns a high-level operational status overview: active feeds, last sync times, next cron execution for each feed, number of episodes downloaded in the past 24 hours, failed episode counts, and disk space free.
 - **Arguments**: None `{}`.
 - **When to use**: General status checks (*"Is Podsync working?"*, *"When is the next sync?"*).

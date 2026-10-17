@@ -115,6 +115,10 @@ func (c *HTTPClientManager) AddFeed(ctx context.Context, cfg *feed.Config) error
 	return c.doRequest(ctx, http.MethodPost, "/api/v1/feeds", cfg, nil)
 }
 
+func (c *HTTPClientManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
+	return c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/v1/feeds/%s", id), update, nil)
+}
+
 func (c *HTTPClientManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
 	path := fmt.Sprintf("/api/v1/feeds/%s", id)
 	if deleteFiles {

@@ -275,6 +275,55 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "update_feed_config",
+			Description: "Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "ID of the feed to update",
+					},
+					"cron_schedule": {
+						Type:        "string",
+						Description: "Optional cron schedule or interval (e.g. '@every 6h', '0 0 * * *')",
+					},
+					"page_size": {
+						Type:        "integer",
+						Description: "Optional page size (number of recent episodes to fetch)",
+					},
+					"quality": {
+						Type:        "string",
+						Description: "Optional media quality: 'high' or 'low'",
+						Enum:        []string{"high", "low"},
+					},
+					"format": {
+						Type:        "string",
+						Description: "Optional media format: 'audio' or 'video'",
+						Enum:        []string{"audio", "video"},
+					},
+					"max_height": {
+						Type:        "integer",
+						Description: "Optional max video height (e.g. 720, 1080)",
+					},
+					"keep_last": {
+						Type:        "integer",
+						Description: "Optional retention policy: keep last N episodes on disk (0 = unlimited)",
+					},
+					"playlist_sort": {
+						Type:        "string",
+						Description: "Optional playlist sort: 'asc' or 'desc'",
+						Enum:        []string{"asc", "desc"},
+					},
+					"private_feed": {
+						Type:        "boolean",
+						Description: "Optional private feed flag (block indexers)",
+					},
+				},
+				Required: []string{"feed_id"},
+			},
+		},
+		{
 			Name:        "retry_episode",
 			Description: "Reset error status of a failed podcast episode to trigger a fresh download attempt",
 			InputSchema: InputSchema{
@@ -526,6 +575,43 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Update triggered for feed %q", feedID)}},
+		}, nil
+
+	case "update_feed_config":
+		feedID, ok := args["feed_id"].(string)
+		if !ok || strings.TrimSpace(feedID) == "" {
+			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
+		}
+		var update web.FeedConfigUpdate
+		if rawSchedule, ok := args["cron_schedule"].(string); ok {
+			update.CronSchedule = rawSchedule
+		}
+		if rawPageSize, ok := args["page_size"].(float64); ok {
+			update.PageSize = int(rawPageSize)
+		}
+		if rawQuality, ok := args["quality"].(string); ok {
+			update.Quality = rawQuality
+		}
+		if rawFormat, ok := args["format"].(string); ok {
+			update.Format = rawFormat
+		}
+		if rawMaxHeight, ok := args["max_height"].(float64); ok {
+			update.MaxHeight = int(rawMaxHeight)
+		}
+		if rawKeepLast, ok := args["keep_last"].(float64); ok {
+			update.KeepLast = int(rawKeepLast)
+		}
+		if rawSort, ok := args["playlist_sort"].(string); ok {
+			update.PlaylistSort = rawSort
+		}
+		if rawPrivate, ok := args["private_feed"].(bool); ok {
+			update.PrivateFeed = rawPrivate
+		}
+		if err := s.mgr.UpdateFeed(ctx, feedID, &update); err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully updated configuration for feed %q", feedID)}},
 		}, nil
 
 	case "retry_episode":

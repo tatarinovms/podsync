@@ -90,7 +90,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 - Secured by HTTP Basic Auth and session cookies (`cfg.Server.Admin`).
 - REST API mounted under `/api/v1`:
   - `/api/v1/feeds` (GET, POST)
-  - `/api/v1/feeds/{id}` (GET, DELETE)
+  - `/api/v1/feeds/{id}` (GET, PUT/PATCH, DELETE)
   - `/api/v1/feeds/{id}/update` (POST)
   - `/api/v1/feeds/{id}/episodes/{ep_id}/retry` (POST)
   - `/api/v1/tokens` (GET, POST with optional append, DELETE with optional `?index={idx}`)
@@ -105,7 +105,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 Podsync exposes a full suite of MCP tools and resources for autonomous AI agents:
 - **Tools**:
-  - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `retry_episode`
+  - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_feed_config`, `retry_episode`
   - `get_download_errors`, `get_recent_downloads`, `get_sync_status`
   - `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`
   - `get_downloader_config`, `update_downloader_config`, `test_downloader`

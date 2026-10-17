@@ -892,6 +892,7 @@ func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content strin
 		if m.downloader != nil {
 			m.downloader.SetCookiesFile("")
 		}
+		m.syncCookiesToFeeds("")
 		return m.saveDownloaderToConfig(&m.cfg.Downloader)
 	}
 
@@ -912,7 +913,46 @@ func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content strin
 		m.downloader.SetCookiesFile(cookiesPath)
 	}
 
+	m.syncCookiesToFeeds(cookiesPath)
+
 	return m.saveDownloaderToConfig(&m.cfg.Downloader)
+}
+
+func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) {
+	for feedID, feedCfg := range m.cfg.Feeds {
+		if len(feedCfg.YouTubeDLArgs) == 0 {
+			continue
+		}
+		hasCookies := false
+		newArgs := make([]string, 0, len(feedCfg.YouTubeDLArgs))
+		for i := 0; i < len(feedCfg.YouTubeDLArgs); i++ {
+			arg := feedCfg.YouTubeDLArgs[i]
+			if arg == "--cookies" {
+				if i+1 < len(feedCfg.YouTubeDLArgs) {
+					if newCookiesPath != "" {
+						newArgs = append(newArgs, "--cookies", newCookiesPath)
+					}
+					i++ // skip old path argument
+					hasCookies = true
+					continue
+				}
+			} else if strings.HasPrefix(arg, "--cookies=") {
+				if newCookiesPath != "" {
+					newArgs = append(newArgs, "--cookies="+newCookiesPath)
+				}
+				hasCookies = true
+				continue
+			}
+			newArgs = append(newArgs, arg)
+		}
+
+		if hasCookies {
+			feedCfg.YouTubeDLArgs = newArgs
+			m.cfg.Feeds[feedID] = feedCfg
+			_ = m.saveFeedToConfig(feedCfg)
+			log.Infof("updated --cookies path in feed %q to %q", feedID, newCookiesPath)
+		}
+	}
 }
 
 func (m *AppFeedManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {

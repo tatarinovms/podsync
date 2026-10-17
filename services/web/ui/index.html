@@ -1478,6 +1478,19 @@
                                             </select>
                                         </div>
                                     </div>
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
+                                            <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="new-feed-cookies-hint">Global cookies: data/cookies.txt</span>
+                                        </div>
+                                        <div class="input-group input-group-sm mb-1">
+                                            <input type="text" id="new-feed-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --js-runtimes deno:/root/.deno/bin/deno --geo-bypass">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertGlobalCookiesToArgs('new-feed')" title="Append/Update global --cookies in arguments">
+                                                <i class="bi bi-cookie me-1"></i>+ Cookies
+                                            </button>
+                                        </div>
+                                        <div class="form-text small">Arguments passed directly to yt-dlp (e.g. <code>--js-runtimes deno:...</code>). Global cookies/proxy from Downloader settings are applied automatically.</div>
+                                    </div>
                                     <div class="border rounded p-2 bg-body-tertiary">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="new-feed-opml" checked>
@@ -1584,11 +1597,6 @@
 
                                 <!-- 5. Advanced -->
                                 <div class="tab-pane fade" id="af-tab-advanced">
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Extra yt-dlp Arguments</label>
-                                        <input type="text" id="new-feed-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --geo-bypass --write-sub --sub-lang en">
-                                        <div class="form-text small">Space-separated arguments passed directly to yt-dlp at download time.</div>
-                                    </div>
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold">Filename Template</label>
                                         <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
@@ -1759,6 +1767,19 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-1">
+                                        <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
+                                        <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="fs-cookies-hint">Global cookies: data/cookies.txt</span>
+                                    </div>
+                                    <div class="input-group input-group-sm mb-1">
+                                        <input type="text" id="fs-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --js-runtimes deno:/root/.deno/bin/deno --geo-bypass">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertGlobalCookiesToArgs('fs')" title="Append/Update global --cookies in arguments">
+                                            <i class="bi bi-cookie me-1"></i>+ Cookies
+                                        </button>
+                                    </div>
+                                    <div class="form-text small">Arguments passed directly to yt-dlp (e.g. <code>--js-runtimes deno:...</code>). Global cookies/proxy from Downloader settings are applied automatically.</div>
+                                </div>
                                 <div class="border rounded p-2 bg-body-tertiary">
                                     <div class="form-check form-switch mb-2">
                                         <input class="form-check-input" type="checkbox" id="fs-opml" checked>
@@ -1865,11 +1886,6 @@
 
                             <!-- 5. Advanced -->
                             <div class="tab-pane fade" id="fs-tab-advanced">
-                                <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Extra yt-dlp Arguments</label>
-                                    <input type="text" id="fs-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --geo-bypass --write-sub --sub-lang en">
-                                    <div class="form-text small">Space-separated arguments passed directly to yt-dlp at download time.</div>
-                                </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-semibold">Filename Template</label>
                                     <input type="text" id="fs-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
@@ -2465,6 +2481,12 @@
             document.getElementById('fs-ytdl-args').value = Array.isArray(args) ? args.join(' ') : (args || '');
             document.getElementById('fs-filename-template').value = cfg.filename_template || '';
 
+            const cFile = (downloaderConfig && downloaderConfig.cookies_file) || 'data/cookies.txt';
+            const fsHint = document.getElementById('fs-cookies-hint');
+            if (fsHint) fsHint.innerText = `Global: ${cFile}`;
+            const afHint = document.getElementById('new-feed-cookies-hint');
+            if (afHint) afHint.innerText = `Global: ${cFile}`;
+
             // Show first tab
             const firstTab = document.querySelector('#feedSettingsTabs button[data-bs-target="#fs-tab-general"]');
             if (firstTab) {
@@ -2486,6 +2508,19 @@
 
         function setPresetCron(val) {
             document.getElementById('fs-cron-schedule').value = val;
+        }
+
+        function insertGlobalCookiesToArgs(prefix) {
+            const input = document.getElementById(prefix + '-ytdl-args');
+            if (!input) return;
+            const cFile = (downloaderConfig && downloaderConfig.cookies_file) || 'data/cookies.txt';
+            let val = input.value.trim();
+            if (val.includes('--cookies')) {
+                val = val.replace(/--cookies(\s+|=)[^\s]+/, `--cookies ${cFile}`);
+            } else {
+                val = val ? `${val} --cookies ${cFile}` : `--cookies ${cFile}`;
+            }
+            input.value = val;
         }
 
         async function saveFeedSettings(event) {
@@ -3143,8 +3178,9 @@
                     const err = await res.json();
                     throw new Error(err.error || 'Failed to save cookies');
                 }
-                alert('Cookies saved and applied successfully!');
+                alert('Cookies saved and applied to downloader & feeds!');
                 await loadDownloaderConfig();
+                await loadFeeds();
             } catch (err) {
                 alert('Error: ' + err.message);
             }
@@ -3158,6 +3194,7 @@
                 document.getElementById('dl-cookies-content').value = '';
                 alert('Cookies cleared successfully.');
                 await loadDownloaderConfig();
+                await loadFeeds();
             } catch (err) {
                 alert('Error: ' + err.message);
             }

@@ -149,6 +149,16 @@ func TestBuildArgsWithCookiesAndProxy(t *testing.T) {
 	assert.Contains(t, args, "chrome")
 	assert.Contains(t, args, "--proxy")
 	assert.Contains(t, args, "http://proxy:8080")
+
+	// Feed with explicit --cookies in YouTubeDLArgs should not have --cookies-from-browser appended
+	feedWithCookies := &feed.Config{
+		Format:        model.FormatAudio,
+		Quality:       model.QualityHigh,
+		YouTubeDLArgs: []string{"--cookies", "/custom/cookies.txt"},
+	}
+	args2 := dl.buildArgs(feedWithCookies, ep, "/tmp/out.mp3")
+	assert.Contains(t, args2, "/custom/cookies.txt")
+	assert.NotContains(t, args2, "--cookies-from-browser")
 }
 
 func TestCleanErrorMessage(t *testing.T) {

@@ -340,22 +340,37 @@ func (dl *YoutubeDl) exec(ctx context.Context, args ...string) (string, error) {
 	return string(output), nil
 }
 
+func hasArg(args []string, name string) bool {
+	for _, a := range args {
+		if a == name || strings.HasPrefix(a, name+"=") {
+			return true
+		}
+	}
+	return false
+}
+
 func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
 	if dl == nil {
 		return args
 	}
 	if dl.cookiesFile != "" {
-		if _, err := os.Stat(dl.cookiesFile); err == nil {
-			args = append(args, "--cookies", dl.cookiesFile)
-		} else {
-			log.Warnf("configured cookies file %q not found on disk", dl.cookiesFile)
+		if !hasArg(args, "--cookies") && !hasArg(args, "--cookies-from-browser") {
+			if _, err := os.Stat(dl.cookiesFile); err == nil {
+				args = append(args, "--cookies", dl.cookiesFile)
+			} else {
+				log.Warnf("configured cookies file %q not found on disk", dl.cookiesFile)
+			}
 		}
 	} else if dl.cookiesFromBrowser != "" {
-		args = append(args, "--cookies-from-browser", dl.cookiesFromBrowser)
+		if !hasArg(args, "--cookies") && !hasArg(args, "--cookies-from-browser") {
+			args = append(args, "--cookies-from-browser", dl.cookiesFromBrowser)
+		}
 	}
 
 	if dl.proxy != "" {
-		args = append(args, "--proxy", dl.proxy)
+		if !hasArg(args, "--proxy") {
+			args = append(args, "--proxy", dl.proxy)
+		}
 	}
 
 	return args

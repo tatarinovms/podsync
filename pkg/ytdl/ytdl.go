@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,61 @@ import (
 
 	"github.com/mxpv/podsync/pkg/model"
 )
+
+var (
+	ErrTooManyRequests = errors.New(http.StatusText(http.StatusTooManyRequests))
+	ErrBotDetection    = errors.New("YouTube requires authentication: sign in to confirm you are not a bot (configure cookies)")
+)
+
+// CleanErrorMessage extracts meaningful human-readable diagnostic message from yt-dlp/ffmpeg combined output.
+func CleanErrorMessage(output string) string {
+	raw := strings.TrimSpace(output)
+	if raw == "" {
+		return "download process exited with error"
+	}
+
+	if strings.Contains(raw, "Sign in to confirm you") ||
+		strings.Contains(raw, "Sign in to confirm your age") ||
+		(strings.Contains(raw, "bot") && strings.Contains(raw, "confirm")) {
+		return "YouTube blocked download: sign in to confirm you are not a bot (configure cookies in Admin Console or set PODSYNC_DOWNLOADER_COOKIES_FILE)"
+	}
+
+	if strings.Contains(raw, "HTTP Error 429") || strings.Contains(raw, "Too Many Requests") {
+		return "Rate limit: HTTP Error 429 (Too Many Requests)"
+	}
+
+	lines := strings.Split(raw, "\n")
+	var errorLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "ERROR:") {
+			clean := strings.TrimPrefix(trimmed, "ERROR:")
+			clean = strings.TrimSpace(clean)
+			clean = regexp.MustCompile(`^\[[^\]]+\]\s*`).ReplaceAllString(clean, "")
+			errorLines = append(errorLines, clean)
+		}
+	}
+
+	if len(errorLines) > 0 {
+		return strings.Join(errorLines, "; ")
+	}
+
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" || strings.HasPrefix(line, "[youtube]") || strings.HasPrefix(line, "[info]") || strings.HasPrefix(line, "[download]") {
+			continue
+		}
+		if len(line) > 200 {
+			line = line[:197] + "..."
+		}
+		return line
+	}
+
+	if len(raw) > 200 {
+		return raw[:197] + "..."
+	}
+	return raw
+}
 
 const (
 	DefaultDownloadTimeout = 10 * time.Minute
@@ -43,10 +99,6 @@ type PlaylistMetadata struct {
 	ChannelUrl  string                      `json:"channel_url"`
 	WebpageUrl  string                      `json:"webpage_url"`
 }
-
-var (
-	ErrTooManyRequests = errors.New(http.StatusText(http.StatusTooManyRequests))
-)
 
 // Config is a youtube-dl related configuration
 type Config struct {
@@ -252,16 +304,17 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 
 	output, err := dl.exec(ctx, args...)
 	if err != nil {
-		log.WithError(err).Errorf("youtube-dl error: %s", filePath)
+		cleanMsg := CleanErrorMessage(output)
+		log.Errorf("youtube-dl download error for %s (%s): %s", episode.Title, episode.VideoURL, cleanMsg)
 
-		// YouTube might block host with HTTP Error 429: Too Many Requests
 		if strings.Contains(output, "HTTP Error 429") {
 			return nil, ErrTooManyRequests
 		}
+		if strings.Contains(output, "Sign in to confirm you") || strings.Contains(output, "confirm you’re not a bot") {
+			return nil, ErrBotDetection
+		}
 
-		log.Error(output)
-
-		return nil, errors.New(output)
+		return nil, errors.New(cleanMsg)
 	}
 
 	// filePath now with the final extension

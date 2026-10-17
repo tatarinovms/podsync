@@ -99,6 +99,26 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 
 ---
 
+
+### 13. `get_download_errors`
+- **Purpose**: Returns a diagnostic list of all failed podcast episodes across all feeds or for a specific feed, with exact error causes (e.g. YouTube bot verification, private video, 429 rate limits, ffmpeg errors) and actionable recommendations.
+- **Arguments**:
+  - `feed_id` *(string, optional)*: Filter errors by feed ID.
+  - `limit` *(integer, optional, default: 20, max: 100)*: Maximum error records to return.
+- **When to use**: Answering *"Are there any download errors?"*, *"Why did download fail on channel X?"*, or before proposing retries.
+
+### 14. `get_recent_downloads`
+- **Purpose**: Returns the most recently downloaded podcast episodes across all channels or for a single feed, complete with file sizes, durations, publication dates, and playable audio/video URLs.
+- **Arguments**:
+  - `feed_id` *(string, optional)*: Filter recent downloads by feed ID.
+  - `limit` *(integer, optional, default: 10, max: 100)*: Number of episodes to return.
+- **When to use**: Answering *"What was downloaded recently?"*, *"Show me latest episodes from channel X"*, or checking if a new episode is already available.
+
+### 15. `get_sync_status`
+- **Purpose**: Returns a high-level operational status overview: active feeds, last sync times, next cron execution for each feed, number of episodes downloaded in the past 24 hours, failed episode counts, and disk space free.
+- **Arguments**: None `{}`.
+- **When to use**: General status checks (*"Is Podsync working?"*, *"When is the next sync?"*).
+
 ## MCP Resources
 
 Agents can read live context from Podsync via resources:

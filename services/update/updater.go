@@ -284,8 +284,12 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 				}
 			}
 
+			errMsg := err.Error()
+			now := time.Now()
 			if err := u.db.UpdateEpisode(feedID, episode.ID, func(episode *model.Episode) error {
 				episode.Status = model.EpisodeError
+				episode.Error = errMsg
+				episode.ErrorAt = &now
 				return nil
 			}); err != nil {
 				return err
@@ -325,6 +329,8 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 		if err := u.db.UpdateEpisode(feedID, episode.ID, func(episode *model.Episode) error {
 			episode.Size = fileSize
 			episode.Status = model.EpisodeDownloaded
+			episode.Error = ""
+			episode.ErrorAt = nil
 			return nil
 		}); err != nil {
 			return err

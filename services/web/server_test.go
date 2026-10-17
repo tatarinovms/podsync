@@ -358,6 +358,18 @@ func (m *mockDownloaderAdminMgr) TestDownloader(ctx context.Context, testURL str
 	return &m.testResponse, nil
 }
 
+func (m *mockDownloaderAdminMgr) GetDownloadErrors(ctx context.Context, feedID string, limit int) ([]DownloadErrorItem, error) {
+	return []DownloadErrorItem{}, nil
+}
+
+func (m *mockDownloaderAdminMgr) GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]RecentDownloadItem, error) {
+	return []RecentDownloadItem{}, nil
+}
+
+func (m *mockDownloaderAdminMgr) GetSyncStatus(ctx context.Context) (*SyncStatusInfo, error) {
+	return &SyncStatusInfo{}, nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,

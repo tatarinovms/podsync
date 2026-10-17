@@ -41,6 +41,8 @@ type Episode struct {
 	Size        int64         `json:"size"`
 	Order       string        `json:"order"`
 	Status      EpisodeStatus `json:"status"` // Disk status
+	Error       string        `json:"error,omitempty"`
+	ErrorAt     *time.Time    `json:"error_at,omitempty"`
 }
 
 type Feed struct {

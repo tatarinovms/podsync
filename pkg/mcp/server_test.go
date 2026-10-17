@@ -103,6 +103,26 @@ func (m *mockAdminManager) TestDownloader(ctx context.Context, testURL string) (
 	}, nil
 }
 
+func (m *mockAdminManager) GetDownloadErrors(ctx context.Context, feedID string, limit int) ([]web.DownloadErrorItem, error) {
+	return []web.DownloadErrorItem{
+		{FeedID: "TEST", EpisodeID: "ep1", EpisodeTitle: "Failed Ep", Error: "Sign in to confirm you are not a bot", Recommendation: "Configure cookies"},
+	}, nil
+}
+
+func (m *mockAdminManager) GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]web.RecentDownloadItem, error) {
+	return []web.RecentDownloadItem{
+		{FeedID: "TEST", EpisodeID: "ep2", EpisodeTitle: "Downloaded Ep", MediaURL: "http://localhost:8080/TEST/ep2.mp3"},
+	}, nil
+}
+
+func (m *mockAdminManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo, error) {
+	return &web.SyncStatusInfo{
+		ActiveFeeds:        1,
+		DownloadedEpisodes: 5,
+		FailedEpisodes:     1,
+	}, nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{
@@ -226,6 +246,58 @@ func TestToolsCall(t *testing.T) {
 		assert.Nil(t, resp.Error)
 		resData, _ := json.Marshal(resp.Result)
 		assert.Contains(t, string(resData), "v2.8.0")
+	})
+
+	t.Run("get_download_errors", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_download_errors","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Sign in to confirm you are not a bot")
+		assert.Contains(t, callResult.Content[0].Text, "Configure cookies")
+	})
+
+	t.Run("get_recent_downloads", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_recent_downloads","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Downloaded Ep")
+	})
+
+	t.Run("get_sync_status", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_sync_status","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "downloaded_episodes")
 	})
 }
 

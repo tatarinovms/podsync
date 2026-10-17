@@ -193,3 +193,38 @@ func (c *HTTPClientManager) TestDownloader(ctx context.Context, testURL string) 
 	}
 	return &result, nil
 }
+
+func (c *HTTPClientManager) GetDownloadErrors(ctx context.Context, feedID string, limit int) ([]web.DownloadErrorItem, error) {
+	path := fmt.Sprintf("/api/v1/system/errors?limit=%d", limit)
+	if feedID != "" {
+		path += "&feed_id=" + feedID
+	}
+	var result []web.DownloadErrorItem
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *HTTPClientManager) GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]web.RecentDownloadItem, error) {
+	path := fmt.Sprintf("/api/v1/system/recent?limit=%d", limit)
+	if feedID != "" {
+		path += "&feed_id=" + feedID
+	}
+	var result []web.RecentDownloadItem
+	err := c.doRequest(ctx, http.MethodGet, path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *HTTPClientManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo, error) {
+	var result web.SyncStatusInfo
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/system/status", nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

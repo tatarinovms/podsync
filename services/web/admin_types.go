@@ -106,6 +106,62 @@ type TestDownloaderResult struct {
 	Error   string `json:"error,omitempty"`
 }
 
+// DownloadErrorItem represents a failed episode download with diagnostic details
+type DownloadErrorItem struct {
+	FeedID         string     `json:"feed_id"`
+	FeedTitle      string     `json:"feed_title"`
+	FeedProvider   string     `json:"feed_provider"`
+	EpisodeID      string     `json:"episode_id"`
+	EpisodeTitle   string     `json:"episode_title"`
+	VideoURL       string     `json:"video_url"`
+	PubDate        time.Time  `json:"pub_date"`
+	Error          string     `json:"error"`
+	ErrorAt        *time.Time `json:"error_at,omitempty"`
+	Recommendation string     `json:"recommendation,omitempty"`
+}
+
+// RecentDownloadItem represents a recently downloaded episode
+type RecentDownloadItem struct {
+	FeedID       string    `json:"feed_id"`
+	FeedTitle    string    `json:"feed_title"`
+	FeedProvider string    `json:"feed_provider"`
+	EpisodeID    string    `json:"episode_id"`
+	EpisodeTitle string    `json:"episode_title"`
+	VideoURL     string    `json:"video_url"`
+	PubDate      time.Time `json:"pub_date"`
+	Size         int64     `json:"size_bytes"`
+	Duration     int64     `json:"duration_seconds"`
+	MediaURL     string    `json:"media_url"`
+}
+
+// SyncStatusFeedInfo represents per-feed synchronization schedule and status
+type SyncStatusFeedInfo struct {
+	FeedID          string     `json:"feed_id"`
+	FeedTitle       string     `json:"feed_title"`
+	URL             string     `json:"url"`
+	Provider        string     `json:"provider"`
+	CronSchedule    string     `json:"cron_schedule"`
+	LastUpdate      *time.Time `json:"last_update,omitempty"`
+	NextUpdate      *time.Time `json:"next_update,omitempty"`
+	EpisodeCount    int        `json:"episode_count"`
+	DownloadedCount int        `json:"downloaded_count"`
+	ErrorCount      int        `json:"error_count"`
+}
+
+// SyncStatusInfo represents a comprehensive health and sync overview
+type SyncStatusInfo struct {
+	ActiveFeeds        int                  `json:"active_feeds"`
+	TotalEpisodes      int                  `json:"total_episodes"`
+	DownloadedEpisodes int                  `json:"downloaded_episodes"`
+	FailedEpisodes     int                  `json:"failed_episodes"`
+	DownloadedPast24h  int                  `json:"downloaded_past_24h"`
+	DiskFreeBytes      uint64               `json:"disk_free_bytes"`
+	DiskTotalBytes     uint64               `json:"disk_total_bytes"`
+	HasDownloader      bool                 `json:"has_downloader"`
+	HasFFmpeg          bool                 `json:"has_ffmpeg"`
+	Feeds              []SyncStatusFeedInfo `json:"feeds"`
+}
+
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
@@ -122,4 +178,7 @@ type AdminManager interface {
 	GetCookiesContent(ctx context.Context) (string, error)
 	UpdateCookiesContent(ctx context.Context, content string) error
 	TestDownloader(ctx context.Context, testURL string) (*TestDownloaderResult, error)
+	GetDownloadErrors(ctx context.Context, feedID string, limit int) ([]DownloadErrorItem, error)
+	GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]RecentDownloadItem, error)
+	GetSyncStatus(ctx context.Context) (*SyncStatusInfo, error)
 }

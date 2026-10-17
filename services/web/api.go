@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,6 +53,9 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("/api/v1/tokens", s.handleTokens)
 	mux.HandleFunc("/api/v1/system", s.handleSystem)
+	mux.HandleFunc("/api/v1/system/errors", s.handleSystemErrors)
+	mux.HandleFunc("/api/v1/system/recent", s.handleSystemRecent)
+	mux.HandleFunc("/api/v1/system/status", s.handleSystemStatus)
 	mux.Handle("/api/v1/downloader", s.authMiddleware(http.HandlerFunc(s.handleDownloader)))
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
 	mux.Handle("/api/v1/downloader/test", s.authMiddleware(http.HandlerFunc(s.handleDownloaderTest)))
@@ -502,4 +506,74 @@ func (s *Server) handleDownloaderTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleSystemErrors(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	feedID := r.URL.Query().Get("feed_id")
+	limit := 20
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if val, err := strconv.Atoi(raw); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	errs, err := s.adminMgr.GetDownloadErrors(r.Context(), feedID, limit)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, errs)
+}
+
+func (s *Server) handleSystemRecent(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	feedID := r.URL.Query().Get("feed_id")
+	limit := 10
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if val, err := strconv.Atoi(raw); err == nil && val > 0 {
+			limit = val
+		}
+	}
+
+	downloads, err := s.adminMgr.GetRecentDownloads(r.Context(), feedID, limit)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, downloads)
+}
+
+func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	status, err := s.adminMgr.GetSyncStatus(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, status)
 }

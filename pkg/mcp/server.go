@@ -369,6 +369,48 @@ func (s *Server) getToolDefinitions() []Tool {
 				Required: []string{"provider", "tokens"},
 			},
 		},
+		{
+			Name:        "get_download_errors",
+			Description: "Get list of failed podcast episode downloads across all feeds or for a specific feed, with detailed error causes and diagnostic recommendations",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Optional feed ID to filter errors by (e.g. LABELCOM, XYZ). If omitted, returns errors across all feeds",
+					},
+					"limit": {
+						Type:        "integer",
+						Description: "Maximum number of error items to return (default: 20, max: 100)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "get_recent_downloads",
+			Description: "Get list of recently downloaded podcast episodes across all feeds or for a specific feed, with file sizes, media URLs, and timestamps",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Optional feed ID to filter downloads by. If omitted, returns recent downloads across all feeds",
+					},
+					"limit": {
+						Type:        "integer",
+						Description: "Maximum number of episodes to return (default: 10, max: 100)",
+					},
+				},
+			},
+		},
+		{
+			Name:        "get_sync_status",
+			Description: "Get comprehensive synchronization overview: active feeds, last sync times, next cron runs, downloads past 24h, active error counts, and storage space",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
 	}
 }
 
@@ -523,6 +565,46 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully updated %d token(s) for provider %q", len(tokens), provider)}},
+		}, nil
+
+	case "get_download_errors":
+		feedID, _ := args["feed_id"].(string)
+		limit := 20
+		if rawLimit, ok := args["limit"].(float64); ok && rawLimit > 0 {
+			limit = int(rawLimit)
+		}
+		errs, err := s.mgr.GetDownloadErrors(ctx, feedID, limit)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(errs, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "get_recent_downloads":
+		feedID, _ := args["feed_id"].(string)
+		limit := 10
+		if rawLimit, ok := args["limit"].(float64); ok && rawLimit > 0 {
+			limit = int(rawLimit)
+		}
+		downloads, err := s.mgr.GetRecentDownloads(ctx, feedID, limit)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(downloads, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "get_sync_status":
+		status, err := s.mgr.GetSyncStatus(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(status, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil
 
 	default:

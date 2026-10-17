@@ -150,3 +150,22 @@ func TestBuildArgsWithCookiesAndProxy(t *testing.T) {
 	assert.Contains(t, args, "--proxy")
 	assert.Contains(t, args, "http://proxy:8080")
 }
+
+func TestCleanErrorMessage(t *testing.T) {
+	rawBot := `[youtube] Extracting URL: https://youtube.com/watch?v=FDgrwfKOkG8
+[youtube] FDgrwfKOkG8: Downloading webpage
+ERROR: [youtube] FDgrwfKOkG8: Sign in to confirm you’re not a bot. This helps protect our community.`
+	msg := CleanErrorMessage(rawBot)
+	assert.Contains(t, msg, "sign in to confirm you are not a bot")
+	assert.Contains(t, msg, "configure cookies")
+
+	raw429 := `[youtube] FDgrwfKOkG8: Downloading webpage
+ERROR: HTTP Error 429: Too Many Requests`
+	msg429 := CleanErrorMessage(raw429)
+	assert.Contains(t, msg429, "Rate limit: HTTP Error 429")
+
+	rawSimple := `[youtube] Extracting URL: https://youtube.com/watch?v=123
+ERROR: [youtube] 123: Private video. Sign in if you have been granted access to this video`
+	msgSimple := CleanErrorMessage(rawSimple)
+	assert.Equal(t, "123: Private video. Sign in if you have been granted access to this video", msgSimple)
+}

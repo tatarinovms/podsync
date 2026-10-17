@@ -100,6 +100,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 Podsync exposes a full suite of MCP tools for autonomous AI agents:
 - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `retry_episode`
+- `get_download_errors`, `get_recent_downloads`, `get_sync_status`
 - `get_system_stats`, `get_tokens`, `update_tokens`
 - `get_downloader_config`, `update_downloader_config`, `test_downloader`
 

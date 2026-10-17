@@ -1919,16 +1919,19 @@
                         statusBadge = '<span class="badge bg-light text-muted border">Cleaned (deleted from disk)</span>';
                     }
 
+                    const errorAlert = ep.error ? `<div class="mt-2 p-2 rounded bg-danger-subtle border border-danger-subtle text-danger small font-monospace"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${escapeHtml(ep.error)}</div>` : "";
+
                     return `
                     <div class="list-group-item p-3">
                         <div class="d-flex align-items-start justify-content-between gap-3">
                             <div class="min-w-0">
-                                <h6 class="fw-semibold mb-1 text-break">${ep.title || ep.id}</h6>
+                                <h6 class="fw-semibold mb-1 text-break">${escapeHtml(ep.title || ep.id)}</h6>
                                 <div class="text-muted small d-flex flex-wrap gap-3">
                                     <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
                                     <span><i class="bi bi-hdd"></i> ${formatBytes(ep.size)}</span>
                                     <span><i class="bi bi-calendar"></i> ${formatDate(ep.pub_date)}</span>
                                 </div>
+                                ${errorAlert}
                             </div>
                             <div class="text-end text-nowrap">
                                 <div>${statusBadge}</div>

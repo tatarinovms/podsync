@@ -346,6 +346,8 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
 	return m.db.UpdateEpisode(feedID, episodeID, func(ep *model.Episode) error {
 		ep.Status = model.EpisodeNew
+		ep.Error = ""
+		ep.ErrorAt = nil
 		return nil
 	})
 }
@@ -773,4 +775,268 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 
 	_, err = tree.WriteTo(f)
 	return err
+}
+
+func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID string, limit int) ([]web.DownloadErrorItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if limit <= 0 {
+		limit = 20
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	var items []web.DownloadErrorItem
+
+	collectFromFeed := func(feedConfig *feed.Config) {
+		feedTitle := feedConfig.ID
+		provider := ""
+		if dbFeed, err := m.db.GetFeed(ctx, feedConfig.ID); err == nil && dbFeed != nil {
+			if dbFeed.Title != "" {
+				feedTitle = dbFeed.Title
+			}
+			provider = string(dbFeed.Provider)
+		}
+		if provider == "" {
+			if info, err := builder.ParseURL(feedConfig.URL); err == nil {
+				provider = string(info.Provider)
+			}
+		}
+
+		_ = m.db.WalkEpisodes(ctx, feedConfig.ID, func(ep *model.Episode) error {
+			if ep.Status == model.EpisodeError {
+				rec := ""
+				errStr := ep.Error
+				if strings.Contains(errStr, "bot") || strings.Contains(errStr, "cookies") || strings.Contains(errStr, "Sign in") {
+					rec = "Configure Netscape cookies.txt file in Web Admin or via PODSYNC_DOWNLOADER_COOKIES_FILE to bypass bot detection"
+				} else if strings.Contains(errStr, "429") || strings.Contains(errStr, "Too Many Requests") {
+					rec = "Rate limited by source platform; use a proxy or reduce update frequency"
+				} else if strings.Contains(errStr, "Private") {
+					rec = "Video is private; authentication cookies for the video owner are required"
+				} else if strings.Contains(errStr, "timed out") {
+					rec = "Download timed out; check network bandwidth or increase downloader timeout"
+				}
+
+				item := web.DownloadErrorItem{
+					FeedID:         feedConfig.ID,
+					FeedTitle:      feedTitle,
+					FeedProvider:   provider,
+					EpisodeID:      ep.ID,
+					EpisodeTitle:   ep.Title,
+					VideoURL:       ep.VideoURL,
+					PubDate:        ep.PubDate,
+					Error:          errStr,
+					ErrorAt:        ep.ErrorAt,
+					Recommendation: rec,
+				}
+				if item.Error == "" {
+					item.Error = "Download failed (error exit status)"
+				}
+				items = append(items, item)
+			}
+			return nil
+		})
+	}
+
+	if targetFeedID != "" {
+		if f, ok := m.feeds[targetFeedID]; ok {
+			collectFromFeed(f)
+		}
+	} else {
+		for _, f := range m.feeds {
+			collectFromFeed(f)
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].ErrorAt != nil && items[j].ErrorAt != nil {
+			return items[i].ErrorAt.After(*items[j].ErrorAt)
+		}
+		return items[i].PubDate.After(items[j].PubDate)
+	})
+
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	return items, nil
+}
+
+func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID string, limit int) ([]web.RecentDownloadItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+
+	var items []web.RecentDownloadItem
+
+	host := m.cfg.Server.Hostname
+	if host == "" {
+		port := m.cfg.Server.Port
+		if port == 0 {
+			port = 8080
+		}
+		host = fmt.Sprintf("http://localhost:%d", port)
+	}
+	host = strings.TrimSuffix(host, "/")
+
+	mountPath := ""
+	if m.cfg.Server.Path != "" {
+		mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
+	}
+
+	collectFromFeed := func(feedConfig *feed.Config) {
+		feedTitle := feedConfig.ID
+		provider := ""
+		if dbFeed, err := m.db.GetFeed(ctx, feedConfig.ID); err == nil && dbFeed != nil {
+			if dbFeed.Title != "" {
+				feedTitle = dbFeed.Title
+			}
+			provider = string(dbFeed.Provider)
+		}
+		if provider == "" {
+			if info, err := builder.ParseURL(feedConfig.URL); err == nil {
+				provider = string(info.Provider)
+			}
+		}
+
+		_ = m.db.WalkEpisodes(ctx, feedConfig.ID, func(ep *model.Episode) error {
+			if ep.Status == model.EpisodeDownloaded {
+				epName := feed.EpisodeName(feedConfig, ep)
+				mediaURL := fmt.Sprintf("%s%s/%s/%s", host, mountPath, feedConfig.ID, epName)
+				items = append(items, web.RecentDownloadItem{
+					FeedID:       feedConfig.ID,
+					FeedTitle:    feedTitle,
+					FeedProvider: provider,
+					EpisodeID:    ep.ID,
+					EpisodeTitle: ep.Title,
+					VideoURL:     ep.VideoURL,
+					PubDate:      ep.PubDate,
+					Size:         ep.Size,
+					Duration:     ep.Duration,
+					MediaURL:     mediaURL,
+				})
+			}
+			return nil
+		})
+	}
+
+	if targetFeedID != "" {
+		if f, ok := m.feeds[targetFeedID]; ok {
+			collectFromFeed(f)
+		}
+	} else {
+		for _, f := range m.feeds {
+			collectFromFeed(f)
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].PubDate.After(items[j].PubDate)
+	})
+
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	return items, nil
+}
+
+func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	info := &web.SyncStatusInfo{
+		ActiveFeeds: len(m.feeds),
+		Feeds:       make([]web.SyncStatusFeedInfo, 0, len(m.feeds)),
+	}
+
+	// Binary presence
+	if m.downloader != nil {
+		info.HasDownloader = true
+	}
+	if _, err := exec.LookPath("ffmpeg"); err == nil {
+		info.HasFFmpeg = true
+	}
+
+	// Disk stats
+	if stats, err := m.GetSystemStats(ctx); err == nil && stats != nil {
+		info.DiskFreeBytes = stats.DiskFree
+		info.DiskTotalBytes = stats.DiskTotal
+	}
+
+	past24h := time.Now().Add(-24 * time.Hour)
+
+	for _, f := range m.feeds {
+		feedTitle := f.ID
+		provider := ""
+		var lastUpdate *time.Time
+		if dbFeed, err := m.db.GetFeed(ctx, f.ID); err == nil && dbFeed != nil {
+			if dbFeed.Title != "" {
+				feedTitle = dbFeed.Title
+			}
+			provider = string(dbFeed.Provider)
+			if !dbFeed.UpdatedAt.IsZero() {
+				lastUpdate = &dbFeed.UpdatedAt
+			}
+		}
+		if provider == "" {
+			if pInfo, err := builder.ParseURL(f.URL); err == nil {
+				provider = string(pInfo.Provider)
+			}
+		}
+
+		var nextUpdate *time.Time
+		if m.cron != nil {
+			if entryID, exists := m.cronEntries[f.ID]; exists {
+				nextTime := m.cron.Entry(entryID).Next
+				if !nextTime.IsZero() {
+					nextUpdate = &nextTime
+				}
+			}
+		}
+
+		var epCount, dlCount, errCount int
+		_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
+			epCount++
+			switch ep.Status {
+			case model.EpisodeDownloaded:
+				dlCount++
+				if ep.PubDate.After(past24h) {
+					info.DownloadedPast24h++
+				}
+			case model.EpisodeError:
+				errCount++
+			}
+			return nil
+		})
+
+		info.TotalEpisodes += epCount
+		info.DownloadedEpisodes += dlCount
+		info.FailedEpisodes += errCount
+
+		info.Feeds = append(info.Feeds, web.SyncStatusFeedInfo{
+			FeedID:          f.ID,
+			FeedTitle:       feedTitle,
+			URL:             f.URL,
+			Provider:        provider,
+			CronSchedule:    f.CronSchedule,
+			LastUpdate:      lastUpdate,
+			NextUpdate:      nextUpdate,
+			EpisodeCount:    epCount,
+			DownloadedCount: dlCount,
+			ErrorCount:      errCount,
+		})
+	}
+
+	sort.Slice(info.Feeds, func(i, j int) bool {
+		return info.Feeds[i].FeedID < info.Feeds[j].FeedID
+	})
+
+	return info, nil
 }

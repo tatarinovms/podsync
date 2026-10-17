@@ -22,6 +22,10 @@ The MCP server exposes:
 - **`update_downloader_config`**: Update yt-dlp downloader options such as timeout, proxy, or cookies_from_browser.
 - **`test_downloader`**: Test yt-dlp downloader against a video URL to verify cookies and connectivity.
 
+- **`get_download_errors`**: View failed episode downloads with cleaned diagnostic causes (e.g., bot detection, 429 rate limits, private videos) and recommendations.
+- **`get_recent_downloads`**: List recent successfully downloaded podcast episodes with file sizes, timestamps, and direct playback URLs.
+- **`get_sync_status`**: High-level status snapshot (active feeds, sync schedules, next cron runs, downloads in past 24h, active error counts).
+
 ### Resources
 - **`podsync://feeds`**: Live JSON snapshot of all podcast feeds.
 - **`podsync://system`**: System diagnostics, hardware usage, and binary paths.

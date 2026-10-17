@@ -37,7 +37,7 @@
             --ctp-lavender: #7287fd;
             --ctp-text: #4c4f69;
             --ctp-subtext1: #5c5f77;
-            --ctp-subtext0: #6c7086;
+            --ctp-subtext0: #6c6f85;
             --ctp-overlay2: #7c7f93;
             --ctp-overlay1: #8c8fa1;
             --ctp-overlay0: #9ca0b0;
@@ -341,7 +341,7 @@
             text-decoration: none !important;
         }
 
-        .btn-danger, .btn-outline-danger {
+        .btn-danger {
             background-color: var(--btn-danger-bg) !important;
             color: var(--btn-danger-text) !important;
             border: 1px solid var(--btn-danger-bg) !important;
@@ -349,11 +349,26 @@
             border-radius: 8px;
             transition: all 0.15s ease-in-out;
         }
-        .btn-danger:hover, .btn-outline-danger:hover,
-        .btn-danger:focus, .btn-outline-danger:focus,
-        .btn-danger:active, .btn-outline-danger:active {
+        .btn-danger:hover,
+        .btn-danger:focus,
+        .btn-danger:active {
             background-color: var(--btn-danger-hover) !important;
             border-color: var(--btn-danger-hover) !important;
+            color: var(--btn-danger-text) !important;
+        }
+        .btn-outline-danger {
+            background-color: transparent !important;
+            border: 1px solid var(--ctp-red) !important;
+            color: var(--ctp-red) !important;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-outline-danger:hover,
+        .btn-outline-danger:focus,
+        .btn-outline-danger:active {
+            background-color: var(--ctp-red) !important;
+            border-color: var(--ctp-red) !important;
             color: var(--btn-danger-text) !important;
         }
 
@@ -898,7 +913,7 @@
                                     </div>
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>Podsync Version</span>
-                                        <span id="sys-ver" class="badge bg-light text-dark border">-</span>
+                                        <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
                                     </div>
                                 </div>
                             </div>
@@ -928,7 +943,7 @@
                         <i class="bi bi-info-circle-fill fs-4 flex-shrink-0 text-info mt-1"></i>
                         <div class="small">
                             <strong>Why are cookies needed?</strong> YouTube frequently blocks downloads from servers or cloud instances with the error:
-                            <div class="font-monospace bg-dark text-warning p-2 rounded my-2 small">
+                            <div class="rss-box text-warning p-2 my-2 small">
                                 ERROR: [youtube] Sign in to confirm you’re not a bot. Use --cookies-from-browser or --cookies for the authentication.
                             </div>
                             Exporting cookies from your browser (while logged into YouTube) and uploading or pasting them below allows yt-dlp to download restricted videos and playlists seamlessly.
@@ -1206,7 +1221,7 @@
                                             <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                         </div>
                                     </div>
-                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
+                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
                                 </div>
 
                                 <!-- Claude Desktop -->
@@ -1215,7 +1230,7 @@
                                         <span class="small text-muted">Add to <code>claude_desktop_config.json</code> under <code>"mcpServers"</code>:</span>
                                         <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('claude-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                     </div>
-                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
+                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
                                 </div>
 
                                 <!-- Cursor / Cline -->
@@ -1224,7 +1239,7 @@
                                         <span class="small text-muted">Add under <strong>Cursor Settings &gt; Features &gt; MCP</strong>:</span>
                                         <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('cursor-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy Config</button>
                                     </div>
-                                    <pre class="p-3 rounded bg-dark text-light mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
+                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
                                 </div>
                             </div>
                         </div>
@@ -2843,7 +2858,7 @@
                                 <span class="fw-bold">${item.provider.toUpperCase()}</span>
                                 ${tokensBadge}
                             </div>
-                            ${item.from_env ? '<span class="badge bg-info text-dark">From ENV</span>' : '<span class="badge bg-light text-muted border">From config.toml</span>'}
+                            ${item.from_env ? '<span class="badge bg-info">From ENV</span>' : '<span class="badge bg-light text-muted border">From config.toml</span>'}
                         </div>
 
                         ${count > 0 ? `
@@ -3243,7 +3258,7 @@
                     resultContainer.className = 'alert alert-danger mt-3 small shadow-sm';
                     resultContainer.innerHTML = `
                         <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> yt-dlp reported an error:</div>
-                        <pre class="bg-dark text-warning p-2 rounded my-1 font-monospace" style="max-height: 200px; overflow-y: auto;">${escapeHtml(data.error || 'Unknown error')}</pre>
+                        <pre class="p-2 my-1 font-monospace small" style="max-height: 200px; overflow-y: auto;">${escapeHtml(data.error || 'Unknown error')}</pre>
                         <div class="mt-1 small">Tip: Ensure your <code>cookies.txt</code> is fresh and exported while logged into YouTube.</div>
                     `;
                 }

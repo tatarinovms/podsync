@@ -308,6 +308,25 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update all feeds: /api/v1/feeds/update or /api/v1/feeds/update-all
+	if len(parts) == 1 && (parts[0] == "update" || parts[0] == "update-all") {
+		if r.Method != http.MethodPost {
+			s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		queued, err := s.adminMgr.TriggerUpdateAll(r.Context())
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"queued": true,
+			"count":  len(queued),
+			"feeds":  queued,
+		})
+		return
+	}
+
 	feedID := parts[0]
 
 	// 1. /api/v1/feeds/{id}/update

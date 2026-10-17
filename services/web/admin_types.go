@@ -188,6 +188,7 @@ type AdminManager interface {
 	UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error
 	DeleteFeed(ctx context.Context, id string, deleteFiles bool) error
 	TriggerUpdate(ctx context.Context, id string) error
+	TriggerUpdateAll(ctx context.Context) ([]string, error)
 	RetryEpisode(ctx context.Context, feedID, episodeID string) error
 	GetTokens(ctx context.Context) []TokenInfo
 	UpdateTokens(ctx context.Context, provider string, tokens []string) error

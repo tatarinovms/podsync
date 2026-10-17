@@ -131,6 +131,18 @@ func (c *HTTPClientManager) TriggerUpdate(ctx context.Context, id string) error 
 	return c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/v1/feeds/%s/update", id), nil, nil)
 }
 
+func (c *HTTPClientManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
+	var resp struct {
+		Queued bool     `json:"queued"`
+		Count  int      `json:"count"`
+		Feeds  []string `json:"feeds"`
+	}
+	if err := c.doRequest(ctx, http.MethodPost, "/api/v1/feeds/update", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Feeds, nil
+}
+
 func (c *HTTPClientManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
 	return c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/v1/feeds/%s/episodes/%s/retry", feedID, episodeID), nil, nil)
 }

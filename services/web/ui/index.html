@@ -805,6 +805,7 @@
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-update-all-feeds" onclick="triggerUpdateAll()" title="Update all podcasts now"><i class="bi bi-arrow-repeat me-1"></i> Update all</button>
                             <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
                         </div>
                     </div>
@@ -1316,6 +1317,11 @@
                                         <td><code>update_feed</code></td>
                                         <td>Trigger immediate update check &amp; download cycle for a channel</td>
                                         <td><code>feed_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_all_feeds</code></td>
+                                        <td>Trigger immediate update check &amp; download cycle for all configured podcast channels</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
                                     </tr>
                                     <tr>
                                         <td><code>update_feed_config</code></td>
@@ -2425,6 +2431,64 @@
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                }
+            }
+        }
+
+        async function triggerUpdateAll() {
+            const btn = document.getElementById('btn-update-all-feeds');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating all...`;
+            }
+
+            try {
+                const res = await fetch('/api/v1/feeds/update', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    const count = data.count !== undefined ? data.count : (data.feeds ? data.feeds.length : 0);
+                    showToast(count > 0 ? `Update triggered for all ${count} podcasts` : 'Update triggered for all podcasts');
+
+                    if (Array.isArray(data.feeds)) {
+                        data.feeds.forEach(id => {
+                            updatingFeeds.add(id);
+                            const b = document.getElementById(`btn-update-${id}`);
+                            if (b) {
+                                b.disabled = true;
+                                b.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
+                            }
+                        });
+                    }
+
+                    // Poll feeds list every 2s for 30s to update status when background download progresses
+                    let pollCount = 0;
+                    const interval = setInterval(async () => {
+                        pollCount++;
+                        await loadFeeds();
+                        if (pollCount >= 15) {
+                            clearInterval(interval);
+                            if (Array.isArray(data.feeds)) {
+                                data.feeds.forEach(id => updatingFeeds.delete(id));
+                            }
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
+                            }
+                            await loadFeeds();
+                        }
+                    }, 2000);
+                } else {
+                    showToast(`Failed to trigger update all: ${await res.text()}`);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
+                    }
+                }
+            } catch (err) {
+                showToast(`Network error: ${err.message}`);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
                 }
             }
         }

@@ -344,6 +344,32 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 	}
 }
 
+func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
+	m.mu.RLock()
+	feedList := make([]*feed.Config, 0, len(m.feeds))
+	for _, f := range m.feeds {
+		feedList = append(feedList, f)
+	}
+	m.mu.RUnlock()
+
+	if len(feedList) == 0 {
+		return []string{}, nil
+	}
+
+	var queued []string
+	for _, f := range feedList {
+		select {
+		case m.updates <- f:
+			log.Infof("manually triggered update for feed %q", f.ID)
+			queued = append(queued, f.ID)
+		default:
+			log.Warnf("failed to queue update for feed %q: queue full", f.ID)
+		}
+	}
+
+	return queued, nil
+}
+
 func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
 	return m.db.UpdateEpisode(feedID, episodeID, func(ep *model.Episode) error {
 		ep.Status = model.EpisodeNew

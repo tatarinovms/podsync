@@ -331,6 +331,9 @@ func (m *mockDownloaderAdminMgr) DeleteFeed(ctx context.Context, id string, dele
 	return nil
 }
 func (m *mockDownloaderAdminMgr) TriggerUpdate(ctx context.Context, id string) error { return nil }
+func (m *mockDownloaderAdminMgr) TriggerUpdateAll(ctx context.Context) ([]string, error) {
+	return []string{"test"}, nil
+}
 func (m *mockDownloaderAdminMgr) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
 	return nil
 }

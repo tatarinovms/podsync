@@ -58,6 +58,11 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `feed_id` *(string, required)*: ID of the feed to update.
 - **When to use**: When the user says *"Check for new episodes now"* or *"Update my podcast"*.
 
+### 6. `update_all_feeds`
+- **Purpose**: Triggers an immediate download and synchronization check for all configured podcast feeds at once.
+- **Arguments**: None `{}`.
+- **When to use**: When the user says *"Update all podcasts"*, *"Sync everything"*, or wants a bulk update.
+
 ### 6. `update_feed_config`
 - **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed) and saves changes to `config.toml`.
 - **Arguments**:

@@ -275,6 +275,14 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "update_all_feeds",
+			Description: "Trigger an immediate update check and download cycle for all registered podcast feeds",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
 			Name:        "update_feed_config",
 			Description: "Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed)",
 			InputSchema: InputSchema{
@@ -575,6 +583,15 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Update triggered for feed %q", feedID)}},
+		}, nil
+
+	case "update_all_feeds":
+		queued, err := s.mgr.TriggerUpdateAll(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Update triggered for %d feed(s): %s", len(queued), strings.Join(queued, ", "))}},
 		}, nil
 
 	case "update_feed_config":

@@ -64,6 +64,17 @@ func (m *mockAdminManager) TriggerUpdate(ctx context.Context, id string) error {
 	return m.updFeedErr
 }
 
+func (m *mockAdminManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
+	if m.updFeedErr != nil {
+		return nil, m.updFeedErr
+	}
+	var ids []string
+	for _, f := range m.feeds {
+		ids = append(ids, f.ID)
+	}
+	return ids, nil
+}
+
 func (m *mockAdminManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
 	return m.retryErr
 }
@@ -249,6 +260,24 @@ func TestToolsCall(t *testing.T) {
 		_ = json.Unmarshal(resData, &callResult)
 		assert.False(t, callResult.IsError)
 		assert.Contains(t, callResult.Content[0].Text, "Successfully added feed")
+	})
+
+	t.Run("update_all_feeds", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"update_all_feeds","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		require.Len(t, callResult.Content, 1)
+		assert.Contains(t, callResult.Content[0].Text, "Update triggered for 2 feed(s)")
 	})
 
 	t.Run("get_system_stats", func(t *testing.T) {

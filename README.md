@@ -149,6 +149,10 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/auth/status` | Current authentication status |
 | `POST` | `/api/v1/auth/login` | Session login with JSON credentials |
 | `POST` | `/api/v1/auth/logout` | Session logout |
+| `POST` | `/api/v1/auth/password` | Change admin password (requires current password) |
+| `GET` | `/api/v1/system/errors` | List download errors with diagnostic causes and recommendations |
+| `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes |
+| `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `GET` | `/api/v1/feeds` | List all podcast feeds with episode counts and disk usage |
 | `POST` | `/api/v1/feeds` | Add new channel/playlist feed with auto-sync to `config.toml` |
 | `GET` | `/api/v1/feeds/{id}` | Detailed feed info and episode download status |

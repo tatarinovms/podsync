@@ -181,4 +181,5 @@ type AdminManager interface {
 	GetDownloadErrors(ctx context.Context, feedID string, limit int) ([]DownloadErrorItem, error)
 	GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]RecentDownloadItem, error)
 	GetSyncStatus(ctx context.Context) (*SyncStatusInfo, error)
+	ChangePassword(ctx context.Context, oldPassword, newPassword string) error
 }

@@ -123,6 +123,10 @@ func (m *mockAdminManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusIn
 	}, nil
 }
 
+func (m *mockAdminManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	return nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{

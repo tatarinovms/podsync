@@ -228,3 +228,11 @@ func (c *HTTPClientManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusI
 	}
 	return &result, nil
 }
+
+func (c *HTTPClientManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	payload := map[string]string{
+		"old_password": oldPassword,
+		"new_password": newPassword,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/api/v1/auth/password", payload, nil)
+}

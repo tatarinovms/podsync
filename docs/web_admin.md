@@ -146,6 +146,10 @@ All endpoints require authentication (Session Cookie or HTTP Basic Auth).
 | `/api/v1/auth/status` | `GET` | Get current authentication status |
 | `/api/v1/auth/login` | `POST` | Authenticate and obtain session cookie |
 | `/api/v1/auth/logout` | `POST` | Invalidate session |
+| `/api/v1/auth/password` | `POST` | Change admin password (requires current password) |
+| `/api/v1/system/errors` | `GET` | List download errors with diagnostic causes and recommendations |
+| `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
+| `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `/api/v1/feeds` | `GET` | List all configured feeds with stats |
 | `/api/v1/feeds` | `POST` | Add a new feed |
 | `/api/v1/feeds/{id}` | `GET` | Get feed details and list of episodes |

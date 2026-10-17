@@ -370,6 +370,10 @@ func (m *mockDownloaderAdminMgr) GetSyncStatus(ctx context.Context) (*SyncStatus
 	return &SyncStatusInfo{}, nil
 }
 
+func (m *mockDownloaderAdminMgr) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	return nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,

@@ -1040,3 +1040,42 @@ func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo
 
 	return info, nil
 }
+
+func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	currentPassword := m.cfg.Server.Admin.Password
+	if currentPassword != "" && currentPassword != oldPassword {
+		return errors.New("current password does not match")
+	}
+
+	if strings.TrimSpace(newPassword) == "" {
+		return errors.New("new password cannot be empty")
+	}
+	if len(newPassword) < 4 {
+		return errors.New("new password must be at least 4 characters long")
+	}
+
+	m.cfg.Server.Admin.Password = newPassword
+
+	if m.configPath != "" {
+		tree, err := toml.LoadFile(m.configPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to load config file")
+		}
+		tree.Set("server.admin.password", newPassword)
+
+		f, err := os.Create(m.configPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to write config file")
+		}
+		defer f.Close()
+
+		if _, err := tree.WriteTo(f); err != nil {
+			return errors.Wrap(err, "failed to save config file")
+		}
+	}
+
+	return nil
+}

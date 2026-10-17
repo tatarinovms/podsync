@@ -206,3 +206,7 @@ func noIndexMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func (s *Server) UpdateAdminPassword(newPassword string) {
+	s.cfg.Admin.Password = newPassword
+}

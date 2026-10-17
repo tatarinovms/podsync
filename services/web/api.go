@@ -47,6 +47,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/v1/auth/login", s.handleAuthLogin)
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)
+	mux.Handle("/api/v1/auth/password", s.authMiddleware(http.HandlerFunc(s.handleAuthPassword)))
 
 	mux.HandleFunc("/api/v1/feeds", s.handleFeeds)
 	mux.HandleFunc("/api/v1/feeds/", s.handleFeedSubroutes)
@@ -160,6 +161,42 @@ func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := s.adminMgr.ChangePassword(r.Context(), req.OldPassword, req.NewPassword); err != nil {
+		s.writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Update server in-memory credentials immediately
+	s.UpdateAdminPassword(req.NewPassword)
+
+	s.writeJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "Password changed successfully",
+	})
 }
 
 func (s *Server) handleFeeds(w http.ResponseWriter, r *http.Request) {

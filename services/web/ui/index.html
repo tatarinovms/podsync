@@ -276,7 +276,7 @@
         .text-muted, .text-secondary { color: var(--ctp-subtext0) !important; }
 
         /* 2. Buttons: Primary (Mauve), Secondary (Ghost/Surface2), Danger (Red) */
-        .btn-primary, .btn-brand {
+        .btn-primary, .btn-brand, .btn-outline-primary {
             background-color: var(--btn-primary-bg) !important;
             color: var(--btn-primary-text) !important;
             border: 1px solid var(--btn-primary-bg) !important;
@@ -284,7 +284,7 @@
             border-radius: 8px;
             transition: all 0.15s ease-in-out;
         }
-        .btn-primary:hover, .btn-brand:hover,
+        .btn-primary:hover, .btn-brand:hover, .btn-outline-primary:hover,
         .btn-primary:focus, .btn-brand:focus,
         .btn-primary:active, .btn-brand:active {
             background-color: var(--btn-primary-hover) !important;
@@ -2164,7 +2164,7 @@
                         <div class="d-flex gap-2">
                             <input type="text" id="token-input-${item.provider}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Enter new token(s) separated by space to replace...' : 'Enter token(s) separated by space for rotation...'}" ${item.from_env ? 'disabled' : ''}>
                             ${!item.from_env ? `
-                                <button class="btn btn-outline-primary btn-sm" onclick="saveTokens('${item.provider}')"><i class="bi bi-check-lg me-1"></i>Save</button>
+                                <button class="btn btn-primary btn-sm" onclick="saveTokens('${item.provider}')"><i class="bi bi-check-lg me-1"></i>Save</button>
                                 ${count > 0 ? `<button class="btn btn-outline-danger btn-sm" onclick="deleteTokens('${item.provider}')" title="Delete configured tokens for ${item.provider}"><i class="bi bi-trash3 me-1"></i>Clear</button>` : ''}
                             ` : ''}
                         </div>

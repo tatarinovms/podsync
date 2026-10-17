@@ -591,6 +591,9 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.Clean = nil
 	}
 
+	if update.Language != "" && update.Custom.Language == "" {
+		update.Custom.Language = strings.TrimSpace(update.Language)
+	}
 	f.Filters = update.Filters
 	f.Custom = update.Custom
 	f.YouTubeDLArgs = update.YouTubeDLArgs

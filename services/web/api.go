@@ -36,6 +36,7 @@ type AddFeedRequest struct {
 	OPML             *bool        `json:"opml,omitempty"`
 	PrivateFeed      bool         `json:"private_feed"`
 	KeepLast         int          `json:"keep_last"`
+	Language         string       `json:"language,omitempty"`
 	Filters          feed.Filters `json:"filters"`
 	Custom           feed.Custom  `json:"custom"`
 	YouTubeDLArgs    []string     `json:"youtube_dl_args"`
@@ -248,6 +249,9 @@ func (s *Server) handleFeeds(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if req.Language != "" && req.Custom.Language == "" {
+			req.Custom.Language = strings.TrimSpace(req.Language)
+		}
 		feedCfg := &feed.Config{
 			ID:               feedID,
 			URL:              req.URL,

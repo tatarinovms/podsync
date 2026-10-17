@@ -539,7 +539,7 @@ func TestUpdateFeedAPI(t *testing.T) {
 	mgr := &mockDownloaderAdminMgr{}
 	srv.SetAdminManager(mgr)
 
-	body := `{"page_size": 25, "quality": "low", "keep_last": 5, "cron_schedule": "@every 6h"}`
+	body := `{"page_size": 25, "quality": "low", "keep_last": 5, "cron_schedule": "@every 6h", "language": "ru"}`
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/feeds/FEED123", strings.NewReader(body))
 	req.SetBasicAuth("admin", "password")
 	rec := httptest.NewRecorder()
@@ -551,6 +551,7 @@ func TestUpdateFeedAPI(t *testing.T) {
 	assert.Equal(t, "low", mgr.lastFeedUpdate.Quality)
 	assert.Equal(t, 5, mgr.lastFeedUpdate.KeepLast)
 	assert.Equal(t, "@every 6h", mgr.lastFeedUpdate.CronSchedule)
+	assert.Equal(t, "ru", mgr.lastFeedUpdate.Language)
 }
 
 func TestTriggerUpdateAllAPI(t *testing.T) {

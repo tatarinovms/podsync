@@ -238,6 +238,10 @@ func (s *Server) getToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "Update interval (e.g., '1h', '6h', '12h', or cron expr)",
 					},
+					"language": {
+						Type:        "string",
+						Description: "Optional preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos",
+					},
 				},
 				Required: []string{"url"},
 			},
@@ -326,6 +330,10 @@ func (s *Server) getToolDefinitions() []Tool {
 					"private_feed": {
 						Type:        "boolean",
 						Description: "Optional private feed flag (block indexers)",
+					},
+					"language": {
+						Type:        "string",
+						Description: "Optional preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos",
 					},
 				},
 				Required: []string{"feed_id"},
@@ -553,6 +561,9 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 				cfg.CronSchedule = p
 			}
 		}
+		if l, ok := args["language"].(string); ok && l != "" {
+			cfg.Custom.Language = strings.TrimSpace(l)
+		}
 
 		if err := s.mgr.AddFeed(ctx, cfg); err != nil {
 			return CallToolResult{}, err
@@ -627,6 +638,9 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		if rawPrivate, ok := args["private_feed"].(bool); ok {
 			update.PrivateFeed = rawPrivate
+		}
+		if rawLang, ok := args["language"].(string); ok {
+			update.Custom.Language = strings.TrimSpace(rawLang)
 		}
 		if err := s.mgr.UpdateFeed(ctx, feedID, &update); err != nil {
 			return CallToolResult{}, err

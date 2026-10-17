@@ -1504,6 +1504,11 @@
                                                 <option value="desc">Descending (Newest first)</option>
                                             </select>
                                         </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Preferred Audio Language</label>
+                                            <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
+                                            <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
+                                        </div>
                                     </div>
                                     <div class="mb-3">
                                         <div class="d-flex align-items-center justify-content-between mb-1">
@@ -1605,13 +1610,9 @@
                                         <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
                                     </div>
                                     <div class="row g-2 mb-3">
-                                        <div class="col-sm-4">
+                                        <div class="col-sm-8">
                                             <label class="form-label small fw-semibold">Category (iTunes)</label>
                                             <input type="text" id="new-feed-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Language Code</label>
-                                            <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. en, ru">
                                         </div>
                                         <div class="col-sm-4 d-flex align-items-end pb-1">
                                             <div class="form-check form-switch mb-1">
@@ -1793,6 +1794,11 @@
                                             <option value="desc">Descending (Newest first)</option>
                                         </select>
                                     </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-semibold">Preferred Audio Language</label>
+                                        <input type="text" id="fs-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
+                                        <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
@@ -1894,13 +1900,9 @@
                                     <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
                                 </div>
                                 <div class="row g-2 mb-3">
-                                    <div class="col-sm-4">
+                                    <div class="col-sm-8">
                                         <label class="form-label small fw-semibold">Category (iTunes)</label>
                                         <input type="text" id="fs-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
-                                    </div>
-                                    <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Language Code</label>
-                                        <input type="text" id="fs-custom-lang" class="form-control form-control-sm" placeholder="e.g. en, ru">
                                     </div>
                                     <div class="col-sm-4 d-flex align-items-end pb-1">
                                         <div class="form-check form-switch mb-1">
@@ -2627,6 +2629,7 @@
                 opml: opmlChecked,
                 private_feed: document.getElementById('fs-private-feed').checked,
                 keep_last: parseInt(document.getElementById('fs-keep-last').value) || 0,
+                language: document.getElementById('fs-custom-lang').value.trim(),
                 filters: {
                     title: document.getElementById('fs-filter-title').value.trim(),
                     not_title: document.getElementById('fs-filter-not-title').value.trim(),
@@ -2747,6 +2750,7 @@
                 opml: document.getElementById('new-feed-opml').checked,
                 private_feed: document.getElementById('new-feed-private-feed').checked,
                 keep_last: parseInt(document.getElementById('new-feed-keeplast').value, 10) || 0,
+                language: document.getElementById('new-feed-custom-lang').value.trim(),
                 filters: {
                     title: document.getElementById('new-feed-filter-title').value.trim(),
                     not_title: document.getElementById('new-feed-filter-nottitle').value.trim(),

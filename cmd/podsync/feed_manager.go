@@ -834,6 +834,7 @@ func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.Download
 		CookiesFile:        dlCfg.CookiesFile,
 		CookiesFromBrowser: dlCfg.CookiesFromBrowser,
 		Proxy:              dlCfg.Proxy,
+		Language:           dlCfg.Language,
 		HasCookiesFile:     hasCookies,
 		CookiesFileSize:    cookiesSize,
 		CookiesFileLines:   cookiesLines,
@@ -864,6 +865,9 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 	}
 	if update.Proxy != nil {
 		m.cfg.Downloader.Proxy = *update.Proxy
+	}
+	if update.Language != nil {
+		m.cfg.Downloader.Language = strings.TrimSpace(*update.Language)
 	}
 
 	if m.downloader != nil {
@@ -1053,6 +1057,11 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 		tree.Set("downloader.proxy", cfg.Proxy)
 	} else {
 		tree.Delete("downloader.proxy")
+	}
+	if cfg.Language != "" {
+		tree.Set("downloader.language", cfg.Language)
+	} else {
+		tree.Delete("downloader.language")
 	}
 
 	f, err := os.Create(m.configPath)

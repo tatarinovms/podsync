@@ -59,7 +59,7 @@ The MCP server provides 17 specialized tools:
 | Tool Name | Arguments | Description |
 |---|---|---|
 | **`get_downloader_config`** | `{}` | Get yt-dlp downloader configuration, cookies status, and proxy settings. |
-| **`update_downloader_config`** | `timeout`, `proxy`, `cookies_from_browser` | Update yt-dlp downloader options. |
+| **`update_downloader_config`** | `timeout`, `proxy`, `cookies_from_browser`, `language` | Update yt-dlp downloader options. |
 | **`test_downloader`** | `url` *(opt)* | Test yt-dlp downloader against a video URL to verify cookies and connectivity. |
 | **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |

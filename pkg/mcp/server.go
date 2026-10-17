@@ -391,6 +391,10 @@ func (s *Server) getToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "Browser to extract cookies from (e.g. chrome, firefox, safari, brave)",
 					},
+					"language": {
+						Type:        "string",
+						Description: "Preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos and YouTube dubbing",
+					},
 				},
 			},
 		},
@@ -753,6 +757,58 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 			return CallToolResult{}, err
 		}
 		data, _ := json.MarshalIndent(status, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "get_downloader_config":
+		cfg, err := s.mgr.GetDownloaderConfig(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(cfg, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "update_downloader_config":
+		var update web.DownloaderConfigUpdate
+		if rawTimeout, ok := args["timeout"].(float64); ok && rawTimeout > 0 {
+			to := int(rawTimeout)
+			update.Timeout = &to
+		}
+		if rawProxy, ok := args["proxy"].(string); ok {
+			update.Proxy = &rawProxy
+		}
+		if rawBrowser, ok := args["cookies_from_browser"].(string); ok {
+			update.CookiesFromBrowser = &rawBrowser
+		}
+		if rawLang, ok := args["language"].(string); ok {
+			update.Language = &rawLang
+		}
+		if rawBinary, ok := args["custom_binary"].(string); ok {
+			update.CustomBinary = &rawBinary
+		}
+		if rawSelfUpdate, ok := args["self_update"].(bool); ok {
+			update.SelfUpdate = &rawSelfUpdate
+		}
+		if err := s.mgr.UpdateDownloaderConfig(ctx, &update); err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: "Successfully updated downloader configuration"}},
+		}, nil
+
+	case "test_downloader":
+		testURL := ""
+		if u, ok := args["url"].(string); ok {
+			testURL = strings.TrimSpace(u)
+		}
+		res, err := s.mgr.TestDownloader(ctx, testURL)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(res, "", "  ")
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil

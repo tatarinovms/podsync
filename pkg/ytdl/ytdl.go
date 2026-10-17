@@ -114,6 +114,8 @@ type Config struct {
 	CookiesFromBrowser string `toml:"cookies_from_browser"`
 	// Proxy URL to pass to yt-dlp via --proxy
 	Proxy string `toml:"proxy"`
+	// Language specifies preferred audio/content language (e.g. "ru", "en")
+	Language string `toml:"language" json:"language,omitempty"`
 }
 
 type YoutubeDl struct {
@@ -122,6 +124,7 @@ type YoutubeDl struct {
 	cookiesFile        string
 	cookiesFromBrowser string
 	proxy              string
+	language           string
 	selfUpdate         bool
 	updateLock         sync.Mutex // Don't call youtube-dl while self updating
 }
@@ -163,6 +166,7 @@ func New(ctx context.Context, cfg Config) (*YoutubeDl, error) {
 		cookiesFile:        cfg.CookiesFile,
 		cookiesFromBrowser: cfg.CookiesFromBrowser,
 		proxy:              cfg.Proxy,
+		language:           cfg.Language,
 		selfUpdate:         cfg.SelfUpdate,
 	}
 
@@ -379,30 +383,59 @@ func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
 func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, outputFilePath string) []string {
 	var args []string
 
+	// Determine preferred language: feed custom.lang takes precedence over global dl.language
+	lang := ""
+	if feedConfig != nil && feedConfig.Custom.Language != "" {
+		lang = strings.TrimSpace(feedConfig.Custom.Language)
+	} else if dl != nil && dl.language != "" {
+		lang = strings.TrimSpace(dl.language)
+	}
+
 	switch feedConfig.Format {
 	case model.FormatVideo:
 		// Video, mp4, high by default
-		format := "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best"
-
-		if feedConfig.Quality == model.QualityLow {
-			format = "worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a]/worst[ext=mp4][vcodec^=avc1]/worst[ext=mp4]/worst"
-		} else if feedConfig.Quality == model.QualityHigh && feedConfig.MaxHeight > 0 {
-			format = fmt.Sprintf("bestvideo[height<=%d][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=%d][ext=mp4][vcodec^=avc1]/best[ext=mp4]/best", feedConfig.MaxHeight, feedConfig.MaxHeight)
+		var format string
+		if lang != "" {
+			format = fmt.Sprintf("bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][language^=%s]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best", lang)
+			if feedConfig.Quality == model.QualityLow {
+				format = fmt.Sprintf("worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a][language^=%s]/worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a]/worst[ext=mp4][vcodec^=avc1]/worst[ext=mp4]/worst", lang)
+			} else if feedConfig.Quality == model.QualityHigh && feedConfig.MaxHeight > 0 {
+				format = fmt.Sprintf("bestvideo[height<=%d][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][language^=%s]/bestvideo[height<=%d][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=%d][ext=mp4][vcodec^=avc1]/best[ext=mp4]/best", feedConfig.MaxHeight, lang, feedConfig.MaxHeight, feedConfig.MaxHeight)
+			}
+		} else {
+			format = "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best"
+			if feedConfig.Quality == model.QualityLow {
+				format = "worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a]/worst[ext=mp4][vcodec^=avc1]/worst[ext=mp4]/worst"
+			} else if feedConfig.Quality == model.QualityHigh && feedConfig.MaxHeight > 0 {
+				format = fmt.Sprintf("bestvideo[height<=%d][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[height<=%d][ext=mp4][vcodec^=avc1]/best[ext=mp4]/best", feedConfig.MaxHeight, feedConfig.MaxHeight)
+			}
 		}
 
 		args = append(args, "--format", format)
 
 	case model.FormatAudio:
 		// Audio, mp3, high by default
-		format := "bestaudio"
-		if feedConfig.Quality == model.QualityLow {
-			format = "worstaudio"
+		var format string
+		if lang != "" {
+			format = fmt.Sprintf("bestaudio[language^=%s]/bestaudio", lang)
+			if feedConfig.Quality == model.QualityLow {
+				format = fmt.Sprintf("worstaudio[language^=%s]/worstaudio", lang)
+			}
+		} else {
+			format = "bestaudio"
+			if feedConfig.Quality == model.QualityLow {
+				format = "worstaudio"
+			}
 		}
 
 		args = append(args, "--extract-audio", "--audio-format", "mp3", "--format", format)
 
 	default:
 		args = append(args, "--audio-format", feedConfig.CustomFormat.Extension, "--format", feedConfig.CustomFormat.YouTubeDLFormat)
+	}
+
+	if lang != "" && !hasArg(feedConfig.YouTubeDLArgs, "--extractor-args") {
+		args = append(args, "--extractor-args", fmt.Sprintf("youtube:lang=%s", lang))
 	}
 
 	// Insert additional per-feed youtube-dl arguments
@@ -431,6 +464,7 @@ func (dl *YoutubeDl) GetConfig() Config {
 		CookiesFile:        dl.cookiesFile,
 		CookiesFromBrowser: dl.cookiesFromBrowser,
 		Proxy:              dl.proxy,
+		Language:           dl.language,
 	}
 }
 
@@ -444,6 +478,7 @@ func (dl *YoutubeDl) UpdateConfig(cfg Config) {
 	dl.cookiesFile = cfg.CookiesFile
 	dl.cookiesFromBrowser = cfg.CookiesFromBrowser
 	dl.proxy = cfg.Proxy
+	dl.language = cfg.Language
 }
 
 func (dl *YoutubeDl) SetCookiesFile(path string) {

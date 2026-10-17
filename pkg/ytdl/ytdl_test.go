@@ -179,3 +179,71 @@ ERROR: [youtube] 123: Private video. Sign in if you have been granted access to 
 	msgSimple := CleanErrorMessage(rawSimple)
 	assert.Equal(t, "123: Private video. Sign in if you have been granted access to this video", msgSimple)
 }
+
+func TestBuildArgsWithLanguage(t *testing.T) {
+	dl := &YoutubeDl{
+		language: "ru",
+	}
+
+	ep := &model.Episode{
+		VideoURL: "https://youtube.com/watch?v=mr7vYgrUjPI",
+	}
+
+	// 1. Video format with global language "ru"
+	videoFeed := &feed.Config{
+		Format:  model.FormatVideo,
+		Quality: model.QualityHigh,
+	}
+	videoArgs := dl.buildArgs(videoFeed, ep, "/tmp/out.mp4")
+	assert.Contains(t, videoArgs, "--format")
+	for i, a := range videoArgs {
+		if a == "--format" {
+			assert.Contains(t, videoArgs[i+1], "[language^=ru]")
+			break
+		}
+	}
+	assert.Contains(t, videoArgs, "--extractor-args")
+	assert.Contains(t, videoArgs, "youtube:lang=ru")
+
+	// 2. Audio format with global language "ru"
+	audioFeed := &feed.Config{
+		Format:  model.FormatAudio,
+		Quality: model.QualityHigh,
+	}
+	audioArgs := dl.buildArgs(audioFeed, ep, "/tmp/out.mp3")
+	assert.Contains(t, audioArgs, "bestaudio[language^=ru]/bestaudio")
+	assert.Contains(t, audioArgs, "--extractor-args")
+	assert.Contains(t, audioArgs, "youtube:lang=ru")
+
+	// 3. Per-feed Custom.Language "en" overrides global "ru"
+	enFeed := &feed.Config{
+		Format:  model.FormatVideo,
+		Quality: model.QualityHigh,
+		Custom: feed.Custom{
+			Language: "en",
+		},
+	}
+	enArgs := dl.buildArgs(enFeed, ep, "/tmp/out.mp4")
+	for i, a := range enArgs {
+		if a == "--format" {
+			assert.Contains(t, enArgs[i+1], "[language^=en]")
+			break
+		}
+	}
+	assert.Contains(t, enArgs, "youtube:lang=en")
+	assert.NotContains(t, enArgs, "youtube:lang=ru")
+
+	// 4. If --extractor-args already present in YouTubeDLArgs, do not duplicate
+	customArgsFeed := &feed.Config{
+		Format:        model.FormatAudio,
+		YouTubeDLArgs: []string{"--extractor-args", "youtube:player_client=android"},
+	}
+	customArgs := dl.buildArgs(customArgsFeed, ep, "/tmp/out.mp3")
+	count := 0
+	for _, a := range customArgs {
+		if a == "--extractor-args" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count)
+}

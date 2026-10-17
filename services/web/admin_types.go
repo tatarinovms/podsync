@@ -92,6 +92,7 @@ type DownloaderConfigInfo struct {
 	CookiesFile        string `json:"cookies_file"`
 	CookiesFromBrowser string `json:"cookies_from_browser"`
 	Proxy              string `json:"proxy"`
+	Language           string `json:"language,omitempty"`
 	HasCookiesFile     bool   `json:"has_cookies_file"`
 	CookiesFileSize    int64  `json:"cookies_file_size"`
 	CookiesFileLines   int    `json:"cookies_file_lines"`
@@ -108,6 +109,7 @@ type DownloaderConfigUpdate struct {
 	CookiesFile        *string `json:"cookies_file"`
 	CookiesFromBrowser *string `json:"cookies_from_browser"`
 	Proxy              *string `json:"proxy"`
+	Language           *string `json:"language,omitempty"`
 }
 
 // CookiesPayload holds cookies file content

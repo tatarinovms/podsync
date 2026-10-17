@@ -293,6 +293,32 @@ func TestToolsCall(t *testing.T) {
 		assert.Contains(t, string(resData), "v2.8.0")
 	})
 
+	t.Run("get_downloader_config", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":60,"method":"tools/call","params":{"name":"get_downloader_config","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "timeout")
+	})
+
+	t.Run("update_downloader_config", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":61,"method":"tools/call","params":{"name":"update_downloader_config","arguments":{"timeout":25,"language":"ru"}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "Successfully updated downloader configuration")
+	})
+
 	t.Run("get_download_errors", func(t *testing.T) {
 		req := `{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_download_errors","arguments":{}}}`
 		respBytes, err := server.HandleMessage(ctx, []byte(req))

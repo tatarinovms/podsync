@@ -370,6 +370,9 @@ func (m *mockDownloaderAdminMgr) UpdateDownloaderConfig(ctx context.Context, cfg
 	if cfg.Proxy != nil {
 		m.dlCfg.Proxy = *cfg.Proxy
 	}
+	if cfg.Language != nil {
+		m.dlCfg.Language = *cfg.Language
+	}
 	return nil
 }
 
@@ -435,7 +438,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "http://proxy:8080")
 
 	// 2. POST /api/v1/downloader
-	updateJSON := `{"timeout": 25, "proxy": "http://newproxy:8080"}`
+	updateJSON := `{"timeout": 25, "proxy": "http://newproxy:8080", "language": "ru"}`
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader", strings.NewReader(updateJSON))
 	req.SetBasicAuth("admin", "password")
 	rec = httptest.NewRecorder()
@@ -443,6 +446,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, 25, mgr.dlCfg.Timeout)
 	assert.Equal(t, "http://newproxy:8080", mgr.dlCfg.Proxy)
+	assert.Equal(t, "ru", mgr.dlCfg.Language)
 
 	// 3. GET /api/v1/downloader/cookies
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/downloader/cookies", nil)

@@ -548,3 +548,42 @@ func TestUpdateFeedAPI(t *testing.T) {
 	assert.Equal(t, 5, mgr.lastFeedUpdate.KeepLast)
 	assert.Equal(t, "@every 6h", mgr.lastFeedUpdate.CronSchedule)
 }
+
+func TestTriggerUpdateAllAPI(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	// 1. POST /api/v1/feeds/update
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/feeds/update", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"queued":true`)
+	assert.Contains(t, rec.Body.String(), `"count":1`)
+	assert.Contains(t, rec.Body.String(), `"feeds":["test"]`)
+
+	// 2. POST /api/v1/feeds/update-all
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/feeds/update-all", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"queued":true`)
+
+	// 3. GET /api/v1/feeds/update should be MethodNotAllowed
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/feeds/update", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}

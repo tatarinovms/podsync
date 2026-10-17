@@ -361,7 +361,104 @@ If connecting via SSE/HTTP transport:
 
 ---
 
-## 4. Operational Checklist for AI Agents
+
+---
+
+## 4. Upgrade Guide for Existing Installations
+
+When upgrading a running Podsync instance to a newer version:
+
+### 4.1: Upgrading Linux Systemd Service (Zero Database Data Loss)
+
+Agents can execute this automated 4-step upgrade workflow:
+
+```bash
+# 1. Stop the running service safely
+sudo systemctl stop podsync
+
+# 2. Backup current binary
+if [ -f /opt/podsync/bin/podsync ]; then
+  sudo cp /opt/podsync/bin/podsync /opt/podsync/bin/podsync.bak
+fi
+
+# 3. Detect architecture & download latest binary
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64) GORELEASER_ARCH="x86_64" ;;
+  aarch64|arm64) GORELEASER_ARCH="arm64" ;;
+  armv7l|armhf) GORELEASER_ARCH="armv7" ;;
+  *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+esac
+
+LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+if [ -z "$LATEST_TAG" ]; then
+  LATEST_TAG="v2.10.0"
+fi
+VERSION_NUM="${LATEST_TAG#v}"
+
+echo "Upgrading Podsync to $LATEST_TAG ($GORELEASER_ARCH)..."
+TAR_URL="https://github.com/tatarinovms/podsync/releases/download/${LATEST_TAG}/Podsync_${VERSION_NUM}_Linux_${GORELEASER_ARCH}.tar.gz"
+
+curl -sSL "$TAR_URL" | sudo tar -xz -C /opt/podsync/bin podsync
+sudo chmod +x /opt/podsync/bin/podsync
+
+# Optional: Update yt-dlp to latest version as well (prevents video extraction failures)
+if [ -f /usr/local/bin/yt-dlp ]; then
+  sudo /usr/local/bin/yt-dlp -U || true
+fi
+
+# 4. Start service and verify health
+sudo systemctl start podsync
+sleep 2
+
+if curl -fs "http://localhost:8080/health" > /dev/null; then
+  echo "Podsync successfully upgraded to $LATEST_TAG and running healthy!"
+else
+  echo "Health check failed after upgrade! Reverting to backup binary..."
+  sudo cp /opt/podsync/bin/podsync.bak /opt/podsync/bin/podsync
+  sudo systemctl restart podsync
+  exit 1
+fi
+```
+
+### 4.2: Upgrading Docker / Docker Compose
+
+For containerized setups:
+
+```bash
+cd /path/to/podsync-compose
+
+# 1. Pull the newest image from GitHub Container Registry
+docker compose pull
+
+# 2. Recreate container with existing volumes (data and db are untouched)
+docker compose up -d
+
+# 3. Verify status
+docker compose ps
+docker compose logs --tail=20 podsync
+curl -I http://localhost:8080/health
+```
+
+### 4.3: Upgrading via Source Build (Git)
+
+```bash
+cd /path/to/cloned/podsync
+
+# 1. Fetch latest commits or release tag
+git fetch --tags
+git checkout $(git describe --tags `git rev-list --tags --max-count=1`)
+
+# 2. Rebuild binary
+make build
+
+# 3. Restart systemd service
+sudo systemctl stop podsync
+sudo cp bin/podsync /opt/podsync/bin/podsync
+sudo systemctl start podsync
+```
+
+## 5. Operational Checklist for AI Agents
 
 When an agent needs to perform tasks on Podsync:
 

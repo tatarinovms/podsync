@@ -621,7 +621,31 @@
             animation: spin 1s linear infinite !important;
         }
 
-        [data-theme="mocha"] .btn-close {
+
+        /* Table Styling (Catppuccin Latte & Mocha) */
+        .table {
+            color: var(--ctp-text) !important;
+            --bs-table-color: var(--ctp-text);
+            --bs-table-bg: transparent;
+            --bs-table-hover-color: var(--ctp-text);
+            --bs-table-hover-bg: var(--ctp-surface0);
+            border-color: var(--card-border) !important;
+        }
+        .table thead th,
+        .table .table-light,
+        .table-light th,
+        .table-light td {
+            background-color: var(--ctp-surface0) !important;
+            color: var(--ctp-subtext1) !important;
+            border-color: var(--card-border) !important;
+            font-weight: 600;
+        }
+        .table td {
+            color: var(--ctp-text) !important;
+            border-color: var(--card-border) !important;
+        }
+
+                [data-theme="mocha"] .btn-close {
             filter: invert(1) grayscale(100%);
         }
     </style>

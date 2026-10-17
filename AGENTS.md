@@ -83,14 +83,18 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 4. Web Admin Console & REST API (`services/web/`)
 
-- Accessible at `/admin` (SPA served from `services/web/ui/index.html`).
+- Accessible at `/admin` (SPA embedded into the binary via `//go:embed ui/*` from `services/web/ui/index.html`).
+- **Embedded UI & Brand Color System**:
+  - The UI uses **Catppuccin Mocha** (dark theme) and **Latte** (light theme) palettes.
+  - **Strict adherence to brand colors**: All UI components, buttons, and badges must use the project's CSS variables (`--ctp-*`, `--btn-primary-bg`, `--btn-danger-bg`, etc.) and classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`). Never use raw Bootstrap default colors (such as default blue `#0d6efd` or bare unstyled `btn-outline-primary`). Primary save/action buttons must always use `.btn-primary` or `.btn-brand`.
 - Secured by HTTP Basic Auth and session cookies (`cfg.Server.Admin`).
 - REST API mounted under `/api/v1`:
   - `/api/v1/feeds` (GET, POST)
   - `/api/v1/feeds/{id}` (GET, DELETE)
   - `/api/v1/feeds/{id}/update` (POST)
   - `/api/v1/feeds/{id}/episodes/{ep_id}/retry` (POST)
-  - `/api/v1/tokens` (GET, POST)
+  - `/api/v1/tokens` (GET, POST, DELETE)
+  - `/api/v1/auth/password` (POST)
   - `/api/v1/system` (GET)
   - `/api/v1/downloader` (GET, POST)
   - `/api/v1/downloader/cookies` (GET, POST, DELETE)
@@ -99,11 +103,16 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes a full suite of MCP tools for autonomous AI agents:
-- `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `retry_episode`
-- `get_download_errors`, `get_recent_downloads`, `get_sync_status`
-- `get_system_stats`, `get_tokens`, `update_tokens`
-- `get_downloader_config`, `update_downloader_config`, `test_downloader`
+Podsync exposes a full suite of MCP tools and resources for autonomous AI agents:
+- **Tools**:
+  - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `retry_episode`
+  - `get_download_errors`, `get_recent_downloads`, `get_sync_status`
+  - `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`
+  - `get_downloader_config`, `update_downloader_config`, `test_downloader`
+- **Embedded Resources**:
+  - `podsync://feeds`: Live JSON snapshot of all registered podcast feeds, episode counts, and status.
+- **Prompts**:
+  - `diagnose_feed`: Troubleshoots download errors or feed parsing failures.
 
 Available over:
 - **Stdio**: `podsync --config config.toml --mcp` (proxies to live instance if running, or operates directly on local BadgerDB).
@@ -158,3 +167,4 @@ docker compose up -d
 3. **Always run `-race` tests**: After modifying any Go code, always run `go test -race ./...` to verify there are no data races or regressions.
 4. **Clean up resources**: Background processes, test databases, and temporary download folders must always be safely terminated and cleaned up.
 5. **No obsolete files**: Do not add unused IDE settings, duplicate skill files, or dead configuration templates to the root of the repository.
+6. **Strict Brand & Theme Compliance (Catppuccin)**: When modifying the embedded Web UI (`services/web/ui/index.html`), strictly adhere to the brand colors and design system (Catppuccin Mocha/Latte). Use project CSS variables (`--ctp-*`) and standard button classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`). Never introduce unstyled Bootstrap colors (like default blue `#0d6efd` or bare `btn-outline-primary`). Primary action/save buttons must always be styled with `--btn-primary-bg` / `--btn-brand`.

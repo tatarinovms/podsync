@@ -1703,7 +1703,7 @@ func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.Audiobook
 		}
 	}
 
-	var results []web.AudiobookDirInfo
+	results := make([]web.AudiobookDirInfo, 0)
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue

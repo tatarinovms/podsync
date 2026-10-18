@@ -836,6 +836,9 @@ func (s *Server) handleAudiobookDirs(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if dirs == nil {
+		dirs = make([]AudiobookDirInfo, 0)
+	}
 	if r.URL.Query().Get("unlinked") == "true" || strings.HasSuffix(r.URL.Path, "/unlinked") {
 		filtered := make([]AudiobookDirInfo, 0, len(dirs))
 		for _, d := range dirs {

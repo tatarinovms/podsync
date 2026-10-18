@@ -433,7 +433,7 @@ func (m *mockDownloaderAdminMgr) DownloadLogs(ctx context.Context) ([]byte, stri
 }
 
 func (m *mockDownloaderAdminMgr) ListAudiobookDirs(ctx context.Context) ([]AudiobookDirInfo, error) {
-	return []AudiobookDirInfo{}, nil
+	return nil, nil
 }
 
 func (m *mockDownloaderAdminMgr) ImportAudiobook(ctx context.Context, req *ImportAudiobookRequest) (*feed.Config, error) {
@@ -712,6 +712,7 @@ func TestAudiobookEndpoints(t *testing.T) {
 	rec := httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, "[]", rec.Body.String())
 
 	// 2. GET /api/v1/audiobooks/config
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/audiobooks/config", nil)

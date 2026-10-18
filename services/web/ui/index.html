@@ -4326,7 +4326,8 @@
             try {
                 const res = await fetch('/api/v1/audiobooks/dirs');
                 if (!res.ok) throw new Error(await res.text());
-                cachedAudiobookDirs = await res.json();
+                const data = await res.json();
+                cachedAudiobookDirs = Array.isArray(data) ? data : [];
                 renderAudiobookDirsTable(cachedAudiobookDirs);
             } catch (err) {
                 if (tbody) {
@@ -4336,12 +4337,13 @@
         }
 
         function renderAudiobookDirsTable(dirs) {
+            if (!Array.isArray(dirs)) dirs = [];
             const tbody = document.getElementById('audiobook-dirs-tbody');
             const countBadge = document.getElementById('audiobook-dirs-count');
             if (countBadge) countBadge.textContent = `${dirs.length} folder${dirs.length === 1 ? '' : 's'}`;
             if (!tbody) return;
 
-            if (!dirs || dirs.length === 0) {
+            if (dirs.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>No audiobook directories found in storage. Click "Upload audiobook" to add your first book!</td></tr>`;
                 return;
             }

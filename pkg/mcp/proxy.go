@@ -342,6 +342,9 @@ func (c *HTTPClientManager) ListAudiobookDirs(ctx context.Context) ([]web.Audiob
 	if err != nil {
 		return nil, err
 	}
+	if result == nil {
+		result = make([]web.AudiobookDirInfo, 0)
+	}
 	return result, nil
 }
 

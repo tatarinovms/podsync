@@ -827,29 +827,64 @@ func (s *Server) handleAudiobookDirs(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
 		return
 	}
-	if r.Method != http.MethodGet {
-		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	dirs, err := s.adminMgr.ListAudiobookDirs(r.Context())
-	if err != nil {
-		s.writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if dirs == nil {
-		dirs = make([]AudiobookDirInfo, 0)
-	}
-	if r.URL.Query().Get("unlinked") == "true" || strings.HasSuffix(r.URL.Path, "/unlinked") {
-		filtered := make([]AudiobookDirInfo, 0, len(dirs))
-		for _, d := range dirs {
+
+	switch r.Method {
+	case http.MethodGet:
+		dirs, err := s.adminMgr.ListAudiobookDirs(r.Context())
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if dirs == nil {
+			dirs = make([]AudiobookDirInfo, 0)
+		}
+		if r.URL.Query().Get("unlinked") == "true" || strings.HasSuffix(r.URL.Path, "/unlinked") {
+			filtered := make([]AudiobookDirInfo, 0, len(dirs))
+			for _, d := range dirs {
 			if !d.Linked {
 				filtered = append(filtered, d)
 			}
 		}
-		s.writeJSON(w, http.StatusOK, filtered)
-		return
+			s.writeJSON(w, http.StatusOK, filtered)
+			return
+		}
+		s.writeJSON(w, http.StatusOK, dirs)
+
+	case http.MethodDelete:
+		dirName := r.URL.Query().Get("name")
+		if dirName == "" {
+			dirName = r.URL.Query().Get("dir")
+		}
+		if dirName == "" {
+			var bodyReq struct {
+				Name    string `json:"name"`
+				DirName string `json:"dir_name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&bodyReq); err == nil {
+				if bodyReq.Name != "" {
+					dirName = bodyReq.Name
+				} else {
+					dirName = bodyReq.DirName
+				}
+			}
+		}
+		dirName = strings.TrimSpace(dirName)
+		if dirName == "" {
+			s.writeError(w, http.StatusBadRequest, "directory name is required (use ?name=... or JSON body)")
+			return
+		}
+		if err := s.adminMgr.DeleteAudiobookDir(r.Context(), dirName); err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success": true,
+			"deleted": dirName,
+		})
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
-	s.writeJSON(w, http.StatusOK, dirs)
 }
 
 func (s *Server) handleAudiobookImport(w http.ResponseWriter, r *http.Request) {

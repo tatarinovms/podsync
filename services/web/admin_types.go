@@ -279,4 +279,5 @@ type AdminManager interface {
 	ImportAudiobook(ctx context.Context, req *ImportAudiobookRequest) (*feed.Config, error)
 	GetAudiobooksDir() string
 	SaveAudiobookFile(bookDir string, filename string, r io.Reader) error
+	DeleteAudiobookDir(ctx context.Context, dirName string) error
 }

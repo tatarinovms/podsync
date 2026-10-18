@@ -4517,15 +4517,23 @@
                 
                 let statusBadge = '';
                 let actionBtn = '';
+                const escapedDir = escapeHtml(d.name);
+                const escapedTitle = escapeHtml(d.suggested_title || d.name);
+                const escapedAuthor = escapeHtml(d.suggested_author || '');
                 if (d.linked) {
                     statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-link-45deg me-1"></i>Linked: ${escapeHtml(d.feed_id)}</span>`;
-                    actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewFeedEpisodes('${escapeHtml(d.feed_id)}')"><i class="bi bi-eye me-1"></i>View Episodes</button>`;
+                    actionBtn = `
+                        <div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="showEpisodes('${escapeHtml(d.feed_id)}')"><i class="bi bi-eye me-1"></i>Chapters</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAudiobookDir('${escapedDir}', '${escapeHtml(d.feed_id)}')" title="Delete folder and linked feed from disk"><i class="bi bi-trash"></i></button>
+                        </div>`;
                 } else {
                     statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-clock me-1"></i>Unlinked</span>`;
-                    const escapedDir = escapeHtml(d.name);
-                    const escapedTitle = escapeHtml(d.suggested_title || d.name);
-                    const escapedAuthor = escapeHtml(d.suggested_author || '');
-                    actionBtn = `<button class="btn btn-sm btn-brand" onclick="openImportModal('${escapedDir}', '${escapedTitle}', '${escapedAuthor}')"><i class="bi bi-plus-circle me-1"></i>Import as Podcast</button>`;
+                    actionBtn = `
+                        <div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-brand" onclick="openImportModal('${escapedDir}', '${escapedTitle}', '${escapedAuthor}')"><i class="bi bi-plus-circle me-1"></i>Import</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAudiobookDir('${escapedDir}', '')" title="Delete folder from disk"><i class="bi bi-trash"></i></button>
+                        </div>`;
                 }
 
                 return `
@@ -4542,6 +4550,31 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        
+        async function deleteAudiobookDir(dirName, linkedFeedId) {
+            let msg = "Are you sure you want to delete audiobook folder \"" + dirName + "\" and all its audio files from disk?";
+            if (linkedFeedId) {
+                msg += "\n\nWarning: This folder is linked to active podcast feed \"" + linkedFeedId + "\". Deleting the folder will also remove the podcast feed.";
+            }
+            if (!confirm(msg)) return;
+
+            try {
+                const res = await fetch("/api/v1/audiobooks/dirs?name=" + encodeURIComponent(dirName), {
+                    method: "DELETE"
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: res.statusText }));
+                    throw new Error(err.error || "Failed to delete folder");
+                }
+                showToast("Folder \"" + dirName + "\" deleted from disk");
+                await loadAudiobookDirs();
+                await loadFeeds();
+                renderAudiobookFeeds();
+            } catch (err) {
+                alert("Delete error: " + err.message);
+            }
         }
 
         function renderAudiobookFeeds() {

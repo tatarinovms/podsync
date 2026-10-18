@@ -530,6 +530,20 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "delete_audiobook_dir",
+			Description: "Delete an audiobook folder and its audio files from the audiobooks storage on disk (also removes any linked podcast feed)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"dir_name": {
+						Type:        "string",
+						Description: "Directory name inside the audiobooks storage folder to delete",
+					},
+				},
+				Required: []string{"dir_name"},
+			},
+		},
+		{
 			Name:        "list_audiobook_dirs",
 			Description: "List available directories in the audiobooks storage, showing track count, cover status, total size, and whether each is already linked to a podcast feed",
 			InputSchema: InputSchema{
@@ -580,6 +594,18 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 	}
 
 	switch name {
+	case "delete_audiobook_dir":
+		dirName, ok := args["dir_name"].(string)
+		if !ok || strings.TrimSpace(dirName) == "" {
+			return CallToolResult{}, fmt.Errorf("dir_name parameter is required")
+		}
+		if err := s.mgr.DeleteAudiobookDir(ctx, strings.TrimSpace(dirName)); err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully deleted audiobook directory %q", dirName)}},
+		}, nil
+
 	case "list_audiobook_dirs":
 		dirs, err := s.mgr.ListAudiobookDirs(ctx)
 		if err != nil {

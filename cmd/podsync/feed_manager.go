@@ -1926,3 +1926,64 @@ func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io
 	}
 	return nil
 }
+
+func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {
+	dirName = strings.TrimSpace(dirName)
+	if dirName == "" {
+		return errors.New("dir_name is required")
+	}
+
+	cleanDir := filepath.Clean(dirName)
+	if cleanDir == "." || cleanDir == "/" || strings.HasPrefix(cleanDir, "..") || strings.Contains(cleanDir, string(filepath.Separator)+"..") {
+		return errors.New("invalid directory path")
+	}
+
+	baseDir := m.GetAudiobooksDir()
+	if baseDir == "" {
+		return errors.New("audiobooks directory is not configured")
+	}
+
+	targetPath := filepath.Join(baseDir, cleanDir)
+	stat, err := os.Stat(targetPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return errors.Errorf("audiobook directory %q not found", dirName)
+		}
+		return err
+	}
+	if !stat.IsDir() {
+		return errors.Errorf("%q is not a directory", dirName)
+	}
+
+	// Security: verify targetPath is strictly inside baseDir
+	rel, err := filepath.Rel(baseDir, targetPath)
+	if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
+		return errors.New("cannot delete outside of audiobooks directory")
+	}
+
+	// If this directory is linked to any active feed(s), delete the feed(s) cleanly
+	m.mu.Lock()
+	var linkedFeedIDs []string
+	for feedID, f := range m.feeds {
+		info, parseErr := builder.ParseURL(f.URL)
+		if parseErr == nil && info.Provider == model.ProviderAudiobook && (info.ItemID == cleanDir || f.AudiobookDir == targetPath) {
+			linkedFeedIDs = append(linkedFeedIDs, feedID)
+		}
+	}
+	m.mu.Unlock()
+
+	for _, feedID := range linkedFeedIDs {
+		log.Infof("deleting linked audiobook feed %q before deleting folder %q", feedID, dirName)
+		if delErr := m.DeleteFeed(ctx, feedID, true); delErr != nil {
+			log.WithError(delErr).Warnf("failed to delete linked feed %q during folder deletion", feedID)
+		}
+	}
+
+	// Remove folder from disk
+	if err := os.RemoveAll(targetPath); err != nil {
+		return errors.Wrapf(err, "failed to delete audiobook directory %q", targetPath)
+	}
+
+	log.Infof("successfully deleted audiobook directory from disk: %s", targetPath)
+	return nil
+}

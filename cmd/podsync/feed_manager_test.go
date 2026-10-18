@@ -271,3 +271,43 @@ func TestUpdateFeed_PrivateFeedPersistence(t *testing.T) {
 	require.NotNil(t, reloaded.Feeds["mybook"])
 	assert.True(t, reloaded.Feeds["mybook"].PrivateFeed)
 }
+
+func TestDeleteAudiobookDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	booksDir := filepath.Join(tmpDir, "audiobooks")
+	require.NoError(t, os.MkdirAll(booksDir, 0755))
+
+	// Create test book folder
+	book1Dir := filepath.Join(booksDir, "Book1")
+	require.NoError(t, os.MkdirAll(book1Dir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(book1Dir, "01.mp3"), []byte("dummy audio"), 0644))
+
+	configPath := filepath.Join(tmpDir, "config.toml")
+	cfgTOML := "[server]\nport = 8080\n\n[audiobooks]\ndir = \"" + booksDir + "\"\n"
+	require.NoError(t, os.WriteFile(configPath, []byte(cfgTOML), 0644))
+
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg: &Config{
+			Audiobooks: AudiobooksConfig{
+				Dir: booksDir,
+			},
+		},
+		feeds: map[string]*feed.Config{},
+	}
+
+	// 1. Path traversal check
+	err := mgr.DeleteAudiobookDir(context.Background(), "../secret")
+	assert.Error(t, err)
+
+	// 2. Delete existing unlinked book
+	err = mgr.DeleteAudiobookDir(context.Background(), "Book1")
+	require.NoError(t, err)
+
+	_, err = os.Stat(book1Dir)
+	assert.True(t, os.IsNotExist(err))
+
+	// 3. Delete non-existent book
+	err = mgr.DeleteAudiobookDir(context.Background(), "NonExistent")
+	assert.Error(t, err)
+}

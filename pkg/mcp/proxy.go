@@ -364,3 +364,8 @@ func (c *HTTPClientManager) GetAudiobooksDir() string {
 func (c *HTTPClientManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
 	return fmt.Errorf("remote file save not implemented in proxy")
 }
+
+func (c *HTTPClientManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {
+	path := fmt.Sprintf("/api/v1/audiobooks/dirs?name=%s", url.QueryEscape(dirName))
+	return c.doRequest(ctx, http.MethodDelete, path, nil, nil)
+}

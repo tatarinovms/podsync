@@ -208,6 +208,10 @@ func (m *mockAdminManager) SaveAudiobookFile(bookDir string, filename string, r 
 	return nil
 }
 
+func (m *mockAdminManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {
+	return nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{

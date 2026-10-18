@@ -448,6 +448,10 @@ func (m *mockDownloaderAdminMgr) SaveAudiobookFile(bookDir string, filename stri
 	return nil
 }
 
+func (m *mockDownloaderAdminMgr) DeleteAudiobookDir(ctx context.Context, dirName string) error {
+	return nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -730,4 +734,12 @@ func TestAudiobookEndpoints(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"feed_id":"1984"`)
+
+	// 4. DELETE /api/v1/audiobooks/dirs
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/audiobooks/dirs?name=Orwell+-+1984", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"success":true`)
 }

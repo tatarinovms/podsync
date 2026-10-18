@@ -104,6 +104,8 @@ type DownloaderConfigInfo struct {
 	CookiesLastMod     string `json:"cookies_last_modified"`
 	BinaryPath         string `json:"binary_path"`
 	BinaryVersion      string `json:"binary_version"`
+	FFmpegPath         string `json:"ffmpeg_path,omitempty"`
+	FFmpegVersion      string `json:"ffmpeg_version,omitempty"`
 }
 
 // DownloaderConfigUpdate contains fields to update downloader settings

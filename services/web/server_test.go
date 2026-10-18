@@ -460,8 +460,9 @@ func TestDownloaderEndpoints(t *testing.T) {
 	srv := New(cfg, &mockFileSystem{}, nil)
 	mgr := &mockDownloaderAdminMgr{
 		dlCfg: DownloaderConfigInfo{
-			Timeout: 15,
-			Proxy:   "http://proxy:8080",
+			Timeout:       15,
+			Proxy:         "http://proxy:8080",
+			FFmpegVersion: "7.1",
 		},
 		cookies: "# Netscape HTTP Cookie File",
 		testResponse: TestDownloaderResult{
@@ -479,6 +480,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "http://proxy:8080")
+	assert.Contains(t, rec.Body.String(), "7.1")
 
 	// 2. POST /api/v1/downloader
 	updateJSON := `{"timeout": 25, "proxy": "http://newproxy:8080", "language": "ru"}`

@@ -379,7 +379,7 @@ func (s *Server) getToolDefinitions() []Tool {
 		},
 		{
 			Name:        "get_downloader_config",
-			Description: "Get yt-dlp downloader configuration, cookies status, and proxy settings",
+			Description: "Get yt-dlp downloader configuration, ffmpeg version, cookies status, and proxy settings",
 			InputSchema: InputSchema{
 				Type:       "object",
 				Properties: map[string]PropertyDef{},

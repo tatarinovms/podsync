@@ -110,7 +110,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **When to use**: Removing invalid, revoked, or unnecessary API keys (either a single key from rotation or the entire provider).
 
 ### 12. `get_downloader_config`
-- **Purpose**: Retrieves yt-dlp binary path, version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).
+- **Purpose**: Retrieves yt-dlp binary path, version, ffmpeg version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).
 - **Arguments**: None `{}`.
 - **When to use**: Diagnosing YouTube download failures such as bot verification blocks or rate limits.
 

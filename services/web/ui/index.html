@@ -1065,9 +1065,14 @@
                                     <h4 class="fw-bold mb-1"><i class="bi bi-cloud-arrow-down me-2"></i>Downloader &amp; Cookies Configuration</h4>
                                     <p class="mb-0 opacity-75">Configure yt-dlp downloader engine, cookies (to bypass YouTube bot checks and age-gates), and proxy settings.</p>
                                 </div>
-                                <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="dl-status-badge">
-                                    <i class="bi bi-gear-fill me-1 text-primary"></i> <span id="dl-badge-text">yt-dlp Ready</span>
-                                </span>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="dl-status-badge">
+                                        <i class="bi bi-gear-fill me-1 text-primary"></i> <span id="dl-badge-text">yt-dlp Ready</span>
+                                    </span>
+                                    <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="ffmpeg-status-badge">
+                                        <i class="bi bi-film me-1 text-info"></i> <span id="ffmpeg-badge-text">ffmpeg Ready</span>
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1173,8 +1178,12 @@
                         <div class="col-lg-5">
                             <!-- Downloader Options -->
                             <div class="card shadow-sm mb-4">
-                                <div class="card-header bg-transparent py-3">
+                                <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                                     <h6 class="mb-0 fw-bold"><i class="bi bi-sliders me-2 text-primary"></i>Downloader Options</h6>
+                                    <div class="d-flex align-items-center gap-2 small">
+                                        <span class="badge bg-body-secondary text-body" id="dl-engine-pill">yt-dlp: -</span>
+                                        <span class="badge bg-body-secondary text-body" id="dl-ffmpeg-pill">ffmpeg: -</span>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <form id="downloader-settings-form" onsubmit="saveDownloaderSettings(event)">
@@ -3620,12 +3629,40 @@
             document.getElementById('dl-browser-select').value = browser;
             document.getElementById('dl-browser-profile').value = profile;
 
-            // Status Badge
+            // Status Badges (yt-dlp & ffmpeg)
             const badgeText = document.getElementById('dl-badge-text');
+            const dlBadge = document.getElementById('dl-status-badge');
             if (downloaderConfig.binary_version) {
                 badgeText.innerText = `yt-dlp ${downloaderConfig.binary_version}`;
+                if (dlBadge) dlBadge.className = 'badge mcp-status-pill px-3 py-2 fs-6 shadow-sm';
             } else if (downloaderConfig.binary_path) {
                 badgeText.innerText = 'yt-dlp Ready';
+                if (dlBadge) dlBadge.className = 'badge mcp-status-pill px-3 py-2 fs-6 shadow-sm';
+            } else {
+                badgeText.innerText = 'yt-dlp Not Found';
+                if (dlBadge) dlBadge.className = 'badge bg-danger px-3 py-2 fs-6 shadow-sm';
+            }
+
+            const ffmpegText = document.getElementById('ffmpeg-badge-text');
+            const ffmpegBadge = document.getElementById('ffmpeg-status-badge');
+            if (downloaderConfig.ffmpeg_version) {
+                if (ffmpegText) ffmpegText.innerText = `ffmpeg ${downloaderConfig.ffmpeg_version}`;
+                if (ffmpegBadge) ffmpegBadge.className = 'badge mcp-status-pill px-3 py-2 fs-6 shadow-sm';
+            } else if (downloaderConfig.ffmpeg_path) {
+                if (ffmpegText) ffmpegText.innerText = 'ffmpeg Ready';
+                if (ffmpegBadge) ffmpegBadge.className = 'badge mcp-status-pill px-3 py-2 fs-6 shadow-sm';
+            } else {
+                if (ffmpegText) ffmpegText.innerText = 'ffmpeg Not Found';
+                if (ffmpegBadge) ffmpegBadge.className = 'badge bg-danger px-3 py-2 fs-6 shadow-sm';
+            }
+
+            const dlEnginePill = document.getElementById('dl-engine-pill');
+            if (dlEnginePill) {
+                dlEnginePill.innerText = downloaderConfig.binary_version ? `yt-dlp v${downloaderConfig.binary_version}` : (downloaderConfig.binary_path ? 'yt-dlp ready' : 'yt-dlp missing');
+            }
+            const dlFfmpegPill = document.getElementById('dl-ffmpeg-pill');
+            if (dlFfmpegPill) {
+                dlFfmpegPill.innerText = downloaderConfig.ffmpeg_version ? `ffmpeg v${downloaderConfig.ffmpeg_version}` : (downloaderConfig.ffmpeg_path ? 'ffmpeg ready' : 'ffmpeg missing');
             }
 
             // Cookies file status

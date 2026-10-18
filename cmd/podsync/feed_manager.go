@@ -908,12 +908,40 @@ func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
 	return err
 }
 
+func getFFmpegVersion(ctx context.Context) (string, string) {
+	path, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return "", ""
+	}
+
+	cmdCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(cmdCtx, path, "-version")
+	out, err := cmd.Output()
+	if err != nil {
+		return path, ""
+	}
+
+	lines := strings.Split(string(out), "\n")
+	if len(lines) > 0 {
+		firstLine := strings.TrimSpace(lines[0])
+		fields := strings.Fields(firstLine)
+		if len(fields) >= 3 && fields[0] == "ffmpeg" && fields[1] == "version" {
+			return path, fields[2]
+		}
+		return path, strings.TrimPrefix(firstLine, "ffmpeg version ")
+	}
+	return path, ""
+}
+
 func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	var dlCfg ytdl.Config
 	var binPath, binVer string
+	ffmpegPath, ffmpegVer := getFFmpegVersion(ctx)
 
 	if m.downloader != nil {
 		dlCfg = m.downloader.GetConfig()
@@ -963,6 +991,8 @@ func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.Download
 		CookiesLastMod:     cookiesMod,
 		BinaryPath:         binPath,
 		BinaryVersion:      binVer,
+		FFmpegPath:         ffmpegPath,
+		FFmpegVersion:      ffmpegVer,
 	}, nil
 }
 

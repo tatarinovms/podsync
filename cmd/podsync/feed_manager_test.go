@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,24 @@ import (
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/services/web"
 )
+
+func TestSaveAudiobookFileRejectsSymlinkAndExistingFile(t *testing.T) {
+	root := t.TempDir()
+	books := filepath.Join(root, "books")
+	outside := filepath.Join(root, "outside")
+	require.NoError(t, os.MkdirAll(books, 0755))
+	require.NoError(t, os.MkdirAll(outside, 0755))
+	require.NoError(t, os.Symlink(outside, filepath.Join(books, "linked")))
+	mgr := &AppFeedManager{cfg: &Config{Audiobooks: AudiobooksConfig{Dir: books}}}
+	require.Error(t, mgr.SaveAudiobookFile("linked", "chapter.mp3", strings.NewReader("audio")))
+	_, err := os.Stat(filepath.Join(outside, "chapter.mp3"))
+	assert.True(t, os.IsNotExist(err))
+	require.NoError(t, mgr.SaveAudiobookFile("book", "chapter.mp3", strings.NewReader("first")))
+	require.Error(t, mgr.SaveAudiobookFile("book", "chapter.mp3", strings.NewReader("second")))
+	content, err := os.ReadFile(filepath.Join(books, "book", "chapter.mp3"))
+	require.NoError(t, err)
+	assert.Equal(t, "first", string(content))
+}
 
 func TestSyncCookiesToFeeds(t *testing.T) {
 	mgr := &AppFeedManager{
@@ -80,6 +99,26 @@ func TestTriggerUpdateAll(t *testing.T) {
 	queuedFull, err := mgr.TriggerUpdateAll(context.Background())
 	assert.NoError(t, err)
 	assert.Empty(t, queuedFull)
+}
+
+func TestFeedUpdateStatusFollowsQueueAndRun(t *testing.T) {
+	updates := make(chan *feed.Config, 2)
+	mgr := &AppFeedManager{
+		feeds:   map[string]*feed.Config{"feed1": {ID: "feed1"}},
+		updates: updates,
+	}
+	require.NoError(t, mgr.TriggerUpdate(context.Background(), "feed1"))
+	assert.Equal(t, 1, mgr.queuedUpdates["feed1"])
+	mgr.MarkFeedUpdateStarted("feed1")
+	assert.Zero(t, mgr.queuedUpdates["feed1"])
+	assert.True(t, mgr.runningUpdates["feed1"])
+	require.NoError(t, mgr.TriggerUpdate(context.Background(), "feed1"))
+	mgr.MarkFeedUpdateFinished("feed1")
+	assert.Equal(t, 1, mgr.queuedUpdates["feed1"])
+	mgr.MarkFeedUpdateStarted("feed1")
+	mgr.MarkFeedUpdateFinished("feed1")
+	assert.Zero(t, mgr.queuedUpdates["feed1"])
+	assert.False(t, mgr.runningUpdates["feed1"])
 }
 
 type mockFeedManagerDB struct {
@@ -270,6 +309,67 @@ func TestUpdateFeed_PrivateFeedPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, reloaded.Feeds["mybook"])
 	assert.True(t, reloaded.Feeds["mybook"].PrivateFeed)
+}
+
+func TestUpdateFeedWhileQueuedUpdateBuildsXML(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("[feeds.test]\nurl = \"https://example.com/feed\"\n"), 0600))
+	initial := &feed.Config{ID: "test", URL: "https://example.com/feed", Custom: feed.Custom{Title: "Before"}}
+	updates := make(chan *feed.Config, 2)
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg:        &Config{Feeds: map[string]*feed.Config{"test": initial}},
+		feeds:      map[string]*feed.Config{"test": initial},
+		updates:    updates,
+	}
+	require.NoError(t, mgr.TriggerUpdate(context.Background(), "test"))
+	inFlight := <-updates
+	started := make(chan struct{})
+	finish := make(chan struct{})
+	done := make(chan string, 1)
+	go func() {
+		close(started)
+		<-finish
+		podcast, err := feed.Build(context.Background(), &model.Feed{Title: "Source"}, inFlight, "http://localhost")
+		if err != nil {
+			done <- err.Error()
+			return
+		}
+		done <- feed.FormatXML(podcast, &model.Feed{})
+	}()
+	<-started
+	require.NoError(t, mgr.UpdateFeed(context.Background(), "test", &web.FeedConfigUpdate{
+		PrivateFeed: true,
+		Custom:      feed.Custom{Title: "After"},
+	}))
+	close(finish)
+	oldXML := <-done
+	assert.Contains(t, oldXML, "Before")
+	assert.NotContains(t, oldXML, "<itunes:block>yes</itunes:block>")
+	current := <-updates
+	newPodcast, err := feed.Build(context.Background(), &model.Feed{Title: "Source"}, current, "http://localhost")
+	require.NoError(t, err)
+	newXML := feed.FormatXML(newPodcast, &model.Feed{})
+	assert.Contains(t, newXML, "After")
+	assert.Contains(t, newXML, "<itunes:block>yes</itunes:block>")
+	stored, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(stored), "private_feed = true")
+}
+
+func TestUpdateFeedFailedSaveKeepsCurrentConfig(t *testing.T) {
+	initial := &feed.Config{ID: "test", URL: "https://example.com/feed", Custom: feed.Custom{Title: "Before"}}
+	mgr := &AppFeedManager{
+		configPath: filepath.Join(t.TempDir(), "missing", "config.toml"),
+		cfg:        &Config{Feeds: map[string]*feed.Config{"test": initial}},
+		feeds:      map[string]*feed.Config{"test": initial},
+		updates:    make(chan *feed.Config, 1),
+	}
+	err := mgr.UpdateFeed(context.Background(), "test", &web.FeedConfigUpdate{Custom: feed.Custom{Title: "After"}})
+	require.Error(t, err)
+	assert.Same(t, initial, mgr.feeds["test"])
+	assert.Equal(t, "Before", mgr.cfg.Feeds["test"].Custom.Title)
+	assert.Empty(t, mgr.updates)
 }
 
 func TestDeleteAudiobookDir(t *testing.T) {

@@ -65,8 +65,11 @@ func (l *Local) resolvePath(name string) string {
 }
 
 func (l *Local) Open(name string) (http.File, error) {
-	if name == "/index.html" && l.WebUIEnabled {
-		return os.Open("./html/index.html")
+	if l.WebUIEnabled {
+		switch name {
+		case "/index.html", "/admin.css", "/admin.js", "/theme.js":
+			return os.Open(filepath.Join("html", strings.TrimPrefix(name, "/")))
+		}
 	}
 
 	cleanName := filepath.FromSlash(strings.TrimPrefix(name, "/"))

@@ -22,6 +22,23 @@ func TestNewLocal(t *testing.T) {
 	assert.NotNil(t, local)
 }
 
+func TestLocalWebUIAssets(t *testing.T) {
+	oldDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(filepath.Join("..", "..")))
+	t.Cleanup(func() { _ = os.Chdir(oldDir) })
+	stor, err := NewLocal(t.TempDir(), true, false)
+	require.NoError(t, err)
+	for _, name := range []string{"/index.html", "/admin.css", "/theme.js", "/admin.js"} {
+		f, err := stor.Open(name)
+		require.NoError(t, err, name)
+		info, err := f.Stat()
+		require.NoError(t, err, name)
+		assert.Greater(t, info.Size(), int64(0), name)
+		require.NoError(t, f.Close())
+	}
+}
+
 func TestLocal_Create(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "")
 	assert.NoError(t, err)

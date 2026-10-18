@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -841,10 +842,10 @@ func (s *Server) handleAudiobookDirs(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("unlinked") == "true" || strings.HasSuffix(r.URL.Path, "/unlinked") {
 			filtered := make([]AudiobookDirInfo, 0, len(dirs))
 			for _, d := range dirs {
-			if !d.Linked {
-				filtered = append(filtered, d)
+				if !d.Linked {
+					filtered = append(filtered, d)
+				}
 			}
-		}
 			s.writeJSON(w, http.StatusOK, filtered)
 			return
 		}
@@ -922,8 +923,19 @@ func (s *Server) handleAudiobookUpload(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	const maxUploadSize = 1024 << 20
+	if r.ContentLength > maxUploadSize {
+		s.writeError(w, http.StatusRequestEntityTooLarge, "upload exceeds 1 GiB limit")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 
-	if err := r.ParseMultipartForm(1024 * 1024 * 1024); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		var limitErr *http.MaxBytesError
+		if errors.As(err, &limitErr) {
+			s.writeError(w, http.StatusRequestEntityTooLarge, "upload exceeds 1 GiB limit")
+			return
+		}
 		s.writeError(w, http.StatusBadRequest, "failed to parse multipart form: "+err.Error())
 		return
 	}

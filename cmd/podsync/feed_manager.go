@@ -38,24 +38,26 @@ type feedErrorEntry struct {
 }
 
 type AppFeedManager struct {
-	mu          sync.RWMutex
-	configPath  string
-	cfg         *Config
-	feeds       map[string]*feed.Config
-	tokens      map[model.Provider]StringSlice
-	downloader  *ytdl.YoutubeDl
-	cron        *cron.Cron
-	cronEntries map[string]cron.EntryID
-	updates     chan *feed.Config
-	updater     *update.Manager
-	db          db.Storage
-	storage     fs.Storage
-	startedAt   time.Time
-	version     string
-	commit      string
-	buildDate   string
-	logBuffer   *logbuffer.Buffer
-	feedErrors  map[string]feedErrorEntry
+	mu             sync.RWMutex
+	configPath     string
+	cfg            *Config
+	feeds          map[string]*feed.Config
+	tokens         map[model.Provider]StringSlice
+	downloader     *ytdl.YoutubeDl
+	cron           *cron.Cron
+	cronEntries    map[string]cron.EntryID
+	updates        chan *feed.Config
+	updater        *update.Manager
+	db             db.Storage
+	storage        fs.Storage
+	startedAt      time.Time
+	version        string
+	commit         string
+	buildDate      string
+	logBuffer      *logbuffer.Buffer
+	feedErrors     map[string]feedErrorEntry
+	queuedUpdates  map[string]int
+	runningUpdates map[string]bool
 }
 
 func NewAppFeedManager(
@@ -74,23 +76,25 @@ func NewAppFeedManager(
 	logBuffer *logbuffer.Buffer,
 ) *AppFeedManager {
 	mgr := &AppFeedManager{
-		configPath:  configPath,
-		cfg:         cfg,
-		feeds:       feeds,
-		tokens:      tokens,
-		downloader:  downloader,
-		cron:        c,
-		cronEntries: cronEntries,
-		updates:     updates,
-		updater:     updater,
-		db:          database,
-		storage:     storage,
-		startedAt:   time.Now(),
-		version:     version,
-		commit:      commit,
-		buildDate:   buildDate,
-		logBuffer:   logBuffer,
-		feedErrors:  make(map[string]feedErrorEntry),
+		configPath:     configPath,
+		cfg:            cfg,
+		feeds:          feeds,
+		tokens:         tokens,
+		downloader:     downloader,
+		cron:           c,
+		cronEntries:    cronEntries,
+		updates:        updates,
+		updater:        updater,
+		db:             database,
+		storage:        storage,
+		startedAt:      time.Now(),
+		version:        version,
+		commit:         commit,
+		buildDate:      buildDate,
+		logBuffer:      logBuffer,
+		feedErrors:     make(map[string]feedErrorEntry),
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
 	}
 	mgr.MountAllAudiobooks()
 	return mgr
@@ -209,6 +213,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		CronSchedule: f.CronSchedule,
 		UpdatePeriod: f.UpdatePeriod.String(),
 		PrivateFeed:  f.PrivateFeed,
+		Updating:     m.queuedUpdates[f.ID] > 0 || m.runningUpdates[f.ID],
 		Config:       f,
 	}
 
@@ -304,18 +309,24 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 		newFeed.CronSchedule = "@every 12h"
 	}
 
+	if err := m.saveFeedToConfig(newFeed); err != nil {
+		return errors.Wrap(err, "failed to save feed configuration")
+	}
+
 	// Add to in-memory map
 	m.feeds[newFeed.ID] = newFeed
+	if m.updater != nil {
+		m.updater.SetFeedConfig(newFeed.ID, newFeed)
+	}
 
 	// Mount if audiobook
 	m.mountAudiobookFeed(newFeed)
 
 	// Add to cron
 	if m.cron != nil {
-		feedToCron := newFeed
+		feedID := newFeed.ID
 		cronID, err := m.cron.AddFunc(newFeed.CronSchedule, func() {
-			log.Debugf("cron triggered for dynamic feed %q", feedToCron.ID)
-			m.updates <- feedToCron
+			m.QueueScheduledUpdate(feedID)
 		})
 		if err == nil {
 			m.cronEntries[newFeed.ID] = cronID
@@ -324,16 +335,13 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 		}
 	}
 
-	// Save to config.toml
-	if err := m.saveFeedToConfig(newFeed); err != nil {
-		log.WithError(err).Errorf("failed to save feed %q to config.toml", newFeed.ID)
-	}
-
 	// Enqueue for immediate update
+	m.markQueuedLocked(newFeed.ID)
 	select {
 	case m.updates <- newFeed:
 		log.Infof("enqueued newly added feed %q for download", newFeed.ID)
 	default:
+		m.queuedUpdates[newFeed.ID]--
 		log.Warnf("update queue full, feed %q will update on next cron cycle", newFeed.ID)
 	}
 
@@ -347,6 +355,9 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 	f, exists := m.feeds[id]
 	if !exists {
 		return errors.Errorf("feed %q not found", id)
+	}
+	if err := m.deleteFeedFromConfig(id); err != nil {
+		return errors.Wrapf(err, "failed to remove feed %q from configuration", id)
 	}
 
 	// Unmount if mounted
@@ -362,10 +373,8 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 
 	// Remove from map
 	delete(m.feeds, id)
-
-	// Remove from config.toml
-	if err := m.deleteFeedFromConfig(id); err != nil {
-		log.WithError(err).Errorf("failed to remove feed %q from config.toml", id)
+	if m.updater != nil {
+		m.updater.SetFeedConfig(id, nil)
 	}
 
 	// Clean database
@@ -390,30 +399,32 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 }
 
 func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
-	m.mu.RLock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	f, ok := m.feeds[id]
-	m.mu.RUnlock()
 
 	if !ok {
 		return errors.Errorf("feed %q not found", id)
 	}
 
+	m.markQueuedLocked(id)
 	select {
 	case m.updates <- f:
 		log.Infof("manually triggered update for feed %q", id)
 		return nil
 	default:
+		m.queuedUpdates[id]--
 		return errors.New("update queue is currently full, please try again shortly")
 	}
 }
 
 func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
-	m.mu.RLock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	feedList := make([]*feed.Config, 0, len(m.feeds))
 	for _, f := range m.feeds {
 		feedList = append(feedList, f)
 	}
-	m.mu.RUnlock()
 
 	if len(feedList) == 0 {
 		return []string{}, nil
@@ -421,16 +432,61 @@ func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error)
 
 	var queued []string
 	for _, f := range feedList {
+		m.markQueuedLocked(f.ID)
 		select {
 		case m.updates <- f:
 			log.Infof("manually triggered update for feed %q", f.ID)
 			queued = append(queued, f.ID)
 		default:
+			m.queuedUpdates[f.ID]--
 			log.Warnf("failed to queue update for feed %q: queue full", f.ID)
 		}
 	}
 
 	return queued, nil
+}
+
+func (m *AppFeedManager) markQueuedLocked(id string) {
+	if m.queuedUpdates == nil {
+		m.queuedUpdates = make(map[string]int)
+	}
+	m.queuedUpdates[id]++
+}
+
+func (m *AppFeedManager) MarkFeedUpdateQueued(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.markQueuedLocked(id)
+}
+
+func (m *AppFeedManager) QueueScheduledUpdate(id string) {
+	m.mu.Lock()
+	current := m.feeds[id]
+	if current != nil {
+		m.markQueuedLocked(id)
+	}
+	m.mu.Unlock()
+	if current != nil {
+		m.updates <- current
+	}
+}
+
+func (m *AppFeedManager) MarkFeedUpdateStarted(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.queuedUpdates[id] > 0 {
+		m.queuedUpdates[id]--
+	}
+	if m.runningUpdates == nil {
+		m.runningUpdates = make(map[string]bool)
+	}
+	m.runningUpdates[id] = true
+}
+
+func (m *AppFeedManager) MarkFeedUpdateFinished(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.runningUpdates, id)
 }
 
 func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
@@ -498,16 +554,6 @@ func maskToken(s string) string {
 
 func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []string) error {
 	provider := model.Provider(providerStr)
-	if m.tokens == nil {
-		m.tokens = make(map[model.Provider]StringSlice)
-	}
-
-	if len(newTokens) > 0 {
-		m.tokens[provider] = newTokens
-	} else {
-		delete(m.tokens, provider)
-	}
-
 	// Save to config.toml
 	if m.configPath != "" {
 		tree, err := toml.LoadFile(m.configPath)
@@ -520,12 +566,20 @@ func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []str
 			} else {
 				tree.Set(key, newTokens)
 			}
-			f, err := os.Create(m.configPath)
-			if err == nil {
-				_, _ = tree.WriteTo(f)
-				_ = f.Close()
+			if err := writeConfigTree(m.configPath, tree); err != nil {
+				return err
 			}
+		} else {
+			return err
 		}
+	}
+	if m.tokens == nil {
+		m.tokens = make(map[model.Provider]StringSlice)
+	}
+	if len(newTokens) > 0 {
+		m.tokens[provider] = newTokens
+	} else {
+		delete(m.tokens, provider)
 	}
 
 	return nil
@@ -647,6 +701,9 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	if !exists {
 		return errors.Errorf("feed %q not found", id)
 	}
+	oldFeed := *f
+	updatedFeed := oldFeed
+	f = &updatedFeed
 
 	oldLang := strings.TrimSpace(f.Custom.Language)
 	newLang := strings.TrimSpace(update.Custom.Language)
@@ -672,17 +729,6 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.OPML = update.OPML
 	}
 	f.PrivateFeed = update.PrivateFeed
-	if m.cfg != nil && m.cfg.Feeds != nil {
-		if cf, ok := m.cfg.Feeds[id]; ok {
-			cf.PrivateFeed = update.PrivateFeed
-		}
-	}
-	if m.db != nil {
-		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
-			dbFeed.PrivateFeed = f.PrivateFeed
-			_ = m.db.AddFeed(ctx, id, dbFeed)
-		}
-	}
 
 	if update.KeepLast > 0 {
 		f.Clean = &feed.Cleanup{KeepLast: update.KeepLast}
@@ -709,18 +755,38 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.PlaylistSort = ""
 	}
 
-	// Reschedule cron if cron_schedule changed
-	if update.CronSchedule != "" && update.CronSchedule != f.CronSchedule {
+	if update.CronSchedule != "" {
 		f.CronSchedule = update.CronSchedule
+	}
+	if err := m.saveFeedToConfig(f); err != nil {
+		return err
+	}
+	m.feeds[id] = f
+	if m.updater != nil {
+		m.updater.SetFeedConfig(id, f)
+	}
+	if m.cfg != nil && m.cfg.Feeds != nil {
+		m.cfg.Feeds[id] = f
+	}
+	if m.db != nil {
+		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
+			dbFeed.PrivateFeed = f.PrivateFeed
+			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
+				log.WithError(err).Warnf("failed to update private feed state for %q", id)
+			}
+		}
+	}
+
+	// Reschedule cron if cron_schedule changed
+	if update.CronSchedule != "" && update.CronSchedule != oldFeed.CronSchedule {
 		if m.cron != nil {
 			if oldID, ok := m.cronEntries[id]; ok {
 				m.cron.Remove(oldID)
 				delete(m.cronEntries, id)
 			}
-			feedToCron := f
+			feedID := id
 			cronID, err := m.cron.AddFunc(f.CronSchedule, func() {
-				log.Debugf("cron triggered for dynamic feed %q", feedToCron.ID)
-				m.updates <- feedToCron
+				m.QueueScheduledUpdate(feedID)
 			})
 			if err == nil {
 				m.cronEntries[id] = cronID
@@ -752,23 +818,23 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 			return nil
 		})
 
+		m.markQueuedLocked(id)
 		select {
 		case m.updates <- f:
 			log.Infof("queued immediate update for feed %q after redownload reset", id)
 		default:
+			m.queuedUpdates[id]--
 			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
 		}
 	}
 
-	if err := m.saveFeedToConfig(f); err != nil {
-		return err
-	}
-
 	if !shouldRedownload && m.updates != nil {
+		m.markQueuedLocked(id)
 		select {
 		case m.updates <- f:
 			log.Infof("queued immediate update for feed %q after settings change", id)
 		default:
+			m.queuedUpdates[id]--
 			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
 		}
 	}
@@ -915,14 +981,7 @@ func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 		tree.Delete(prefix + ".audiobook_dir")
 	}
 
-	file, err := os.Create(m.configPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = tree.WriteTo(file)
-	return err
+	return writeConfigTree(m.configPath, tree)
 }
 
 func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
@@ -937,14 +996,7 @@ func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
 
 	_ = tree.Delete(fmt.Sprintf("feeds.%s", id))
 
-	file, err := os.Create(m.configPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = tree.WriteTo(file)
-	return err
+	return writeConfigTree(m.configPath, tree)
 }
 
 func getFFmpegVersion(ctx context.Context) (string, string) {
@@ -1255,14 +1307,7 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 		tree.Delete("downloader.language")
 	}
 
-	f, err := os.Create(m.configPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = tree.WriteTo(f)
-	return err
+	return writeConfigTree(m.configPath, tree)
 }
 
 func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID string, limit int) ([]web.DownloadErrorItem, error) {
@@ -1565,8 +1610,6 @@ func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPas
 		return errors.New("new password must be at least 4 characters long")
 	}
 
-	m.cfg.Server.Admin.Password = newPassword
-
 	if m.configPath != "" {
 		tree, err := toml.LoadFile(m.configPath)
 		if err != nil {
@@ -1574,16 +1617,11 @@ func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPas
 		}
 		tree.Set("server.admin.password", newPassword)
 
-		f, err := os.Create(m.configPath)
-		if err != nil {
-			return errors.Wrap(err, "failed to write config file")
-		}
-		defer f.Close()
-
-		if _, err := tree.WriteTo(f); err != nil {
+		if err := writeConfigTree(m.configPath, tree); err != nil {
 			return errors.Wrap(err, "failed to save config file")
 		}
 	}
+	m.cfg.Server.Admin.Password = newPassword
 
 	return nil
 }
@@ -1900,12 +1938,22 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 
 func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
 	baseDir := m.GetAudiobooksDir()
+	if baseDir == "" {
+		return errors.New("audiobooks directory is not configured")
+	}
 	cleanBookDir := filepath.Clean(bookDir)
-	if strings.HasPrefix(cleanBookDir, "..") || strings.Contains(cleanBookDir, string(filepath.Separator)+"..") {
+	if cleanBookDir == "." || filepath.IsAbs(cleanBookDir) || cleanBookDir == ".." || strings.HasPrefix(cleanBookDir, ".."+string(filepath.Separator)) {
 		return errors.New("invalid book directory")
 	}
-	targetDir := filepath.Join(baseDir, cleanBookDir)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return errors.Wrap(err, "failed to create audiobooks base directory")
+	}
+	root, err := os.OpenRoot(baseDir)
+	if err != nil {
+		return errors.Wrap(err, "failed to open audiobooks directory")
+	}
+	defer root.Close()
+	if err := root.MkdirAll(cleanBookDir, 0755); err != nil {
 		return errors.Wrap(err, "failed to create book directory")
 	}
 
@@ -1914,17 +1962,17 @@ func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io
 		return errors.New("invalid filename")
 	}
 
-	targetPath := filepath.Join(targetDir, cleanFilename)
-	out, err := os.Create(targetPath)
+	targetPath := filepath.Join(cleanBookDir, cleanFilename)
+	out, err := root.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to create destination file")
 	}
-	defer out.Close()
-
 	if _, err := io.Copy(out, r); err != nil {
+		_ = out.Close()
+		_ = root.Remove(targetPath)
 		return errors.Wrap(err, "failed to write file")
 	}
-	return nil
+	return out.Close()
 }
 
 func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {

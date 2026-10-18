@@ -269,6 +269,7 @@ func main() {
 		for {
 			select {
 			case _feed := <-updates:
+				feedManager.MarkFeedUpdateStarted(_feed.ID)
 				if err := manager.Update(ctx, _feed); err != nil {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 					feedManager.RecordFeedUpdateError(_feed.ID, err)
@@ -276,6 +277,7 @@ func main() {
 					feedManager.ClearFeedUpdateError(_feed.ID)
 					log.WithField("feed_id", _feed.ID).Infof("next update of %s: %s", _feed.ID, c.Entry(m[_feed.ID]).Next)
 				}
+				feedManager.MarkFeedUpdateFinished(_feed.ID)
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -284,20 +286,29 @@ func main() {
 
 	// Run cron scheduler (only in daemon mode, not in MCP stdio mode)
 	if !opts.MCP {
+		type scheduledFeed struct {
+			config      *feed.Config
+			hasExplicit bool
+		}
+		initialFeeds := make([]scheduledFeed, 0, len(cfg.Feeds))
+		for _, configuredFeed := range cfg.Feeds {
+			hasExplicit := configuredFeed.CronSchedule != ""
+			if !hasExplicit {
+				configuredFeed.CronSchedule = fmt.Sprintf("@every %s", configuredFeed.UpdatePeriod.String())
+			}
+			initialFeeds = append(initialFeeds, scheduledFeed{config: configuredFeed, hasExplicit: hasExplicit})
+		}
 		group.Go(func() error {
 			var cronID cron.EntryID
 
-			for _, _feed := range cfg.Feeds {
+			for _, scheduled := range initialFeeds {
+				_feed := scheduled.config
 				// Track if this feed has an explicit cron schedule
-				hasExplicitCronSchedule := _feed.CronSchedule != ""
-
-				if _feed.CronSchedule == "" {
-					_feed.CronSchedule = fmt.Sprintf("@every %s", _feed.UpdatePeriod.String())
-				}
+				hasExplicitCronSchedule := scheduled.hasExplicit
 				cronFeed := _feed
 				if cronID, err = c.AddFunc(cronFeed.CronSchedule, func() {
 					log.Debugf("adding %q to update queue", cronFeed.ID)
-					updates <- cronFeed
+					feedManager.QueueScheduledUpdate(cronFeed.ID)
 				}); err != nil {
 					log.WithError(err).Fatalf("can't create cron task for feed: %s", cronFeed.ID)
 				}
@@ -308,6 +319,7 @@ func main() {
 				// Only perform initial update if no explicit cron schedule is configured
 				// This prevents unwanted updates when using fixed schedules in Docker deployments
 				if !hasExplicitCronSchedule {
+					feedManager.MarkFeedUpdateQueued(cronFeed.ID)
 					updates <- cronFeed
 				}
 			}

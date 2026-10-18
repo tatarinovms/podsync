@@ -743,3 +743,26 @@ func TestAudiobookEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"success":true`)
 }
+
+func TestAudiobookUploadTooLarge(t *testing.T) {
+	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
+	srv.SetAdminManager(&mockDownloaderAdminMgr{})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/audiobooks/upload", strings.NewReader("x"))
+	req.ContentLength = (1024 << 20) + 1
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+}
+
+func TestAdminAssets(t *testing.T) {
+	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
+	for _, path := range []string{"/admin/", "/admin/admin.css", "/admin/theme.js", "/admin/admin.js"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.SetBasicAuth("admin", "password")
+		rec := httptest.NewRecorder()
+		srv.Handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code, path)
+		assert.NotEmpty(t, rec.Body.String(), path)
+	}
+}

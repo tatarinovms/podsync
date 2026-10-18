@@ -36,6 +36,7 @@ type FeedSummary struct {
 	ErrorCount      int          `json:"error_count"`
 	TotalSize       int64        `json:"total_size"`
 	LastUpdate      *time.Time   `json:"last_update,omitempty"`
+	Updating        bool         `json:"updating"`
 	LastError       string       `json:"last_error,omitempty"`
 	LastErrorAt     *time.Time   `json:"last_error_at,omitempty"`
 	FeedURL         string       `json:"feed_url"`

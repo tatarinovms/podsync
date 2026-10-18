@@ -136,7 +136,7 @@
                             </select>
                             <span id="feeds-filter-info" class="badge bg-secondary-subtle text-secondary py-2 px-2 text-nowrap d-none"></span>
                         </div>
-                        <div class="d-flex gap-2">
+                        <div class="d-flex flex-wrap gap-2">
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
                             <button class="btn btn-outline-secondary btn-sm" id="btn-update-all-feeds" onclick="triggerUpdateAll()" title="Update all podcasts now"><i class="bi bi-arrow-repeat me-1"></i> Update all</button>
                             <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
@@ -734,7 +734,7 @@
                                     </tr>
                                     <tr>
                                         <td><code>update_feed_config</code></td>
-                                        <td>Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, language, max_height, filters)</td>
+                                        <td>Update supplied settings for an existing podcast feed; omitted settings are preserved (cron schedule, format, quality, page_size, retention keep_last, language, max_height, filters)</td>
                                         <td><code>feed_id</code>, <code>cron_schedule</code>, <code>format</code>, <code>quality</code>, <code>page_size</code>, <code>keep_last</code>, <code>language</code>, ...</td>
                                     </tr>
                                     <tr>
@@ -935,7 +935,7 @@
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" id="import-feed-private">
                                 <label class="form-check-label small fw-semibold" for="import-feed-private">Private podcast (Block aggregators)</label>
-                                <div class="form-text small">Adds &lt;itunes:block&gt;yes&lt;/itunes:block&gt; to prevent indexing in public directories.</div>
+                                <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
                             </div>
                         </div>
                         <div class="d-flex justify-content-end gap-2 pt-2">
@@ -1148,7 +1148,7 @@
                                         <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" id="new-feed-private-feed">
                                             <label class="form-check-label small fw-semibold" for="new-feed-private-feed">Private podcast (Block aggregators)</label>
-                                            <div class="form-text small">Adds &lt;itunes:block&gt;yes&lt;/itunes:block&gt; to prevent indexing in public directories.</div>
+                                            <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1280,7 +1280,7 @@
 
     <!-- Modal: Episodes Viewer -->
     <div class="modal fade" id="episodesModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <div>
@@ -1290,6 +1290,16 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
+                    <div class="d-flex flex-column flex-sm-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
+                        <input id="episodes-search" type="search" class="form-control form-control-sm" placeholder="Search episodes" aria-label="Search episodes" oninput="renderEpisodeList()">
+                        <select id="episodes-status-filter" class="form-select form-select-sm w-auto" aria-label="Episode status" onchange="renderEpisodeList()">
+                            <option value="all">All statuses</option>
+                            <option value="downloaded">Downloaded / available</option>
+                            <option value="new">Pending</option>
+                            <option value="error">Errors</option>
+                            <option value="cleaned">Cleaned</option>
+                        </select>
+                    </div>
                     <div id="episodes-list" class="list-group list-group-flush">
                         <!-- Loaded dynamically -->
                     </div>
@@ -1446,7 +1456,7 @@
                                     <div class="form-check form-switch mb-0">
                                         <input class="form-check-input" type="checkbox" id="fs-private-feed">
                                         <label class="form-check-label small fw-semibold" for="fs-private-feed">Private podcast (Block aggregators)</label>
-                                        <div class="form-text small">Adds &lt;itunes:block&gt;yes&lt;/itunes:block&gt; to prevent indexing in public directories.</div>
+                                        <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
                                     </div>
                                 </div>
                             </div>
@@ -1539,7 +1549,7 @@
                                     <div class="form-check form-switch mb-0">
                                         <input class="form-check-input" type="checkbox" id="fs-book-private-feed">
                                         <label class="form-check-label small fw-semibold" for="fs-book-private-feed">Private podcast (Block aggregators)</label>
-                                        <div class="form-text small">Adds &lt;itunes:block&gt;yes&lt;/itunes:block&gt; to prevent indexing in public directories.</div>
+                                        <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
                                     </div>
                                 </div>
                             </div>

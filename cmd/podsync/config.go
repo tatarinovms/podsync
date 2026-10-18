@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/mxpv/podsync/pkg/builder"
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
@@ -89,6 +90,17 @@ func LoadConfigWithOptions(path string, adminOverride *bool) (*Config, error) {
 
 	config.applyDefaults(path)
 	config.applyEnv()
+	for _, f := range config.Feeds {
+		if info, err := builder.ParseURL(f.URL); err == nil && info.Provider == model.ProviderAudiobook {
+			if f.AudiobookDir == "" {
+				f.AudiobookDir = filepath.Join(config.Audiobooks.Dir, info.ItemID)
+			}
+			f.CronSchedule = ""
+			f.Format = model.FormatAudio
+			f.Quality = model.QualityHigh
+			f.Clean = nil
+		}
+	}
 
 	if adminOverride != nil {
 		config.Server.Admin.Enabled = *adminOverride

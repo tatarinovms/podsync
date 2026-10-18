@@ -215,7 +215,7 @@ func main() {
 	}
 
 	log.Debug("creating update manager")
-	manager, err := update.NewUpdater(cfg.Feeds, keys, cfg.Server.Hostname, downloader, database, storage)
+	manager, err := update.NewUpdater(cfg.Feeds, keys, cfg.Server.PublicURL(), downloader, database, storage)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create updater")
 	}
@@ -275,7 +275,7 @@ func main() {
 					feedManager.RecordFeedUpdateError(_feed.ID, err)
 				} else {
 					feedManager.ClearFeedUpdateError(_feed.ID)
-					log.WithField("feed_id", _feed.ID).Infof("next update of %s: %s", _feed.ID, c.Entry(m[_feed.ID]).Next)
+					log.WithField("feed_id", _feed.ID).Info("feed update complete")
 				}
 				feedManager.MarkFeedUpdateFinished(_feed.ID)
 			case <-ctx.Done():
@@ -292,6 +292,11 @@ func main() {
 		}
 		initialFeeds := make([]scheduledFeed, 0, len(cfg.Feeds))
 		for _, configuredFeed := range cfg.Feeds {
+			if isAudiobookFeed(configuredFeed) {
+				configuredFeed.CronSchedule = ""
+				initialFeeds = append(initialFeeds, scheduledFeed{config: configuredFeed})
+				continue
+			}
 			hasExplicit := configuredFeed.CronSchedule != ""
 			if !hasExplicit {
 				configuredFeed.CronSchedule = fmt.Sprintf("@every %s", configuredFeed.UpdatePeriod.String())
@@ -303,6 +308,20 @@ func main() {
 
 			for _, scheduled := range initialFeeds {
 				_feed := scheduled.config
+				if isAudiobookFeed(_feed) {
+					// New books configured by hand need an initial build, without cron.
+					_, dbErr := database.GetFeed(ctx, _feed.ID)
+					size, xmlErr := storage.Size(ctx, _feed.ID+".xml")
+					if dbErr != nil || xmlErr != nil || size == 0 {
+						feedManager.MarkFeedUpdateQueued(_feed.ID)
+						select {
+						case updates <- _feed:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+					}
+					continue
+				}
 				// Track if this feed has an explicit cron schedule
 				hasExplicitCronSchedule := scheduled.hasExplicit
 				cronFeed := _feed
@@ -313,7 +332,9 @@ func main() {
 					log.WithError(err).Fatalf("can't create cron task for feed: %s", cronFeed.ID)
 				}
 
+				feedManager.mu.Lock()
 				m[cronFeed.ID] = cronID
+				feedManager.mu.Unlock()
 				log.Debugf("-> %s (update '%s')", cronFeed.ID, cronFeed.CronSchedule)
 
 				// Only perform initial update if no explicit cron schedule is configured

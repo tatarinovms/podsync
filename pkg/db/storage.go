@@ -18,7 +18,8 @@ type Storage interface {
 
 	// AddFeed will:
 	// - Insert or update feed info
-	// - Append new episodes to the existing list of episodes (existing episodes are not overwritten!)
+	// - Append remote episodes without overwriting existing download state
+	// - Synchronize audiobook chapters with a supplied non-nil directory snapshot
 	AddFeed(ctx context.Context, feedID string, feed *model.Feed) error
 
 	// GetFeed gets a feed by ID

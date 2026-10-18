@@ -1,15 +1,15 @@
 ---
-name: podsync
+name: "podsync"
 description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
-version: 1.0.0
+version: "1.0.0"
 triggers:
-  - podsync
-  - podcast
-  - youtube podcast
-  - vk video podcast
-  - rutube podcast
-  - retry episode
-  - feed update
+  - "podsync"
+  - "podcast"
+  - "youtube podcast"
+  - "vk video podcast"
+  - "rutube podcast"
+  - "retry episode"
+  - "feed update"
 ---
 
 # Podsync Skill
@@ -66,7 +66,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **When to use**: When the user says *"Update all podcasts"*, *"Sync everything"*, or wants a bulk update.
 
 ### 7. `update_feed_config`
-- **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed, language) and saves changes to `config.toml`.
+- **Purpose**: Updates configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed, language) and saves changes to `config.toml`. Only supplied fields change; omitted settings are preserved. Invalid schedules are rejected. Audiobooks do not use cron schedules.
 - **Arguments**:
   - `feed_id` *(string, required)*: Feed identifier.
   - `cron_schedule` *(string, optional)*: Cron expression or interval (e.g. `"@every 6h"`).

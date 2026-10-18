@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -184,11 +186,14 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 
 	summary := m.buildSummary(ctx, f)
 
-	var episodes []*model.Episode
-	_ = m.db.WalkEpisodes(ctx, id, func(episode *model.Episode) error {
-		episodes = append(episodes, episode)
+	episodes := make([]*model.Episode, 0)
+	if err := m.db.WalkEpisodes(ctx, id, func(episode *model.Episode) error {
+		copy := *episode
+		episodes = append(episodes, &copy)
 		return nil
-	})
+	}); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to load episodes")
+	}
 
 	info, parseErr := builder.ParseURL(f.URL)
 	isAudiobook := (parseErr == nil && info.Provider == model.ProviderAudiobook) || strings.HasPrefix(f.URL, "audiobook://")
@@ -202,7 +207,6 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 		abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
 		if bErr == nil {
 			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
-				_ = m.db.AddFeed(ctx, f.ID, builtFeed)
 				episodes = builtFeed.Episodes
 				summary.EpisodeCount = len(episodes)
 				summary.DownloadedCount = len(episodes)
@@ -212,14 +216,37 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 
 	if isAudiobook || f.PlaylistSort == model.SortingAsc {
 		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
 			return episodes[i].PubDate.Before(episodes[j].PubDate)
 		})
 	} else {
 		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
 			return episodes[i].PubDate.After(episodes[j].PubDate)
 		})
 	}
 
+	for _, ep := range episodes {
+		if ep.Status != model.EpisodeDownloaded {
+			continue
+		}
+		filename := feed.EpisodeName(f, ep)
+		if isAudiobook {
+			filename = ep.ID
+		} else if m.storage != nil {
+			if _, err := m.storage.Size(ctx, id+"/"+filename); err != nil {
+				legacy := feed.LegacyEpisodeName(f, ep)
+				if _, err := m.storage.Size(ctx, id+"/"+legacy); err == nil {
+					filename = legacy
+				}
+			}
+		}
+		ep.MediaURL = strings.TrimSuffix(summary.FeedURL, id+".xml") + url.PathEscape(id) + "/" + url.PathEscape(filename)
+	}
 	return &summary, episodes, nil
 }
 
@@ -322,22 +349,12 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		summary.LastErrorAt = &errEntry.Time
 	}
 
-	// Generate URLs
-	host := "http://localhost:8080"
-	mountPath := ""
+	// Generate URLs using the same base as RSS enclosure links.
+	host := web.Config{}.PublicURL()
 	if m.cfg != nil {
-		if m.cfg.Server.Hostname != "" {
-			host = m.cfg.Server.Hostname
-		} else if m.cfg.Server.Port != 0 {
-			host = fmt.Sprintf("http://localhost:%d", m.cfg.Server.Port)
-		}
-		if m.cfg.Server.Path != "" {
-			mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
-		}
+		host = m.cfg.Server.PublicURL()
 	}
-	host = strings.TrimSuffix(host, "/")
-
-	feedURL := fmt.Sprintf("%s%s/%s.xml", host, mountPath, f.ID)
+	feedURL := fmt.Sprintf("%s/%s.xml", host, f.ID)
 	summary.FeedURL = feedURL
 
 	cleanURL := strings.TrimPrefix(feedURL, "https://")
@@ -350,16 +367,37 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	return summary
 }
 
+// Audiobooks are refreshed on import, settings changes, and manual updates.
+func isAudiobookFeed(f *feed.Config) bool {
+	info, err := builder.ParseURL(f.URL)
+	return err == nil && info.Provider == model.ProviderAudiobook
+}
+
 func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if !regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(newFeed.ID) {
+		return errors.New("feed ID must contain only Latin letters, digits, underscores, or hyphens")
+	}
 
 	if _, exists := m.feeds[newFeed.ID]; exists {
 		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
 	}
 
-	if newFeed.CronSchedule == "" {
+	if isAudiobookFeed(newFeed) {
+		newFeed.CronSchedule = ""
+	} else if newFeed.CronSchedule == "" {
 		newFeed.CronSchedule = "@every 12h"
+	}
+
+	if !isAudiobookFeed(newFeed) {
+		if _, err := cron.ParseStandard(newFeed.CronSchedule); err != nil {
+			return errors.Wrap(err, "invalid update schedule")
+		}
+	}
+	if err := m.checkUpdateCapacityLocked(); err != nil {
+		return err
 	}
 
 	if err := m.saveFeedToConfig(newFeed); err != nil {
@@ -375,8 +413,8 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 	// Mount if audiobook
 	m.mountAudiobookFeed(newFeed)
 
-	// Add to cron
-	if m.cron != nil {
+	// Add remote feeds to cron.
+	if m.cron != nil && !isAudiobookFeed(newFeed) {
 		feedID := newFeed.ID
 		cronID, err := m.cron.AddFunc(newFeed.CronSchedule, func() {
 			m.QueueScheduledUpdate(feedID)
@@ -388,17 +426,7 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 		}
 	}
 
-	// Enqueue for immediate update
-	m.markQueuedLocked(newFeed.ID)
-	select {
-	case m.updates <- newFeed:
-		log.Infof("enqueued newly added feed %q for download", newFeed.ID)
-	default:
-		m.queuedUpdates[newFeed.ID]--
-		log.Warnf("update queue full, feed %q will update on next cron cycle", newFeed.ID)
-	}
-
-	return nil
+	return m.queueUpdateLocked(newFeed)
 }
 
 func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
@@ -754,6 +782,11 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	if !exists {
 		return errors.Errorf("feed %q not found", id)
 	}
+	resolved, err := update.WithCurrent(f)
+	if err != nil {
+		return err
+	}
+	update = resolved
 	oldFeed := *f
 	updatedFeed := oldFeed
 	f = &updatedFeed
@@ -765,7 +798,7 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		update.Custom.Language = newLang
 	}
 	languageChanged := (oldLang != newLang) && (oldLang != "" || newLang != "")
-	shouldRedownload := update.Redownload || languageChanged
+	shouldRedownload := !isAudiobookFeed(f) && (update.Redownload || languageChanged)
 
 	if update.PageSize > 0 {
 		f.PageSize = update.PageSize
@@ -808,8 +841,18 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.PlaylistSort = ""
 	}
 
-	if update.CronSchedule != "" {
+	if isAudiobookFeed(f) {
+		f.CronSchedule = ""
+	} else if update.CronSchedule != "" {
 		f.CronSchedule = update.CronSchedule
+	}
+	if !isAudiobookFeed(f) && f.CronSchedule != "" {
+		if _, err := cron.ParseStandard(f.CronSchedule); err != nil {
+			return errors.Wrap(err, "invalid update schedule")
+		}
+	}
+	if err := m.checkUpdateCapacityLocked(); err != nil {
+		return err
 	}
 	if err := m.saveFeedToConfig(f); err != nil {
 		return err
@@ -824,6 +867,7 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	if m.db != nil {
 		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
 			dbFeed.PrivateFeed = f.PrivateFeed
+			dbFeed.Episodes = nil // Metadata-only update must not replace a concurrent chapter scan.
 			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
 				log.WithError(err).Warnf("failed to update private feed state for %q", id)
 			}
@@ -831,7 +875,13 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	}
 
 	// Reschedule cron if cron_schedule changed
-	if update.CronSchedule != "" && update.CronSchedule != oldFeed.CronSchedule {
+	if isAudiobookFeed(f) && m.cron != nil {
+		if oldID, ok := m.cronEntries[id]; ok {
+			m.cron.Remove(oldID)
+			delete(m.cronEntries, id)
+		}
+	}
+	if !isAudiobookFeed(f) && update.CronSchedule != "" && update.CronSchedule != oldFeed.CronSchedule {
 		if m.cron != nil {
 			if oldID, ok := m.cronEntries[id]; ok {
 				m.cron.Remove(oldID)
@@ -870,29 +920,9 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 			}
 			return nil
 		})
-
-		m.markQueuedLocked(id)
-		select {
-		case m.updates <- f:
-			log.Infof("queued immediate update for feed %q after redownload reset", id)
-		default:
-			m.queuedUpdates[id]--
-			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
-		}
 	}
 
-	if !shouldRedownload && m.updates != nil {
-		m.markQueuedLocked(id)
-		select {
-		case m.updates <- f:
-			log.Infof("queued immediate update for feed %q after settings change", id)
-		default:
-			m.queuedUpdates[id]--
-			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
-		}
-	}
-
-	return nil
+	return m.queueUpdateLocked(f)
 }
 
 func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
@@ -918,6 +948,8 @@ func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 	}
 	if f.CronSchedule != "" {
 		tree.Set(prefix+".cron_schedule", f.CronSchedule)
+	} else {
+		tree.Delete(prefix + ".cron_schedule")
 	}
 	if f.MaxHeight > 0 {
 		tree.Set(prefix+".max_height", int64(f.MaxHeight))
@@ -1779,6 +1811,10 @@ func (m *AppFeedManager) DownloadLogs(ctx context.Context) ([]byte, string, erro
 func (m *AppFeedManager) GetAudiobooksDir() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	return m.audiobooksDirLocked()
+}
+
+func (m *AppFeedManager) audiobooksDirLocked() string {
 	if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
 		return m.cfg.Audiobooks.Dir
 	}
@@ -1793,7 +1829,7 @@ func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.Audiobook
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	baseDir := m.GetAudiobooksDir()
+	baseDir := m.audiobooksDirLocked()
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, errors.Wrapf(err, "failed to access audiobooks directory: %s", baseDir)
 	}
@@ -1947,27 +1983,29 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 	}
 
 	baseDir := m.GetAudiobooksDir()
-	fullPath := filepath.Join(baseDir, cleanedDir)
-	if stat, err := os.Stat(fullPath); err != nil || !stat.IsDir() {
-		if stat, err := os.Stat(cleanedDir); err == nil && stat.IsDir() {
-			fullPath = cleanedDir
-		} else {
-			return nil, errors.Errorf("audiobook directory %q does not exist", fullPath)
-		}
+	if filepath.IsAbs(cleanedDir) || cleanedDir == "." {
+		return nil, errors.New("book must be a subdirectory of the audiobook library")
 	}
-
-	schedule := req.CronSchedule
-	if schedule == "" {
-		schedule = "@every 12h"
+	rootPath, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot access audiobook library")
+	}
+	fullPath, err := filepath.EvalSymlinks(filepath.Join(rootPath, cleanedDir))
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot access audiobook folder")
+	}
+	rel, err := filepath.Rel(rootPath, fullPath)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil, errors.New("book folder is outside the audiobook library")
 	}
 
 	newFeed := &feed.Config{
 		ID:           id,
 		URL:          fmt.Sprintf("audiobook://%s", cleanedDir),
-		Format:       model.FormatCustom,
+		Format:       model.FormatAudio,
+		Quality:      model.QualityHigh,
 		PlaylistSort: model.SortingAsc,
 		PageSize:     1000,
-		CronSchedule: schedule,
 		AudiobookDir: fullPath,
 	}
 
@@ -1982,16 +2020,15 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 		newFeed.PrivateFeed = true
 	}
 
-	if err := m.AddFeed(ctx, newFeed); err != nil {
+	abBuilder, err := builder.NewAudiobookBuilder(baseDir)
+	if err != nil {
 		return nil, err
 	}
-
-	// Build audiobook feed metadata and chapters immediately so chapters are available right away
-	abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
-	if bErr == nil {
-		if builtFeed, bErr := abBuilder.Build(ctx, newFeed); bErr == nil && builtFeed != nil {
-			_ = m.db.AddFeed(ctx, newFeed.ID, builtFeed)
-		}
+	if _, err := abBuilder.Build(ctx, newFeed); err != nil {
+		return nil, errors.Wrap(err, "cannot import audiobook")
+	}
+	if err := m.AddFeed(ctx, newFeed); err != nil {
+		return nil, err
 	}
 
 	return newFeed, nil
@@ -2025,6 +2062,27 @@ func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io
 
 	targetPath := filepath.Join(cleanBookDir, cleanFilename)
 	out, err := root.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if os.IsExist(err) {
+		// Retrying an interrupted multi-file upload may include completed files.
+		existing, openErr := root.Open(targetPath)
+		if openErr != nil {
+			return openErr
+		}
+		defer existing.Close()
+		oldHash, newHash := sha256.New(), sha256.New()
+		oldSize, readErr := io.Copy(oldHash, existing)
+		if readErr != nil {
+			return readErr
+		}
+		newSize, readErr := io.Copy(newHash, r)
+		if readErr != nil {
+			return readErr
+		}
+		if oldSize == newSize && bytes.Equal(oldHash.Sum(nil), newHash.Sum(nil)) {
+			return nil
+		}
+		return errors.New("file already exists with different content; choose a different filename")
+	}
 	if err != nil {
 		return errors.Wrap(err, "failed to create destination file")
 	}
@@ -2033,7 +2091,11 @@ func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io
 		_ = root.Remove(targetPath)
 		return errors.Wrap(err, "failed to write file")
 	}
-	return out.Close()
+	if err := out.Close(); err != nil {
+		_ = root.Remove(targetPath)
+		return err
+	}
+	return nil
 }
 
 func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {

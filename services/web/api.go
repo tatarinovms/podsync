@@ -57,18 +57,18 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)
 	mux.Handle("/api/v1/auth/password", s.authMiddleware(http.HandlerFunc(s.handleAuthPassword)))
 
-	mux.HandleFunc("/api/v1/feeds/status", s.handleFeedsStatus)
-	mux.HandleFunc("/api/v1/feeds", s.handleFeeds)
-	mux.HandleFunc("/api/v1/feeds/", s.handleFeedSubroutes)
+	mux.Handle("/api/v1/feeds/status", s.authMiddleware(http.HandlerFunc(s.handleFeedsStatus)))
+	mux.Handle("/api/v1/feeds", s.authMiddleware(http.HandlerFunc(s.handleFeeds)))
+	mux.Handle("/api/v1/feeds/", s.authMiddleware(http.HandlerFunc(s.handleFeedSubroutes)))
 
-	mux.HandleFunc("/api/v1/tokens", s.handleTokens)
-	mux.HandleFunc("/api/v1/system", s.handleSystem)
-	mux.HandleFunc("/api/v1/system/errors", s.handleSystemErrors)
-	mux.HandleFunc("/api/v1/system/recent", s.handleSystemRecent)
-	mux.HandleFunc("/api/v1/system/status", s.handleSystemStatus)
-	mux.HandleFunc("/api/v1/system/logs", s.handleSystemLogs)
-	mux.HandleFunc("/api/v1/system/logs/level", s.handleSystemLogLevel)
-	mux.HandleFunc("/api/v1/system/logs/download", s.handleSystemLogsDownload)
+	mux.Handle("/api/v1/tokens", s.authMiddleware(http.HandlerFunc(s.handleTokens)))
+	mux.Handle("/api/v1/system", s.authMiddleware(http.HandlerFunc(s.handleSystem)))
+	mux.Handle("/api/v1/system/errors", s.authMiddleware(http.HandlerFunc(s.handleSystemErrors)))
+	mux.Handle("/api/v1/system/recent", s.authMiddleware(http.HandlerFunc(s.handleSystemRecent)))
+	mux.Handle("/api/v1/system/status", s.authMiddleware(http.HandlerFunc(s.handleSystemStatus)))
+	mux.Handle("/api/v1/system/logs", s.authMiddleware(http.HandlerFunc(s.handleSystemLogs)))
+	mux.Handle("/api/v1/system/logs/level", s.authMiddleware(http.HandlerFunc(s.handleSystemLogLevel)))
+	mux.Handle("/api/v1/system/logs/download", s.authMiddleware(http.HandlerFunc(s.handleSystemLogsDownload)))
 
 	mux.Handle("/api/v1/downloader", s.authMiddleware(http.HandlerFunc(s.handleDownloader)))
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
@@ -1005,7 +1005,7 @@ func (s *Server) handleAudiobookUpload(w http.ResponseWriter, r *http.Request) {
 		err = s.adminMgr.SaveAudiobookFile(bookDir, fh.Filename, file)
 		file.Close()
 		if err != nil {
-			s.writeError(w, http.StatusInternalServerError, "failed to save file "+fh.Filename+": "+err.Error())
+			s.writeJSON(w, http.StatusInternalServerError, map[string]interface{}{"error": "failed to save file " + fh.Filename + ": " + err.Error(), "uploaded": savedCount})
 			return
 		}
 		savedCount++
@@ -1025,9 +1025,14 @@ func (s *Server) handleAudiobookUpload(w http.ResponseWriter, r *http.Request) {
 			Author:      author,
 			Description: desc,
 		})
-		if err == nil {
-			createdFeed = feedCfg
+		if err != nil {
+			s.writeJSON(w, http.StatusUnprocessableEntity, map[string]interface{}{
+				"error":    "files uploaded, but import failed: " + err.Error(),
+				"uploaded": savedCount, "book_dir": bookDir, "imported": false,
+			})
+			return
 		}
+		createdFeed = feedCfg
 	}
 
 	resp := map[string]interface{}{

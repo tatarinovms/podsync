@@ -740,3 +740,57 @@
             border-color: var(--ctp-blue);
             color: var(--ctp-blue);
         }
+
+        .min-w-0 {
+            min-width: 0;
+        }
+
+        #episodes-list .list-group-item {
+            background-color: var(--ctp-base);
+            color: var(--ctp-text);
+            border-color: var(--ctp-surface1);
+        }
+
+        #episodes-feed-title {
+            overflow-wrap: anywhere;
+        }
+
+        #episodes-list .episode-error {
+            background-color: rgba(var(--ctp-red-rgb), 0.12);
+            color: var(--ctp-red);
+            border: 1px solid rgba(var(--ctp-red-rgb), 0.35);
+            overflow-wrap: anywhere;
+        }
+
+        /* Wide screen optimizations for Episodes & Settings Modals */
+        @media (min-width: 1200px) {
+            #episodesModal .modal-dialog {
+                max-width: 1140px;
+            }
+        }
+        @media (min-width: 1400px) {
+            #episodesModal .modal-dialog {
+                max-width: 1280px;
+            }
+        }
+        #episodesModal .modal-content {
+            max-height: 90vh;
+        }
+
+        /* Mobile screen optimizations for cards, buttons and modal layout */
+        @media (max-width: 576px) {
+            .container-fluid {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+            .feed-card, .card {
+                padding: 0.85rem !important;
+            }
+            .feed-card .btn, .card .btn {
+                font-size: 0.8rem;
+                padding: 0.25rem 0.5rem;
+            }
+            #episodesModal .modal-dialog {
+                margin: 0.5rem;
+            }
+        }

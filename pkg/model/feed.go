@@ -37,6 +37,7 @@ type Episode struct {
 	Thumbnail   string        `json:"thumbnail"`
 	Duration    int64         `json:"duration"`
 	VideoURL    string        `json:"video_url"`
+	MediaURL    string        `json:"media_url,omitempty"`
 	PubDate     time.Time     `json:"pub_date"`
 	Size        int64         `json:"size"`
 	Order       string        `json:"order"`

@@ -465,10 +465,10 @@
                         <!-- RSS URL Box with Copy and QR -->
                         <div class="d-flex align-items-center gap-1 mb-2">
                             <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
-                            <button class="btn btn-light btn-sm border" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
+                            <button class="btn btn-light btn-sm border flex-shrink-0" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
                                 <i class="bi bi-clipboard"></i>
                             </button>
-                            <button class="btn btn-light btn-sm border" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
+                            <button class="btn btn-light btn-sm border flex-shrink-0" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
                                 <i class="bi bi-qr-code"></i>
                             </button>
                         </div>
@@ -509,7 +509,7 @@
                                 <span class="stat-badge" id="feed-size-${escapeHtml(feed.id)}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
                                 <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ""}</span>
                             </div>
-                            <div class="d-flex gap-1">
+                            <div class="d-flex flex-wrap gap-1">
                                 <button class="btn btn-light btn-sm border" title="View episodes" ${actionAttrs("episodes", feed.id)}>
                                     <i class="bi bi-list-ul"></i> Episodes
                                 </button>
@@ -972,8 +972,8 @@
                 if (titleEl) titleEl.innerHTML = '<i class="bi bi-book text-primary me-2"></i>Audiobook Settings';
                 if (urlLabelEl) urlLabelEl.textContent = 'Audiobook Folder Path';
                 if (btnCustom) btnCustom.innerHTML = '<i class="bi bi-book me-1"></i>Book Metadata';
-                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>Schedule &amp; Access';
-                if (cronHelp) cronHelp.textContent = 'Schedule to periodically check local directory for newly added chapters.';
+                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>General &amp; Access';
+                document.getElementById('fs-cron-schedule').value = '';
 
                 if (navCleanup) navCleanup.classList.add('d-none');
                 if (navFilters) navFilters.classList.add('d-none');
@@ -983,7 +983,7 @@
                 if (channelSortRow) channelSortRow.classList.add('d-none');
                 if (channelRedownloadRow) channelRedownloadRow.classList.add('d-none');
                 if (channelYtdlArgsRow) channelYtdlArgsRow.classList.add('d-none');
-                if (cronCol) cronCol.className = 'col-sm-12';
+                if (cronCol) cronCol.className = 'col-sm-8 d-none';
 
                 // Activate Book Metadata tab first
                 if (btnCustom) {
@@ -1063,7 +1063,7 @@
                 quality: isAudiobook ? 'high' : document.getElementById('fs-quality').value,
                 max_height: isAudiobook ? 0 : (parseInt(document.getElementById('fs-max-height').value) || 0),
                 page_size: isAudiobook ? 50 : (parseInt(document.getElementById('fs-page-size').value) || 50),
-                cron_schedule: document.getElementById('fs-cron-schedule').value.trim(),
+                cron_schedule: isAudiobook ? '' : document.getElementById('fs-cron-schedule').value.trim(),
                 playlist_sort: isAudiobook ? '' : document.getElementById('fs-playlist-sort').value,
                 opml: opmlChecked,
                 private_feed: document.getElementById('fs-private-feed').checked || (document.getElementById('fs-book-private-feed') ? document.getElementById('fs-book-private-feed').checked : false),
@@ -1265,7 +1265,11 @@
         function viewFeedEpisodes(feedId) {
             return showEpisodes(feedId);
         }
+        let episodesRequestId = 0;
+        let episodeView = null;
+
         async function showEpisodes(feedId, openModal = true) {
+            const requestId = ++episodesRequestId;
             const modalEl = document.getElementById('episodesModal');
             modalEl.dataset.feedId = feedId;
             const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -1275,6 +1279,8 @@
             const isAudiobook = f && ((f.provider === 'audiobook') || (f.url && f.url.startsWith('audiobook://')));
             document.getElementById('episodes-feed-title').innerText = isAudiobook ? `Audiobook Chapters: ${f?.title || feedId}` : `Podcast: ${f?.title || feedId}`;
             if (openModal) {
+                document.getElementById('episodes-search').value = '';
+                document.getElementById('episodes-status-filter').value = 'all';
                 document.getElementById('episodes-feed-subtitle').innerText = isAudiobook ? 'Loading chapters...' : 'Loading episodes...';
                 listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
                 modal.show();
@@ -1284,83 +1290,85 @@
                 const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}`);
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
-                const episodes = data.episodes || [];
-
-                const downloadedCount = episodes.filter(e => e.status === 'downloaded').length;
-                const cleanedCount = episodes.filter(e => e.status === 'cleaned').length;
-                const errorCount = episodes.filter(e => e.status === 'error').length;
-                const queuedCount = episodes.filter(e => e.status === 'new').length;
-
-                const subtitleParts = [`Downloaded: ${downloadedCount}`];
-                if (cleanedCount > 0) subtitleParts.push(`Cleaned: ${cleanedCount}`);
-                if (errorCount > 0) subtitleParts.push(`Errors: ${errorCount}`);
-                if (queuedCount > 0) subtitleParts.push(`Queued: ${queuedCount}`);
-                if (episodes.length !== downloadedCount) subtitleParts.push(`Total: ${episodes.length}`);
-                document.getElementById('episodes-feed-subtitle').innerText = subtitleParts.join(' • ');
-
-                const feedTitle = data.feed?.title || f?.title || feedId;
-                const isAudiobookFeed = isAudiobook || (data.feed?.provider === 'audiobook');
-                document.getElementById('episodes-feed-title').innerText = isAudiobookFeed ? `Audiobook Chapters: ${feedTitle}` : `Podcast: ${feedTitle}`;
-
-                const unitName = isAudiobookFeed ? 'chapters' : 'episodes';
-                if (episodes.length === 0) {
-                    listEl.innerHTML = `
-                        <div class="p-4 text-center text-muted">
-                            <div class="mb-2"><i class="bi bi-inbox fs-4 d-block mb-2"></i>No ${unitName} in database for this feed yet.</div>
-                            <button class="btn btn-outline-primary btn-sm mt-1" ${actionAttrs("update", feedId)}><i class="bi bi-arrow-repeat me-1"></i> Scan / Update Feed Now</button>
-                        </div>`;
-                    return;
-                }
-
-                listEl.innerHTML = episodes.map(ep => {
-                    let statusBadge = '<span class="badge bg-secondary">Unknown</span>';
-                    let actionBtns = '';
-                    let sizeDisplay = `<i class="bi bi-hdd"></i> ${formatBytes(ep.size)}`;
-
-                    if (isAudiobookFeed && ep.status === 'downloaded' && (ep.video_url || ep.id)) {
-                        const playFilename = ep.video_url || ep.id;
-                        const audioSrc = `/${encodeURIComponent(feedId)}/${encodeURIComponent(playFilename)}`;
-                        actionBtns += `<a href="${safeUrl(audioSrc)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm py-0 px-2 mt-1 me-1" title="Stream chapter"><i class="bi bi-play-fill"></i> Play</a>`;
-                    }
-
-                    if (ep.status === 'downloaded') {
-                        statusBadge = '<span class="badge bg-success">Downloaded</span>';
-                    } else if (ep.status === 'new') {
-                        statusBadge = '<span class="badge bg-primary">Queued</span>';
-                        sizeDisplay = '<i class="bi bi-hourglass-split"></i> Pending';
-                    } else if (ep.status === 'error') {
-                        statusBadge = '<span class="badge bg-danger">Error</span>';
-                        actionBtns += `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" ${actionAttrs("retry", feedId, ep.id)}><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
-                    } else if (ep.status === 'cleaned') {
-                        statusBadge = '<span class="badge bg-light text-muted border">Cleaned (deleted from disk)</span>';
-                        sizeDisplay = '<i class="bi bi-trash"></i> 0 B (deleted)';
-                    }
-
-                    const errorAlert = ep.error ? `<div class="mt-2 p-2 rounded bg-danger-subtle border border-danger-subtle text-danger small font-monospace"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${escapeHtml(ep.error)}</div>` : "";
-
-                    return `
-                    <div class="list-group-item p-3">
-                        <div class="d-flex align-items-start justify-content-between gap-3">
-                            <div class="min-w-0">
-                                <h6 class="fw-semibold mb-1 text-break">${escapeHtml(ep.title || ep.id)}</h6>
-                                <div class="text-muted small d-flex flex-wrap gap-3">
-                                    <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
-                                    <span>${sizeDisplay}</span>
-                                    <span><i class="bi bi-calendar"></i> ${formatDate(ep.pub_date)}</span>
-                                </div>
-                                ${errorAlert}
-                            </div>
-                            <div class="text-end text-nowrap">
-                                <div>${statusBadge}</div>
-                                <div class="mt-1">${actionBtns}</div>
-                            </div>
-                        </div>
-                    </div>`;
-                }).join('');
-
+                if (requestId !== episodesRequestId || modalEl.dataset.feedId !== feedId) return;
+                episodeView = {
+                    feedId,
+                    title: data.feed?.title || f?.title || feedId,
+                    isAudiobook: !!isAudiobook || data.feed?.provider === 'audiobook',
+                    episodes: Array.isArray(data.episodes) ? data.episodes : []
+                };
+                renderEpisodeList();
             } catch (err) {
+                if (requestId !== episodesRequestId || modalEl.dataset.feedId !== feedId) return;
+                document.getElementById('episodes-feed-subtitle').innerText = 'Could not load episodes';
                 listEl.innerHTML = `<div class="p-4 text-center text-danger">Error: ${escapeHtml(err.message)}</div>`;
             }
+        }
+
+        function renderEpisodeList() {
+            if (!episodeView) return;
+            const { feedId, title, isAudiobook, episodes } = episodeView;
+            const listEl = document.getElementById('episodes-list');
+            const query = document.getElementById('episodes-search').value.trim().toLowerCase();
+            const status = document.getElementById('episodes-status-filter').value;
+            const visible = episodes.filter(ep =>
+                (status === 'all' || ep.status === status) &&
+                (String(ep.title || '') + ' ' + String(ep.id || '')).toLowerCase().includes(query));
+            const count = value => episodes.filter(ep => ep.status === value).length;
+            const parts = [`${isAudiobook ? 'Available' : 'Downloaded'}: ${count('downloaded')}`];
+            for (const [value, label] of [['new', 'Pending'], ['error', 'Errors'], ['cleaned', 'Cleaned']]) {
+                if (count(value)) parts.push(`${label}: ${count(value)}`);
+            }
+            parts.push(`Shown: ${visible.length} / ${episodes.length}`);
+            document.getElementById('episodes-feed-subtitle').innerText = parts.join(' • ');
+            document.getElementById('episodes-feed-title').innerText =
+                `${isAudiobook ? 'Audiobook Chapters' : 'Podcast'}: ${title}`;
+            if (!visible.length) {
+                listEl.innerHTML = episodes.length
+                    ? '<div class="p-4 text-center text-muted">No episodes match the search or status filter.</div>'
+                    : `<div class="p-4 text-center text-muted">No ${isAudiobook ? 'chapters' : 'episodes'} yet.
+                        <div><button class="btn btn-outline-primary btn-sm mt-2" ${actionAttrs("update", feedId)}>Scan / Update Feed Now</button></div></div>`;
+                return;
+            }
+            listEl.innerHTML = visible.map(ep => {
+                let badge = '<span class="badge bg-secondary">Unknown</span>';
+                let size = formatBytes(ep.size);
+                let actions = '';
+                if (ep.status === 'downloaded') {
+                    badge = `<span class="badge bg-success">${isAudiobook ? 'Available' : 'Downloaded'}</span>`;
+                    if (ep.media_url) actions += `<a href="${safeUrl(ep.media_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm" title="Play downloaded media"><i class="bi bi-play-fill"></i> Play</a>`;
+                } else if (ep.status === 'new') {
+                    badge = '<span class="badge bg-primary">Pending</span>';
+                    size = 'Not downloaded';
+                } else if (ep.status === 'error') {
+                    badge = '<span class="badge bg-danger">Error</span>';
+                    size = 'Not downloaded';
+                    actions += `<button class="btn btn-outline-danger btn-sm" ${actionAttrs("retry", feedId, ep.id)}><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+                } else if (ep.status === 'cleaned') {
+                    badge = '<span class="badge bg-secondary">Cleaned</span>';
+                    size = 'Deleted from disk';
+                }
+                if (!isAudiobook && /^https?:\/\//i.test(ep.video_url || '')) {
+                    actions += `<a href="${safeUrl(ep.video_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm">Source</a>`;
+                }
+                const error = ep.status === 'error' && ep.error
+                    ? `<div class="mt-2 p-2 rounded episode-error small text-break">${escapeHtml(ep.error)}</div>` : '';
+                const date = isAudiobook ? '' : `<span><i class="bi bi-calendar"></i> ${escapeHtml(formatDate(ep.pub_date))}</span>`;
+                return `<div class="list-group-item p-3">
+                    <div class="d-flex flex-column flex-sm-row align-items-start justify-content-between gap-3">
+                        <div class="min-w-0 flex-grow-1">
+                            <h6 class="fw-semibold mb-1 text-break">${isAudiobook && ep.order ? escapeHtml(ep.order) + '. ' : ''}${escapeHtml(ep.title || ep.id)}</h6>
+                            <div class="text-muted small d-flex flex-wrap gap-3">
+                                <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
+                                <span>${size}</span>${date}
+                            </div>${error}
+                        </div>
+                        <div class="flex-shrink-0 text-sm-end">
+                            ${badge}<div class="d-flex flex-wrap gap-1 mt-2 justify-content-sm-end">${actions}</div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         async function retryEpisode(feedId, episodeId) {
@@ -1379,16 +1387,17 @@
 
         function formatDuration(sec) {
             if (!sec) return '0:00';
-            const m = Math.floor(sec / 60);
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
             const s = Math.floor(sec % 60);
-            return `${m}:${s < 10 ? '0' : ''}${s}`;
+            return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
         }
 
         function formatDate(dateStr) {
             if (!dateStr) return '';
             try {
                 const d = new Date(dateStr);
-                return d.toLocaleDateString();
+                return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString();
             } catch (e) {
                 return dateStr;
             }
@@ -2528,10 +2537,10 @@
                             <!-- RSS URL Box with Copy and QR -->
                             <div class="d-flex align-items-center gap-1 mb-2">
                                 <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
-                                <button class="btn btn-light btn-sm border" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
+                                <button class="btn btn-light btn-sm border flex-shrink-0" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
                                     <i class="bi bi-clipboard"></i>
                                 </button>
-                                <button class="btn btn-light btn-sm border" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
+                                <button class="btn btn-light btn-sm border flex-shrink-0" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
                                     <i class="bi bi-qr-code"></i>
                                 </button>
                             </div>
@@ -2552,16 +2561,17 @@
                                 </a>
                             </div>
 
-                            <div class="d-flex justify-content-between small text-muted mb-3 border-top pt-2">
-                                <span role="button" ${actionAttrs("episodes", feed.id)} class="text-primary" style="cursor: pointer;" title="View Chapters"><i class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
-                                <span><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-primary btn-sm flex-grow-1" ${actionAttrs("copy", feed.feed_url)}><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
-                                <a href="${safeUrl(feed.feed_url, ['http:', 'https:'])}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm" title="Open RSS XML in new tab"><i class="bi bi-box-arrow-up-right"></i> XML</a>
-                                <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i class="bi bi-gear"></i></button>
-                                <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i class="bi bi-list-ol me-1"></i>Chapters</button>
-                                <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i class="bi bi-arrow-repeat"></i></button>
+                            <!-- Stats and Action Buttons -->
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span role="button" ${actionAttrs("episodes", feed.id)} class="stat-badge text-primary" style="cursor: pointer;" title="View Chapters"><i class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
+                                    <span class="stat-badge"><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i class="bi bi-list-ol me-1"></i>Chapters</button>
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i class="bi bi-gear me-1"></i>Settings</button>
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i class="bi bi-arrow-repeat me-1"></i>Update</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2608,7 +2618,7 @@
                 }
                 const data = await res.json();
                 closeModal('importAudiobookModal');
-                showToast(`Audiobook imported successfully as feed ${data.feed_id}!`);
+                showToast(`Book ${data.feed_id} imported; RSS generation queued.`);
                 await loadFeeds();
                 await loadAudiobookDirs();
                 renderAudiobookFeeds();
@@ -2620,7 +2630,7 @@
             }
         }
 
-        function submitUploadAudiobook() {
+        async function submitUploadAudiobook() {
             const bookDir = document.getElementById('upload-book-dir').value.trim();
             const audioFiles = document.getElementById('upload-audio-files').files;
             const coverFile = document.getElementById('upload-cover-file').files[0];
@@ -2635,80 +2645,63 @@
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('book_dir', bookDir);
-            formData.append('auto_import', autoImport ? '1' : '0');
-
-            for (let i = 0; i < audioFiles.length; i++) {
-                formData.append('files', audioFiles[i]);
+            const files = [...audioFiles, ...(coverFile ? [coverFile] : [])];
+            if (files.some(file => file.size > 1024 ** 3 - 1024 ** 2)) {
+                alert('Each file must be smaller than 1 GiB. Use folder import for larger files.');
+                return;
             }
-            if (coverFile) {
-                formData.append('cover', coverFile);
-            }
-
             const progressContainer = document.getElementById('upload-progress-container');
             const progressBar = document.getElementById('upload-progress-bar');
             const progressPct = document.getElementById('upload-progress-pct');
             const progressStatus = document.getElementById('upload-progress-status');
             const submitBtn = document.getElementById('btn-submit-upload-audiobook');
-
             progressContainer.classList.remove('d-none');
-            progressBar.style.width = '0%';
-            progressPct.textContent = '0%';
-            progressStatus.textContent = `Uploading ${audioFiles.length} file(s)...`;
             submitBtn.disabled = true;
-
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/v1/audiobooks/upload', true);
-
-            xhr.upload.onprogress = function(e) {
-                if (e.lengthComputable) {
-                    const percent = Math.round((e.loaded / e.total) * 100);
-                    progressBar.style.width = percent + '%';
-                    progressPct.textContent = percent + '%';
-                    if (percent === 100) {
-                        progressStatus.textContent = 'Processing files on server...';
-                    }
+            let completed = 0;
+            try {
+                for (const file of files) {
+                    const formData = new FormData();
+                    formData.append('book_dir', bookDir);
+                    formData.append('auto_import', autoImport && completed === files.length - 1 ? '1' : '0');
+                    formData.append('files', file);
+                    progressStatus.textContent = `Uploading ${completed + 1} / ${files.length}: ${file.name}`;
+                    await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', '/api/v1/audiobooks/upload', true);
+                        xhr.upload.onprogress = e => {
+                            if (!e.lengthComputable) return;
+                            const percent = Math.floor((completed + e.loaded / e.total) / files.length * 100);
+                            progressBar.style.width = percent + '%';
+                            progressPct.textContent = percent + '%';
+                            if (e.loaded === e.total) progressStatus.textContent = 'Processing files / preparing book...';
+                        };
+                        xhr.onload = () => {
+                            let result;
+                            try { result = JSON.parse(xhr.responseText); }
+                            catch { reject(new Error('Invalid response; retry the upload to check saved files.')); return; }
+                            if (xhr.status >= 200 && xhr.status < 300) resolve(result);
+                            else reject(new Error(result.error || 'Upload failed'));
+                        };
+                        xhr.onerror = () => reject(new Error('Network error. Retry with the same files; completed identical files will be skipped.'));
+                        xhr.send(formData);
+                    });
+                    completed++;
                 }
-            };
-
-            xhr.onload = function() {
-                submitBtn.disabled = false;
-                if (xhr.status === 200 || xhr.status === 201) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        closeModal('uploadAudiobookModal');
-                        showToast(`Successfully uploaded ${data.uploaded} file(s) for "${data.book_dir}"!`);
-                        document.getElementById('upload-audiobook-form').reset();
-                        progressContainer.classList.add('d-none');
-                        loadFeeds().then(() => {
-                            loadAudiobookDirs();
-                            renderAudiobookFeeds();
-                        });
-                    } catch (e) {
-                        alert('Upload succeeded but failed to parse response');
-                    }
-                } else {
-                    let errMsg = 'Upload failed';
-                    try {
-                        const err = JSON.parse(xhr.responseText);
-                        if (err.error) errMsg = err.error;
-                    } catch (e) {
-                        errMsg = xhr.statusText || errMsg;
-                    }
-                    alert('Upload failed: ' + errMsg);
-                    progressContainer.classList.add('d-none');
-                }
-            };
-
-            xhr.onerror = function() {
-                submitBtn.disabled = false;
-                alert('Network error during upload');
+                closeModal('uploadAudiobookModal');
+                showToast(autoImport ? 'Files uploaded; book queued for RSS generation.' : 'Files uploaded. Import the folder or update its existing feed.');
+                document.getElementById('upload-audiobook-form').reset();
                 progressContainer.classList.add('d-none');
-            };
-
-            xhr.send(formData);
+            } catch (err) {
+                progressStatus.textContent = err.message;
+                alert(err.message);
+            } finally {
+                submitBtn.disabled = false;
+                await loadFeeds();
+                await loadAudiobookDirs();
+                renderAudiobookFeeds();
+            }
         }
+
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 if (updatePollTimer) {

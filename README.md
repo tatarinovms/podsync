@@ -205,7 +205,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 
 ## Model Context Protocol (MCP) Server
 
-Podsync includes a built-in **MCP Server** with 21 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
+Podsync includes a built-in **MCP Server** with 22 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
 
 An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). See the [MCP Guide](./docs/mcp.md) for full details and setup instructions.
 
@@ -303,3 +303,26 @@ docker compose up -d
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
+### Importing and updating local books
+
+Set `[audiobooks].dir` in `config.toml` (or `PODSYNC_AUDIOBOOKS_DIR`).
+The default is an `audiobooks` folder beside the config. With the bundled Docker
+compose, `./data/audiobooks` is available at `/app/data/audiobooks`; an external
+library can instead be mounted with `/your/books:/app/data/audiobooks`.
+Use a writable mount for web uploads or embedded cover extraction.
+
+Put each book in a separate subfolder and import it from **Admin → Audiobooks**.
+Subfolders are discovered, but are not subscribed automatically. Chapters are
+served in place. Books do not run on cron; use **Update** after changing files
+or chapter tags. New books added directly to the config receive an initial build
+on startup when their database entry or RSS is missing.
+
+Web uploads send one file at a time (each must be smaller than 1 GiB); larger
+files can be imported from the library folder. Retrying the same upload accepts
+identical existing files and rejects conflicting content. Upload and import errors
+are reported separately. A queued import means RSS generation is still pending.
+
+**Hide from podcast directories** requests exclusion from public directories.
+It does not restrict access to RSS or media URLs.

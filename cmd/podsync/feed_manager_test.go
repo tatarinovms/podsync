@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -571,4 +572,109 @@ func TestGetFeedDetail_AudiobookDynamicScan(t *testing.T) {
 	require.Len(t, episodes, 2)
 	assert.Equal(t, "01_intro.mp3", episodes[0].ID)
 	assert.Equal(t, "02_chapter.mp3", episodes[1].ID)
+}
+
+func TestAudiobookUpdatesWithoutCron(t *testing.T) {
+	ctx := context.Background()
+	updates := make(chan *feed.Config, 4)
+	mgr := &AppFeedManager{
+		feeds:       make(map[string]*feed.Config),
+		updates:     updates,
+		cron:        cron.New(),
+		cronEntries: make(map[string]cron.EntryID),
+	}
+	book := &feed.Config{ID: "book", URL: "audiobook://Dune", CronSchedule: "@every 1h"}
+	require.NoError(t, mgr.AddFeed(ctx, book))
+	assert.Empty(t, book.CronSchedule)
+	assert.Empty(t, mgr.cron.Entries())
+	require.Len(t, updates, 1)
+	assert.Equal(t, "book", (<-updates).ID)
+
+	require.NoError(t, mgr.TriggerUpdate(ctx, "book"))
+	require.Len(t, updates, 1)
+	<-updates
+
+	// Remove a legacy schedule when saving book settings.
+	entry, err := mgr.cron.AddFunc("@every 1h", func() {})
+	require.NoError(t, err)
+	mgr.cronEntries["book"] = entry
+	require.NoError(t, mgr.UpdateFeed(ctx, "book", &web.FeedConfigUpdate{
+		CronSchedule: "@every 2h",
+		Custom:       feed.Custom{Title: "Updated book"},
+	}))
+	assert.Empty(t, mgr.feeds["book"].CronSchedule)
+	assert.Empty(t, mgr.cron.Entries())
+	require.Len(t, updates, 1)
+	assert.Equal(t, "Updated book", (<-updates).Custom.Title)
+
+	require.NoError(t, mgr.AddFeed(ctx, &feed.Config{ID: "channel", URL: "https://www.youtube.com/channel/UCtest"}))
+	assert.Equal(t, "@every 12h", mgr.feeds["channel"].CronSchedule)
+	assert.Len(t, mgr.cron.Entries(), 1)
+}
+
+func TestInvalidScheduleAndFullQueueDoNotChangeFeed(t *testing.T) {
+	ctx := context.Background()
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	initial := "[feeds.channel]\nurl = \"https://youtube.com/channel/UCtest\"\ncron_schedule = \"@every 1h\"\n"
+	require.NoError(t, os.WriteFile(configPath, []byte(initial), 0600))
+	cfg := &feed.Config{ID: "channel", URL: "https://youtube.com/channel/UCtest", CronSchedule: "@every 1h", PrivateFeed: true}
+	mgr := &AppFeedManager{configPath: configPath, feeds: map[string]*feed.Config{"channel": cfg},
+		updates: make(chan *feed.Config, 1), cron: cron.New(), cronEntries: make(map[string]cron.EntryID)}
+	entry, err := mgr.cron.AddFunc(cfg.CronSchedule, func() {})
+	require.NoError(t, err)
+	mgr.cronEntries[cfg.ID] = entry
+	var patch web.FeedConfigUpdate
+	require.NoError(t, json.Unmarshal([]byte(`{"cron_schedule":"nonsense"}`), &patch))
+	require.Error(t, mgr.UpdateFeed(ctx, cfg.ID, &patch))
+	assert.Equal(t, entry, mgr.cronEntries[cfg.ID])
+	assert.Same(t, cfg, mgr.feeds[cfg.ID])
+
+	mgr.updates <- cfg
+	require.NoError(t, json.Unmarshal([]byte(`{"custom":{"title":"Changed"}}`), &patch))
+	require.ErrorContains(t, mgr.UpdateFeed(ctx, cfg.ID, &patch), "queue is full")
+	require.Error(t, mgr.AddFeed(ctx, &feed.Config{ID: "new", URL: cfg.URL}))
+	assert.NotContains(t, mgr.feeds, "new")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, initial, string(data))
+	assert.Empty(t, cfg.Custom.Title)
+}
+
+func TestImportAudiobookRejectsEmptyAndOutsideFolders(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, "empty"), 0755))
+	require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(root, "outside")))
+	mgr := &AppFeedManager{cfg: &Config{Audiobooks: AudiobooksConfig{Dir: root}},
+		feeds: make(map[string]*feed.Config), updates: make(chan *feed.Config, 2)}
+	for _, folder := range []string{"empty", "outside"} {
+		_, err := mgr.ImportAudiobook(context.Background(), &web.ImportAudiobookRequest{DirName: folder, ID: folder})
+		require.Error(t, err)
+	}
+	assert.Empty(t, mgr.feeds)
+	assert.Empty(t, mgr.updates)
+}
+
+func TestAudiobookUploadRetryAcceptsIdenticalFiles(t *testing.T) {
+	mgr := &AppFeedManager{cfg: &Config{Audiobooks: AudiobooksConfig{Dir: t.TempDir()}}}
+	require.NoError(t, mgr.SaveAudiobookFile("book", "01.mp3", strings.NewReader("audio")))
+	require.NoError(t, mgr.SaveAudiobookFile("book", "01.mp3", strings.NewReader("audio")))
+	require.Error(t, mgr.SaveAudiobookFile("book", "01.mp3", strings.NewReader("different")))
+}
+
+func TestEpisodeDetailOrderAndMediaLinks(t *testing.T) {
+	now := time.Now()
+	mgr := &AppFeedManager{
+		cfg:   &Config{Server: web.Config{Hostname: "https://example.com", Path: "podcasts"}},
+		feeds: map[string]*feed.Config{"show": {ID: "show", URL: "https://youtube.com/channel/UCtest", Format: model.FormatAudio}},
+		db: &mockFeedManagerDB{episodes: map[string]map[string]*model.Episode{"show": {
+			"old": {ID: "old", PubDate: now.Add(-time.Hour), Status: model.EpisodeCleaned},
+			"new": {ID: "new", Title: "Newest", PubDate: now, Status: model.EpisodeDownloaded},
+		}}},
+	}
+	_, episodes, err := mgr.GetFeedDetail(context.Background(), "show")
+	require.NoError(t, err)
+	require.Len(t, episodes, 2)
+	assert.Equal(t, "new", episodes[0].ID)
+	assert.Contains(t, episodes[0].MediaURL, "https://example.com/podcasts/show/")
+	assert.Empty(t, episodes[1].MediaURL)
 }

@@ -5,6 +5,7 @@ import (
 	"expvar"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -52,6 +53,23 @@ type Config struct {
 	NoListing bool `toml:"no_listing"`
 	// Admin panel configuration
 	Admin AdminConfig `toml:"admin"`
+}
+
+// PublicURL is shared by RSS generation and the admin UI, including the mount path.
+func (c Config) PublicURL() string {
+	host := strings.TrimRight(c.Hostname, "/")
+	if host == "" {
+		port := c.Port
+		if port == 0 {
+			port = 8080
+		}
+		host = fmt.Sprintf("http://localhost:%d", port)
+	}
+	mount := strings.Trim(c.Path, "/")
+	if mount != "" && !strings.HasSuffix(host, "/"+mount) {
+		host += "/" + mount
+	}
+	return host
 }
 
 func (s *Server) SetAdminManager(mgr AdminManager) {
@@ -168,7 +186,7 @@ func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	// Walk through all feeds to count recent failures
 	err := s.db.WalkFeeds(ctx, func(feed *model.Feed) error {
 		return s.db.WalkEpisodes(ctx, feed.ID, func(episode *model.Episode) error {
-			if episode.Status == model.EpisodeError && episode.PubDate.After(cutoffTime) {
+			if episode.Status == model.EpisodeError && episode.ErrorAt != nil && episode.ErrorAt.After(cutoffTime) {
 				failedCount++
 			}
 			return nil

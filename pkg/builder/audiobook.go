@@ -18,6 +18,8 @@ import (
 	"github.com/mxpv/podsync/pkg/model"
 )
 
+var ErrEmptyAudiobook = errors.New("no supported audio files found")
+
 var defaultSupportedAudiobookExtensions = []string{
 	".mp3", ".m4b", ".m4a", ".aac", ".ogg", ".opus", ".flac",
 }
@@ -182,7 +184,7 @@ func (b *AudiobookBuilder) Build(ctx context.Context, cfg *feed.Config) (*model.
 	}
 
 	if len(audioFiles) == 0 {
-		return nil, errors.Errorf("no supported audio files found in %s", bookDir)
+		return nil, errors.Wrapf(ErrEmptyAudiobook, "directory %s", bookDir)
 	}
 
 	// Natural sort by filename: "Chapter 1", "Chapter 2", ..., "Chapter 10"

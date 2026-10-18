@@ -292,7 +292,7 @@ func (s *Server) getToolDefinitions() []Tool {
 		},
 		{
 			Name:        "update_feed_config",
-			Description: "Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed)",
+			Description: "Update only supplied settings for an existing podcast feed; omitted settings are preserved (cron schedule, format, quality, page_size, retention keep_last, max_height, playlist_sort, private_feed)",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertyDef{
@@ -754,36 +754,14 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		if !ok || strings.TrimSpace(feedID) == "" {
 			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
 		}
+		// Decode the supplied fields as a patch, preserving omitted values.
+		payload, err := json.Marshal(args)
+		if err != nil {
+			return CallToolResult{}, err
+		}
 		var update web.FeedConfigUpdate
-		if rawSchedule, ok := args["cron_schedule"].(string); ok {
-			update.CronSchedule = rawSchedule
-		}
-		if rawPageSize, ok := args["page_size"].(float64); ok {
-			update.PageSize = int(rawPageSize)
-		}
-		if rawQuality, ok := args["quality"].(string); ok {
-			update.Quality = rawQuality
-		}
-		if rawFormat, ok := args["format"].(string); ok {
-			update.Format = rawFormat
-		}
-		if rawMaxHeight, ok := args["max_height"].(float64); ok {
-			update.MaxHeight = int(rawMaxHeight)
-		}
-		if rawKeepLast, ok := args["keep_last"].(float64); ok {
-			update.KeepLast = int(rawKeepLast)
-		}
-		if rawSort, ok := args["playlist_sort"].(string); ok {
-			update.PlaylistSort = rawSort
-		}
-		if rawPrivate, ok := args["private_feed"].(bool); ok {
-			update.PrivateFeed = rawPrivate
-		}
-		if rawLang, ok := args["language"].(string); ok {
-			update.Custom.Language = strings.TrimSpace(rawLang)
-		}
-		if rawRedownload, ok := args["redownload"].(bool); ok {
-			update.Redownload = rawRedownload
+		if err := json.Unmarshal(payload, &update); err != nil {
+			return CallToolResult{}, err
 		}
 		if err := s.mgr.UpdateFeed(ctx, feedID, &update); err != nil {
 			return CallToolResult{}, err

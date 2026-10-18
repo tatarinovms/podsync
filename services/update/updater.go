@@ -142,6 +142,16 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	// Query API to get episodes
 	log.Debug("building feed")
 	result, err := provider.Build(ctx, feedConfig)
+	if info.Provider == model.ProviderAudiobook && errors.Is(err, builder.ErrEmptyAudiobook) {
+		// An emptied existing book must not keep broken chapter links in RSS.
+		existing, readErr := u.db.GetFeed(ctx, feedConfig.ID)
+		if readErr != nil {
+			return err
+		}
+		existing.Episodes = make([]*model.Episode, 0)
+		existing.UpdatedAt = time.Now().UTC()
+		return u.db.AddFeed(ctx, feedConfig.ID, existing)
+	}
 	if err != nil {
 		return err
 	}

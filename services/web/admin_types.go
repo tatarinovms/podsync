@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"time"
 
@@ -62,6 +63,8 @@ type FeedSummary struct {
 
 // FeedConfigUpdate contains all configurable parameters for an existing feed
 type FeedConfigUpdate struct {
+	fields map[string]json.RawMessage
+
 	PageSize         int          `json:"page_size"`
 	CronSchedule     string       `json:"cron_schedule"`
 	Quality          string       `json:"quality"`

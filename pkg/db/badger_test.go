@@ -204,3 +204,27 @@ func getFeed() *model.Feed {
 		UpdatedAt: time.Now().UTC(),
 	}
 }
+
+func TestAudiobookSnapshotRefreshesAndRemovesChapters(t *testing.T) {
+	database, err := NewBadger(&Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	defer database.Close()
+	ctx := context.Background()
+	book := &model.Feed{ID: "book", Provider: model.ProviderAudiobook, Episodes: []*model.Episode{
+		{ID: "01.mp3", Title: "Old title", Status: model.EpisodeDownloaded},
+		{ID: "02.mp3", Title: "Removed", Status: model.EpisodeDownloaded},
+	}}
+	require.NoError(t, database.AddFeed(ctx, book.ID, book))
+	book.Episodes = []*model.Episode{{ID: "01.mp3", Title: "New title", Size: 42, Order: "1", Status: model.EpisodeDownloaded}}
+	require.NoError(t, database.AddFeed(ctx, book.ID, book))
+	got, err := database.GetFeed(ctx, book.ID)
+	require.NoError(t, err)
+	require.Len(t, got.Episodes, 1)
+	assert.Equal(t, "New title", got.Episodes[0].Title)
+	assert.Equal(t, int64(42), got.Episodes[0].Size)
+	book.Episodes = []*model.Episode{}
+	require.NoError(t, database.AddFeed(ctx, book.ID, book))
+	got, err = database.GetFeed(ctx, book.ID)
+	require.NoError(t, err)
+	assert.Empty(t, got.Episodes)
+}

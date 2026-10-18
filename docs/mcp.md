@@ -53,7 +53,7 @@ The MCP server provides 22 specialized tools:
 | **`delete_feed`** | `feed_id` *(req)*, `delete_files` *(opt, def: false)* | Remove a feed and optionally delete its downloaded media files from disk. |
 | **`update_feed`** | `feed_id` *(req)* | Trigger an immediate update check and download cycle for a feed. |
 | **`update_all_feeds`** | `{}` | Trigger an immediate update check and download cycle for all configured feeds. |
-| **`update_feed_config`** | `feed_id` *(req)*, `cron_schedule`, `format`, `quality`, `page_size`, `keep_last`, `max_height`, `playlist_sort`, `private_feed`, `language` | Update settings for an existing podcast feed and save to `config.toml`. |
+| **`update_feed_config`** | `feed_id` *(req)*, `cron_schedule`, `format`, `quality`, `page_size`, `keep_last`, `max_height`, `playlist_sort`, `private_feed`, `language` | Update supplied settings and save to `config.toml`; omitted fields are preserved. Invalid schedules are rejected. Audiobooks ignore cron schedules. |
 | **`retry_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Reset an episode that failed to download so Podsync attempts downloading it again. |
 
 ### Downloader & Authentication

@@ -186,3 +186,11 @@ vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Al
   url = "https://vkvideo.ru/@labelcom"
   page_size = 20
   update_period = "6h"
+
+
+# Local audiobook library: one subfolder per book, chapters directly inside.
+# In the bundled Docker compose, ./data/audiobooks maps to this directory.
+# Open Admin > Audiobooks and import each folder. Files are served in place.
+# No cron is required: use Update after adding/removing chapters or editing tags.
+[audiobooks]
+  dir = "/app/data/audiobooks"

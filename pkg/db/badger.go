@@ -101,10 +101,33 @@ func (b *Badger) AddFeed(_ context.Context, feedID string, feed *model.Feed) err
 			return err
 		}
 
-		// Append new episodes
+		// A local book is a complete snapshot of its directory. Synchronize it
+		// atomically, while remote feeds retain downloaded historical episodes.
+		isBook := feed.Provider == model.ProviderAudiobook
+		if isBook && feed.Episodes != nil {
+			keep := make(map[string]bool, len(feed.Episodes))
+			for _, episode := range feed.Episodes {
+				keep[episode.ID] = true
+			}
+			opts := badger.DefaultIteratorOptions
+			opts.Prefix = b.getKey(episodePrefix, feedID)
+			if err := b.iterator(txn, opts, func(item *badger.Item) error {
+				var old model.Episode
+				if err := b.unmarshalObj(item, &old); err != nil {
+					return err
+				}
+				if !keep[old.ID] {
+					return txn.Delete(item.KeyCopy(nil))
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		// Append remote episodes; refresh all chapter metadata for local books.
 		for _, episode := range feed.Episodes {
 			episodeKey := b.getKey(episodePath, feedID, episode.ID)
-			err := b.setObj(txn, episodeKey, episode, false)
+			err := b.setObj(txn, episodeKey, episode, isBook)
 			if err == nil || err == model.ErrAlreadyExists {
 				// Do nothing
 			} else {

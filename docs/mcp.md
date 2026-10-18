@@ -33,7 +33,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 18 specialized tools:
+The MCP server provides 22 specialized tools:
 
 ### Monitoring & Status
 | Tool Name | Arguments | Description |
@@ -65,6 +65,13 @@ The MCP server provides 18 specialized tools:
 | **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |
 | **`delete_tokens`** | `provider` *(req)*, `index` *(opt)* | Delete a specific API token by index, or clear all configured tokens for a provider from `config.toml`. |
+
+### Audiobooks Management
+| Tool Name | Arguments | Description |
+|---|---|---|
+| **`list_audiobook_dirs`** | `{}` | List available directories in audiobooks storage, showing track count, total size, cover status, and linked feed status. |
+| **`import_audiobook`** | `dir_name` *(req)*, `feed_id`, `title`, `author`, `description`, `cron_schedule` | Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format). |
+| **`delete_audiobook_dir`** | `dir_name` *(req)* | Delete an audiobook folder and all its audio files from disk (and remove any linked podcast feed). |
 
 ### Resources & Prompts
 - **`podsync://feeds`**: Live JSON snapshot of all podcast feeds.

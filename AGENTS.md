@@ -139,7 +139,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes 21 MCP tools:
+Podsync exposes 22 MCP tools:
 - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
 - `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
 - `get_download_errors`, `get_recent_downloads`, `get_sync_status`

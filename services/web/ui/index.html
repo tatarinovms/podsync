@@ -715,7 +715,7 @@
                                     <tr>
                                         <td><code>add_feed</code></td>
                                         <td>Subscribe to YouTube/VK Video/Vimeo channel and save to config.toml</td>
-                                        <td><code>url</code>, <code>format</code>, <code>quality</code></td>
+                                        <td><code>url</code>, <code>format</code>, <code>quality</code>, <code>page_size</code>, <code>language</code> <em>(optional)</em></td>
                                     </tr>
                                     <tr>
                                         <td><code>delete_feed</code></td>
@@ -734,8 +734,8 @@
                                     </tr>
                                     <tr>
                                         <td><code>update_feed_config</code></td>
-                                        <td>Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, filters, custom metadata)</td>
-                                        <td><code>feed_id</code>, <code>cron_schedule</code>, <code>format</code>, <code>quality</code>, <code>page_size</code>, <code>keep_last</code>, ...</td>
+                                        <td>Update configuration settings for an existing podcast feed (cron schedule, format, quality, page_size, retention keep_last, language, max_height, filters)</td>
+                                        <td><code>feed_id</code>, <code>cron_schedule</code>, <code>format</code>, <code>quality</code>, <code>page_size</code>, <code>keep_last</code>, <code>language</code>, ...</td>
                                     </tr>
                                     <tr>
                                         <td><code>retry_episode</code></td>
@@ -781,6 +781,21 @@
                                         <td><code>get_system_logs</code></td>
                                         <td>Inspect recent server logs, filter by level (error, warn, info, debug) or search string</td>
                                         <td><code>limit</code>, <code>level</code>, <code>search</code>, <code>feed_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>list_audiobook_dirs</code></td>
+                                        <td>List available directories in audiobooks storage with track count, total size, cover status, and linked feed</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>import_audiobook</code></td>
+                                        <td>Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format)</td>
+                                        <td><code>dir_name</code>, <code>feed_id</code>, <code>title</code>, <code>author</code>, <code>cron_schedule</code> <em>(optional)</em></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>delete_audiobook_dir</code></td>
+                                        <td>Delete an audiobook folder from audiobooks storage on disk and remove any linked podcast feed</td>
+                                        <td><code>dir_name</code></td>
                                     </tr>
                                 </tbody>
                             </table>

@@ -459,7 +459,7 @@
                             <span class="badge badge-provider ${providerClass}">${escapeHtml((feed.provider || "").toUpperCase())}</span>
                         </div>
                         <div class="text-muted small text-truncate mb-2">
-                            ${feed.author ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
+                            ${(feed.author && feed.author !== "<notfound>") ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
                         </div>
 
                         <!-- RSS URL Box with Copy and QR -->
@@ -668,7 +668,7 @@
                 const matchesQuery = !query || (
                     (f.id && f.id.toLowerCase().includes(query)) ||
                     (f.title && f.title.toLowerCase().includes(query)) ||
-                    (f.author && f.author.toLowerCase().includes(query)) ||
+                    (f.author && f.author !== "<notfound>" && f.author.toLowerCase().includes(query)) ||
                     (f.provider && f.provider.toLowerCase().includes(query))
                 );
                 if (!matchesQuery) return false;
@@ -2530,7 +2530,7 @@
                                 </div>
                                 <div class="min-w-0 flex-grow-1">
                                     <h6 class="fw-bold mb-1 text-truncate" role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters (Click to open)" style="cursor: pointer;">${escapeHtml(feed.title || feed.id)}</h6>
-                                    <div class="text-muted small text-truncate">${feed.author ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
+                                    <div class="text-muted small text-truncate">${(feed.author && feed.author !== "<notfound>") ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
                                 </div>
                             </div>
 

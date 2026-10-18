@@ -233,10 +233,18 @@ func (yt *YouTubeBuilder) queryFeed(ctx context.Context, feed *model.Feed, info 
 			feed.Author = fmt.Sprintf("@%s", info.ItemID)
 		} else if channel.Kind == "youtube#channel" {
 			feed.ItemURL = fmt.Sprintf("https://youtube.com/channel/%s", channel.Id)
-			feed.Author = "<notfound>"
+			if channel.Snippet.CustomUrl != "" {
+				feed.Author = channel.Snippet.CustomUrl
+			} else {
+				feed.Author = channel.Snippet.Title
+			}
 		} else {
 			feed.ItemURL = fmt.Sprintf("https://youtube.com/user/%s", channel.Snippet.CustomUrl)
-			feed.Author = channel.Snippet.CustomUrl
+			if channel.Snippet.CustomUrl != "" {
+				feed.Author = channel.Snippet.CustomUrl
+			} else {
+				feed.Author = channel.Snippet.Title
+			}
 		}
 
 		feed.ItemID = channel.ContentDetails.RelatedPlaylists.Uploads

@@ -2366,6 +2366,33 @@
             toastEl.show();
         }
 
+        function closeModal(modalId) {
+            const el = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+            if (!el) return;
+            try {
+                const inst = bootstrap.Modal.getOrCreateInstance(el);
+                if (inst) inst.hide();
+            } catch (e) {
+                console.warn('Modal hide failed:', e);
+            }
+            // Fallback: cleanup DOM classes and backdrop in case Bootstrap animation is interrupted
+            setTimeout(() => {
+                if (el.classList.contains('show')) {
+                    el.classList.remove('show');
+                    el.setAttribute('aria-hidden', 'true');
+                    el.removeAttribute('aria-modal');
+                    el.style.display = 'none';
+                }
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                if (backdrops.length > 0) {
+                    backdrops.forEach(b => b.remove());
+                }
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }, 100);
+        }
+
         // Auth
         async function checkAuth() {
             try {
@@ -2467,8 +2494,7 @@
                 }
 
                 // Close modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
-                if (modal) modal.hide();
+                closeModal('changePasswordModal');
                 document.getElementById('changePasswordForm').reset();
 
                 showToast('Password updated successfully!');
@@ -3120,6 +3146,12 @@
             const feedId = document.getElementById('fs-feed-id').value;
             if (!feedId) return;
 
+            const saveBtn = event?.submitter || document.querySelector('#feed-settings-form button[type="submit"]');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Saving...';
+            }
+
             const ytdlArgsVal = document.getElementById('fs-ytdl-args').value.trim();
             const ytdlArgs = ytdlArgsVal ? ytdlArgsVal.split(/\s+/).filter(Boolean) : [];
 
@@ -3167,6 +3199,11 @@
                 });
 
                 if (res.ok) {
+                    closeModal('feedSettingsModal');
+                    showToast(`Settings for ${feedId} saved successfully`);
+                    await loadFeeds();
+                    renderAudiobookFeeds();
+
                     const isRedownloading = document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false;
                     if (isRedownloading) {
                         showToast(`Settings for ${feedId} saved. Redownloading episodes with updated language...`);
@@ -3180,24 +3217,25 @@
                         const pollInterval = setInterval(async () => {
                             pollCount++;
                             await loadFeeds();
+                            renderAudiobookFeeds();
                             if (pollCount >= 15) {
                                 clearInterval(pollInterval);
                                 updatingFeeds.delete(feedId);
                                 await loadFeeds();
+                                renderAudiobookFeeds();
                             }
                         }, 2000);
-                    } else {
-                        showToast(`Settings for ${feedId} saved`);
                     }
-                    const modalEl = document.getElementById('feedSettingsModal');
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                    loadFeeds();
                 } else {
                     alert(`Failed to save settings: ${await res.text()}`);
                 }
             } catch (err) {
                 alert(`Error: ${err.message}`);
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Settings';
+                }
             }
         }
 
@@ -3309,7 +3347,7 @@
                 });
 
                 if (res.ok) {
-                    bootstrap.Modal.getInstance(document.getElementById('addFeedModal')).hide();
+                    closeModal('addFeedModal');
                     document.getElementById('add-feed-form').reset();
                     document.getElementById('new-feed-id').dataset.manual = 'false';
                     const firstTab = document.querySelector('#addFeedTabs button[data-bs-target="#af-tab-general"]');
@@ -3333,17 +3371,20 @@
         });
 
         // Episodes
+        
+        function viewFeedEpisodes(feedId) {
+            return showEpisodes(feedId);
+        }
         async function showEpisodes(feedId, openModal = true) {
             const modalEl = document.getElementById('episodesModal');
-            let modal = bootstrap.Modal.getInstance(modalEl);
-            if (!modal) {
-                modal = new bootstrap.Modal(modalEl);
-            }
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
             const listEl = document.getElementById('episodes-list');
 
-            document.getElementById('episodes-feed-title').innerText = `Podcast: ${feedId}`;
+            const f = (allFeeds || []).find(x => x.id === feedId);
+            const isAudiobook = f && ((f.provider === 'audiobook') || (f.url && f.url.startsWith('audiobook://')));
+            document.getElementById('episodes-feed-title').innerText = isAudiobook ? `Audiobook Chapters: ${f?.title || feedId}` : `Podcast: ${f?.title || feedId}`;
             if (openModal) {
-                document.getElementById('episodes-feed-subtitle').innerText = 'Loading episodes...';
+                document.getElementById('episodes-feed-subtitle').innerText = isAudiobook ? 'Loading chapters...' : 'Loading episodes...';
                 listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
                 modal.show();
             }
@@ -3366,8 +3407,9 @@
                 if (episodes.length !== downloadedCount) subtitleParts.push(`Total: ${episodes.length}`);
                 document.getElementById('episodes-feed-subtitle').innerText = subtitleParts.join(' • ');
 
+                const unitName = isAudiobook ? 'chapters' : 'episodes';
                 if (episodes.length === 0) {
-                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No episodes in database for this feed yet.</div>`;
+                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No ${unitName} in database for this feed yet.</div>`;
                     return;
                 }
 
@@ -4610,7 +4652,7 @@
                     throw new Error(err.error || 'Failed to import audiobook');
                 }
                 const data = await res.json();
-                bootstrap.Modal.getInstance(document.getElementById('importAudiobookModal')).hide();
+                closeModal('importAudiobookModal');
                 showToast(`Audiobook imported successfully as feed ${data.feed_id}!`);
                 await loadFeeds();
                 await loadAudiobookDirs();
@@ -4680,7 +4722,7 @@
                 if (xhr.status === 200 || xhr.status === 201) {
                     try {
                         const data = JSON.parse(xhr.responseText);
-                        bootstrap.Modal.getInstance(document.getElementById('uploadAudiobookModal')).hide();
+                        closeModal('uploadAudiobookModal');
                         showToast(`Successfully uploaded ${data.uploaded} file(s) for "${data.book_dir}"!`);
                         document.getElementById('upload-audiobook-form').reset();
                         progressContainer.classList.add('d-none');

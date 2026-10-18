@@ -99,4 +99,16 @@ filtered = vm.runInContext('getFilteredFeeds()', context);
 assert.equal(filtered.length, 1);
 assert.equal(filtered[0].id, 'book1');
 
+
+// Test 5: Error badge rendering and clickable actions
+const cardHtml = vm.runInContext('renderFeedCardHTML({id: "errpod", title: "Error Podcast", error_count: 3, total_size: 1024, downloaded_count: 5, episode_count: 8})', context);
+assert(cardHtml.includes('data-ui-action="errors"'), "Missing data-ui-action=errors on error badge");
+assert(cardHtml.includes('data-ui-arg1="errpod"'), "Missing data-ui-arg1=errpod on error badge");
+assert(cardHtml.includes('role="button"'), "Missing role=button on error badge");
+assert(cardHtml.includes('3 errors'), "Missing error count text in badge");
+assert(cardHtml.includes('Click to view error log'), "Missing error badge tooltip");
+assert.equal(typeof context.showFeedErrors, "function", "showFeedErrors must be a function");
+assert.equal(typeof context.retryFeedError, "function", "retryFeedError must be a function");
+assert.equal(typeof context.retryAllErrorsForFeed, "function", "retryAllErrorsForFeed must be a function");
+
 console.log('UI search, filter, and rendering tests passed!');

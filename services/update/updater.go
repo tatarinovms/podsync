@@ -260,7 +260,7 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 
 	for idx, episode := range downloadList {
 		var (
-			logger      = log.WithFields(log.Fields{"index": idx, "episode_id": episode.ID})
+			logger      = log.WithFields(log.Fields{"feed_id": feedID, "index": idx, "episode_id": episode.ID})
 			episodeName = feed.EpisodeName(feedConfig, episode)
 		)
 

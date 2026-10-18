@@ -794,3 +794,14 @@
                 margin: 0.5rem;
             }
         }
+
+.stat-badge.text-danger[role="button"] {
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.stat-badge.text-danger[role="button"]:hover {
+    background-color: rgba(220, 53, 69, 0.15);
+    text-decoration: underline;
+}

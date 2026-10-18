@@ -303,7 +303,14 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 	output, err := dl.exec(ctx, args...)
 	if err != nil {
 		cleanMsg := CleanErrorMessage(output)
-		log.Errorf("youtube-dl download error for %s (%s): %s", episode.Title, episode.VideoURL, cleanMsg)
+		feedID := ""
+		if feedConfig != nil {
+			feedID = feedConfig.ID
+		}
+		log.WithFields(log.Fields{
+			"feed_id":    feedID,
+			"episode_id": episode.ID,
+		}).Errorf("youtube-dl download error for %s (%s): %s", episode.Title, episode.VideoURL, cleanMsg)
 
 		if strings.Contains(output, "HTTP Error 429") {
 			return nil, ErrTooManyRequests

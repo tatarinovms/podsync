@@ -158,7 +158,11 @@ func (b *Buffer) Query(f Filter) Result {
 
 		if f.FeedID != "" {
 			feedVal, ok := entry.Fields["feed_id"]
-			if !ok || !strings.EqualFold(fmt.Sprintf("%v", feedVal), f.FeedID) {
+			matched := ok && strings.EqualFold(fmt.Sprintf("%v", feedVal), f.FeedID)
+			if !matched && strings.Contains(strings.ToLower(entry.Message), strings.ToLower(f.FeedID)) {
+				matched = true
+			}
+			if !matched {
 				continue
 			}
 		}

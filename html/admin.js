@@ -40,6 +40,8 @@
                 case 'update': triggerUpdate(arg1); break;
                 case 'delete-feed': deleteFeed(arg1); break;
                 case 'logs': showLogsForFeed(arg1); break;
+                case 'errors': showFeedErrors(arg1); break;
+                case 'retry-error': retryFeedError(arg1, arg2); break;
                 case 'retry': retryEpisode(arg1, arg2); break;
                 case 'delete-token': deleteSingleToken(arg1, Number(arg2), arg3); break;
                 case 'add-token': addToken(arg1); break;
@@ -507,7 +509,7 @@
                             <div class="d-flex align-items-center gap-3">
                                 <span class="stat-badge" id="feed-ep-${escapeHtml(feed.id)}" title="${feed.downloaded_count ?? 0} downloaded on disk${(feed.episode_count ?? 0) > (feed.downloaded_count ?? 0) ? ` (${feed.episode_count} total in feed)` : ""}"><i class="bi bi-file-earmark-music"></i> ${feed.downloaded_count ?? 0} ep.</span>
                                 <span class="stat-badge" id="feed-size-${escapeHtml(feed.id)}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
-                                <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ""}</span>
+                                <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger" role="button" tabindex="0" title="Click to view error log" ${actionAttrs("errors", feed.id)}><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ""}</span>
                             </div>
                             <div class="d-flex flex-wrap gap-1">
                                 <button class="btn btn-light btn-sm border" title="View episodes" ${actionAttrs("episodes", feed.id)}>
@@ -596,7 +598,7 @@
                         const errEl = document.getElementById(`feed-err-${feed.id}`);
                         if (errEl) {
                             errEl.innerHTML = feed.error_count > 0 ?
-                                `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : "";
+                                `<span class="stat-badge text-danger" role="button" tabindex="0" title="Click to view error log" ${actionAttrs("errors", feed.id)}><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : "";
                         }
 
                         const lastErrEl = document.getElementById(`feed-lasterr-${feed.id}`);
@@ -2314,7 +2316,7 @@
             loadLogs(true);
         }
 
-        function showLogsForFeed(feedId) {
+        function showLogsForFeed(feedId, level = 'all') {
             const triggerEl = document.querySelector('button[data-bs-target="#tab-logs"]');
             if (triggerEl) {
                 bootstrap.Tab.getOrCreateInstance(triggerEl).show();
@@ -2324,14 +2326,230 @@
             if (feedSelect) {
                 feedSelect.value = feedId;
             }
-            currentLogsLevel = 'all';
-            const group = document.getElementById('logs-level-group');
-            if (group) {
-                Array.from(group.querySelectorAll('button')).forEach(b => b.classList.remove('active'));
-                const allBtn = group.querySelector('button');
-                if (allBtn) allBtn.classList.add('active');
+            setLogsLevel(level || 'all');
+        }
+
+        async function showFeedErrors(feedId) {
+            const modalEl = document.getElementById('feedErrorsModal');
+            if (!modalEl) return;
+
+            const titleEl = document.getElementById('feed-errors-title');
+            const subEl = document.getElementById('feed-errors-subtitle');
+            const bodyEl = document.getElementById('feed-errors-body');
+            const logsBtn = document.getElementById('btn-open-server-logs');
+            const retryAllBtn = document.getElementById('btn-retry-all-errors');
+
+            const feed = (allFeeds || []).find(f => f.id === feedId);
+            const feedTitle = feed ? (feed.title || feed.id) : feedId;
+
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> Error Log &mdash; ${escapeHtml(feedTitle)}`;
             }
-            loadLogs(true);
+            if (subEl) {
+                subEl.innerHTML = `Podcast ID: <code>${escapeHtml(feedId)}</code>`;
+            }
+            if (retryAllBtn) {
+                retryAllBtn.style.display = 'none';
+                retryAllBtn.onclick = null;
+            }
+            if (logsBtn) {
+                logsBtn.onclick = () => {
+                    const inst = bootstrap.Modal.getInstance(modalEl);
+                    if (inst) inst.hide();
+                    showLogsForFeed(feedId, 'error');
+                };
+            }
+
+            if (bodyEl) {
+                bodyEl.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <div class="spinner-border spinner-border-sm text-danger me-2" role="status"></div>
+                        Loading error details...
+                    </div>`;
+            }
+
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalInstance.show();
+
+            try {
+                const [errRes, logRes] = await Promise.all([
+                    fetch(`/api/v1/system/errors?feed_id=${encodeURIComponent(feedId)}&limit=50`),
+                    fetch(`/api/v1/system/logs?feed_id=${encodeURIComponent(feedId)}&level=error&limit=50`)
+                ]);
+
+                let errorItems = [];
+                if (errRes.ok) {
+                    const data = await errRes.json();
+                    errorItems = Array.isArray(data) ? data : (data?.errors || []);
+                }
+
+                let logEntries = [];
+                if (logRes.ok) {
+                    const logData = await logRes.json();
+                    logEntries = logData.entries || [];
+                }
+
+                if (!bodyEl) return;
+
+                const hasLastError = feed && feed.last_error;
+                const hasEpisodeErrors = errorItems.length > 0;
+                const hasLogs = logEntries.length > 0;
+
+                if (!hasLastError && !hasEpisodeErrors && !hasLogs) {
+                    bodyEl.innerHTML = `
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
+                            <h6 class="fw-bold text-dark">No active errors</h6>
+                            <p class="small mb-0">All episodes downloaded successfully and no error logs were recorded for this podcast.</p>
+                        </div>`;
+                    return;
+                }
+
+                let html = '';
+
+                // 1. Last feed update error
+                if (hasLastError) {
+                    html += `
+                        <div class="alert alert-danger mb-3 p-3">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <strong class="d-flex align-items-center gap-1">
+                                    <i class="bi bi-exclamation-octagon-fill"></i> Last Feed Update Error
+                                </strong>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="copyToClipboard('${escapeHtml(feed.last_error)}')">
+                                    <i class="bi bi-clipboard me-1"></i> Copy
+                                </button>
+                            </div>
+                            <div class="small font-monospace text-break mb-0">${escapeHtml(feed.last_error)}</div>
+                        </div>`;
+                }
+
+                // 2. Failed episodes
+                if (hasEpisodeErrors) {
+                    if (retryAllBtn) {
+                        retryAllBtn.style.display = '';
+                        retryAllBtn.onclick = () => retryAllErrorsForFeed(feedId, errorItems);
+                    }
+
+                    html += `
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <h6 class="fw-bold mb-0 text-danger d-flex align-items-center gap-1">
+                                <i class="bi bi-file-earmark-x-fill"></i> Failed Episodes (${errorItems.length})
+                            </h6>
+                            <span class="text-muted small">Click Retry to attempt re-download</span>
+                        </div>
+                        <div class="d-flex flex-column gap-2 mb-3">`;
+
+                    errorItems.forEach(item => {
+                        const errDate = item.error_at ? formatDate(item.error_at) : (item.pub_date ? formatDate(item.pub_date) : '');
+                        html += `
+                            <div class="card p-2.5 border-danger-subtle bg-body-tertiary">
+                                <div class="d-flex align-items-start justify-content-between gap-2">
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="fw-bold text-break small">${escapeHtml(item.episode_title || item.episode_id)}</div>
+                                        <div class="text-muted small d-flex flex-wrap align-items-center gap-2 mt-1">
+                                            <span>ID: <code>${escapeHtml(item.episode_id)}</code></span>
+                                            ${errDate ? `<span>&bull; ${escapeHtml(errDate)}</span>` : ''}
+                                            ${item.video_url ? `<span>&bull; <a href="${escapeHtml(item.video_url)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Source <i class="bi bi-box-arrow-up-right"></i></a></span>` : ''}
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger py-1 px-2 flex-shrink-0" ${actionAttrs('retry-error', feedId, item.episode_id)}>
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Retry
+                                    </button>
+                                </div>
+                                <pre class="bg-dark text-danger-subtle p-2 rounded small text-break mt-2 mb-1 user-select-all font-monospace" style="max-height: 140px; overflow-y: auto;"><code>${escapeHtml(item.error || 'Unknown download error')}</code></pre>
+                                ${item.recommendation ? `
+                                    <div class="text-muted small mt-1 d-flex align-items-start gap-1">
+                                        <i class="bi bi-lightbulb text-warning flex-shrink-0 mt-1"></i>
+                                        <span>${escapeHtml(item.recommendation)}</span>
+                                    </div>` : ''}
+                            </div>`;
+                    });
+
+                    html += `</div>`;
+                }
+
+                // 3. Server error logs
+                html += `
+                    <div class="d-flex align-items-center justify-content-between mb-2 pt-2 border-top">
+                        <h6 class="fw-bold mb-0 text-secondary d-flex align-items-center gap-1">
+                            <i class="bi bi-terminal-fill"></i> Server Error Logs (${logEntries.length})
+                        </h6>
+                    </div>`;
+
+                if (hasLogs) {
+                    html += `
+                        <div class="bg-dark text-light p-2.5 rounded font-monospace small" style="max-height: 220px; overflow-y: auto;">`;
+                    logEntries.forEach(e => {
+                        const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
+                        const lvl = (e.level || 'error').toUpperCase();
+                        html += `
+                            <div class="text-break mb-1 lh-sm">
+                                <span class="text-secondary">[${escapeHtml(ts)}]</span>
+                                <span class="text-danger fw-bold">[${escapeHtml(lvl)}]</span>
+                                <span>${escapeHtml(e.message)}</span>
+                            </div>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `
+                        <div class="text-muted small fst-italic p-2 bg-body-tertiary rounded border">
+                            No server log entries with ERROR level currently in buffer for this podcast.
+                        </div>`;
+                }
+
+                bodyEl.innerHTML = html;
+
+            } catch (err) {
+                if (bodyEl) {
+                    bodyEl.innerHTML = `
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Failed to load error log: ${escapeHtml(err.message)}
+                        </div>`;
+                }
+            }
+        }
+
+        async function retryFeedError(feedId, episodeId) {
+            try {
+                const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}/episodes/${encodeURIComponent(episodeId)}/retry`, { method: 'POST' });
+                if (res.ok) {
+                    showToast("Status reset, episode will be retried on next update");
+                    await showFeedErrors(feedId);
+                    await loadFeeds();
+                } else {
+                    alert("Retry failed: " + await res.text());
+                }
+            } catch (e) {
+                alert("Network error: " + e.message);
+            }
+        }
+
+        async function retryAllErrorsForFeed(feedId, errorItems) {
+            if (!errorItems || errorItems.length === 0) return;
+            const retryBtn = document.getElementById('btn-retry-all-errors');
+            if (retryBtn) {
+                retryBtn.disabled = true;
+                retryBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Retrying...`;
+            }
+
+            try {
+                let successCount = 0;
+                for (const item of errorItems) {
+                    try {
+                        const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}/episodes/${encodeURIComponent(item.episode_id)}/retry`, { method: 'POST' });
+                        if (res.ok) successCount++;
+                    } catch (_) {}
+                }
+                showToast(`Reset ${successCount} episode(s), will retry on next update`);
+                await showFeedErrors(feedId);
+                await loadFeeds();
+            } finally {
+                if (retryBtn) {
+                    retryBtn.disabled = false;
+                    retryBtn.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i> Retry All`;
+                }
+            }
         }
 
         async function toggleServerDebug(enabled) {

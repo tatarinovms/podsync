@@ -1311,6 +1311,37 @@
         </div>
     </div>
 
+    <!-- Modal: Feed Error Log Viewer -->
+    <div class="modal fade" id="feedErrorsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="feed-errors-title">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Error Log
+                        </h5>
+                        <p class="text-muted small mb-0" id="feed-errors-subtitle">Loading error details...</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-3" id="feed-errors-body">
+                    <!-- Loaded dynamically -->
+                </div>
+                <div class="modal-footer border-top d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-open-server-logs">
+                        <i class="bi bi-terminal me-1"></i> Open Server Logs Tab
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="btn-retry-all-errors" style="display: none;">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Retry All
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Feed Settings -->
     <div class="modal fade" id="feedSettingsModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">

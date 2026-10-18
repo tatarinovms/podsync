@@ -42,6 +42,7 @@ type FeedSummary struct {
 	AppleURL        string       `json:"apple_url"`
 	PocketCastsURL  string       `json:"pocketcasts_url"`
 	OvercastURL     string       `json:"overcast_url"`
+	PrivateFeed     bool         `json:"private_feed"`
 	Config          *feed.Config `json:"config,omitempty"`
 }
 
@@ -238,6 +239,7 @@ type ImportAudiobookRequest struct {
 	Author       string `json:"author,omitempty"`
 	Description  string `json:"description,omitempty"`
 	CronSchedule string `json:"cron_schedule,omitempty"`
+	PrivateFeed  bool   `json:"private_feed,omitempty"`
 }
 
 // AdminManager is the interface required by the web admin handlers

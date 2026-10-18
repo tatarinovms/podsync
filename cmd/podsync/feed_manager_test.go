@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
@@ -224,4 +227,47 @@ func TestUpdateFeed_AudiobookProtections(t *testing.T) {
 	assert.Equal(t, model.QualityHigh, updated.Quality)
 	assert.Equal(t, "Dune Updated", updated.Custom.Title)
 	assert.Equal(t, "Frank Herbert", updated.Custom.Author)
+}
+
+func TestUpdateFeed_PrivateFeedPersistence(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.toml")
+	initialTOML := "[server]\nport = 8080\n\n[storage.local]\ndata_dir = \"/tmp\"\n\n[feeds.mybook]\nurl = \"audiobook://Dune\"\n"
+	require.NoError(t, os.WriteFile(configPath, []byte(initialTOML), 0644))
+
+	bookCfg := &feed.Config{
+		ID:  "mybook",
+		URL: "audiobook://Dune",
+	}
+
+	updates := make(chan *feed.Config, 10)
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg: &Config{
+			Feeds: map[string]*feed.Config{
+				"mybook": bookCfg,
+			},
+		},
+		feeds: map[string]*feed.Config{
+			"mybook": bookCfg,
+		},
+		updates: updates,
+	}
+
+	err := mgr.UpdateFeed(context.Background(), "mybook", &web.FeedConfigUpdate{
+		PrivateFeed: true,
+	})
+	require.NoError(t, err)
+
+	assert.True(t, mgr.feeds["mybook"].PrivateFeed)
+
+	content, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	t.Logf("Config content:\n%s", string(content))
+	assert.Contains(t, string(content), "private_feed = true")
+
+	reloaded, err := LoadConfig(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.Feeds["mybook"])
+	assert.True(t, reloaded.Feeds["mybook"].PrivateFeed)
 }

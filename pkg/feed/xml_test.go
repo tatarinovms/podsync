@@ -164,3 +164,32 @@ func TestBuildXML_AudiobookSerial(t *testing.T) {
 	assert.Contains(t, xmlStr, "<itunes:episode>1</itunes:episode>")
 	assert.Contains(t, xmlStr, "<itunes:episode>2</itunes:episode>")
 }
+
+func TestBuildXML_PrivateFeed(t *testing.T) {
+	// Case 1: cfg.PrivateFeed is true, feed.PrivateFeed is false
+	feed1 := model.Feed{}
+	cfg1 := Config{ID: "test1", PrivateFeed: true}
+	out1, err := Build(context.Background(), &feed1, &cfg1, "http://localhost/")
+	require.NoError(t, err)
+	assert.Equal(t, "yes", out1.IBlock)
+	xmlStr1 := FormatXML(out1, &feed1)
+	assert.Contains(t, xmlStr1, "<itunes:block>yes</itunes:block>")
+
+	// Case 2: cfg.PrivateFeed is false, feed.PrivateFeed is true
+	feed2 := model.Feed{PrivateFeed: true}
+	cfg2 := Config{ID: "test2", PrivateFeed: false}
+	out2, err := Build(context.Background(), &feed2, &cfg2, "http://localhost/")
+	require.NoError(t, err)
+	assert.Equal(t, "yes", out2.IBlock)
+	xmlStr2 := FormatXML(out2, &feed2)
+	assert.Contains(t, xmlStr2, "<itunes:block>yes</itunes:block>")
+
+	// Case 3: both false
+	feed3 := model.Feed{PrivateFeed: false}
+	cfg3 := Config{ID: "test3", PrivateFeed: false}
+	out3, err := Build(context.Background(), &feed3, &cfg3, "http://localhost/")
+	require.NoError(t, err)
+	assert.Empty(t, out3.IBlock)
+	xmlStr3 := FormatXML(out3, &feed3)
+	assert.NotContains(t, xmlStr3, "<itunes:block>")
+}

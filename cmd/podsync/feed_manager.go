@@ -208,6 +208,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		PageSize:     f.PageSize,
 		CronSchedule: f.CronSchedule,
 		UpdatePeriod: f.UpdatePeriod.String(),
+		PrivateFeed:  f.PrivateFeed,
 		Config:       f,
 	}
 
@@ -220,6 +221,9 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		summary.Provider = string(dbFeed.Provider)
 		if !dbFeed.UpdatedAt.IsZero() {
 			summary.LastUpdate = &dbFeed.UpdatedAt
+		}
+		if dbFeed.PrivateFeed {
+			summary.PrivateFeed = true
 		}
 	}
 
@@ -668,6 +672,17 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.OPML = update.OPML
 	}
 	f.PrivateFeed = update.PrivateFeed
+	if m.cfg != nil && m.cfg.Feeds != nil {
+		if cf, ok := m.cfg.Feeds[id]; ok {
+			cf.PrivateFeed = update.PrivateFeed
+		}
+	}
+	if m.db != nil {
+		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
+			dbFeed.PrivateFeed = f.PrivateFeed
+			_ = m.db.AddFeed(ctx, id, dbFeed)
+		}
+	}
 
 	if update.KeepLast > 0 {
 		f.Clean = &feed.Cleanup{KeepLast: update.KeepLast}
@@ -745,7 +760,20 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		}
 	}
 
-	return m.saveFeedToConfig(f)
+	if err := m.saveFeedToConfig(f); err != nil {
+		return err
+	}
+
+	if !shouldRedownload && m.updates != nil {
+		select {
+		case m.updates <- f:
+			log.Infof("queued immediate update for feed %q after settings change", id)
+		default:
+			log.Warnf("failed to queue immediate update for feed %q (queue full)", id)
+		}
+	}
+
+	return nil
 }
 
 func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
@@ -1858,6 +1886,9 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 			Author:      req.Author,
 			Description: req.Description,
 		}
+	}
+	if req.PrivateFeed {
+		newFeed.PrivateFeed = true
 	}
 
 	if err := m.AddFeed(ctx, newFeed); err != nil {

@@ -618,3 +618,74 @@ func setup(t *testing.T, file string) string {
 
 	return f.Name()
 }
+
+func TestAudiobooksConfig(t *testing.T) {
+	t.Run("default configuration", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		cfg, err := LoadConfig(path)
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		assert.NotEmpty(t, cfg.Audiobooks.Dir)
+		assert.Contains(t, cfg.Audiobooks.SupportedExtensions, ".mp3")
+		assert.Contains(t, cfg.Audiobooks.SupportedExtensions, ".m4b")
+		assert.Contains(t, cfg.Audiobooks.CoverFilenames, "cover.jpg")
+	})
+
+	t.Run("custom toml configuration", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[audiobooks]
+dir = "/var/audiobooks"
+supported_extensions = [".mp3", ".m4b"]
+cover_filenames = ["folder.jpg"]
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		cfg, err := LoadConfig(path)
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		assert.Equal(t, "/var/audiobooks", cfg.Audiobooks.Dir)
+		assert.Equal(t, []string{".mp3", ".m4b"}, cfg.Audiobooks.SupportedExtensions)
+		assert.Equal(t, []string{"folder.jpg"}, cfg.Audiobooks.CoverFilenames)
+	})
+
+	t.Run("env override", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_AUDIOBOOKS_DIR", "/env/audiobooks")
+
+		cfg, err := LoadConfig(path)
+		require.NoError(t, err)
+		require.NotNil(t, cfg)
+
+		assert.Equal(t, "/env/audiobooks", cfg.Audiobooks.Dir)
+	})
+}

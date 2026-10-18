@@ -486,6 +486,7 @@
         .provider-soundcloud { background-color: rgba(var(--ctp-peach-rgb), 0.16) !important; color: var(--ctp-peach) !important; border: 1px solid rgba(var(--ctp-peach-rgb), 0.3) !important; }
         .provider-twitch { background-color: rgba(var(--ctp-mauve-rgb), 0.16) !important; color: var(--ctp-mauve) !important; border: 1px solid rgba(var(--ctp-mauve-rgb), 0.3) !important; }
         .provider-rutube { background-color: rgba(var(--ctp-teal-rgb), 0.16) !important; color: var(--ctp-teal) !important; border: 1px solid rgba(var(--ctp-teal-rgb), 0.3) !important; }
+        .provider-audiobook { background-color: rgba(var(--ctp-mauve-rgb), 0.16) !important; color: var(--ctp-mauve) !important; border: 1px solid rgba(var(--ctp-mauve-rgb), 0.3) !important; }
 
         /* Alerts */
         .alert {
@@ -835,6 +836,11 @@
                     </button>
                 </li>
                 <li class="nav-item">
+                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audiobooks" onclick="loadAudiobooksTab()">
+                        <i class="bi bi-book me-1"></i> Audiobooks
+                    </button>
+                </li>
+                <li class="nav-item">
                     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tokens">
                         <i class="bi bi-key me-1"></i> API Keys
                     </button>
@@ -886,6 +892,62 @@
                         <div class="col-12 text-center py-5 text-muted">
                             <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
                             <div>Loading podcasts...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audiobooks Tab -->
+                <div class="tab-pane fade" id="tab-audiobooks">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                        <div>
+                            <h5 class="fw-bold mb-1"><i class="bi bi-book me-2 text-primary"></i>Audiobooks &amp; Local Folders</h5>
+                            <div class="text-muted small">
+                                Storage path: <code id="audiobooks-dir-display">/audiobooks</code>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadAudiobookDirs()"><i class="bi bi-arrow-clockwise me-1"></i> Rescan folders</button>
+                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadAudiobookModal"><i class="bi bi-cloud-arrow-up me-1"></i> Upload audiobook</button>
+                        </div>
+                    </div>
+
+                    <!-- Server Folders (Auto-discovery) -->
+                    <div class="card p-4 mb-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h6 class="fw-bold mb-0"><i class="bi bi-folder2-open me-2 text-primary"></i>Server Folders (Discovered on disk)</h6>
+                            <span class="badge bg-secondary" id="audiobook-dirs-count">0 folders</span>
+                        </div>
+                        <p class="text-muted small mb-3">
+                            Each flat directory in the audiobooks storage can be imported as a Podcast 2.0 serial feed. Chapters are naturally sorted (01, 02... 10) with automatic ID3/APIC cover extraction.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="audiobook-dirs-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Folder Name</th>
+                                        <th>Tracks</th>
+                                        <th>Total Size</th>
+                                        <th>Cover</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audiobook-dirs-tbody">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <div class="spinner-border spinner-border-sm text-primary me-2"></div>Scanning audiobooks directory...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Active Audiobook Feeds -->
+                    <div class="card p-4">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-broadcast me-2 text-primary"></i>Active Audiobook Podcast Feeds</h6>
+                        <div id="audiobook-feeds-container" class="row g-3">
+                            <!-- Rendered dynamically -->
                         </div>
                     </div>
                 </div>
@@ -1546,6 +1608,102 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Import Audiobook -->
+    <div class="modal fade" id="importAudiobookModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold">Import Local Audiobook</h5>
+                        <div class="text-muted small">Create serial podcast RSS feed from server folder</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="import-audiobook-form" onsubmit="event.preventDefault(); submitImportAudiobook();">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Directory Name <span class="text-danger">*</span></label>
+                            <input type="text" id="import-dir-name" class="form-control" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Feed ID (Slug) <span class="text-danger">*</span></label>
+                            <input type="text" id="import-feed-id" class="form-control" placeholder="e.g. 1984-orwell" required>
+                            <div class="form-text small">Unique URL slug (a-z, 0-9, dash, underscore)</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Book Title</label>
+                            <input type="text" id="import-feed-title" class="form-control" placeholder="Defaults to directory name or ID3 album">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Author / Narrator</label>
+                            <input type="text" id="import-feed-author" class="form-control" placeholder="Defaults to parsed author or ID3 artist">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Description</label>
+                            <textarea id="import-feed-desc" class="form-control" rows="2" placeholder="Optional book synopsis"></textarea>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 pt-2">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-brand" id="btn-submit-import-audiobook"><i class="bi bi-check-lg me-1"></i> Create Feed</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Upload Audiobook -->
+    <div class="modal fade" id="uploadAudiobookModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold">Upload Audiobook Files</h5>
+                        <div class="text-muted small">Upload tracks and optional cover image to the server</div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="upload-audiobook-form" onsubmit="event.preventDefault(); submitUploadAudiobook();">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Book Folder Name <span class="text-danger">*</span></label>
+                            <input type="text" id="upload-book-dir" class="form-control" placeholder="e.g. George Orwell - 1984" required>
+                            <div class="form-text small">Folder will be created in the audiobooks directory</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Audio Files (MP3, M4B, M4A, etc.) <span class="text-danger">*</span></label>
+                            <input type="file" id="upload-audio-files" class="form-control" multiple accept=".mp3,.m4b,.m4a,.aac,.ogg,.opus,.flac" required>
+                            <div class="form-text small">Select all audio chapters/tracks (multi-select supported)</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Cover Image (Optional)</label>
+                            <input type="file" id="upload-cover-file" class="form-control" accept="image/jpeg,image/png">
+                            <div class="form-text small">Optional JPG/PNG cover art (or will be extracted from ID3 tags)</div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="upload-auto-import" checked>
+                            <label class="form-check-label small" for="upload-auto-import">Automatically import and create podcast feed after upload</label>
+                        </div>
+                        <!-- Progress bar -->
+                        <div id="upload-progress-container" class="d-none mb-3">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span id="upload-progress-status">Uploading files...</span>
+                                <span id="upload-progress-pct">0%</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 pt-2">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-brand" id="btn-submit-upload-audiobook"><i class="bi bi-upload me-1"></i> Start Upload</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -2316,6 +2474,7 @@
                 allFeeds = await res.json();
                 document.getElementById('feeds-count').innerText = allFeeds.length;
                 renderFeeds(allFeeds);
+                if (typeof renderAudiobookFeeds === "function") renderAudiobookFeeds();
             } catch (err) {
                 container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to load feeds: ${err.message}</div>`;
             }
@@ -4101,6 +4260,268 @@
                 alert('Could not copy: ' + err.message);
             });
         }
+
+        // Audiobooks Tab Logic
+        let cachedAudiobookDirs = [];
+
+        async function loadAudiobooksTab() {
+            try {
+                const cfgRes = await fetch('/api/v1/audiobooks/config');
+                if (cfgRes.ok) {
+                    const cfgData = await cfgRes.json();
+                    if (cfgData.audiobooks_dir) {
+                        const disp = document.getElementById('audiobooks-dir-display');
+                        if (disp) disp.textContent = cfgData.audiobooks_dir;
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to load audiobooks config', e);
+            }
+            await loadAudiobookDirs();
+            renderAudiobookFeeds();
+        }
+
+        async function loadAudiobookDirs() {
+            const tbody = document.getElementById('audiobook-dirs-tbody');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Scanning folders...</td></tr>`;
+            }
+            try {
+                const res = await fetch('/api/v1/audiobooks/dirs');
+                if (!res.ok) throw new Error(await res.text());
+                cachedAudiobookDirs = await res.json();
+                renderAudiobookDirsTable(cachedAudiobookDirs);
+            } catch (err) {
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle me-2"></i>Failed to read audiobooks: ${escapeHtml(err.message)}</td></tr>`;
+                }
+            }
+        }
+
+        function renderAudiobookDirsTable(dirs) {
+            const tbody = document.getElementById('audiobook-dirs-tbody');
+            const countBadge = document.getElementById('audiobook-dirs-count');
+            if (countBadge) countBadge.textContent = `${dirs.length} folder${dirs.length === 1 ? '' : 's'}`;
+            if (!tbody) return;
+
+            if (!dirs || dirs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>No audiobook directories found in storage. Click "Upload audiobook" to add your first book!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = dirs.map(d => {
+                const sizeMB = (d.total_size / (1024 * 1024)).toFixed(1);
+                const coverBadge = d.has_cover 
+                    ? `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-image me-1"></i>Found</span>` 
+                    : `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">None (or ID3)</span>`;
+                
+                let statusBadge = '';
+                let actionBtn = '';
+                if (d.linked) {
+                    statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-link-45deg me-1"></i>Linked: ${escapeHtml(d.feed_id)}</span>`;
+                    actionBtn = `<button class="btn btn-sm btn-outline-secondary" onclick="viewFeedEpisodes('${escapeHtml(d.feed_id)}')"><i class="bi bi-eye me-1"></i>View Episodes</button>`;
+                } else {
+                    statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-clock me-1"></i>Unlinked</span>`;
+                    const escapedDir = escapeHtml(d.name);
+                    const escapedTitle = escapeHtml(d.suggested_title || d.name);
+                    const escapedAuthor = escapeHtml(d.suggested_author || '');
+                    actionBtn = `<button class="btn btn-sm btn-brand" onclick="openImportModal('${escapedDir}', '${escapedTitle}', '${escapedAuthor}')"><i class="bi bi-plus-circle me-1"></i>Import as Podcast</button>`;
+                }
+
+                return `
+                    <tr>
+                        <td class="fw-semibold">
+                            <i class="bi bi-folder-fill text-warning me-2"></i>${escapeHtml(d.name)}
+                            ${d.suggested_title && d.suggested_author ? `<div class="text-muted small fw-normal ms-4">${escapeHtml(d.suggested_author)} — ${escapeHtml(d.suggested_title)}</div>` : ''}
+                        </td>
+                        <td><span class="badge bg-body-secondary text-body">${d.file_count} chapters</span></td>
+                        <td class="text-muted small">${sizeMB} MB</td>
+                        <td>${coverBadge}</td>
+                        <td>${statusBadge}</td>
+                        <td class="text-end">${actionBtn}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderAudiobookFeeds() {
+            const container = document.getElementById('audiobook-feeds-container');
+            if (!container) return;
+            const audioFeeds = (allFeeds || []).filter(f => f.provider === 'audiobook');
+            if (audioFeeds.length === 0) {
+                container.innerHTML = `
+                    <div class="col-12 text-center text-muted py-4">
+                        <i class="bi bi-book me-2"></i>No audiobook podcast feeds configured yet. Import a local directory above!
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = audioFeeds.map(feed => {
+                const totalMB = (feed.total_size / (1024 * 1024)).toFixed(1);
+                return `
+                    <div class="col-12 col-md-6 col-xl-4">
+                        <div class="card h-100 p-3 shadow-sm">
+                            <div class="d-flex gap-3 align-items-center mb-3">
+                                ${feed.cover_art ? `<img src="${feed.cover_art}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i class="bi bi-book fs-3"></i></div>`}
+                                <div class="min-w-0 flex-grow-1">
+                                    <h6 class="fw-bold mb-1 text-truncate" title="${escapeHtml(feed.title || feed.id)}">${escapeHtml(feed.title || feed.id)}</h6>
+                                    <div class="text-muted small text-truncate">${feed.author ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted mb-3 border-top pt-2">
+                                <span><i class="bi bi-file-earmark-music me-1"></i>${feed.downloaded_count || feed.episode_count} chapters</span>
+                                <span><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="copyFeedUrl('${escapeHtml(feed.feed_url)}')"><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="viewFeedEpisodes('${escapeHtml(feed.id)}')"><i class="bi bi-list-ol"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="triggerUpdate('${escapeHtml(feed.id)}')"><i class="bi bi-arrow-repeat"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openImportModal(dirName, title, author) {
+            document.getElementById('import-dir-name').value = dirName;
+            document.getElementById('import-feed-title').value = title || '';
+            document.getElementById('import-feed-author').value = author || '';
+            const slug = (title || dirName).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+            document.getElementById('import-feed-id').value = slug;
+            document.getElementById('import-feed-desc').value = '';
+            const modal = new bootstrap.Modal(document.getElementById('importAudiobookModal'));
+            modal.show();
+        }
+
+        async function submitImportAudiobook() {
+            const btn = document.getElementById('btn-submit-import-audiobook');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Creating...`;
+
+            const payload = {
+                dir_name: document.getElementById('import-dir-name').value,
+                id: document.getElementById('import-feed-id').value,
+                title: document.getElementById('import-feed-title').value,
+                author: document.getElementById('import-feed-author').value,
+                description: document.getElementById('import-feed-desc').value
+            };
+
+            try {
+                const res = await fetch('/api/v1/audiobooks/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: res.statusText }));
+                    throw new Error(err.error || 'Failed to import audiobook');
+                }
+                const data = await res.json();
+                bootstrap.Modal.getInstance(document.getElementById('importAudiobookModal')).hide();
+                showToast(`Audiobook imported successfully as feed ${data.feed_id}!`);
+                await loadFeeds();
+                await loadAudiobookDirs();
+                renderAudiobookFeeds();
+            } catch (err) {
+                alert('Import error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Create Feed`;
+            }
+        }
+
+        function submitUploadAudiobook() {
+            const bookDir = document.getElementById('upload-book-dir').value.trim();
+            const audioFiles = document.getElementById('upload-audio-files').files;
+            const coverFile = document.getElementById('upload-cover-file').files[0];
+            const autoImport = document.getElementById('upload-auto-import').checked;
+
+            if (!bookDir) {
+                alert('Please enter a folder name');
+                return;
+            }
+            if (!audioFiles || audioFiles.length === 0) {
+                alert('Please select audio files to upload');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('book_dir', bookDir);
+            formData.append('auto_import', autoImport ? '1' : '0');
+
+            for (let i = 0; i < audioFiles.length; i++) {
+                formData.append('files', audioFiles[i]);
+            }
+            if (coverFile) {
+                formData.append('cover', coverFile);
+            }
+
+            const progressContainer = document.getElementById('upload-progress-container');
+            const progressBar = document.getElementById('upload-progress-bar');
+            const progressPct = document.getElementById('upload-progress-pct');
+            const progressStatus = document.getElementById('upload-progress-status');
+            const submitBtn = document.getElementById('btn-submit-upload-audiobook');
+
+            progressContainer.classList.remove('d-none');
+            progressBar.style.width = '0%';
+            progressPct.textContent = '0%';
+            progressStatus.textContent = `Uploading ${audioFiles.length} file(s)...`;
+            submitBtn.disabled = true;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/v1/audiobooks/upload', true);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressPct.textContent = percent + '%';
+                    if (percent === 100) {
+                        progressStatus.textContent = 'Processing files on server...';
+                    }
+                }
+            };
+
+            xhr.onload = function() {
+                submitBtn.disabled = false;
+                if (xhr.status === 200 || xhr.status === 201) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        bootstrap.Modal.getInstance(document.getElementById('uploadAudiobookModal')).hide();
+                        showToast(`Successfully uploaded ${data.uploaded} file(s) for "${data.book_dir}"!`);
+                        document.getElementById('upload-audiobook-form').reset();
+                        progressContainer.classList.add('d-none');
+                        loadFeeds().then(() => {
+                            loadAudiobookDirs();
+                            renderAudiobookFeeds();
+                        });
+                    } catch (e) {
+                        alert('Upload succeeded but failed to parse response');
+                    }
+                } else {
+                    let errMsg = 'Upload failed';
+                    try {
+                        const err = JSON.parse(xhr.responseText);
+                        if (err.error) errMsg = err.error;
+                    } catch (e) {
+                        errMsg = xhr.statusText || errMsg;
+                    }
+                    alert('Upload failed: ' + errMsg);
+                    progressContainer.classList.add('d-none');
+                }
+            };
+
+            xhr.onerror = function() {
+                submitBtn.disabled = false;
+                alert('Network error during upload');
+                progressContainer.classList.add('d-none');
+            };
+
+            xhr.send(formData);
+        }
+
     </script>
 </body>
 </html>

@@ -119,3 +119,48 @@ func TestEpisodeNameWithCustomExtensionNormalization(t *testing.T) {
 	cfg.CustomFormat.Extension = "../bad"
 	assert.Equal(t, "abc123.mp4", EpisodeName(cfg, episode))
 }
+
+func TestBuildXML_AudiobookSerial(t *testing.T) {
+	feed := model.Feed{
+		Provider: model.ProviderAudiobook,
+		CoverArt: "cover.jpg",
+		Episodes: []*model.Episode{
+			{
+				ID:      "02_Chapter2.mp3",
+				Status:  model.EpisodeDownloaded,
+				Title:   "Chapter 2",
+				PubDate: time.Date(2026, 1, 1, 1, 0, 0, 0, time.UTC),
+				Size:    2000,
+			},
+			{
+				ID:      "01_Chapter1.m4a",
+				Status:  model.EpisodeDownloaded,
+				Title:   "Chapter 1",
+				PubDate: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				Size:    1000,
+			},
+		},
+	}
+
+	cfg := Config{
+		ID: "dune",
+	}
+
+	out, err := Build(context.Background(), &feed, &cfg, "http://localhost/")
+	require.NoError(t, err)
+	require.Len(t, out.Items, 2)
+
+	// In audiobook feeds, items must be sorted ascending (Chapter 1 first, then Chapter 2)
+	require.Equal(t, "Chapter 1", out.Items[0].Title)
+	require.Equal(t, "http://localhost/dune/01_Chapter1.m4a", out.Items[0].Enclosure.URL)
+	require.Equal(t, itunes.M4A, out.Items[0].Enclosure.Type)
+
+	require.Equal(t, "Chapter 2", out.Items[1].Title)
+	require.Equal(t, "http://localhost/dune/02_Chapter2.mp3", out.Items[1].Enclosure.URL)
+	require.Equal(t, itunes.MP3, out.Items[1].Enclosure.Type)
+
+	xmlStr := FormatXML(out, &feed)
+	assert.Contains(t, xmlStr, "<itunes:type>serial</itunes:type>")
+	assert.Contains(t, xmlStr, "<itunes:episode>1</itunes:episode>")
+	assert.Contains(t, xmlStr, "<itunes:episode>2</itunes:episode>")
+}

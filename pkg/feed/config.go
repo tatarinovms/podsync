@@ -62,6 +62,8 @@ type Config struct {
 	// FilenameTemplate controls output media filename (without extension)
 	// Supported tokens: {{id}}, {{title}}, {{pub_date}}, {{feed_id}}
 	FilenameTemplate string `toml:"filename_template" json:"filename_template,omitempty"`
+	// AudiobookDir is an optional custom directory path for local audiobook feeds
+	AudiobookDir string `toml:"audiobook_dir" json:"audiobook_dir,omitempty"`
 }
 
 type CustomFormat struct {

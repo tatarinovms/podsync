@@ -38,6 +38,17 @@ type Config struct {
 	Downloader ytdl.Config `toml:"downloader"`
 	// Global cleanup policy applied to feeds that don't specify their own cleanup policy
 	Cleanup *feed.Cleanup `toml:"cleanup"`
+	// Audiobooks configuration
+	Audiobooks AudiobooksConfig `toml:"audiobooks"`
+}
+
+type AudiobooksConfig struct {
+	// Dir is the root directory where audiobooks are stored or imported from
+	Dir string `toml:"dir"`
+	// SupportedExtensions is the list of audio extensions (default: mp3, m4b, m4a, aac, ogg, opus, flac)
+	SupportedExtensions []string `toml:"supported_extensions"`
+	// CoverFilenames is the list of cover image filenames to check (default: cover.jpg, cover.png, folder.jpg, cover.jpeg)
+	CoverFilenames []string `toml:"cover_filenames"`
 }
 
 type Log struct {
@@ -185,6 +196,17 @@ func (c *Config) applyDefaults(configPath string) {
 		c.Database.Dir = filepath.Join(configDir, "db")
 	}
 
+	if len(c.Audiobooks.SupportedExtensions) == 0 {
+		c.Audiobooks.SupportedExtensions = []string{".mp3", ".m4b", ".m4a", ".aac", ".ogg", ".opus", ".flac"}
+	}
+	if len(c.Audiobooks.CoverFilenames) == 0 {
+		c.Audiobooks.CoverFilenames = []string{"cover.jpg", "cover.png", "folder.jpg", "cover.jpeg"}
+	}
+	if c.Audiobooks.Dir == "" {
+		configDir := filepath.Dir(configPath)
+		c.Audiobooks.Dir = filepath.Join(configDir, "audiobooks")
+	}
+
 	for _, _feed := range c.Feeds {
 		if _feed.UpdatePeriod == 0 {
 			_feed.UpdatePeriod = model.DefaultUpdatePeriod
@@ -252,6 +274,10 @@ func (c *Config) applyEnv() {
 				c.Tokens[model.ProviderVkVideo] = vkTokens
 			}
 		}
+	}
+
+	if val, ok := os.LookupEnv("PODSYNC_AUDIOBOOKS_DIR"); ok && val != "" {
+		c.Audiobooks.Dir = val
 	}
 
 	// Downloader environment variables

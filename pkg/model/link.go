@@ -3,12 +3,13 @@ package model
 type Type string
 
 const (
-	TypeChannel  = Type("channel")
-	TypePlaylist = Type("playlist")
-	TypeUser     = Type("user")
-	TypeGroup    = Type("group")
-	TypeHandle   = Type("handle")
-	TypeVideo    = Type("video")
+	TypeChannel   = Type("channel")
+	TypePlaylist  = Type("playlist")
+	TypeUser      = Type("user")
+	TypeGroup     = Type("group")
+	TypeHandle    = Type("handle")
+	TypeVideo     = Type("video")
+	TypeAudiobook = Type("audiobook")
 )
 
 type Provider string
@@ -20,6 +21,7 @@ const (
 	ProviderTwitch     = Provider("twitch")
 	ProviderVkVideo    = Provider("vkvideo")
 	ProviderRutube     = Provider("rutube")
+	ProviderAudiobook  = Provider("audiobook")
 )
 
 // Info represents data extracted from URL

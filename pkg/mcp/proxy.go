@@ -335,3 +335,29 @@ func (c *HTTPClientManager) DownloadLogs(ctx context.Context) ([]byte, string, e
 	}
 	return data, "podsync.log", nil
 }
+
+func (c *HTTPClientManager) ListAudiobookDirs(ctx context.Context) ([]web.AudiobookDirInfo, error) {
+	var result []web.AudiobookDirInfo
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/audiobooks/dirs", nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *HTTPClientManager) ImportAudiobook(ctx context.Context, req *web.ImportAudiobookRequest) (*feed.Config, error) {
+	var result feed.Config
+	err := c.doRequest(ctx, http.MethodPost, "/api/v1/audiobooks/import", req, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *HTTPClientManager) GetAudiobooksDir() string {
+	return "./audiobooks"
+}
+
+func (c *HTTPClientManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
+	return fmt.Errorf("remote file save not implemented in proxy")
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -174,6 +175,37 @@ func (m *mockAdminManager) GetLogLevel(ctx context.Context) string {
 
 func (m *mockAdminManager) DownloadLogs(ctx context.Context) ([]byte, string, error) {
 	return []byte("mock log content\n"), "podsync.log", nil
+}
+
+func (m *mockAdminManager) ListAudiobookDirs(ctx context.Context) ([]web.AudiobookDirInfo, error) {
+	return []web.AudiobookDirInfo{
+		{
+			Name:            "Orwell - 1984",
+			Path:            "/data/audiobooks/Orwell - 1984",
+			FileCount:       12,
+			HasCover:        true,
+			TotalSize:       1024000,
+			SuggestedTitle:  "1984",
+			SuggestedAuthor: "Orwell",
+		},
+	}, nil
+}
+
+func (m *mockAdminManager) ImportAudiobook(ctx context.Context, req *web.ImportAudiobookRequest) (*feed.Config, error) {
+	return &feed.Config{
+		ID:           req.ID,
+		URL:          "audiobook://" + req.DirName,
+		Format:       model.FormatCustom,
+		PlaylistSort: model.SortingAsc,
+	}, nil
+}
+
+func (m *mockAdminManager) GetAudiobooksDir() string {
+	return "/data/audiobooks"
+}
+
+func (m *mockAdminManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
+	return nil
 }
 
 func setupTestServer() (*Server, *mockAdminManager) {
@@ -446,6 +478,40 @@ func TestToolsCall(t *testing.T) {
 		_ = json.Unmarshal(resData, &callResult)
 		assert.False(t, callResult.IsError)
 		assert.Contains(t, callResult.Content[0].Text, "mock log entry")
+	})
+
+	t.Run("list_audiobook_dirs", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"list_audiobook_dirs","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Orwell - 1984")
+	})
+
+	t.Run("import_audiobook", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"import_audiobook","arguments":{"dir_name":"Orwell - 1984","feed_id":"1984","title":"Nineteen Eighty-Four"}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		err = json.Unmarshal(respBytes, &resp)
+		require.NoError(t, err)
+		assert.Nil(t, resp.Error)
+
+		var callResult CallToolResult
+		resData, _ := json.Marshal(resp.Result)
+		_ = json.Unmarshal(resData, &callResult)
+		assert.False(t, callResult.IsError)
+		assert.Contains(t, callResult.Content[0].Text, "Successfully imported audiobook as feed")
 	})
 }
 

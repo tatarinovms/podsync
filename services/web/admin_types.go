@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/mxpv/podsync/pkg/feed"
@@ -214,6 +215,29 @@ type LogResult struct {
 	CurrentLevel  string     `json:"current_level"`
 }
 
+// AudiobookDirInfo holds metadata about a discovered local audiobook directory
+type AudiobookDirInfo struct {
+	Name            string `json:"name"`
+	Path            string `json:"path"`
+	FileCount       int    `json:"file_count"`
+	HasCover        bool   `json:"has_cover"`
+	TotalSize       int64  `json:"total_size"`
+	Linked          bool   `json:"linked"`
+	FeedID          string `json:"feed_id,omitempty"`
+	SuggestedTitle  string `json:"suggested_title"`
+	SuggestedAuthor string `json:"suggested_author"`
+}
+
+// ImportAudiobookRequest specifies the parameters for creating an audiobook feed
+type ImportAudiobookRequest struct {
+	DirName      string `json:"dir_name"`
+	ID           string `json:"id"`
+	Title        string `json:"title,omitempty"`
+	Author       string `json:"author,omitempty"`
+	Description  string `json:"description,omitempty"`
+	CronSchedule string `json:"cron_schedule,omitempty"`
+}
+
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
@@ -245,4 +269,10 @@ type AdminManager interface {
 	SetLogLevel(ctx context.Context, level string) (string, error)
 	GetLogLevel(ctx context.Context) string
 	DownloadLogs(ctx context.Context) ([]byte, string, error)
+
+	// Audiobook management
+	ListAudiobookDirs(ctx context.Context) ([]AudiobookDirInfo, error)
+	ImportAudiobook(ctx context.Context, req *ImportAudiobookRequest) (*feed.Config, error)
+	GetAudiobooksDir() string
+	SaveAudiobookFile(bookDir string, filename string, r io.Reader) error
 }

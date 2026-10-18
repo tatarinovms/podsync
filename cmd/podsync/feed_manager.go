@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -72,7 +73,7 @@ func NewAppFeedManager(
 	version, commit, buildDate string,
 	logBuffer *logbuffer.Buffer,
 ) *AppFeedManager {
-	return &AppFeedManager{
+	mgr := &AppFeedManager{
 		configPath:  configPath,
 		cfg:         cfg,
 		feeds:       feeds,
@@ -90,6 +91,38 @@ func NewAppFeedManager(
 		buildDate:   buildDate,
 		logBuffer:   logBuffer,
 		feedErrors:  make(map[string]feedErrorEntry),
+	}
+	mgr.MountAllAudiobooks()
+	return mgr
+}
+
+func (m *AppFeedManager) mountAudiobookFeed(f *feed.Config) {
+	mounter, ok := m.storage.(fs.Mounter)
+	if !ok {
+		return
+	}
+	info, err := builder.ParseURL(f.URL)
+	if err != nil || info.Provider != model.ProviderAudiobook {
+		return
+	}
+	baseDir := ""
+	if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
+		baseDir = m.cfg.Audiobooks.Dir
+	}
+	resolvedDir, err := builder.ResolveBookDirectory(baseDir, f, info.ItemID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to resolve directory for audiobook feed %q", f.ID)
+		return
+	}
+	mounter.Mount(f.ID, resolvedDir)
+	log.Infof("mounted audiobook feed %q -> %s", f.ID, resolvedDir)
+}
+
+func (m *AppFeedManager) MountAllAudiobooks() {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, f := range m.feeds {
+		m.mountAudiobookFeed(f)
 	}
 }
 
@@ -270,6 +303,9 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 	// Add to in-memory map
 	m.feeds[newFeed.ID] = newFeed
 
+	// Mount if audiobook
+	m.mountAudiobookFeed(newFeed)
+
 	// Add to cron
 	if m.cron != nil {
 		feedToCron := newFeed
@@ -309,6 +345,11 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 		return errors.Errorf("feed %q not found", id)
 	}
 
+	// Unmount if mounted
+	if mounter, ok := m.storage.(fs.Mounter); ok {
+		mounter.Unmount(id)
+	}
+
 	// Remove from cron
 	if cronID, ok := m.cronEntries[id]; ok {
 		m.cron.Remove(cronID)
@@ -331,7 +372,9 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 	// Optionally delete files from disk/storage
 	if deleteFiles {
 		_ = m.storage.Delete(ctx, fmt.Sprintf("%s.xml", id))
-		if m.cfg.Storage.Type == "local" {
+		info, err := builder.ParseURL(f.URL)
+		isAudiobook := (err == nil && info.Provider == model.ProviderAudiobook)
+		if m.cfg.Storage.Type == "local" && !isAudiobook {
 			feedDir := filepath.Join(m.cfg.Storage.Local.DataDir, id)
 			_ = os.RemoveAll(feedDir)
 			log.Infof("deleted files for feed %q at %s", id, feedDir)
@@ -826,6 +869,11 @@ func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 		tree.Set(prefix+".filename_template", f.FilenameTemplate)
 	} else {
 		tree.Delete(prefix + ".filename_template")
+	}
+	if f.AudiobookDir != "" {
+		tree.Set(prefix+".audiobook_dir", f.AudiobookDir)
+	} else {
+		tree.Delete(prefix + ".audiobook_dir")
 	}
 
 	file, err := os.Create(m.configPath)
@@ -1566,4 +1614,243 @@ func (m *AppFeedManager) DownloadLogs(ctx context.Context) ([]byte, string, erro
 	}
 
 	return []byte("No logs available\n"), "podsync.log", nil
+}
+
+func (m *AppFeedManager) GetAudiobooksDir() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
+		return m.cfg.Audiobooks.Dir
+	}
+	dir := os.Getenv("PODSYNC_AUDIOBOOKS_DIR")
+	if dir != "" {
+		return dir
+	}
+	return "./audiobooks"
+}
+
+func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.AudiobookDirInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	baseDir := m.GetAudiobooksDir()
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to access audiobooks directory: %s", baseDir)
+	}
+
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read audiobooks directory: %s", baseDir)
+	}
+
+	exts := map[string]bool{
+		".mp3": true, ".m4b": true, ".m4a": true, ".aac": true, ".ogg": true, ".opus": true, ".flac": true,
+	}
+	if m.cfg != nil && len(m.cfg.Audiobooks.SupportedExtensions) > 0 {
+		exts = make(map[string]bool)
+		for _, e := range m.cfg.Audiobooks.SupportedExtensions {
+			exts[strings.ToLower(e)] = true
+		}
+	}
+
+	coverNames := map[string]bool{
+		"cover.jpg": true, "cover.png": true, "folder.jpg": true, "cover.jpeg": true,
+	}
+	if m.cfg != nil && len(m.cfg.Audiobooks.CoverFilenames) > 0 {
+		coverNames = make(map[string]bool)
+		for _, c := range m.cfg.Audiobooks.CoverFilenames {
+			coverNames[strings.ToLower(c)] = true
+		}
+	}
+
+	// Map existing feeds for quick lookup
+	linkedDirs := make(map[string]string)
+	for _, f := range m.feeds {
+		info, err := builder.ParseURL(f.URL)
+		if err == nil && info.Provider == model.ProviderAudiobook {
+			linkedDirs[info.ItemID] = f.ID
+			linkedDirs[filepath.Base(info.ItemID)] = f.ID
+		}
+	}
+
+	var results []web.AudiobookDirInfo
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirName := entry.Name()
+		if strings.HasPrefix(dirName, ".") {
+			continue
+		}
+
+		fullPath := filepath.Join(baseDir, dirName)
+		files, err := os.ReadDir(fullPath)
+		if err != nil {
+			continue
+		}
+
+		fileCount := 0
+		var totalSize int64
+		hasCover := false
+
+		for _, f := range files {
+			if f.IsDir() {
+				continue
+			}
+			lowerName := strings.ToLower(f.Name())
+			if coverNames[lowerName] {
+				hasCover = true
+			}
+			ext := strings.ToLower(filepath.Ext(lowerName))
+			if exts[ext] {
+				fileCount++
+				if info, err := f.Info(); err == nil {
+					totalSize += info.Size()
+				}
+			}
+		}
+
+		feedID, isLinked := linkedDirs[dirName]
+
+		var suggestedAuthor, suggestedTitle string
+		if parts := strings.SplitN(dirName, " - ", 2); len(parts) == 2 {
+			suggestedAuthor = strings.TrimSpace(parts[0])
+			suggestedTitle = strings.TrimSpace(parts[1])
+		} else {
+			suggestedTitle = dirName
+		}
+
+		results = append(results, web.AudiobookDirInfo{
+			Name:            dirName,
+			Path:            fullPath,
+			FileCount:       fileCount,
+			HasCover:        hasCover,
+			TotalSize:       totalSize,
+			Linked:          isLinked,
+			FeedID:          feedID,
+			SuggestedTitle:  suggestedTitle,
+			SuggestedAuthor: suggestedAuthor,
+		})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return strings.ToLower(results[i].Name) < strings.ToLower(results[j].Name)
+	})
+
+	return results, nil
+}
+
+func generateAudiobookSlug(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	reg := regexp.MustCompile(`[^a-z0-9_-]+`)
+	slug := reg.ReplaceAllString(s, "-")
+	slug = strings.Trim(slug, "-")
+	if len(slug) > 50 {
+		slug = slug[:50]
+		slug = strings.Trim(slug, "-")
+	}
+	return slug
+}
+
+func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAudiobookRequest) (*feed.Config, error) {
+	if req == nil {
+		return nil, errors.New("empty request")
+	}
+	dirName := strings.TrimSpace(req.DirName)
+	if dirName == "" {
+		return nil, errors.New("dir_name is required")
+	}
+
+	cleanedDir := filepath.Clean(dirName)
+	if strings.HasPrefix(cleanedDir, "..") || strings.Contains(cleanedDir, string(filepath.Separator)+"..") {
+		return nil, errors.New("invalid directory path")
+	}
+
+	id := strings.TrimSpace(req.ID)
+	if id == "" {
+		base := req.Title
+		if base == "" {
+			base = dirName
+		}
+		id = generateAudiobookSlug(base)
+	}
+
+	if id == "" {
+		return nil, errors.New("could not generate valid feed ID")
+	}
+
+	m.mu.RLock()
+	_, exists := m.feeds[id]
+	m.mu.RUnlock()
+	if exists {
+		return nil, errors.Errorf("feed with ID %q already exists", id)
+	}
+
+	baseDir := m.GetAudiobooksDir()
+	fullPath := filepath.Join(baseDir, cleanedDir)
+	if stat, err := os.Stat(fullPath); err != nil || !stat.IsDir() {
+		if stat, err := os.Stat(cleanedDir); err == nil && stat.IsDir() {
+			fullPath = cleanedDir
+		} else {
+			return nil, errors.Errorf("audiobook directory %q does not exist", fullPath)
+		}
+	}
+
+	schedule := req.CronSchedule
+	if schedule == "" {
+		schedule = "@every 12h"
+	}
+
+	newFeed := &feed.Config{
+		ID:           id,
+		URL:          fmt.Sprintf("audiobook://%s", cleanedDir),
+		Format:       model.FormatCustom,
+		PlaylistSort: model.SortingAsc,
+		PageSize:     1000,
+		CronSchedule: schedule,
+		AudiobookDir: fullPath,
+	}
+
+	if req.Title != "" || req.Author != "" || req.Description != "" {
+		newFeed.Custom = feed.Custom{
+			Title:       req.Title,
+			Author:      req.Author,
+			Description: req.Description,
+		}
+	}
+
+	if err := m.AddFeed(ctx, newFeed); err != nil {
+		return nil, err
+	}
+
+	return newFeed, nil
+}
+
+func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
+	baseDir := m.GetAudiobooksDir()
+	cleanBookDir := filepath.Clean(bookDir)
+	if strings.HasPrefix(cleanBookDir, "..") || strings.Contains(cleanBookDir, string(filepath.Separator)+"..") {
+		return errors.New("invalid book directory")
+	}
+	targetDir := filepath.Join(baseDir, cleanBookDir)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return errors.Wrap(err, "failed to create book directory")
+	}
+
+	cleanFilename := filepath.Base(filepath.Clean(filename))
+	if cleanFilename == "." || cleanFilename == "/" || cleanFilename == ".." {
+		return errors.New("invalid filename")
+	}
+
+	targetPath := filepath.Join(targetDir, cleanFilename)
+	out, err := os.Create(targetPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to create destination file")
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, r); err != nil {
+		return errors.Wrap(err, "failed to write file")
+	}
+	return nil
 }

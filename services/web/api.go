@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -71,6 +72,12 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
 	mux.Handle("/api/v1/downloader/test", s.authMiddleware(http.HandlerFunc(s.handleDownloaderTest)))
 	mux.Handle("/api/v1/mcp/config", s.authMiddleware(http.HandlerFunc(s.handleMCPConfig)))
+
+	mux.Handle("/api/v1/audiobooks/dirs", s.authMiddleware(http.HandlerFunc(s.handleAudiobookDirs)))
+	mux.Handle("/api/v1/audiobooks/unlinked", s.authMiddleware(http.HandlerFunc(s.handleAudiobookDirs)))
+	mux.Handle("/api/v1/audiobooks/import", s.authMiddleware(http.HandlerFunc(s.handleAudiobookImport)))
+	mux.Handle("/api/v1/audiobooks/upload", s.authMiddleware(http.HandlerFunc(s.handleAudiobookUpload)))
+	mux.Handle("/api/v1/audiobooks/config", s.authMiddleware(http.HandlerFunc(s.handleAudiobookConfig)))
 }
 
 func cleanToken(providerStr, tok string) string {
@@ -813,4 +820,161 @@ func (s *Server) handleSystemLogsDownload(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(content)
+}
+
+func (s *Server) handleAudiobookDirs(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	dirs, err := s.adminMgr.ListAudiobookDirs(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if r.URL.Query().Get("unlinked") == "true" || strings.HasSuffix(r.URL.Path, "/unlinked") {
+		filtered := make([]AudiobookDirInfo, 0, len(dirs))
+		for _, d := range dirs {
+			if !d.Linked {
+				filtered = append(filtered, d)
+			}
+		}
+		s.writeJSON(w, http.StatusOK, filtered)
+		return
+	}
+	s.writeJSON(w, http.StatusOK, dirs)
+}
+
+func (s *Server) handleAudiobookImport(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req ImportAudiobookRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	feedCfg, err := s.adminMgr.ImportAudiobook(r.Context(), &req)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"success": true,
+		"feed_id": feedCfg.ID,
+		"feed":    feedCfg,
+	})
+}
+
+func (s *Server) handleAudiobookUpload(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if err := r.ParseMultipartForm(1024 * 1024 * 1024); err != nil {
+		s.writeError(w, http.StatusBadRequest, "failed to parse multipart form: "+err.Error())
+		return
+	}
+
+	bookDir := strings.TrimSpace(r.FormValue("book_dir"))
+	if bookDir == "" {
+		bookDir = strings.TrimSpace(r.FormValue("dir_name"))
+	}
+	if bookDir == "" {
+		s.writeError(w, http.StatusBadRequest, "book_dir is required")
+		return
+	}
+
+	var files []*multipart.FileHeader
+	if r.MultipartForm != nil {
+		if list, ok := r.MultipartForm.File["files"]; ok {
+			files = append(files, list...)
+		}
+		if single, ok := r.MultipartForm.File["file"]; ok {
+			files = append(files, single...)
+		}
+		if coverFiles, ok := r.MultipartForm.File["cover"]; ok {
+			files = append(files, coverFiles...)
+		}
+	}
+
+	if len(files) == 0 {
+		s.writeError(w, http.StatusBadRequest, "no files provided in upload")
+		return
+	}
+
+	savedCount := 0
+	for _, fh := range files {
+		file, err := fh.Open()
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "failed to open uploaded file: "+err.Error())
+			return
+		}
+
+		err = s.adminMgr.SaveAudiobookFile(bookDir, fh.Filename, file)
+		file.Close()
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, "failed to save file "+fh.Filename+": "+err.Error())
+			return
+		}
+		savedCount++
+	}
+
+	autoImport := r.FormValue("auto_import") == "true" || r.FormValue("auto_import") == "1"
+	var createdFeed *feed.Config
+	if autoImport {
+		id := strings.TrimSpace(r.FormValue("id"))
+		title := strings.TrimSpace(r.FormValue("title"))
+		author := strings.TrimSpace(r.FormValue("author"))
+		desc := strings.TrimSpace(r.FormValue("description"))
+		feedCfg, err := s.adminMgr.ImportAudiobook(r.Context(), &ImportAudiobookRequest{
+			DirName:     bookDir,
+			ID:          id,
+			Title:       title,
+			Author:      author,
+			Description: desc,
+		})
+		if err == nil {
+			createdFeed = feedCfg
+		}
+	}
+
+	resp := map[string]interface{}{
+		"success":  true,
+		"uploaded": savedCount,
+		"book_dir": bookDir,
+	}
+	if createdFeed != nil {
+		resp["imported"] = true
+		resp["feed_id"] = createdFeed.ID
+	}
+	s.writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleAudiobookConfig(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	s.writeJSON(w, http.StatusOK, map[string]string{
+		"audiobooks_dir": s.adminMgr.GetAudiobooksDir(),
+	})
 }

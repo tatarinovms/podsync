@@ -3,6 +3,8 @@ package feed
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -100,10 +102,15 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 		}
 	}
 
+	coverArtURL := feed.CoverArt
 	if cfg.Custom.CoverArt != "" {
-		p.AddImage(cfg.Custom.CoverArt)
-	} else {
-		p.AddImage(feed.CoverArt)
+		coverArtURL = cfg.Custom.CoverArt
+	}
+	if coverArtURL != "" && !strings.HasPrefix(coverArtURL, "http://") && !strings.HasPrefix(coverArtURL, "https://") {
+		coverArtURL = fmt.Sprintf("%s/%s/%s", strings.TrimRight(hostname, "/"), cfg.ID, url.PathEscape(coverArtURL))
+	}
+	if coverArtURL != "" {
+		p.AddImage(coverArtURL)
 	}
 
 	if cfg.Custom.Category != "" {
@@ -128,8 +135,14 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 		}
 	}
 
-	// Sort all episodes in descending order
-	sort.Sort(timeSlice(feed.Episodes))
+	if feed.Provider == model.ProviderAudiobook || feed.PlaylistSort == model.SortingAsc {
+		sort.Slice(feed.Episodes, func(i, j int) bool {
+			return feed.Episodes[i].PubDate.Before(feed.Episodes[j].PubDate)
+		})
+	} else {
+		// Sort all episodes in descending order
+		sort.Sort(timeSlice(feed.Episodes))
+	}
 
 	for i, episode := range feed.Episodes {
 		if episode.Status != model.EpisodeDownloaded {
@@ -164,6 +177,20 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			episodeName = EpisodeName(cfg, episode)
 			downloadURL = fmt.Sprintf("%s/%s/%s", strings.TrimRight(hostname, "/"), cfg.ID, episodeName)
 		)
+
+		if feed.Provider == model.ProviderAudiobook {
+			episodeName = episode.ID
+			downloadURL = fmt.Sprintf("%s/%s/%s", strings.TrimRight(hostname, "/"), cfg.ID, url.PathEscape(episodeName))
+			ext := strings.ToLower(filepath.Ext(episode.ID))
+			switch ext {
+			case ".m4b", ".m4a":
+				enclosureType = itunes.M4A
+			case ".mp4", ".m4v":
+				enclosureType = itunes.MP4
+			default:
+				enclosureType = itunes.MP3
+			}
+		}
 
 		item.AddEnclosure(downloadURL, enclosureType, episode.Size)
 
@@ -315,4 +342,14 @@ func sanitizeFilename(value string) string {
 	cleaned = multiWhitespacePattern.ReplaceAllString(cleaned, "_")
 	cleaned = strings.Trim(cleaned, "._- ")
 	return cleaned
+}
+
+func FormatXML(podcast *itunes.Podcast, f *model.Feed) string {
+	raw := podcast.String()
+	if f != nil && f.Provider == model.ProviderAudiobook {
+		raw = strings.Replace(raw, "<channel>", "<channel>\n\t<itunes:type>serial</itunes:type>", 1)
+		re := regexp.MustCompile(`<itunes:order>(\d+)</itunes:order>`)
+		raw = re.ReplaceAllString(raw, "<itunes:order>$1</itunes:order>\n\t<itunes:episode>$1</itunes:episode>")
+	}
+	return raw
 }

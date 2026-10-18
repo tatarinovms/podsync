@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -144,4 +145,42 @@ func TestLocal_NoListing_Disabled(t *testing.T) {
 	file, err := stor.Open("/feed1")
 	assert.NoError(t, err)
 	file.Close()
+}
+
+func TestLocal_Mount(t *testing.T) {
+	dataDir := t.TempDir()
+	audiobookDir := t.TempDir()
+
+	// Write an audio file to external audiobookDir
+	chapterFile := filepath.Join(audiobookDir, "01_intro.mp3")
+	require.NoError(t, os.WriteFile(chapterFile, []byte("audio-bytes-12345"), 0644))
+
+	stor, err := NewLocal(dataDir, false, false)
+	require.NoError(t, err)
+
+	// Mount "dune" to audiobookDir
+	stor.Mount("dune", audiobookDir)
+
+	mountDir, ok := stor.GetMount("dune")
+	require.True(t, ok)
+	require.Equal(t, audiobookDir, mountDir)
+
+	// Test Size via mount
+	size, err := stor.Size(testCtx, "dune/01_intro.mp3")
+	require.NoError(t, err)
+	require.Equal(t, int64(17), size)
+
+	// Test Open via mount
+	file, err := stor.Open("/dune/01_intro.mp3")
+	require.NoError(t, err)
+	defer file.Close()
+
+	stat, err := file.Stat()
+	require.NoError(t, err)
+	require.Equal(t, int64(17), stat.Size())
+
+	// Test Unmount
+	stor.Unmount("dune")
+	_, ok = stor.GetMount("dune")
+	require.False(t, ok)
 }

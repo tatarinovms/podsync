@@ -6,6 +6,13 @@ import (
 	"net/http"
 )
 
+// Mounter allows registering dynamic mounts for external directories (e.g. audiobooks)
+type Mounter interface {
+	Mount(prefix string, dirPath string)
+	Unmount(prefix string)
+	GetMount(prefix string) (string, bool)
+}
+
 // Storage is a file system interface to host downloaded episodes and feeds.
 type Storage interface {
 	// FileSystem must be implemented to in order to pass Storage interface to HTTP file server.

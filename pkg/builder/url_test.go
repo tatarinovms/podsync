@@ -403,3 +403,40 @@ func TestParseURL_Rutube(t *testing.T) {
 	require.Equal(t, model.TypeVideo, info.LinkType)
 	require.Equal(t, "6459e556582749f8fb4c697b9b90cb8a", info.ItemID)
 }
+
+func TestParseAudiobookURL(t *testing.T) {
+	kind, id, err := parseAudiobookURL("audiobook://Dune")
+	require.NoError(t, err)
+	require.Equal(t, model.TypeAudiobook, kind)
+	require.Equal(t, "Dune", id)
+
+	kind, id, err = parseAudiobookURL("audiobook:///data/audiobooks/Frank_Herbert_Dune/")
+	require.NoError(t, err)
+	require.Equal(t, model.TypeAudiobook, kind)
+	require.Equal(t, "data/audiobooks/Frank_Herbert_Dune", id)
+
+	kind, id, err = parseAudiobookURL("local://War_And_Peace")
+	require.NoError(t, err)
+	require.Equal(t, model.TypeAudiobook, kind)
+	require.Equal(t, "War_And_Peace", id)
+
+	_, _, err = parseAudiobookURL("audiobook://")
+	require.Error(t, err)
+
+	_, _, err = parseAudiobookURL("local:///")
+	require.Error(t, err)
+}
+
+func TestParseURL_Audiobook(t *testing.T) {
+	info, err := ParseURL("audiobook://Dune")
+	require.NoError(t, err)
+	require.Equal(t, model.ProviderAudiobook, info.Provider)
+	require.Equal(t, model.TypeAudiobook, info.LinkType)
+	require.Equal(t, "Dune", info.ItemID)
+
+	info, err = ParseURL("local:///var/audiobooks/1984")
+	require.NoError(t, err)
+	require.Equal(t, model.ProviderAudiobook, info.Provider)
+	require.Equal(t, model.TypeAudiobook, info.LinkType)
+	require.Equal(t, "var/audiobooks/1984", info.ItemID)
+}

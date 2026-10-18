@@ -112,7 +112,7 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	var key string
 	if keyProvider, ok := u.keys[info.Provider]; ok {
 		key = keyProvider.Get()
-	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud {
+	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud && info.Provider != model.ProviderAudiobook {
 		return errors.Errorf("key provider %q not loaded", info.Provider)
 	}
 
@@ -363,8 +363,9 @@ func (u *Manager) buildXML(ctx context.Context, feedConfig *feed.Config) error {
 		return err
 	}
 
+	xmlContent := feed.FormatXML(podcast, f)
 	var (
-		reader  = bytes.NewReader([]byte(podcast.String()))
+		reader  = bytes.NewReader([]byte(xmlContent))
 		xmlName = fmt.Sprintf("%s.xml", feedConfig.ID)
 	)
 
@@ -396,6 +397,10 @@ func (u *Manager) buildOPML(ctx context.Context) error {
 }
 
 func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
+	if info, err := builder.ParseURL(feedConfig.URL); err == nil && info.Provider == model.ProviderAudiobook {
+		return nil // Audiobooks are local files and must never be auto-purged
+	}
+
 	var (
 		feedID = feedConfig.ID
 	)

@@ -11,6 +11,19 @@ import (
 )
 
 func ParseURL(link string) (model.Info, error) {
+	link = strings.TrimSpace(link)
+	if strings.HasPrefix(link, "audiobook://") || strings.HasPrefix(link, "local://") {
+		kind, id, err := parseAudiobookURL(link)
+		if err != nil {
+			return model.Info{}, err
+		}
+		return model.Info{
+			Provider: model.ProviderAudiobook,
+			LinkType: kind,
+			ItemID:   id,
+		}, nil
+	}
+
 	parsed, err := parseURL(link)
 	if err != nil {
 		return model.Info{}, err
@@ -472,4 +485,14 @@ func parseRutubeURL(parsed *url.URL) (model.Type, string, error) {
 	}
 
 	return "", "", errors.Errorf("unsupported rutube URL format: %s", parsed.String())
+}
+
+func parseAudiobookURL(link string) (model.Type, string, error) {
+	trimmed := strings.TrimPrefix(link, "audiobook://")
+	trimmed = strings.TrimPrefix(trimmed, "local://")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		return "", "", errors.New("empty audiobook path")
+	}
+	return model.TypeAudiobook, trimmed, nil
 }

@@ -158,6 +158,23 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `feed_id` *(string, optional)*: Filter logs for a specific feed ID.
 - **When to use**: Diagnosing issues when feed updates fail, missing API tokens, network problems, or yt-dlp execution failures.
 
+
+### 19. `list_audiobook_dirs`
+- **Purpose**: Discovers and lists all folders in the configured audiobooks directory (`[audiobooks].dir`), reporting track count, total size, cover image presence, and whether the folder is already linked to an active podcast feed.
+- **Arguments**: None `{}`.
+- **When to use**: When the user asks what audiobooks are available on the server, wants to see unlinked folders, or wants to check local audiobook storage.
+
+### 20. `import_audiobook`
+- **Purpose**: Imports a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts compliant with `<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`). Chapters are naturally sorted (01, 02... 10) with automatic ID3/APIC cover extraction.
+- **Arguments**:
+  - `dir_name` *(string, required)*: Directory name in the audiobooks directory (e.g. `"George Orwell - 1984"`).
+  - `feed_id` *(string, optional)*: Unique slug/ID (auto-generated from title or folder if omitted).
+  - `title` *(string, optional)*: Book title override (defaults to folder name or ID3 album tag).
+  - `author` *(string, optional)*: Author/narrator override (defaults to parsed author or ID3 artist tag).
+  - `description` *(string, optional)*: Book synopsis override.
+  - `cron_schedule` *(string, optional)*: Update schedule (defaults to `@every 12h`).
+- **When to use**: Setting up an audiobook feed from a local directory on disk.
+
 ## MCP Resources
 
 Agents can read live context from Podsync via resources:
@@ -197,6 +214,23 @@ curl -u "$USER:$PASS" -X POST "$HOST/api/v1/feeds/FEED_ID/update"
 
 # System health
 curl -u "$USER:$PASS" "$HOST/api/v1/system"
+
+# Audiobooks API
+# 1. List available audiobook directories
+curl -u "$USER:$PASS" "$HOST/api/v1/audiobooks/dirs"
+
+# 2. Import an audiobook folder as a feed
+curl -u "$USER:$PASS" -X POST "$HOST/api/v1/audiobooks/import" \
+  -H "Content-Type: application/json" \
+  -d '{"dir_name":"Orwell - 1984","id":"1984","title":"Nineteen Eighty-Four","author":"George Orwell"}'
+
+# 3. Upload audiobook tracks/cover to server
+curl -u "$USER:$PASS" -X POST "$HOST/api/v1/audiobooks/upload" \
+  -F "book_dir=My Book" \
+  -F "files=@chapter01.mp3" \
+  -F "files=@chapter02.mp3" \
+  -F "cover=@cover.jpg" \
+  -F "auto_import=true"
 ```
 
 ---

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -23,10 +24,39 @@ type Local struct {
 	rootDir      string
 	WebUIEnabled bool
 	NoListing    bool
+	mounts       map[string]string
+	mountLock    sync.RWMutex
 }
 
 func NewLocal(rootDir string, webUIEnabled bool, noListing bool) (*Local, error) {
-	return &Local{rootDir: rootDir, WebUIEnabled: webUIEnabled, NoListing: noListing}, nil
+	return &Local{
+		rootDir:      rootDir,
+		WebUIEnabled: webUIEnabled,
+		NoListing:    noListing,
+		mounts:       make(map[string]string),
+	}, nil
+}
+
+func (l *Local) Mount(prefix string, dirPath string) {
+	l.mountLock.Lock()
+	defer l.mountLock.Unlock()
+	if l.mounts == nil {
+		l.mounts = make(map[string]string)
+	}
+	l.mounts[prefix] = dirPath
+}
+
+func (l *Local) Unmount(prefix string) {
+	l.mountLock.Lock()
+	defer l.mountLock.Unlock()
+	delete(l.mounts, prefix)
+}
+
+func (l *Local) GetMount(prefix string) (string, bool) {
+	l.mountLock.RLock()
+	defer l.mountLock.RUnlock()
+	dir, ok := l.mounts[prefix]
+	return dir, ok
 }
 
 func (l *Local) resolvePath(name string) string {
@@ -38,6 +68,35 @@ func (l *Local) Open(name string) (http.File, error) {
 	if name == "/index.html" && l.WebUIEnabled {
 		return os.Open("./html/index.html")
 	}
+
+	cleanName := filepath.FromSlash(strings.TrimPrefix(name, "/"))
+	parts := strings.Split(cleanName, string(filepath.Separator))
+
+	if len(parts) > 1 {
+		l.mountLock.RLock()
+		targetDir, ok := l.mounts[parts[0]]
+		l.mountLock.RUnlock()
+		if ok {
+			rest := filepath.Join(parts[1:]...)
+			mountedPath := filepath.Join(targetDir, rest)
+			file, err := os.Open(mountedPath)
+			if err == nil {
+				if l.NoListing {
+					stat, err := file.Stat()
+					if err != nil {
+						file.Close()
+						return nil, err
+					}
+					if stat.IsDir() {
+						file.Close()
+						return nil, os.ErrNotExist
+					}
+				}
+				return file, nil
+			}
+		}
+	}
+
 	path := l.resolvePath(name)
 	file, err := os.Open(path)
 	if err != nil {

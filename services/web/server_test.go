@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -431,6 +432,22 @@ func (m *mockDownloaderAdminMgr) DownloadLogs(ctx context.Context) ([]byte, stri
 	return []byte("test log content\n"), "podsync.log", nil
 }
 
+func (m *mockDownloaderAdminMgr) ListAudiobookDirs(ctx context.Context) ([]AudiobookDirInfo, error) {
+	return []AudiobookDirInfo{}, nil
+}
+
+func (m *mockDownloaderAdminMgr) ImportAudiobook(ctx context.Context, req *ImportAudiobookRequest) (*feed.Config, error) {
+	return &feed.Config{ID: req.ID}, nil
+}
+
+func (m *mockDownloaderAdminMgr) GetAudiobooksDir() string {
+	return "./audiobooks"
+}
+
+func (m *mockDownloaderAdminMgr) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
+	return nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -672,4 +689,42 @@ func TestSystemLogsEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "test log content")
 	assert.Contains(t, rec.Header().Get("Content-Disposition"), "podsync.log")
+}
+
+func TestAudiobookEndpoints(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	// 1. GET /api/v1/audiobooks/dirs
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audiobooks/dirs", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// 2. GET /api/v1/audiobooks/config
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/audiobooks/config", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "audiobooks_dir")
+
+	// 3. POST /api/v1/audiobooks/import
+	importJSON := `{"dir_name": "Orwell - 1984", "id": "1984", "title": "1984"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/audiobooks/import", strings.NewReader(importJSON))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"feed_id":"1984"`)
 }

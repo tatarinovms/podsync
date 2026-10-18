@@ -529,6 +529,48 @@ func (s *Server) getToolDefinitions() []Tool {
 				},
 			},
 		},
+		{
+			Name:        "list_audiobook_dirs",
+			Description: "List available directories in the audiobooks storage, showing track count, cover status, total size, and whether each is already linked to a podcast feed",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "import_audiobook",
+			Description: "Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format)",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"dir_name": {
+						Type:        "string",
+						Description: "Directory name inside the audiobooks storage folder (e.g. 'George Orwell - 1984')",
+					},
+					"feed_id": {
+						Type:        "string",
+						Description: "Optional unique feed ID / slug (auto-generated if omitted)",
+					},
+					"title": {
+						Type:        "string",
+						Description: "Optional book title override",
+					},
+					"author": {
+						Type:        "string",
+						Description: "Optional author name override",
+					},
+					"description": {
+						Type:        "string",
+						Description: "Optional book description override",
+					},
+					"cron_schedule": {
+						Type:        "string",
+						Description: "Optional cron schedule (defaults to '@every 12h')",
+					},
+				},
+				Required: []string{"dir_name"},
+			},
+		},
 	}
 }
 
@@ -538,6 +580,48 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 	}
 
 	switch name {
+	case "list_audiobook_dirs":
+		dirs, err := s.mgr.ListAudiobookDirs(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(dirs, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "import_audiobook":
+		dirName, ok := args["dir_name"].(string)
+		if !ok || strings.TrimSpace(dirName) == "" {
+			return CallToolResult{}, fmt.Errorf("dir_name parameter is required")
+		}
+		req := web.ImportAudiobookRequest{
+			DirName: strings.TrimSpace(dirName),
+		}
+		if fid, ok := args["feed_id"].(string); ok {
+			req.ID = strings.TrimSpace(fid)
+		}
+		if title, ok := args["title"].(string); ok {
+			req.Title = strings.TrimSpace(title)
+		}
+		if author, ok := args["author"].(string); ok {
+			req.Author = strings.TrimSpace(author)
+		}
+		if desc, ok := args["description"].(string); ok {
+			req.Description = strings.TrimSpace(desc)
+		}
+		if cron, ok := args["cron_schedule"].(string); ok {
+			req.CronSchedule = strings.TrimSpace(cron)
+		}
+		cfg, err := s.mgr.ImportAudiobook(ctx, &req)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(cfg, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Successfully imported audiobook as feed %q:\n%s", cfg.ID, string(data))}},
+		}, nil
+
 	case "list_feeds":
 		feeds, err := s.mgr.ListFeeds(ctx)
 		if err != nil {

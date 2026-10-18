@@ -7,8 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/ytdl"
 
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
@@ -126,6 +130,7 @@ func TestFeedUpdateStatusFollowsQueueAndRun(t *testing.T) {
 }
 
 type mockFeedManagerDB struct {
+	mu                sync.RWMutex
 	episodes          map[string]map[string]*model.Episode
 	walkEpisodesCount int
 }
@@ -174,8 +179,16 @@ func (m *mockFeedManagerDB) UpdateEpisode(feedID string, episodeID string, cb fu
 	return nil
 }
 func (m *mockFeedManagerDB) WalkEpisodes(_ context.Context, feedID string, cb func(episode *model.Episode) error) error {
+	m.mu.Lock()
 	m.walkEpisodesCount++
-	for _, ep := range m.episodes[feedID] {
+	epMap := m.episodes[feedID]
+	eps := make([]*model.Episode, 0, len(epMap))
+	for _, ep := range epMap {
+		eps = append(eps, ep)
+	}
+	m.mu.Unlock()
+
+	for _, ep := range eps {
 		if err := cb(ep); err != nil {
 			return err
 		}
@@ -677,4 +690,89 @@ func TestEpisodeDetailOrderAndMediaLinks(t *testing.T) {
 	assert.Equal(t, "new", episodes[0].ID)
 	assert.Contains(t, episodes[0].MediaURL, "https://example.com/podcasts/show/")
 	assert.Empty(t, episodes[1].MediaURL)
+}
+
+func TestConcurrentAPIWhileFeedUpdates(t *testing.T) {
+	mockDB := &mockFeedManagerDB{
+		episodes: map[string]map[string]*model.Episode{
+			"feed1": {
+				"ep1": {ID: "ep1", Status: model.EpisodeDownloaded, Size: 1000},
+				"ep2": {ID: "ep2", Status: model.EpisodeError, Error: "timeout"},
+			},
+		},
+	}
+	mgr := &AppFeedManager{
+		cfg: &Config{
+			Server:     web.Config{Hostname: "https://example.com"},
+			Storage:    fs.Config{Type: "local", Local: fs.LocalConfig{DataDir: t.TempDir()}},
+			Downloader: ytdl.Config{Timeout: 10},
+		},
+		feeds: map[string]*feed.Config{
+			"feed1": {ID: "feed1", URL: "https://youtube.com/channel/test", Format: model.FormatAudio},
+		},
+		db:             mockDB,
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		feedErrors:     make(map[string]feedErrorEntry),
+	}
+
+	stop := make(chan struct{})
+	// Goroutine simulating background update cycle (acquiring write lock)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				mgr.MarkFeedUpdateQueued("feed1")
+				mgr.MarkFeedUpdateStarted("feed1")
+				mgr.RecordFeedUpdateError("feed1", fmt.Errorf("network blip"))
+				mgr.ClearFeedUpdateError("feed1")
+				mgr.MarkFeedUpdateFinished("feed1")
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}()
+
+	// Run concurrent API readers
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					status, err := mgr.GetFeedsStatus(ctx)
+					assert.NoError(t, err)
+					assert.NotEmpty(t, status)
+
+					feeds, err := mgr.ListFeeds(ctx)
+					assert.NoError(t, err)
+					assert.NotEmpty(t, feeds)
+
+					syncStatus, err := mgr.GetSyncStatus(ctx)
+					assert.NoError(t, err)
+					assert.NotNil(t, syncStatus)
+
+					errs, err := mgr.GetDownloadErrors(ctx, "", 10)
+					assert.NoError(t, err)
+					assert.NotNil(t, errs)
+
+					dlCfg, err := mgr.GetDownloaderConfig(ctx)
+					assert.NoError(t, err)
+					assert.NotNil(t, dlCfg)
+				}
+			}
+		}()
+	}
+
+	<-ctx.Done()
+	close(stop)
+	wg.Wait()
 }

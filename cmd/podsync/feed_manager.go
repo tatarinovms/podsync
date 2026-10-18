@@ -60,6 +60,7 @@ type AppFeedManager struct {
 	feedErrors     map[string]feedErrorEntry
 	queuedUpdates  map[string]int
 	runningUpdates map[string]bool
+	coverCache     sync.Map
 }
 
 func NewAppFeedManager(
@@ -134,11 +135,14 @@ func (m *AppFeedManager) MountAllAudiobooks() {
 
 func (m *AppFeedManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	result := make([]web.FeedSummary, 0, len(m.feeds))
-
+	feedList := make([]*feed.Config, 0, len(m.feeds))
 	for _, f := range m.feeds {
+		feedList = append(feedList, f)
+	}
+	m.mu.RUnlock()
+
+	result := make([]web.FeedSummary, 0, len(feedList))
+	for _, f := range feedList {
 		summary := m.buildSummary(ctx, f)
 		result = append(result, summary)
 	}
@@ -177,9 +181,13 @@ func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusIt
 
 func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.FeedSummary, []*model.Episode, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	f, ok := m.feeds[id]
+	audiobooksDir := ""
+	if m.cfg != nil {
+		audiobooksDir = m.cfg.Audiobooks.Dir
+	}
+	m.mu.RUnlock()
+
 	if !ok {
 		return nil, nil, errors.Errorf("feed %q not found", id)
 	}
@@ -200,10 +208,7 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 
 	// If database has no episodes yet (e.g. prior to cron update), dynamically scan local audiobook directory
 	if len(episodes) == 0 && isAudiobook {
-		baseDir := ""
-		if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
-			baseDir = m.cfg.Audiobooks.Dir
-		}
+		baseDir := audiobooksDir
 		abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
 		if bErr == nil {
 			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
@@ -252,6 +257,12 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 
 // extractCoverArtFromXML reads the generated <feed_id>.xml from storage and extracts <image><url>...</url></image>
 func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
+	if val, ok := m.coverCache.Load(feedID); ok {
+		if s, ok := val.(string); ok && s != "" {
+			return s
+		}
+	}
+
 	if m.storage == nil {
 		return ""
 	}
@@ -269,22 +280,35 @@ func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
 	}
 
 	xmlContent := string(buf[:n])
+	var cover string
 	// Match <image> ... <url>URL</url>
 	re := regexp.MustCompile(`(?s)<image>.*?<url>\s*([^<\s]+)\s*</url>`)
 	if match := re.FindStringSubmatch(xmlContent); len(match) > 1 {
-		return strings.TrimSpace(match[1])
+		cover = strings.TrimSpace(match[1])
+	} else {
+		// Fallback to <itunes:image href="URL"
+		itunesRe := regexp.MustCompile(`<itunes:image\s+href="([^"]+)"`)
+		if match := itunesRe.FindStringSubmatch(xmlContent); len(match) > 1 {
+			cover = strings.TrimSpace(match[1])
+		}
 	}
 
-	// Fallback to <itunes:image href="URL"
-	itunesRe := regexp.MustCompile(`<itunes:image\s+href="([^"]+)"`)
-	if match := itunesRe.FindStringSubmatch(xmlContent); len(match) > 1 {
-		return strings.TrimSpace(match[1])
+	if cover != "" {
+		m.coverCache.Store(feedID, cover)
 	}
-
-	return ""
+	return cover
 }
 
 func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.FeedSummary {
+	m.mu.RLock()
+	updating := m.queuedUpdates[f.ID] > 0 || m.runningUpdates[f.ID]
+	errEntry, hasErr := m.feedErrors[f.ID]
+	host := web.Config{}.PublicURL()
+	if m.cfg != nil {
+		host = m.cfg.Server.PublicURL()
+	}
+	m.mu.RUnlock()
+
 	summary := web.FeedSummary{
 		ID:           f.ID,
 		URL:          f.URL,
@@ -294,7 +318,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		CronSchedule: f.CronSchedule,
 		UpdatePeriod: f.UpdatePeriod.String(),
 		PrivateFeed:  f.PrivateFeed,
-		Updating:     m.queuedUpdates[f.ID] > 0 || m.runningUpdates[f.ID],
+		Updating:     updating,
 		Config:       f,
 	}
 
@@ -344,16 +368,12 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	summary.ErrorCount = errCount
 	summary.TotalSize = totalSize
 
-	if errEntry, ok := m.feedErrors[f.ID]; ok {
+	if hasErr {
 		summary.LastError = errEntry.Error
 		summary.LastErrorAt = &errEntry.Time
 	}
 
 	// Generate URLs using the same base as RSS enclosure links.
-	host := web.Config{}.PublicURL()
-	if m.cfg != nil {
-		host = m.cfg.Server.PublicURL()
-	}
 	feedURL := fmt.Sprintf("%s/%s.xml", host, f.ID)
 	summary.FeedURL = feedURL
 
@@ -457,6 +477,7 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 	if m.updater != nil {
 		m.updater.SetFeedConfig(id, nil)
 	}
+	m.coverCache.Delete(id)
 
 	// Clean database
 	if err := m.db.DeleteFeed(ctx, id); err != nil {
@@ -566,8 +587,9 @@ func (m *AppFeedManager) MarkFeedUpdateStarted(id string) {
 
 func (m *AppFeedManager) MarkFeedUpdateFinished(id string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.runningUpdates, id)
+	m.mu.Unlock()
+	m.coverCache.Delete(id)
 }
 
 func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
@@ -581,7 +603,11 @@ func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID str
 
 func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	tokensCopy := make(map[model.Provider]StringSlice, len(m.tokens))
+	for k, v := range m.tokens {
+		tokensCopy[k] = append([]string(nil), v...)
+	}
+	m.mu.RUnlock()
 
 	providers := []struct {
 		provider model.Provider
@@ -606,7 +632,7 @@ func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 		}
 
 		var rawTokens []string
-		if list, ok := m.tokens[p.provider]; ok {
+		if list, ok := tokensCopy[p.provider]; ok {
 			rawTokens = list
 		}
 
@@ -748,18 +774,29 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
-	dataDir := m.cfg.Storage.Local.DataDir
+	m.mu.RLock()
+	version := m.version
+	commit := m.commit
+	buildDate := m.buildDate
+	startedAt := m.startedAt
+	var dataDir, storageType string
+	if m.cfg != nil {
+		dataDir = m.cfg.Storage.Local.DataDir
+		storageType = m.cfg.Storage.Type
+	}
+	m.mu.RUnlock()
+
 	total, free, used, _ := getDiskSpace(dataDir)
 
 	_, hasYtDlp := exec.LookPath("yt-dlp")
 	_, hasFFmpeg := exec.LookPath("ffmpeg")
 
 	stats := &web.SystemStats{
-		Version:    m.version,
-		Commit:     m.commit,
-		BuildDate:  m.buildDate,
-		Uptime:     time.Since(m.startedAt).Truncate(time.Second).String(),
-		StartedAt:  m.startedAt,
+		Version:    version,
+		Commit:     commit,
+		BuildDate:  buildDate,
+		Uptime:     time.Since(startedAt).Truncate(time.Second).String(),
+		StartedAt:  startedAt,
 		Goroutines: runtime.NumGoroutine(),
 		MemoryMB:   float64(mem.Alloc) / 1024 / 1024,
 		DiskTotal:  total,
@@ -768,7 +805,7 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 		HasYtDlp:   hasYtDlp == nil,
 		HasFFmpeg:  hasFFmpeg == nil,
 		DataDir:    dataDir,
-		Storage:    m.cfg.Storage.Type,
+		Storage:    storageType,
 	}
 
 	return stats, nil
@@ -1113,25 +1150,34 @@ func getFFmpegVersion(ctx context.Context) (string, string) {
 
 func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
+	dl := m.downloader
 	var dlCfg ytdl.Config
+	if m.cfg != nil {
+		dlCfg = m.cfg.Downloader
+	}
+	var dataDir, storageType string
+	if m.cfg != nil {
+		dataDir = m.cfg.Storage.Local.DataDir
+		storageType = m.cfg.Storage.Type
+	}
+	m.mu.RUnlock()
+
 	var binPath, binVer string
 	ffmpegPath, ffmpegVer := getFFmpegVersion(ctx)
 
-	if m.downloader != nil {
-		dlCfg = m.downloader.GetConfig()
-		binPath = m.downloader.GetBinaryPath()
-		if ver, err := m.downloader.GetVersion(ctx); err == nil {
+	if dl != nil {
+		dlCfg = dl.GetConfig()
+		binPath = dl.GetBinaryPath()
+		verCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		if ver, err := dl.GetVersion(verCtx); err == nil {
 			binVer = strings.TrimSpace(ver)
 		}
-	} else {
-		dlCfg = m.cfg.Downloader
+		cancel()
 	}
 
 	cookiesPath := dlCfg.CookiesFile
-	if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
-		defaultPath := filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+	if cookiesPath == "" && storageType == "local" && dataDir != "" {
+		defaultPath := filepath.Join(dataDir, "cookies.txt")
 		if _, err := os.Stat(defaultPath); err == nil {
 			cookiesPath = defaultPath
 		}
@@ -1207,12 +1253,14 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 
 func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	cookiesPath := m.cfg.Downloader.CookiesFile
-	if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
-		cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+	cookiesPath := ""
+	if m.cfg != nil {
+		cookiesPath = m.cfg.Downloader.CookiesFile
+		if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
+			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
+		}
 	}
+	m.mu.RUnlock()
 
 	if cookiesPath == "" {
 		return "", nil
@@ -1396,14 +1444,28 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 }
 
 func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID string, limit int) ([]web.DownloadErrorItem, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	if limit <= 0 {
 		limit = 20
 	} else if limit > 100 {
 		limit = 100
 	}
+
+	m.mu.RLock()
+	feeds := make([]*feed.Config, 0, len(m.feeds))
+	if targetFeedID != "" {
+		if f, ok := m.feeds[targetFeedID]; ok {
+			feeds = append(feeds, f)
+		}
+	} else {
+		for _, f := range m.feeds {
+			feeds = append(feeds, f)
+		}
+	}
+	errorsMap := make(map[string]feedErrorEntry, len(m.feedErrors))
+	for k, v := range m.feedErrors {
+		errorsMap[k] = v
+	}
+	m.mu.RUnlock()
 
 	var items []web.DownloadErrorItem
 
@@ -1456,7 +1518,7 @@ func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID str
 			return nil
 		})
 
-		if feedErr, hasErr := m.feedErrors[feedConfig.ID]; hasErr {
+		if feedErr, hasErr := errorsMap[feedConfig.ID]; hasErr {
 			rec := "Check logs or API configuration"
 			errLower := strings.ToLower(feedErr.Error)
 			if strings.Contains(errLower, "token is required") || strings.Contains(errLower, "not loaded") || strings.Contains(errLower, "api token") {
@@ -1477,14 +1539,8 @@ func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID str
 		}
 	}
 
-	if targetFeedID != "" {
-		if f, ok := m.feeds[targetFeedID]; ok {
-			collectFromFeed(f)
-		}
-	} else {
-		for _, f := range m.feeds {
-			collectFromFeed(f)
-		}
+	for _, f := range feeds {
+		collectFromFeed(f)
 	}
 
 	sort.Slice(items, func(i, j int) bool {
@@ -1502,31 +1558,41 @@ func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID str
 }
 
 func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID string, limit int) ([]web.RecentDownloadItem, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	if limit <= 0 {
 		limit = 10
 	} else if limit > 100 {
 		limit = 100
 	}
 
-	var items []web.RecentDownloadItem
-
-	host := m.cfg.Server.Hostname
-	if host == "" {
-		port := m.cfg.Server.Port
-		if port == 0 {
-			port = 8080
+	m.mu.RLock()
+	feeds := make([]*feed.Config, 0, len(m.feeds))
+	if targetFeedID != "" {
+		if f, ok := m.feeds[targetFeedID]; ok {
+			feeds = append(feeds, f)
 		}
-		host = fmt.Sprintf("http://localhost:%d", port)
+	} else {
+		for _, f := range m.feeds {
+			feeds = append(feeds, f)
+		}
 	}
+
+	host := "http://localhost:8080"
+	mountPath := ""
+	if m.cfg != nil {
+		if m.cfg.Server.Hostname != "" {
+			host = m.cfg.Server.Hostname
+		} else if m.cfg.Server.Port != 0 {
+			host = fmt.Sprintf("http://localhost:%d", m.cfg.Server.Port)
+		}
+		if m.cfg.Server.Path != "" {
+			mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
+		}
+	}
+	m.mu.RUnlock()
+
 	host = strings.TrimSuffix(host, "/")
 
-	mountPath := ""
-	if m.cfg.Server.Path != "" {
-		mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
-	}
+	var items []web.RecentDownloadItem
 
 	collectFromFeed := func(feedConfig *feed.Config) {
 		feedTitle := feedConfig.ID
@@ -1564,14 +1630,8 @@ func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID st
 		})
 	}
 
-	if targetFeedID != "" {
-		if f, ok := m.feeds[targetFeedID]; ok {
-			collectFromFeed(f)
-		}
-	} else {
-		for _, f := range m.feeds {
-			collectFromFeed(f)
-		}
+	for _, f := range feeds {
+		collectFromFeed(f)
 	}
 
 	sort.Slice(items, func(i, j int) bool {
@@ -1587,17 +1647,25 @@ func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID st
 
 func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	feeds := make([]*feed.Config, 0, len(m.feeds))
+	for _, f := range m.feeds {
+		feeds = append(feeds, f)
+	}
+	hasDl := m.downloader != nil
+	cronEntries := make(map[string]cron.EntryID, len(m.cronEntries))
+	for k, v := range m.cronEntries {
+		cronEntries[k] = v
+	}
+	c := m.cron
+	m.mu.RUnlock()
 
 	info := &web.SyncStatusInfo{
-		ActiveFeeds: len(m.feeds),
-		Feeds:       make([]web.SyncStatusFeedInfo, 0, len(m.feeds)),
+		ActiveFeeds: len(feeds),
+		Feeds:       make([]web.SyncStatusFeedInfo, 0, len(feeds)),
 	}
 
 	// Binary presence
-	if m.downloader != nil {
-		info.HasDownloader = true
-	}
+	info.HasDownloader = hasDl
 	if _, err := exec.LookPath("ffmpeg"); err == nil {
 		info.HasFFmpeg = true
 	}
@@ -1610,7 +1678,7 @@ func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo
 
 	past24h := time.Now().Add(-24 * time.Hour)
 
-	for _, f := range m.feeds {
+	for _, f := range feeds {
 		feedTitle := f.ID
 		provider := ""
 		var lastUpdate *time.Time
@@ -1630,9 +1698,9 @@ func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo
 		}
 
 		var nextUpdate *time.Time
-		if m.cron != nil {
-			if entryID, exists := m.cronEntries[f.ID]; exists {
-				nextTime := m.cron.Entry(entryID).Next
+		if c != nil {
+			if entryID, exists := cronEntries[f.ID]; exists {
+				nextTime := c.Entry(entryID).Next
 				if !nextTime.IsZero() {
 					nextUpdate = &nextTime
 				}
@@ -1827,18 +1895,7 @@ func (m *AppFeedManager) audiobooksDirLocked() string {
 
 func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.AudiobookDirInfo, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	baseDir := m.audiobooksDirLocked()
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to access audiobooks directory: %s", baseDir)
-	}
-
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read audiobooks directory: %s", baseDir)
-	}
-
 	exts := map[string]bool{
 		".mp3": true, ".m4b": true, ".m4a": true, ".aac": true, ".ogg": true, ".opus": true, ".flac": true,
 	}
@@ -1867,6 +1924,16 @@ func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.Audiobook
 			linkedDirs[info.ItemID] = f.ID
 			linkedDirs[filepath.Base(info.ItemID)] = f.ID
 		}
+	}
+	m.mu.RUnlock()
+
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return nil, errors.Wrapf(err, "failed to access audiobooks directory: %s", baseDir)
+	}
+
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read audiobooks directory: %s", baseDir)
 	}
 
 	results := make([]web.AudiobookDirInfo, 0)

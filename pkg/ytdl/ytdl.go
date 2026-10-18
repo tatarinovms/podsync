@@ -120,13 +120,14 @@ type Config struct {
 
 type YoutubeDl struct {
 	path               string
+	cfgMu              sync.RWMutex
 	timeout            time.Duration
 	cookiesFile        string
 	cookiesFromBrowser string
 	proxy              string
 	language           string
 	selfUpdate         bool
-	updateLock         sync.Mutex // Don't call youtube-dl while self updating
+	binaryMu           sync.RWMutex // Protects binary during self-update (exclusive write lock)
 }
 
 func New(ctx context.Context, cfg Config) (*YoutubeDl, error) {
@@ -235,11 +236,11 @@ func (dl *YoutubeDl) ensureDependencies(ctx context.Context) error {
 }
 
 func (dl *YoutubeDl) Update(ctx context.Context) error {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.binaryMu.Lock()
+	defer dl.binaryMu.Unlock()
 
 	log.Info("updating youtube-dl")
-	output, err := dl.exec(ctx, "--update", "--verbose")
+	output, err := dl.execRaw(ctx, "--update", "--verbose")
 	if err != nil {
 		log.WithError(err).Error(output)
 		return errors.Wrap(err, "failed to self update youtube-dl")
@@ -257,13 +258,9 @@ func (dl *YoutubeDl) PlaylistMetadata(ctx context.Context, url string) (metadata
 		"-q",            // quiet mode
 		"--no-warnings", // suppress warnings
 	}
-	dl.updateLock.Lock()
 	args = dl.appendCommonArgs(args)
-	dl.updateLock.Unlock()
 	args = append(args, url)
 
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
 	output, err := dl.exec(ctx, args...)
 	if err != nil {
 		log.WithError(err).Errorf("youtube-dl error: %s", url)
@@ -278,7 +275,7 @@ func (dl *YoutubeDl) PlaylistMetadata(ctx context.Context, url string) (metadata
 	}
 
 	var playlistMetadata PlaylistMetadata
-	json.Unmarshal([]byte(output), &playlistMetadata)
+	_ = json.Unmarshal([]byte(output), &playlistMetadata)
 	return playlistMetadata, nil
 }
 
@@ -302,9 +299,6 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 	filePath := filepath.Join(tmpDir, fmt.Sprintf("%s.%s", baseName, "%(ext)s"))
 
 	args := dl.buildArgs(feedConfig, episode, filePath)
-
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
 
 	output, err := dl.exec(ctx, args...)
 	if err != nil {
@@ -332,10 +326,21 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 }
 
 func (dl *YoutubeDl) exec(ctx context.Context, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, dl.timeout)
+	dl.binaryMu.RLock()
+	defer dl.binaryMu.RUnlock()
+	return dl.execRaw(ctx, args...)
+}
+
+func (dl *YoutubeDl) execRaw(ctx context.Context, args ...string) (string, error) {
+	dl.cfgMu.RLock()
+	timeout := dl.timeout
+	path := dl.path
+	dl.cfgMu.RUnlock()
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, dl.path, args...)
+	cmd := exec.CommandContext(ctx, path, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), errors.Wrap(err, "failed to execute youtube-dl")
@@ -357,23 +362,29 @@ func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
 	if dl == nil {
 		return args
 	}
-	if dl.cookiesFile != "" {
+	dl.cfgMu.RLock()
+	cookiesFile := dl.cookiesFile
+	cookiesFromBrowser := dl.cookiesFromBrowser
+	proxy := dl.proxy
+	dl.cfgMu.RUnlock()
+
+	if cookiesFile != "" {
 		if !hasArg(args, "--cookies") && !hasArg(args, "--cookies-from-browser") {
-			if _, err := os.Stat(dl.cookiesFile); err == nil {
-				args = append(args, "--cookies", dl.cookiesFile)
+			if _, err := os.Stat(cookiesFile); err == nil {
+				args = append(args, "--cookies", cookiesFile)
 			} else {
-				log.Warnf("configured cookies file %q not found on disk", dl.cookiesFile)
+				log.Warnf("configured cookies file %q not found on disk", cookiesFile)
 			}
 		}
-	} else if dl.cookiesFromBrowser != "" {
+	} else if cookiesFromBrowser != "" {
 		if !hasArg(args, "--cookies") && !hasArg(args, "--cookies-from-browser") {
-			args = append(args, "--cookies-from-browser", dl.cookiesFromBrowser)
+			args = append(args, "--cookies-from-browser", cookiesFromBrowser)
 		}
 	}
 
-	if dl.proxy != "" {
+	if proxy != "" {
 		if !hasArg(args, "--proxy") {
-			args = append(args, "--proxy", dl.proxy)
+			args = append(args, "--proxy", proxy)
 		}
 	}
 
@@ -387,8 +398,12 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 	lang := ""
 	if feedConfig != nil && feedConfig.Custom.Language != "" {
 		lang = strings.TrimSpace(feedConfig.Custom.Language)
-	} else if dl != nil && dl.language != "" {
-		lang = strings.TrimSpace(dl.language)
+	} else if dl != nil {
+		dl.cfgMu.RLock()
+		if dl.language != "" {
+			lang = strings.TrimSpace(dl.language)
+		}
+		dl.cfgMu.RUnlock()
 	}
 
 	switch feedConfig.Format {
@@ -455,8 +470,8 @@ func buildArgs(feedConfig *feed.Config, episode *model.Episode, outputFilePath s
 }
 
 func (dl *YoutubeDl) GetConfig() Config {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.cfgMu.RLock()
+	defer dl.cfgMu.RUnlock()
 	return Config{
 		SelfUpdate:         dl.selfUpdate,
 		Timeout:            int(dl.timeout.Minutes()),
@@ -469,8 +484,8 @@ func (dl *YoutubeDl) GetConfig() Config {
 }
 
 func (dl *YoutubeDl) UpdateConfig(cfg Config) {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.cfgMu.Lock()
+	defer dl.cfgMu.Unlock()
 	if cfg.Timeout > 0 {
 		dl.timeout = time.Duration(cfg.Timeout) * time.Minute
 	}
@@ -482,30 +497,30 @@ func (dl *YoutubeDl) UpdateConfig(cfg Config) {
 }
 
 func (dl *YoutubeDl) SetCookiesFile(path string) {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.cfgMu.Lock()
+	defer dl.cfgMu.Unlock()
 	dl.cookiesFile = path
 }
 
 func (dl *YoutubeDl) SetCookiesFromBrowser(browser string) {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.cfgMu.Lock()
+	defer dl.cfgMu.Unlock()
 	dl.cookiesFromBrowser = browser
 }
 
 func (dl *YoutubeDl) SetProxy(proxy string) {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
+	dl.cfgMu.Lock()
+	defer dl.cfgMu.Unlock()
 	dl.proxy = proxy
 }
 
 func (dl *YoutubeDl) GetBinaryPath() string {
+	dl.cfgMu.RLock()
+	defer dl.cfgMu.RUnlock()
 	return dl.path
 }
 
 func (dl *YoutubeDl) GetVersion(ctx context.Context) (string, error) {
-	dl.updateLock.Lock()
-	defer dl.updateLock.Unlock()
 	return dl.exec(ctx, "--version")
 }
 
@@ -518,9 +533,7 @@ func (dl *YoutubeDl) TestURL(ctx context.Context, testURL string) (string, error
 		"--no-download",
 		"--no-warnings",
 	}
-	dl.updateLock.Lock()
 	args = dl.appendCommonArgs(args)
-	dl.updateLock.Unlock()
 	args = append(args, testURL)
 
 	output, err := dl.exec(ctx, args...)

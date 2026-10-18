@@ -207,16 +207,22 @@ USER="admin"
 PASS="password"
 HOST="http://localhost:8080"
 
-# List feeds
+# List feeds (full summaries with episode counts and sizes)
 curl -u "$USER:$PASS" "$HOST/api/v1/feeds"
+
+# Check lightweight feed status (in-memory state: idle, queued, running)
+curl -u "$USER:$PASS" "$HOST/api/v1/feeds/status"
 
 # Add feed
 curl -u "$USER:$PASS" -X POST "$HOST/api/v1/feeds" \
   -H "Content-Type: application/json" \
   -d '{"url":"https://youtube.com/channel/...","format":"audio","quality":"high"}'
 
-# Trigger update
+# Trigger update for a single feed
 curl -u "$USER:$PASS" -X POST "$HOST/api/v1/feeds/FEED_ID/update"
+
+# Trigger bulk update for all configured feeds
+curl -u "$USER:$PASS" -X POST "$HOST/api/v1/feeds/update"
 
 # System health
 curl -u "$USER:$PASS" "$HOST/api/v1/system"

@@ -23,6 +23,7 @@ RUN apk --no-cache add ca-certificates python3 py3-pip ffmpeg tzdata libc6-compa
 
 RUN chmod 777 /usr/local/bin
 COPY --from=builder /usr/bin/yt-dlp /usr/local/bin/youtube-dl
+RUN ln -s /usr/local/bin/youtube-dl /usr/local/bin/yt-dlp
 COPY --from=builder /build/bin/podsync /app/podsync
 COPY --from=builder /build/html/index.html /app/html/index.html
 

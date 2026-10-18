@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -607,4 +610,46 @@ func TestRunStdio(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 	require.Len(t, lines, 1)
 	assert.Contains(t, lines[0], `"id":1`)
+}
+
+func TestMCPToolsDocumentationSync(t *testing.T) {
+	server, _ := setupTestServer()
+	tools := server.getToolDefinitions()
+	require.NotEmpty(t, tools)
+
+	// 1. Verify services/web/ui/index.html
+	uiPath := filepath.Join("..", "..", "services", "web", "ui", "index.html")
+	uiBytes, err := os.ReadFile(uiPath)
+	require.NoError(t, err, "failed to read services/web/ui/index.html")
+	uiContent := string(uiBytes)
+
+	// 2. Verify html/index.html
+	htmlPath := filepath.Join("..", "..", "html", "index.html")
+	htmlBytes, err := os.ReadFile(htmlPath)
+	require.NoError(t, err, "failed to read html/index.html")
+	assert.Equal(t, string(uiBytes), string(htmlBytes), "services/web/ui/index.html and html/index.html must be byte-for-byte identical")
+
+	// 3. Verify docs/mcp.md
+	docsPath := filepath.Join("..", "..", "docs", "mcp.md")
+	docsBytes, err := os.ReadFile(docsPath)
+	require.NoError(t, err, "failed to read docs/mcp.md")
+	docsContent := string(docsBytes)
+
+	// 4. Verify AGENTS.md
+	agentsPath := filepath.Join("..", "..", "AGENTS.md")
+	agentsBytes, err := os.ReadFile(agentsPath)
+	require.NoError(t, err, "failed to read AGENTS.md")
+	agentsContent := string(agentsBytes)
+
+	for _, tool := range tools {
+		expectedHTMLSnippet := fmt.Sprintf("<td><code>%s</code></td>", tool.Name)
+		assert.Contains(t, uiContent, expectedHTMLSnippet, "Tool %q is registered in MCP server but missing from services/web/ui/index.html", tool.Name)
+
+		expectedDocsSnippet := fmt.Sprintf("`%s`", tool.Name)
+		assert.Contains(t, docsContent, expectedDocsSnippet, "Tool %q is registered in MCP server but missing from docs/mcp.md", tool.Name)
+		assert.Contains(t, agentsContent, expectedDocsSnippet, "Tool %q is registered in MCP server but missing from AGENTS.md", tool.Name)
+	}
+
+	assert.Contains(t, docsContent, fmt.Sprintf("%d specialized tools", len(tools)), "docs/mcp.md tool count is out of date")
+	assert.Contains(t, agentsContent, fmt.Sprintf("%d MCP tools", len(tools)), "AGENTS.md tool count is out of date")
 }

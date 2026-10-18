@@ -165,3 +165,12 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
 8. **Proper Agent Skill Formatting (`SKILL.md`)**:
    - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`).
    - Keep `.agents/skills/podsync/SKILL.md` and user config skill directories synchronized.
+9. **Mandatory MCP Tools Synchronization & Automated Verification**:
+   - Whenever adding, removing, or modifying MCP tools in `pkg/mcp/server.go`:
+     1. Update `getToolDefinitions()` and `callTool()`.
+     2. Update the `#tab-mcp` tools reference table in `services/web/ui/index.html` (tool name, description, arguments).
+     3. Synchronize `html/index.html` byte-for-byte with `services/web/ui/index.html`.
+     4. Update `docs/mcp.md` (tool count and reference table).
+     5. Update `AGENTS.md` (tool count and list in Section 5).
+     6. Update `SKILL.md` (and propagate to all 4 skill locations: `.agents/skills/podsync/`, `.gemini/skills/podsync/`, `~/.gemini/config/skills/podsync/`, `~/.gemini/antigravity-cli/skills/podsync/`).
+     7. Run `go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...` to automatically verify that all registered tools match the UI table and documentation.

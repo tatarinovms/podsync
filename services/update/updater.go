@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -180,14 +181,13 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 
 func (u *Manager) fetchEpisodes(ctx context.Context, feedConfig *feed.Config) ([]*model.Episode, error) {
 	var (
-		feedID       = feedConfig.ID
-		downloadList []*model.Episode
-		pageSize     = feedConfig.PageSize
+		feedID   = feedConfig.ID
+		pageSize = feedConfig.PageSize
 	)
 
 	log.WithField("page_size", pageSize).Info("fetching episodes for download")
 
-	// Build the list of files to download
+	var candidates []*model.Episode
 	err := u.db.WalkEpisodes(ctx, feedID, func(episode *model.Episode) error {
 		var (
 			logger = log.WithFields(log.Fields{"episode_id": episode.ID})
@@ -202,14 +202,7 @@ func (u *Manager) fetchEpisodes(ctx context.Context, feedConfig *feed.Config) ([
 			return nil
 		}
 
-		// Limit the number of episodes downloaded at once
-		pageSize--
-		if pageSize < 0 {
-			return nil
-		}
-
-		log.Debugf("adding %s (%q) to queue", episode.ID, episode.Title)
-		downloadList = append(downloadList, episode)
+		candidates = append(candidates, episode)
 		return nil
 	})
 
@@ -217,7 +210,26 @@ func (u *Manager) fetchEpisodes(ctx context.Context, feedConfig *feed.Config) ([
 		return nil, errors.Wrapf(err, "failed to build update list")
 	}
 
-	return downloadList, nil
+	// Sort candidates so the newest episodes are prioritized (or oldest first for chronological ascending playlists)
+	if feedConfig.PlaylistSort == model.SortingAsc {
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].PubDate.Before(candidates[j].PubDate)
+		})
+	} else {
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].PubDate.After(candidates[j].PubDate)
+		})
+	}
+
+	if pageSize > 0 && len(candidates) > pageSize {
+		candidates = candidates[:pageSize]
+	}
+
+	for _, episode := range candidates {
+		log.Debugf("adding %s (%q) to queue", episode.ID, episode.Title)
+	}
+
+	return candidates, nil
 }
 
 func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config, downloadList []*model.Episode) error {
@@ -438,16 +450,12 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 
 	log.Debugf("purging old episodes, leaving %d", keep)
 
-	// Episode list is already sorted by date (descending)
-	var purgeList []*model.Episode
+	// Collect all downloaded episodes from database
+	var downloaded []*model.Episode
 	err := u.db.WalkEpisodes(ctx, feedID, func(episode *model.Episode) error {
 		if episode.Status == model.EpisodeDownloaded {
-			keep--
-			if keep < 0 {
-				purgeList = append(purgeList, episode)
-			}
+			downloaded = append(downloaded, episode)
 		}
-
 		return nil
 	})
 
@@ -455,6 +463,18 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 		return errors.Wrap(err, "failed to build purge list")
 	}
 
+	// BadgerDB iterates keys in alphabetical order of episode IDs, not by publication date!
+	// We must explicitly sort downloaded episodes by date descending (newest first)
+	// so that we retain the newest `keep` episodes and purge only the oldest.
+	sort.Slice(downloaded, func(i, j int) bool {
+		return downloaded[i].PubDate.After(downloaded[j].PubDate)
+	})
+
+	if len(downloaded) <= keep {
+		return nil
+	}
+
+	purgeList := downloaded[keep:]
 	log.Debugf("found %d episode(s) to purge", len(purgeList))
 
 	var result error

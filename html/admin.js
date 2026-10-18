@@ -1298,16 +1298,30 @@
                 if (episodes.length !== downloadedCount) subtitleParts.push(`Total: ${episodes.length}`);
                 document.getElementById('episodes-feed-subtitle').innerText = subtitleParts.join(' • ');
 
-                const unitName = isAudiobook ? 'chapters' : 'episodes';
+                const feedTitle = data.feed?.title || f?.title || feedId;
+                const isAudiobookFeed = isAudiobook || (data.feed?.provider === 'audiobook');
+                document.getElementById('episodes-feed-title').innerText = isAudiobookFeed ? `Audiobook Chapters: ${feedTitle}` : `Podcast: ${feedTitle}`;
+
+                const unitName = isAudiobookFeed ? 'chapters' : 'episodes';
                 if (episodes.length === 0) {
-                    listEl.innerHTML = `<div class="p-4 text-center text-muted">No ${unitName} in database for this feed yet.</div>`;
+                    listEl.innerHTML = `
+                        <div class="p-4 text-center text-muted">
+                            <div class="mb-2"><i class="bi bi-inbox fs-4 d-block mb-2"></i>No ${unitName} in database for this feed yet.</div>
+                            <button class="btn btn-outline-primary btn-sm mt-1" ${actionAttrs("update", feedId)}><i class="bi bi-arrow-repeat me-1"></i> Scan / Update Feed Now</button>
+                        </div>`;
                     return;
                 }
 
                 listEl.innerHTML = episodes.map(ep => {
                     let statusBadge = '<span class="badge bg-secondary">Unknown</span>';
-                    let retryBtn = '';
+                    let actionBtns = '';
                     let sizeDisplay = `<i class="bi bi-hdd"></i> ${formatBytes(ep.size)}`;
+
+                    if (isAudiobookFeed && ep.status === 'downloaded' && (ep.video_url || ep.id)) {
+                        const playFilename = ep.video_url || ep.id;
+                        const audioSrc = `/${encodeURIComponent(feedId)}/${encodeURIComponent(playFilename)}`;
+                        actionBtns += `<a href="${safeUrl(audioSrc)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm py-0 px-2 mt-1 me-1" title="Stream chapter"><i class="bi bi-play-fill"></i> Play</a>`;
+                    }
 
                     if (ep.status === 'downloaded') {
                         statusBadge = '<span class="badge bg-success">Downloaded</span>';
@@ -1316,7 +1330,7 @@
                         sizeDisplay = '<i class="bi bi-hourglass-split"></i> Pending';
                     } else if (ep.status === 'error') {
                         statusBadge = '<span class="badge bg-danger">Error</span>';
-                        retryBtn = `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" ${actionAttrs("retry", feedId, ep.id)}><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+                        actionBtns += `<button class="btn btn-outline-danger btn-sm py-0 px-2 mt-1" ${actionAttrs("retry", feedId, ep.id)}><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
                     } else if (ep.status === 'cleaned') {
                         statusBadge = '<span class="badge bg-light text-muted border">Cleaned (deleted from disk)</span>';
                         sizeDisplay = '<i class="bi bi-trash"></i> 0 B (deleted)';
@@ -1338,7 +1352,7 @@
                             </div>
                             <div class="text-end text-nowrap">
                                 <div>${statusBadge}</div>
-                                ${retryBtn}
+                                <div class="mt-1">${actionBtns}</div>
                             </div>
                         </div>
                     </div>`;
@@ -2502,9 +2516,11 @@
                     <div class="col-12 col-md-6 col-xl-4">
                         <div class="card h-100 p-3 shadow-sm">
                             <div class="d-flex gap-3 align-items-center mb-3">
-                                ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i class="bi bi-book fs-3"></i></div>`}
+                                <div role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters" class="flex-shrink-0" style="cursor: pointer;">
+                                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i class="bi bi-book fs-3"></i></div>`}
+                                </div>
                                 <div class="min-w-0 flex-grow-1">
-                                    <h6 class="fw-bold mb-1 text-truncate" title="${escapeHtml(feed.title || feed.id)}">${escapeHtml(feed.title || feed.id)}</h6>
+                                    <h6 class="fw-bold mb-1 text-truncate" role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters (Click to open)" style="cursor: pointer;">${escapeHtml(feed.title || feed.id)}</h6>
                                     <div class="text-muted small text-truncate">${feed.author ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
                                 </div>
                             </div>
@@ -2537,14 +2553,14 @@
                             </div>
 
                             <div class="d-flex justify-content-between small text-muted mb-3 border-top pt-2">
-                                <span><i class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
+                                <span role="button" ${actionAttrs("episodes", feed.id)} class="text-primary" style="cursor: pointer;" title="View Chapters"><i class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
                                 <span><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
                             </div>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-outline-primary btn-sm flex-grow-1" ${actionAttrs("copy", feed.feed_url)}><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
                                 <a href="${safeUrl(feed.feed_url, ['http:', 'https:'])}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm" title="Open RSS XML in new tab"><i class="bi bi-box-arrow-up-right"></i> XML</a>
                                 <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i class="bi bi-gear"></i></button>
-                                <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i class="bi bi-list-ol"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i class="bi bi-list-ol me-1"></i>Chapters</button>
                                 <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i class="bi bi-arrow-repeat"></i></button>
                             </div>
                         </div>

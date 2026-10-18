@@ -190,9 +190,35 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 		return nil
 	})
 
-	sort.Slice(episodes, func(i, j int) bool {
-		return episodes[i].PubDate.After(episodes[j].PubDate)
-	})
+	info, parseErr := builder.ParseURL(f.URL)
+	isAudiobook := (parseErr == nil && info.Provider == model.ProviderAudiobook) || strings.HasPrefix(f.URL, "audiobook://")
+
+	// If database has no episodes yet (e.g. prior to cron update), dynamically scan local audiobook directory
+	if len(episodes) == 0 && isAudiobook {
+		baseDir := ""
+		if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
+			baseDir = m.cfg.Audiobooks.Dir
+		}
+		abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
+		if bErr == nil {
+			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
+				_ = m.db.AddFeed(ctx, f.ID, builtFeed)
+				episodes = builtFeed.Episodes
+				summary.EpisodeCount = len(episodes)
+				summary.DownloadedCount = len(episodes)
+			}
+		}
+	}
+
+	if isAudiobook || f.PlaylistSort == model.SortingAsc {
+		sort.Slice(episodes, func(i, j int) bool {
+			return episodes[i].PubDate.Before(episodes[j].PubDate)
+		})
+	} else {
+		sort.Slice(episodes, func(i, j int) bool {
+			return episodes[i].PubDate.After(episodes[j].PubDate)
+		})
+	}
 
 	return &summary, episodes, nil
 }
@@ -1958,6 +1984,14 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 
 	if err := m.AddFeed(ctx, newFeed); err != nil {
 		return nil, err
+	}
+
+	// Build audiobook feed metadata and chapters immediately so chapters are available right away
+	abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
+	if bErr == nil {
+		if builtFeed, bErr := abBuilder.Build(ctx, newFeed); bErr == nil && builtFeed != nil {
+			_ = m.db.AddFeed(ctx, newFeed.ID, builtFeed)
+		}
 	}
 
 	return newFeed, nil

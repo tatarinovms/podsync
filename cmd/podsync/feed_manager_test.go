@@ -131,7 +131,18 @@ type mockFeedManagerDB struct {
 
 func (m *mockFeedManagerDB) Close() error          { return nil }
 func (m *mockFeedManagerDB) Version() (int, error) { return 1, nil }
-func (m *mockFeedManagerDB) AddFeed(_ context.Context, _ string, _ *model.Feed) error {
+func (m *mockFeedManagerDB) AddFeed(_ context.Context, id string, feed *model.Feed) error {
+	if m.episodes == nil {
+		m.episodes = make(map[string]map[string]*model.Episode)
+	}
+	if m.episodes[id] == nil {
+		m.episodes[id] = make(map[string]*model.Episode)
+	}
+	if feed != nil {
+		for _, ep := range feed.Episodes {
+			m.episodes[id][ep.ID] = ep
+		}
+	}
 	return nil
 }
 func (m *mockFeedManagerDB) GetFeed(_ context.Context, _ string) (*model.Feed, error) {
@@ -521,4 +532,43 @@ func TestDeleteAudiobookDir(t *testing.T) {
 	// 3. Delete non-existent book
 	err = mgr.DeleteAudiobookDir(context.Background(), "NonExistent")
 	assert.Error(t, err)
+}
+
+func TestGetFeedDetail_AudiobookDynamicScan(t *testing.T) {
+	tmpDir := t.TempDir()
+	booksDir := filepath.Join(tmpDir, "audiobooks")
+	require.NoError(t, os.MkdirAll(booksDir, 0755))
+
+	bookDir := filepath.Join(booksDir, "Dune")
+	require.NoError(t, os.MkdirAll(bookDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(bookDir, "01_intro.mp3"), []byte("mp3 content 1"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(bookDir, "02_chapter.mp3"), []byte("mp3 content 2"), 0644))
+
+	mockDB := &mockFeedManagerDB{
+		episodes: make(map[string]map[string]*model.Episode),
+	}
+
+	bookFeed := &feed.Config{
+		ID:  "dune_book",
+		URL: "audiobook://Dune",
+	}
+
+	mgr := &AppFeedManager{
+		cfg: &Config{
+			Audiobooks: AudiobooksConfig{
+				Dir: booksDir,
+			},
+		},
+		feeds: map[string]*feed.Config{
+			"dune_book": bookFeed,
+		},
+		db: mockDB,
+	}
+
+	summary, episodes, err := mgr.GetFeedDetail(context.Background(), "dune_book")
+	require.NoError(t, err)
+	assert.Equal(t, 2, summary.EpisodeCount)
+	require.Len(t, episodes, 2)
+	assert.Equal(t, "01_intro.mp3", episodes[0].ID)
+	assert.Equal(t, "02_chapter.mp3", episodes[1].ID)
 }

@@ -188,3 +188,40 @@ func TestCleanTokenExtraction(t *testing.T) {
 
 	assert.Equal(t, []string{"vk1.a.secret_key"}, []string(mgr.tokens[model.Provider("vkvideo")]))
 }
+
+func TestUpdateFeed_AudiobookProtections(t *testing.T) {
+	mgr := &AppFeedManager{
+		cfg: &Config{
+			Feeds: map[string]*feed.Config{
+				"mybook": {
+					ID:  "mybook",
+					URL: "audiobook://Dune",
+				},
+			},
+		},
+		feeds: map[string]*feed.Config{
+			"mybook": {
+				ID:  "mybook",
+				URL: "audiobook://Dune",
+			},
+		},
+	}
+
+	err := mgr.UpdateFeed(context.Background(), "mybook", &web.FeedConfigUpdate{
+		KeepLast: 5,
+		Format:   "video",
+		Quality:  "low",
+		Custom: feed.Custom{
+			Title:  "Dune Updated",
+			Author: "Frank Herbert",
+		},
+	})
+	assert.NoError(t, err)
+
+	updated := mgr.feeds["mybook"]
+	assert.Nil(t, updated.Clean)
+	assert.Equal(t, model.FormatAudio, updated.Format)
+	assert.Equal(t, model.QualityHigh, updated.Quality)
+	assert.Equal(t, "Dune Updated", updated.Custom.Title)
+	assert.Equal(t, "Frank Herbert", updated.Custom.Author)
+}

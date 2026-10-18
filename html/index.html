@@ -874,11 +874,16 @@
                 <!-- 1. Feeds Tab -->
                 <div class="tab-pane fade show active" id="tab-feeds">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                        <div class="d-flex gap-2 flex-grow-1" style="max-width: 450px;">
+                        <div class="d-flex gap-2 flex-grow-1" style="max-width: 540px;">
                             <div class="input-group">
                                 <span class="input-group-text border-end-0"><i class="bi bi-search text-muted"></i></span>
                                 <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Search by title or ID..." oninput="filterFeeds()">
                             </div>
+                            <select id="feed-type-filter" class="form-select form-select-sm" style="max-width: 140px;" onchange="filterFeeds()">
+                                <option value="all" selected>All Types</option>
+                                <option value="channels">Channels</option>
+                                <option value="audiobooks">Audiobooks</option>
+                            </select>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
@@ -2024,7 +2029,7 @@
             <div class="modal-content">
                 <div class="modal-header border-bottom">
                     <div>
-                        <h5 class="modal-title fw-bold mb-0">
+                        <h5 class="modal-title fw-bold mb-0" id="feed-settings-title">
                             <i class="bi bi-sliders text-primary me-2"></i>Podcast Settings
                         </h5>
                         <div class="text-muted small mt-1" id="feed-settings-subtitle">ID: <code>-</code></div>
@@ -2034,28 +2039,28 @@
                 <div class="modal-body p-0">
                     <!-- Nav tabs -->
                     <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary" id="feedSettingsTabs" role="tablist">
-                        <li class="nav-item">
-                            <button class="nav-link active small fw-semibold" data-bs-toggle="tab" data-bs-target="#fs-tab-general">
+                        <li class="nav-item" id="fs-nav-general">
+                            <button class="nav-link active small fw-semibold" id="fs-btn-general" data-bs-toggle="tab" data-bs-target="#fs-tab-general">
                                 <i class="bi bi-clock me-1"></i>General &amp; Schedule
                             </button>
                         </li>
-                        <li class="nav-item">
-                            <button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#fs-tab-cleanup">
+                        <li class="nav-item" id="fs-nav-cleanup">
+                            <button class="nav-link small fw-semibold" id="fs-btn-cleanup" data-bs-toggle="tab" data-bs-target="#fs-tab-cleanup">
                                 <i class="bi bi-trash3 me-1"></i>Retention
                             </button>
                         </li>
-                        <li class="nav-item">
-                            <button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#fs-tab-filters">
+                        <li class="nav-item" id="fs-nav-filters">
+                            <button class="nav-link small fw-semibold" id="fs-btn-filters" data-bs-toggle="tab" data-bs-target="#fs-tab-filters">
                                 <i class="bi bi-funnel me-1"></i>Filters
                             </button>
                         </li>
-                        <li class="nav-item">
-                            <button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#fs-tab-custom">
+                        <li class="nav-item" id="fs-nav-custom">
+                            <button class="nav-link small fw-semibold" id="fs-btn-custom" data-bs-toggle="tab" data-bs-target="#fs-tab-custom">
                                 <i class="bi bi-card-text me-1"></i>RSS Overrides
                             </button>
                         </li>
-                        <li class="nav-item">
-                            <button class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#fs-tab-advanced">
+                        <li class="nav-item" id="fs-nav-advanced">
+                            <button class="nav-link small fw-semibold" id="fs-btn-advanced" data-bs-toggle="tab" data-bs-target="#fs-tab-advanced">
                                 <i class="bi bi-terminal me-1"></i>Advanced
                             </button>
                         </li>
@@ -2068,10 +2073,10 @@
                             <!-- 1. General & Schedule -->
                             <div class="tab-pane fade show active" id="fs-tab-general">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Source URL</label>
+                                    <label class="form-label small fw-semibold" id="fs-url-label">Source URL</label>
                                     <input type="text" id="fs-url" class="form-control form-control-sm font-monospace text-muted" readonly disabled>
                                 </div>
-                                <div class="row g-2 mb-3">
+                                <div class="row g-2 mb-3" id="fs-channel-media-row">
                                     <div class="col-sm-4">
                                         <label class="form-label small fw-semibold">Media Format</label>
                                         <select id="fs-format" class="form-select form-select-sm" onchange="toggleMaxHeight()">
@@ -2099,12 +2104,12 @@
                                     </div>
                                 </div>
                                 <div class="row g-2 mb-3">
-                                    <div class="col-sm-4">
+                                    <div class="col-sm-4" id="fs-channel-page-size-col">
                                         <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
                                         <input type="number" id="fs-page-size" class="form-control form-control-sm" min="1" max="500" value="50">
                                         <div class="form-text small">Number of recent episodes to query from channel.</div>
                                     </div>
-                                    <div class="col-sm-8">
+                                    <div class="col-sm-8" id="fs-cron-col">
                                         <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
                                         <div class="input-group input-group-sm mb-1">
                                             <input type="text" id="fs-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
@@ -2116,10 +2121,11 @@
                                             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('@every 24h')">24h</button>
                                             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('0 4 * * *')">Daily 04:00</button>
                                         </div>
+                                        <div class="form-text small text-muted" id="fs-cron-help">Schedule to periodically check for new media files.</div>
                                     </div>
                                 </div>
-                                <div class="row g-2 mb-3">
-                                    <div class="col-sm-6">
+                                <div class="row g-2 mb-3" id="fs-channel-sort-row">
+                                    <div class="col-sm-6" id="fs-channel-sort-col">
                                         <label class="form-label small fw-semibold">Playlist Sorting</label>
                                         <select id="fs-playlist-sort" class="form-select form-select-sm">
                                             <option value="">Default (Source order)</option>
@@ -2127,20 +2133,20 @@
                                             <option value="desc">Descending (Newest first)</option>
                                         </select>
                                     </div>
-                                    <div class="col-sm-6">
+                                    <div class="col-sm-6" id="fs-channel-lang-col">
                                         <label class="form-label small fw-semibold">Preferred Audio Language</label>
                                         <input type="text" id="fs-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
                                         <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
                                     </div>
                                 </div>
-                                <div class="form-check form-switch mb-3">
+                                <div class="form-check form-switch mb-3" id="fs-channel-redownload-row">
                                     <input class="form-check-input" type="checkbox" id="fs-redownload">
                                     <label class="form-check-label small fw-semibold" for="fs-redownload">
                                         Redownload existing episodes with new language
                                     </label>
                                     <div class="form-text small">Clears previously downloaded media files for this feed and downloads them again using the new language. (Auto-selected when language is modified).</div>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3" id="fs-channel-ytdl-args-row">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
                                         <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
                                         <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="fs-cookies-hint">Global cookies: data/cookies.txt</span>
@@ -2713,17 +2719,23 @@
         }
 
         function filterFeeds() {
-            const query = document.getElementById('feed-search').value.toLowerCase().trim();
-            if (!query) {
-                renderFeeds(allFeeds);
-                return;
-            }
-            const filtered = allFeeds.filter(f => 
-                (f.id && f.id.toLowerCase().includes(query)) ||
-                (f.title && f.title.toLowerCase().includes(query)) ||
-                (f.author && f.author.toLowerCase().includes(query)) ||
-                (f.provider && f.provider.toLowerCase().includes(query))
-            );
+            const query = (document.getElementById('feed-search')?.value || '').toLowerCase().trim();
+            const typeFilter = document.getElementById('feed-type-filter')?.value || 'all';
+
+            const filtered = (allFeeds || []).filter(f => {
+                const matchesQuery = !query || (
+                    (f.id && f.id.toLowerCase().includes(query)) ||
+                    (f.title && f.title.toLowerCase().includes(query)) ||
+                    (f.author && f.author.toLowerCase().includes(query)) ||
+                    (f.provider && f.provider.toLowerCase().includes(query))
+                );
+                if (!matchesQuery) return false;
+
+                const isAudiobook = (f.provider === 'audiobook') || (f.url && f.url.startsWith('audiobook://'));
+                if (typeFilter === 'channels') return !isAudiobook;
+                if (typeFilter === 'audiobooks') return isAudiobook;
+                return true;
+            });
             renderFeeds(filtered);
         }
 
@@ -2984,10 +2996,66 @@
             const afHint = document.getElementById('new-feed-cookies-hint');
             if (afHint) afHint.innerText = `Global: ${cFile}`;
 
-            // Show first tab
-            const firstTab = document.querySelector('#feedSettingsTabs button[data-bs-target="#fs-tab-general"]');
-            if (firstTab) {
-                bootstrap.Tab.getOrCreateInstance(firstTab).show();
+            const isAudiobook = (feed.provider === 'audiobook') || (feed.url && feed.url.startsWith('audiobook://'));
+            window._isEditingAudiobook = isAudiobook;
+
+            const titleEl = document.getElementById('feed-settings-title');
+            const urlLabelEl = document.getElementById('fs-url-label');
+            const btnGeneral = document.getElementById('fs-btn-general');
+            const btnCustom = document.getElementById('fs-btn-custom');
+            const navCleanup = document.getElementById('fs-nav-cleanup');
+            const navFilters = document.getElementById('fs-nav-filters');
+            const navAdvanced = document.getElementById('fs-nav-advanced');
+            const channelMediaRow = document.getElementById('fs-channel-media-row');
+            const channelPageSizeCol = document.getElementById('fs-channel-page-size-col');
+            const channelSortRow = document.getElementById('fs-channel-sort-row');
+            const channelRedownloadRow = document.getElementById('fs-channel-redownload-row');
+            const channelYtdlArgsRow = document.getElementById('fs-channel-ytdl-args-row');
+            const cronCol = document.getElementById('fs-cron-col');
+            const cronHelp = document.getElementById('fs-cron-help');
+
+            if (isAudiobook) {
+                if (titleEl) titleEl.innerHTML = '<i class="bi bi-book text-primary me-2"></i>Audiobook Settings';
+                if (urlLabelEl) urlLabelEl.textContent = 'Audiobook Folder Path';
+                if (btnCustom) btnCustom.innerHTML = '<i class="bi bi-book me-1"></i>Book Metadata';
+                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>Schedule &amp; Access';
+                if (cronHelp) cronHelp.textContent = 'Schedule to periodically check local directory for newly added chapters.';
+
+                if (navCleanup) navCleanup.classList.add('d-none');
+                if (navFilters) navFilters.classList.add('d-none');
+                if (navAdvanced) navAdvanced.classList.add('d-none');
+                if (channelMediaRow) channelMediaRow.classList.add('d-none');
+                if (channelPageSizeCol) channelPageSizeCol.classList.add('d-none');
+                if (channelSortRow) channelSortRow.classList.add('d-none');
+                if (channelRedownloadRow) channelRedownloadRow.classList.add('d-none');
+                if (channelYtdlArgsRow) channelYtdlArgsRow.classList.add('d-none');
+                if (cronCol) cronCol.className = 'col-sm-12';
+
+                // Activate Book Metadata tab first
+                if (btnCustom) {
+                    bootstrap.Tab.getOrCreateInstance(btnCustom).show();
+                }
+            } else {
+                if (titleEl) titleEl.innerHTML = '<i class="bi bi-sliders text-primary me-2"></i>Podcast Settings';
+                if (urlLabelEl) urlLabelEl.textContent = 'Source URL';
+                if (btnCustom) btnCustom.innerHTML = '<i class="bi bi-card-text me-1"></i>RSS Overrides';
+                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>General &amp; Schedule';
+                if (cronHelp) cronHelp.textContent = 'Schedule to periodically check for new media files.';
+
+                if (navCleanup) navCleanup.classList.remove('d-none');
+                if (navFilters) navFilters.classList.remove('d-none');
+                if (navAdvanced) navAdvanced.classList.remove('d-none');
+                if (channelMediaRow) channelMediaRow.classList.remove('d-none');
+                if (channelPageSizeCol) channelPageSizeCol.classList.remove('d-none');
+                if (channelSortRow) channelSortRow.classList.remove('d-none');
+                if (channelRedownloadRow) channelRedownloadRow.classList.remove('d-none');
+                if (channelYtdlArgsRow) channelYtdlArgsRow.classList.remove('d-none');
+                if (cronCol) cronCol.className = 'col-sm-8';
+
+                // Activate General tab first
+                if (btnGeneral) {
+                    bootstrap.Tab.getOrCreateInstance(btnGeneral).show();
+                }
             }
 
             const modalEl = document.getElementById('feedSettingsModal');
@@ -3028,20 +3096,21 @@
             const ytdlArgsVal = document.getElementById('fs-ytdl-args').value.trim();
             const ytdlArgs = ytdlArgsVal ? ytdlArgsVal.split(/\s+/).filter(Boolean) : [];
 
+            const isAudiobook = !!window._isEditingAudiobook;
             const opmlChecked = document.getElementById('fs-opml').checked;
             const updatePayload = {
-                format: document.getElementById('fs-format').value,
-                quality: document.getElementById('fs-quality').value,
-                max_height: parseInt(document.getElementById('fs-max-height').value) || 0,
-                page_size: parseInt(document.getElementById('fs-page-size').value) || 50,
+                format: isAudiobook ? 'audio' : document.getElementById('fs-format').value,
+                quality: isAudiobook ? 'high' : document.getElementById('fs-quality').value,
+                max_height: isAudiobook ? 0 : (parseInt(document.getElementById('fs-max-height').value) || 0),
+                page_size: isAudiobook ? 50 : (parseInt(document.getElementById('fs-page-size').value) || 50),
                 cron_schedule: document.getElementById('fs-cron-schedule').value.trim(),
-                playlist_sort: document.getElementById('fs-playlist-sort').value,
+                playlist_sort: isAudiobook ? '' : document.getElementById('fs-playlist-sort').value,
                 opml: opmlChecked,
                 private_feed: document.getElementById('fs-private-feed').checked,
-                keep_last: parseInt(document.getElementById('fs-keep-last').value) || 0,
+                keep_last: isAudiobook ? 0 : (parseInt(document.getElementById('fs-keep-last').value) || 0),
                 language: document.getElementById('fs-custom-lang').value.trim(),
-                redownload: document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false,
-                filters: {
+                redownload: isAudiobook ? false : (document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false),
+                filters: isAudiobook ? {} : {
                     title: document.getElementById('fs-filter-title').value.trim(),
                     not_title: document.getElementById('fs-filter-not-title').value.trim(),
                     description: document.getElementById('fs-filter-desc').value.trim(),
@@ -3059,8 +3128,8 @@
                     lang: document.getElementById('fs-custom-lang').value.trim(),
                     explicit: document.getElementById('fs-custom-explicit').checked
                 },
-                youtube_dl_args: ytdlArgs,
-                filename_template: document.getElementById('fs-filename-template').value.trim()
+                youtube_dl_args: isAudiobook ? [] : ytdlArgs,
+                filename_template: isAudiobook ? '' : document.getElementById('fs-filename-template').value.trim()
             };
 
             try {
@@ -4466,6 +4535,7 @@
                             <div class="d-flex gap-2">
                                 <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="copyToClipboard('${escapeHtml(feed.feed_url)}')"><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
                                 <a href="${feed.feed_url}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Open RSS XML in new tab"><i class="bi bi-box-arrow-up-right"></i> XML</a>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="openFeedSettings('${escapeHtml(feed.id)}')" title="Audiobook Settings"><i class="bi bi-gear"></i></button>
                                 <button class="btn btn-outline-secondary btn-sm" onclick="viewFeedEpisodes('${escapeHtml(feed.id)}')" title="View Chapters"><i class="bi bi-list-ol"></i></button>
                                 <button class="btn btn-outline-secondary btn-sm" onclick="triggerUpdate('${escapeHtml(feed.id)}')" title="Refresh Metadata"><i class="bi bi-arrow-repeat"></i></button>
                             </div>

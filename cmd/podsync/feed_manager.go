@@ -683,6 +683,17 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	f.YouTubeDLArgs = update.YouTubeDLArgs
 	f.FilenameTemplate = update.FilenameTemplate
 
+	info, parseErr := builder.ParseURL(f.URL)
+	if parseErr == nil && info.Provider == model.ProviderAudiobook {
+		f.Clean = nil
+		f.Format = model.FormatAudio
+		f.Quality = model.QualityHigh
+		f.MaxHeight = 0
+		f.Filters = feed.Filters{}
+		f.YouTubeDLArgs = nil
+		f.PlaylistSort = ""
+	}
+
 	// Reschedule cron if cron_schedule changed
 	if update.CronSchedule != "" && update.CronSchedule != f.CronSchedule {
 		f.CronSchedule = update.CronSchedule

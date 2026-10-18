@@ -2727,19 +2727,42 @@
             renderFeeds(filtered);
         }
 
+        function copyFeedUrl(url) {
+            copyToClipboard(url);
+        }
+
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showToast("Link copied to clipboard!");
-            }).catch(err => {
-                // Fallback
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast("Link copied to clipboard!");
+                }).catch(() => {
+                    fallbackCopyText(text);
+                });
+            } else {
+                fallbackCopyText(text);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            try {
                 const input = document.createElement('textarea');
                 input.value = text;
+                input.style.position = 'fixed';
+                input.style.left = '-9999px';
+                input.style.top = '-9999px';
                 document.body.appendChild(input);
+                input.focus();
                 input.select();
-                document.execCommand('copy');
+                const successful = document.execCommand('copy');
                 document.body.removeChild(input);
-                showToast("Link copied to clipboard!");
-            });
+                if (successful) {
+                    showToast("Link copied to clipboard!");
+                } else {
+                    prompt("Copy link:", text);
+                }
+            } catch (err) {
+                prompt("Copy link:", text);
+            }
         }
 
         function showQRCode(title, url) {
@@ -4408,14 +4431,43 @@
                                     <div class="text-muted small text-truncate">${feed.author ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
                                 </div>
                             </div>
+
+                            <!-- RSS URL Box with Copy and QR -->
+                            <div class="d-flex align-items-center gap-1 mb-2">
+                                <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
+                                <button class="btn btn-light btn-sm border" title="Copy link" onclick="copyToClipboard('${escapeHtml(feed.feed_url)}')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <button class="btn btn-light btn-sm border" title="Show QR code" onclick="showQRCode('${escapeHtml(feed.title || feed.id)}', '${escapeHtml(feed.feed_url)}')">
+                                    <i class="bi bi-qr-code"></i>
+                                </button>
+                            </div>
+
+                            <!-- Deep Links for Podcast Apps -->
+                            <div class="d-flex flex-wrap gap-1 mb-3">
+                                <a href="${feed.apple_url}" class="deep-link-btn border">
+                                    <i class="bi bi-apple"></i> Apple
+                                </a>
+                                <a href="${feed.pocketcasts_url}" class="deep-link-btn border">
+                                    <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
+                                </a>
+                                <a href="${feed.overcast_url}" class="deep-link-btn border">
+                                    <i class="bi bi-soundwave text-warning"></i> Overcast
+                                </a>
+                                <a href="${feed.feed_url}" target="_blank" class="deep-link-btn border">
+                                    <i class="bi bi-box-arrow-up-right"></i> XML
+                                </a>
+                            </div>
+
                             <div class="d-flex justify-content-between small text-muted mb-3 border-top pt-2">
                                 <span><i class="bi bi-file-earmark-music me-1"></i>${feed.downloaded_count || feed.episode_count} chapters</span>
                                 <span><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
                             </div>
                             <div class="d-flex gap-2">
-                                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="copyFeedUrl('${escapeHtml(feed.feed_url)}')"><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="viewFeedEpisodes('${escapeHtml(feed.id)}')"><i class="bi bi-list-ol"></i></button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="triggerUpdate('${escapeHtml(feed.id)}')"><i class="bi bi-arrow-repeat"></i></button>
+                                <button class="btn btn-outline-primary btn-sm flex-grow-1" onclick="copyToClipboard('${escapeHtml(feed.feed_url)}')"><i class="bi bi-clipboard me-1"></i>Copy RSS</button>
+                                <a href="${feed.feed_url}" target="_blank" class="btn btn-outline-secondary btn-sm" title="Open RSS XML in new tab"><i class="bi bi-box-arrow-up-right"></i> XML</a>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="viewFeedEpisodes('${escapeHtml(feed.id)}')" title="View Chapters"><i class="bi bi-list-ol"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="triggerUpdate('${escapeHtml(feed.id)}')" title="Refresh Metadata"><i class="bi bi-arrow-repeat"></i></button>
                             </div>
                         </div>
                     </div>

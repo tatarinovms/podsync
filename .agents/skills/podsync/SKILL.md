@@ -175,6 +175,12 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `cron_schedule` *(string, optional)*: Update schedule (defaults to `@every 12h`).
 - **When to use**: Setting up an audiobook feed from a local directory on disk.
 
+### 21. `delete_audiobook_dir`
+- **Purpose**: Deletes an audiobook folder and all its audio files from the audiobooks storage on disk. If the folder is linked to an active podcast feed, it automatically removes the feed, unmounts it, and deletes it from `config.toml` and database.
+- **Arguments**:
+  - `dir_name` *(string, required)*: Directory name in the audiobooks directory to delete (e.g. `"George Orwell - 1984"`).
+- **When to use**: When the user asks to delete, clean up, or remove an audiobook folder from the server. Always confirm with the user before deleting.
+
 ## MCP Resources
 
 Agents can read live context from Podsync via resources:
@@ -231,6 +237,9 @@ curl -u "$USER:$PASS" -X POST "$HOST/api/v1/audiobooks/upload" \
   -F "files=@chapter02.mp3" \
   -F "cover=@cover.jpg" \
   -F "auto_import=true"
+
+# 4. Delete audiobook folder (and linked feed) from disk
+curl -u "$USER:$PASS" -X DELETE "$HOST/api/v1/audiobooks/dirs?name=My+Book"
 ```
 
 ---

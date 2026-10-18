@@ -1,0 +1,149 @@
+# Development & Operational Workflow
+
+This guide details the standard development lifecycle, test procedures, tagging, release processes, and deployment strategies for **Podsync**.
+
+---
+
+## 1. Local Development Setup
+
+### 1.1 Prerequisites
+Install required binaries:
+- **Go**: 1.25+ (`go version`)
+- **yt-dlp**: Latest release (`yt-dlp --version`)
+- **ffmpeg**: Required for audio transcoding and ID3 cover extraction (`ffmpeg -version`)
+
+On macOS:
+```bash
+brew install go yt-dlp ffmpeg
+```
+
+On Ubuntu / Debian:
+```bash
+sudo apt update
+sudo apt install -y golang ffmpeg
+sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp
+sudo chmod a+rx /usr/local/bin/yt-dlp
+```
+
+### 1.2 Running Locally
+Copy sample configuration:
+```bash
+cp config.toml.example config.toml
+```
+
+Build and run:
+```bash
+make build
+./bin/podsync --config config.toml
+```
+
+Or run directly without building:
+```bash
+go run ./cmd/podsync --config config.toml
+```
+
+The Web Admin console will be available at `http://localhost:8080/admin`.
+
+---
+
+## 2. Testing Procedures
+
+Always verify test suites before committing changes.
+
+### 2.1 Running All Unit Tests
+```bash
+# Run all tests with race detector
+go test -v -race ./...
+
+# Run without cache
+go test -count=1 ./...
+```
+
+### 2.2 Package-Specific Testing
+```bash
+# Test Web API & Admin Handlers
+go test -v ./services/web
+
+# Test Feed Manager & Config Persistence
+go test -v ./cmd/podsync
+
+# Test RSS XML & iTunes Generator
+go test -v ./pkg/feed
+
+# Test Builders (VK, YouTube, Audiobooks, Rutube)
+go test -v ./pkg/builder
+```
+
+---
+
+## 3. Web UI Workflow (`services/web/ui/`)
+
+The Web UI is an embedded Single Page Application located in `services/web/ui/index.html`.
+
+### 3.1 Synchronizing Files
+Whenever `services/web/ui/index.html` is modified, you must copy it to `html/index.html`:
+```bash
+cp services/web/ui/index.html html/index.html
+```
+
+### 3.2 Modal Lifecycle Rules
+- **Do not use** `bootstrap.Modal.getInstance(el).hide()`. It can evaluate to `null` if the instance was created with `getOrCreateInstance` or detached.
+- **Always use** `closeModal('modalId')`. It guarantees reliable closing, clears `.modal-backdrop`, and restores `document.body` scrolling.
+
+### 3.3 Theme Verification
+- Check both **Catppuccin Mocha** (dark) and **Catppuccin Latte** (light) using the top navigation toggle.
+- Verify that buttons use `.btn-primary` (Mauve) or `.btn-brand`, and that no raw Bootstrap blue (`#0d6efd`) or slate-gray (`#2b3035`) is visible.
+
+---
+
+## 4. Git Versioning & Release Workflow
+
+Podsync uses Semantic Versioning (`vMAJOR.MINOR.PATCH`).
+
+### 4.1 Commit Standards
+Follow conventional commit prefixes:
+- `feat(...)`: New features (e.g. audiobook folder deletion, serial format).
+- `fix(...)`: Bug fixes (e.g. modal closing, private feed persistence).
+- `docs(...)`: Documentation updates (`AGENTS.md`, guides).
+- `refactor(...)`: Code cleanup without behavior change.
+
+### 4.2 Releasing a New Version
+1. Verify all tests pass:
+   ```bash
+   go test -v -race ./...
+   make build
+   ```
+2. Check git status to ensure working tree is clean:
+   ```bash
+   git status
+   ```
+3. Commit all changes:
+   ```bash
+   git add -A
+   git commit -m "feat(audiobooks): add deletion of server audiobook folders from disk"
+   ```
+4. Create an annotated git tag and push:
+   ```bash
+   git tag v2.13.7
+   git push origin main --tags
+   ```
+
+---
+
+## 5. Docker Build & Deployment
+
+### 5.1 Local Docker Build
+```bash
+docker build -t podsync:local .
+```
+
+### 5.2 Running with Docker Compose
+```bash
+docker compose up -d
+docker compose logs -f podsync
+```
+
+### 5.3 Volumes to Mount
+- `/app/data/`: Podsync data directory (BadgerDB and downloaded media).
+- `/app/config.toml`: Path to active config file.
+- `/data/audiobooks`: Local directory containing audiobook subfolders.

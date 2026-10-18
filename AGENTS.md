@@ -6,16 +6,16 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 1. Project Overview & Tech Stack
 
-**Podsync** is a Go-based service that converts video and audio channels, playlists, communities, and user profiles (YouTube, VK Video, Vimeo, SoundCloud, Twitch) into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
+**Podsync** is a high-performance Go service that converts video and audio channels, playlists, communities, user profiles (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch), and **local audiobook folder collections** into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
 
 ### Core Technologies
 - **Language**: Go 1.25+ (`go.mod`)
 - **Storage/DB**: BadgerDB v3 (embedded key-value database for feed/episode metadata and state)
-- **Filesystem**: Local filesystem storage or AWS S3 (`pkg/fs/`)
-- **Downloader**: `yt-dlp` (native preference with fallback to `youtube-dl`), using `ffmpeg` for audio conversion
-- **Scheduling**: `robfig/cron/v3` supporting cron expressions and duration intervals
+- **Filesystem**: Local filesystem storage or AWS S3 (`pkg/fs/`), with dynamic Virtual Mounter (`fs.Mounter`) for zero-copy audiobook serving
+- **Downloader**: `yt-dlp` (native preference with fallback to `youtube-dl`), using `ffmpeg` for audio conversion and metadata extraction
+- **Scheduling**: `robfig/cron/v3` supporting standard 5-field cron expressions and `@every` duration intervals
 - **Configuration**: TOML via `pelletier/go-toml`
-- **Web UI**: Embedded single-page application (`services/web/ui/index.html`) styled with Catppuccin Mocha & Latte
+- **Web UI**: Embedded single-page application (`services/web/ui/index.html`) styled with strict Catppuccin Mocha (dark) & Latte (light) themes
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
 
 ---
@@ -29,9 +29,13 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── config.go             # Config struct, defaults, environment variable overrides
 │   ├── config_test.go        # Unit tests for config loading and env vars
 │   ├── feed_manager.go       # Implementation of AppFeedManager for Web UI and MCP
+│   ├── feed_manager_test.go  # Tests for feed management, private feeds, audiobook deletion
 │   └── disk_unix.go / windows.go # Platform-specific disk space calculations
 ├── pkg/
 │   ├── builder/              # Platform builders fetching metadata from source APIs
+│   │   ├── audiobook.go      # Local audiobook builder (ID3/APIC tags, natural sorting, serial format)
+│   │   ├── audiobook_test.go # Unit tests for audiobook discovery, chapter sorting, and covers
+│   │   ├── rutube.go         # Rutube builder (channel, playlists, users via yt-dlp)
 │   │   ├── vkvideo.go        # VK Video builder (official VK API client, handle resolution)
 │   │   ├── youtube.go        # YouTube Data API v3 builder
 │   │   ├── vimeo.go          # Vimeo API builder
@@ -40,16 +44,22 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   └── url.go            # URL parsing and platform detection
 │   ├── db/                   # BadgerDB wrappers for Feeds, Episodes, and State
 │   ├── feed/                 # Podcast RSS XML generation, OPML export, API key rotation
-│   ├── fs/                   # Storage abstraction (Local file system and S3)
+│   │   ├── xml.go            # RSS/iTunes XML builder (serial/episodic, itunes:block, covers)
+│   │   └── xml_test.go       # RSS XML generation tests
+│   ├── fs/                   # Storage abstraction (Local file system, S3, and Virtual Mounter)
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
+│   │   ├── server.go         # 21 MCP tools, resources (podsync://*), and diagnostic prompts
+│   │   └── proxy.go          # HTTP client proxy implementing web.AdminManager over REST
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
+│   │   ├── admin_types.go    # FeedSummary, FeedConfigUpdate, AudiobookDirInfo structs
+│   │   ├── api.go            # REST API endpoints (/api/v1/*)
+│   │   └── ui/index.html     # Embedded SPA Web UI (Catppuccin theme)
 │   ├── update/               # Feed update orchestrator and regex episode matcher
 │   └── migrate/              # Tooling for media filename migration
 ├── docs/                     # Guides, token setup instructions, and MCP specs
-│   └── deployment_guide_agents.md # Linux systemd service & Docker deployment for OpenCode and Hermes
 ├── .agents/skills/podsync/   # Standard agent skill definition for MCP
 ├── Dockerfile                # Multi-stage Docker build (Go builder + Alpine runtime with yt-dlp)
 ├── docker-compose.yml        # Docker compose configuration for running Podsync
@@ -60,119 +70,98 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 3. Platform Implementations & Specifics
 
+### Local Audiobooks (`audiobook://<folder_name>`)
+- **Protocol**: `audiobook://<folder>` or `audiobook://relative/path`
+- **Podcast 2.0 Serial Standard**: Generated RSS feed contains `<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>` to ensure podcast apps play chapters in strict chronological order (Chapter 1 -> Chapter 2).
+- **Natural Chapter Sorting**: Files are naturally sorted (`01_intro.mp3`, `2_chapter.mp3`, `10_chapter.mp3`) using human-friendly alphanumeric ordering.
+- **Automatic ID3 / APIC Cover Extraction**:
+  - Automatically searches for external cover files (`cover.jpg`, `folder.png`, `album.jpeg`).
+  - If no external cover exists, extracts embedded ID3v2 APIC cover art directly from the first MP3/M4A file using `ffmpeg`.
+- **Zero-Copy Virtual Mounter (`fs.Mounter`)**: Mounts the audiobook directory directly into HTTP server storage (`/{feed_id}/{filename}`) without duplicating audio files.
+- **Audiobook Feeds Protection**: Audiobook feeds are audio-only (`format = "audio"`, `quality = "high"`), retention cleanup (`keep_last`) is disabled, and video/ytdl-args options are hidden in the UI.
+
 ### VK Video (`pkg/builder/vkvideo.go`)
-- **Supported URLs**: `vkvideo.ru`, `vk.com`, `vk.ru`
-  - Handles: `https://vkvideo.ru/@channel_name`
-  - Group videos: `https://vk.com/video/@group_name` or `https://vk.com/video-196446247`
-  - Playlists/Albums: `https://vkvideo.ru/playlist/-196446247_1`
-  - User videos: `https://vk.com/video/id12345`
-- **VK API Details**:
-  - Base URL: `https://api.vk.com/method/` (API version `5.199`).
-  - Owner IDs for communities/groups **must be negative** when calling `video.get` (e.g. `owner_id: -196446247`).
-  - Screen names (handles `@foo`) are resolved via `utils.resolveScreenName`.
-  - Downloads use canonical URLs: `https://vk.com/video{owner_id}_{video_id}` passed to `yt-dlp`.
-  - Live streams and upcoming premieres (`live_status: "started" | "upcoming"`) are automatically excluded from feed generation to avoid broken podcast downloads.
-  - Requires user access token with `video` and `offline` scopes.
+- **Supported URLs**: `vkvideo.ru`, `vk.com`, `vk.ru` (channels, groups, playlists, user videos).
+- **VK API**: Base URL `https://api.vk.com/method/` (API v`5.199`). Community owner IDs must be negative (e.g. `-196446247`).
+- Live streams and upcoming premieres (`live_status: "started" | "upcoming"`) are excluded.
+
+### Rutube (`pkg/builder/rutube.go`)
+- Supported URLs: `rutube.ru/channel/...`, `rutube.ru/plst/...`, `rutube.ru/u/...`, `rutube.ru/video/...`.
+- Native zero-API-key metadata querying and downloading via `yt-dlp`.
 
 ### YouTube (`pkg/builder/youtube.go`)
 - Requires YouTube Data API v3 key (`PODSYNC_YOUTUBE_API_KEY`).
-- Supports multi-key Round-Robin rotation to prevent quota exhaustion.
-- Downloads run through `yt-dlp`. Supports passing Netscape format `cookies.txt` or `--cookies-from-browser` via downloader config to bypass bot verification.
+- Multi-key Round-Robin rotation. Downloads run through `yt-dlp` with Netscape cookies support.
 
 ---
 
 ## 4. Web Admin Console & REST API (`services/web/`)
 
-- Accessible at `/admin` (SPA embedded into the binary via `//go:embed ui/*` from `services/web/ui/index.html`).
-- **Embedded UI & Brand Color System**:
-  - The UI uses **Catppuccin Mocha** (dark theme) and **Latte** (light theme) palettes.
-  - **Strict adherence to brand colors (Catppuccin Mocha & Latte)**: All UI components, buttons, badges, switches, and backgrounds must strictly adhere to the Catppuccin palette via CSS variables (`--ctp-*`, `--btn-primary-bg`, `--btn-danger-bg`, etc.). Never allow raw Bootstrap defaults to leak through (such as default blue `#0d6efd`, slate-green `#2b3035` on `.bg-body-tertiary`, or unstyled `btn-outline-primary`). Primary save/action buttons must always use `.btn-primary` or `.btn-brand` (Mauve).
-- Secured by HTTP Basic Auth and session cookies (`cfg.Server.Admin`).
-- REST API mounted under `/api/v1`:
-  - `/api/v1/feeds` (GET, POST)
-  - `/api/v1/feeds/{id}` (GET, PUT/PATCH, DELETE)
-  - `/api/v1/feeds/{id}/update` (POST)
-  - `/api/v1/feeds/{id}/episodes/{ep_id}/retry` (POST)
-  - `/api/v1/tokens` (GET, POST with optional append, DELETE with optional `?index={idx}`)
-  - `/api/v1/auth/password` (POST)
-  - `/api/v1/system` (GET)
-  - `/api/v1/downloader` (GET, POST)
-  - `/api/v1/downloader/cookies` (GET, POST, DELETE)
+- Accessible at `/admin` (SPA embedded via `//go:embed ui/*` from `services/web/ui/index.html`).
+- **Brand Colors (Catppuccin Mocha & Latte)**:
+  - All UI elements must strictly use project CSS variables (`--ctp-*`).
+  - Never allow raw Bootstrap defaults (`#0d6efd`, slate `#2b3035`) to leak into backgrounds or buttons.
+  - Save buttons must use `.btn-primary` or `.btn-brand` (Mauve).
+- **Modal Lifecycle Reliability**:
+  - Never use `bootstrap.Modal.getInstance(el).hide()` directly as it can return `null`.
+  - Always use `closeModal(modalId)` which leverages `bootstrap.Modal.getOrCreateInstance(el)` and ensures DOM backdrop/class cleanup.
+- **Instant Feed Rebuild**: Saving feed settings (`UpdateFeed`) immediately triggers `m.updates <- f` so changes (`private_feed`, `title`, `author`, `custom cover`) appear in `{feed_id}.xml` right away.
+
+### REST API Endpoints (`/api/v1`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/feeds` | List all active feeds (channels and audiobooks) |
+| `POST` | `/api/v1/feeds` | Create new podcast feed |
+| `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list |
+| `PUT` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
+| `DELETE` | `/api/v1/feeds/{id}` | Delete feed (optional `?delete_files=true`) |
+| `POST` | `/api/v1/feeds/{id}/update` | Trigger manual update for a feed |
+| `POST` | `/api/v1/feeds/update-all` | Trigger update for all feeds |
+| `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode state |
+| `GET` | `/api/v1/tokens` | List masked API tokens and ENV sources |
+| `POST` | `/api/v1/tokens` | Update / append API tokens for rotation |
+| `DELETE` | `/api/v1/tokens` | Delete token by `?provider=...&index=...` |
+| `GET` | `/api/v1/audiobooks/dirs` | List folders in `[audiobooks].dir` (track count, cover, linked status) |
+| `DELETE` | `/api/v1/audiobooks/dirs` | Delete audiobook folder and audio files from disk (`?name=...`) |
+| `POST` | `/api/v1/audiobooks/import` | Import local audiobook folder as serial podcast feed |
+| `POST` | `/api/v1/audiobooks/upload` | Multipart file upload for audiobook chapters/cover |
+| `GET` | `/api/v1/audiobooks/config` | Read configured audiobooks directory |
+| `GET` | `/api/v1/downloader` | Inspect yt-dlp binary, ffmpeg version, timeout, cookies stats |
+| `POST` | `/api/v1/downloader` | Update downloader timeout, proxy, language, browser cookies |
+| `GET`/`POST`/`DELETE` | `/api/v1/downloader/cookies` | Manage Netscape `cookies.txt` content |
+| `POST` | `/api/v1/downloader/test` | Test yt-dlp metadata extraction against URL |
+| `GET` | `/api/v1/system/logs` | Query in-memory server logs (level/search/feed filter) |
+| `GET` | `/api/v1/system/logs/download` | Download `.log` file |
+| `DELETE` | `/api/v1/system/logs` | Clear in-memory log buffer |
+| `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
 
 ---
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes a full suite of MCP tools and resources for autonomous AI agents:
-- **Tools**:
-  - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
-  - `get_download_errors`, `get_recent_downloads`, `get_sync_status`
-  - `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`
-  - `get_downloader_config`, `update_downloader_config`, `test_downloader`
-- **Embedded Resources**:
-  - `podsync://feeds`: Live JSON snapshot of all registered podcast feeds, episode counts, and status.
-- **Prompts**:
-  - `diagnose_feed`: Troubleshoots download errors or feed parsing failures.
+Podsync exposes 21 MCP tools:
+- `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
+- `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
+- `get_download_errors`, `get_recent_downloads`, `get_sync_status`
+- `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`
+- `get_downloader_config`, `update_downloader_config`, `test_downloader`
+- `get_system_logs`
 
-Available over:
-- **Stdio**: `podsync --config config.toml --mcp` (proxies to live instance if running, or operates directly on local BadgerDB).
-- **HTTP / SSE**: `/mcp` and `/mcp/sse`.
-- Standard agent skill: [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md).
+Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE** (`/mcp` and `/mcp/sse`).
 
 ---
 
-## 6. Development & Testing Commands
+## 6. Golden Rules for AI Agents
 
-### Build
-```bash
-# Build binary into bin/podsync
-make build
-# or: go build -o bin/podsync ./cmd/podsync
-```
-
-### Run Tests
-```bash
-# Run all unit tests with race detection
-go test -v -race ./...
-
-# Run tests for a specific package
-go test -v -race ./pkg/builder
-go test -v -race ./cmd/podsync
-```
-
-### Code Formatting & Linting
-```bash
-# Run golangci-lint
-golangci-lint run
-
-# Format code
-go fmt ./...
-```
-
-### Docker
-```bash
-# Build Docker image locally
-docker build -t podsync:local .
-
-# Run with docker compose
-docker compose up -d
-```
-
----
-
-## 7. Golden Rules for AI Agents
-
-1. **Never break existing platform builders**: Any changes to `pkg/builder/url.go` or `pkg/builder/builder.go` must maintain full backwards compatibility with YouTube, Vimeo, SoundCloud, Twitch, and VK Video.
-2. **Preserve BadgerDB integrity**: Always close DB transactions and database instances properly. Do not write corrupted metadata keys.
-3. **Always run `-race` tests**: After modifying any Go code, always run `go test -race ./...` to verify there are no data races or regressions.
-4. **Clean up resources**: Background processes, test databases, and temporary download folders must always be safely terminated and cleaned up.
-5. **No obsolete files**: Do not add unused IDE settings, duplicate skill files, or dead configuration templates to the root of the repository.
-6. **Strict Brand & Theme Compliance (Catppuccin Mocha & Latte)**:
-   - When modifying or creating UI components in the embedded Web UI (`services/web/ui/index.html`), strictly adhere to the **Catppuccin Mocha** (dark theme) and **Catppuccin Latte** (light theme) design system.
-   - Always use project CSS variables (`--ctp-*`, `--ctp-base`, `--ctp-mantle`, `--ctp-crust`, `--ctp-surface0`, `--ctp-surface1`, `--ctp-surface2`, `--ctp-mauve`, `--ctp-text`, `--ctp-subtext0`, etc.) and standard styled classes (`.btn-primary`, `.btn-brand`, `.btn-secondary`, `.btn-outline-danger`).
-   - **Never allow Bootstrap default colors to leak**: Raw Bootstrap 5 utility classes (e.g. `.bg-body-tertiary`, `.bg-body-secondary`, `.form-check-input`, `.form-switch`, unstyled focus rings, or default badges) carry hardcoded Bootstrap colors like slate-green `#2b3035` or blue `#0d6efd`. In Catppuccin Mocha/Latte, these appear as jarring, mismatched tints (e.g. greenish or bright blue patches). Ensure all container backgrounds, modal navigation tabs, switches (`.form-check-input:checked`), and utility backgrounds are explicitly mapped to the corresponding Catppuccin tokens (`--ctp-crust`, `--ctp-surface0`, `--ctp-mauve`).
-   - Primary action/save buttons must always be styled with `--btn-primary-bg` / `--btn-brand` (Mauve), never unstyled blue Bootstrap buttons (`.btn-primary` without custom variable mapping or raw `btn-outline-primary`).
-7. **Proper Agent Skill Formatting (`SKILL.md`)**:
-   - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`), especially `description`, to prevent YAML parse errors when colons (`: `) or special characters are present (`mapping values are not allowed here`).
-   - Never fabricate or hallucinate skill content: always read the real implementation and actual files in the repository (`.agents/skills/podsync/SKILL.md`) as the canonical source.
-   - When updating tools, endpoints, or arguments, keep `.agents/skills/podsync/SKILL.md` and user skill directories in sync.
+1. **Never break existing platform builders**: Any modifications to `pkg/builder/` must preserve full backwards compatibility across all supported providers (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch, Audiobooks).
+2. **Preserve BadgerDB integrity**: Always handle transactions cleanly and prevent corrupt keys.
+3. **Always run `-race` tests**: After modifying Go code, run `go test -race ./...` to verify there are no data races.
+4. **Instant XML Rebuild on Config Change**: Whenever feed metadata or `private_feed` is updated, ensure `m.updates <- f` is queued so the XML file on disk reflects changes immediately.
+5. **Private Feeds Guarantee**: Generates `<itunes:block>yes</itunes:block>` in RSS XML when `feed.PrivateFeed || cfg.PrivateFeed`. Both in-memory `Config`, BadgerDB `Feed`, and `config.toml` must be kept in sync.
+6. **Path Traversal Protection**: Any file or directory operations (`AudiobookDir`, `DeleteAudiobookDir`, uploads) must strictly validate with `filepath.Clean` and verify `filepath.Rel` stays inside the configured parent directory.
+7. **Strict Brand & Theme Compliance (Catppuccin Mocha & Latte)**:
+   - When modifying `services/web/ui/index.html`, strictly adhere to Catppuccin color tokens. Never let default Bootstrap blue or slate-gray leak through.
+   - Synchronize changes between `services/web/ui/index.html` and `html/index.html`.
+8. **Proper Agent Skill Formatting (`SKILL.md`)**:
+   - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`).
+   - Keep `.agents/skills/podsync/SKILL.md` and user config skill directories synchronized.

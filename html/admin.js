@@ -1,3 +1,9 @@
+
+        function isValidAuthor(author) {
+            if (!author) return false;
+            const str = String(author).trim().toLowerCase();
+            return str !== "" && str !== "<notfound>" && str !== "notfound" && !str.includes("notfound");
+        }
         // State
         let allFeeds = [];
         let qrInstance = null;
@@ -460,8 +466,8 @@
                             </h6>
                             <span class="badge badge-provider ${providerClass}">${escapeHtml((feed.provider || "").toUpperCase())}</span>
                         </div>
-                        <div class="text-muted small text-truncate mb-2">
-                            ${(feed.author && feed.author !== "<notfound>") ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
+                        <div class="text-muted small text-truncate mb-2" id="feed-meta-${escapeHtml(feed.id)}">
+                            ${isValidAuthor(feed.author) ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
                         </div>
 
                         <!-- RSS URL Box with Copy and QR -->
@@ -594,6 +600,11 @@
 
                         const sizeEl = document.getElementById(`feed-size-${feed.id}`);
                         if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
+
+                        const metaEl = document.getElementById(`feed-meta-${feed.id}`);
+                        if (metaEl) {
+                            metaEl.innerHTML = `${isValidAuthor(feed.author) ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>`;
+                        }
 
                         const errEl = document.getElementById(`feed-err-${feed.id}`);
                         if (errEl) {

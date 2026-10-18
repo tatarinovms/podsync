@@ -339,12 +339,15 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 
 	if f.Custom.Author != "" {
 		summary.Author = f.Custom.Author
-	} else if summary.Author == "<notfound>" {
-		if summary.Title != "" {
+	} else {
+		cleanAuthor := strings.TrimSpace(strings.ToLower(summary.Author))
+		if cleanAuthor == "<notfound>" || cleanAuthor == "notfound" || strings.Contains(cleanAuthor, "notfound") {
+			if summary.Title != "" {
 			summary.Author = summary.Title
 		} else {
 			summary.Author = ""
 		}
+	}
 	}
 
 	// Always extract/override cover art from the generated XML (<image><url>...</url></image>)

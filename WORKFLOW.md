@@ -124,7 +124,7 @@ Follow conventional commit prefixes:
    ```
 4. Create an annotated git tag and push:
    ```bash
-   git tag v2.13.8
+   git tag v2.13.9
    git push origin main --tags
    ```
 

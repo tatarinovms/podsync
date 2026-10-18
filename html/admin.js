@@ -1,6 +1,14 @@
         // State
         let allFeeds = [];
         let qrInstance = null;
+        let currentTab = "tab-feeds";
+        const tabDirty = {
+            "tab-feeds": false,
+            "tab-audiobooks": false
+        };
+        let feedsFetchSeq = 0;
+        let statusFetchSeq = 0;
+        let pollFailureCount = 0;
         const toastEl = new bootstrap.Toast(document.getElementById('app-toast'), { delay: 2500 });
 
         function escapeHtml(str) {
@@ -39,6 +47,7 @@
                 case 'filter-log': filterByTag(arg1, arg2); break;
                 case 'delete-book': deleteAudiobookDir(arg1, arg2); break;
                 case 'import-book': openImportModal(arg1, arg2, arg3); break;
+                case 'reset-filters': resetFeedFilters(); break;
             }
         });
 
@@ -210,7 +219,17 @@
         }
 
         async function logout() {
-            await fetch('/api/v1/auth/logout', { method: 'POST' });
+            if (updatePollTimer) {
+                clearInterval(updatePollTimer);
+                updatePollTimer = null;
+            }
+            if (typeof logsAutoRefreshTimer !== "undefined" && logsAutoRefreshTimer) {
+                clearInterval(logsAutoRefreshTimer);
+                logsAutoRefreshTimer = null;
+            }
+            try {
+                await fetch('/api/v1/auth/logout', { method: 'POST' });
+            } catch (e) {}
             location.reload();
         }
 
@@ -223,37 +242,86 @@
         }
 
         // Feeds
+        function showConnectionWarning(msg) {
+            const el = document.getElementById("feeds-connection-alert");
+            if (el) {
+                if (msg) {
+                    const span = el.querySelector("span");
+                    if (span) span.textContent = msg;
+                }
+                el.classList.remove("d-none");
+            }
+        }
+
+        function hideConnectionWarning() {
+            const el = document.getElementById("feeds-connection-alert");
+            if (el) el.classList.add("d-none");
+        }
+
+        function setFeedButtonUpdating(feedId, isUpdating) {
+            const btn = document.getElementById(`btn-update-${feedId}`);
+            if (btn) {
+                if (isUpdating) {
+                    btn.disabled = true;
+                    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                }
+            }
+        }
+
         async function loadFeeds() {
-            const container = document.getElementById('feeds-container');
+            const seq = ++feedsFetchSeq;
             try {
-                const res = await fetch('/api/v1/feeds');
+                const res = await fetch("/api/v1/feeds");
+                if (seq !== feedsFetchSeq) return;
                 if (!res.ok) throw new Error(await res.text());
                 allFeeds = await res.json();
+                if (seq !== feedsFetchSeq) return;
+
                 const activeIds = new Set(allFeeds.filter(f => f.updating).map(f => f.id));
                 updatingFeeds.clear();
                 activeIds.forEach(id => updatingFeeds.add(id));
                 if (activeIds.size > 0) startUpdatePolling();
-                document.getElementById('feeds-count').innerText = allFeeds.length;
-                renderFeeds(allFeeds);
-                if (typeof renderAudiobookFeeds === "function") renderAudiobookFeeds();
+
+                const countEl = document.getElementById("feeds-count");
+                if (countEl) countEl.innerText = allFeeds.length;
+
+                if (currentTab === "tab-feeds") {
+                    filterFeeds();
+                } else {
+                    tabDirty["tab-feeds"] = true;
+                }
+
+                if (typeof renderAudiobookFeeds === "function") {
+                    if (currentTab === "tab-audiobooks") {
+                        renderAudiobookFeeds();
+                    } else {
+                        tabDirty["tab-audiobooks"] = true;
+                    }
+                }
             } catch (err) {
-                container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to load feeds: ${escapeHtml(err.message)}</div>`;
+                const container = document.getElementById("feeds-container");
+                if (container && (!allFeeds || allFeeds.length === 0)) {
+                    container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to load feeds: ${escapeHtml(err.message)}</div>`;
+                }
             }
         }
 
         function formatBytes(bytes) {
-            if (!bytes || bytes === 0) return '0 B';
+            if (!bytes || bytes === 0) return "0 B";
             const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const sizes = ["B", "KB", "MB", "GB", "TB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
         }
 
-                function handleCoverError(img) {
-            img.style.display = 'none';
-            const placeholder = img.parentElement ? img.parentElement.querySelector('.feed-cover-placeholder') : null;
+        function handleCoverError(img) {
+            img.style.display = "none";
+            const placeholder = img.parentElement ? img.parentElement.querySelector(".feed-cover-placeholder") : null;
             if (placeholder) {
-                placeholder.classList.remove('d-none');
+                placeholder.classList.remove("d-none");
             }
         }
 
@@ -265,29 +333,29 @@
                 if (!res.ok) return;
                 const text = await res.text();
                 const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, 'text/xml');
-                const imgUrl = xmlDoc.querySelector('channel > image > url')?.textContent?.trim() ||
-                               xmlDoc.querySelector('channel > itunes\\:image, channel > image')?.getAttribute('href')?.trim();
+                const xmlDoc = parser.parseFromString(text, "text/xml");
+                const imgUrl = xmlDoc.querySelector("channel > image > url")?.textContent?.trim() ||
+                               xmlDoc.querySelector("channel > itunes\\:image, channel > image")?.getAttribute("href")?.trim();
                 if (imgUrl) {
                     const resolved = new URL(imgUrl, window.location.href);
-                    if (!['http:', 'https:'].includes(resolved.protocol)) return;
-                    const card = Array.from(document.querySelectorAll('[data-feed-id]'))
-                        .find(el => el.getAttribute('data-feed-id') === feedId);
+                    if (!["http:", "https:"].includes(resolved.protocol)) return;
+                    const card = Array.from(document.querySelectorAll("[data-feed-id]"))
+                        .find(el => el.getAttribute("data-feed-id") === feedId);
                     if (card) {
-                        let img = card.querySelector('img.feed-cover');
-                        const placeholder = card.querySelector('.feed-cover-placeholder');
-                        if (!img && placeholder && placeholder.parentElement) {
-                            img = document.createElement('img');
-                            img.className = 'feed-cover';
-                            img.alt = 'Cover';
-                            img.loading = 'lazy';
+                        let img = card.querySelector("img.feed-cover");
+                        const placeholder = card.querySelector(".feed-cover-placeholder");
+                        if (!img && placeholder && placeholder.parentElement && document.createElement) {
+                            img = document.createElement("img");
+                            img.className = "feed-cover";
+                            img.alt = "Cover";
+                            img.loading = "lazy";
                             img.onerror = () => handleCoverError(img);
                             placeholder.parentElement.prepend(img);
                         }
                         if (img) {
                             img.src = resolved.href;
-                            img.style.display = 'block';
-                            if (placeholder) placeholder.classList.add('d-none');
+                            img.style.display = "block";
+                            if (placeholder) placeholder.classList.add("d-none");
                         }
                     }
                 }
@@ -300,74 +368,130 @@
         let updatePollTimer = null;
         let updatePollBusy = false;
 
-        function startUpdatePolling() {
-            if (updatePollTimer) return;
-            updatePollTimer = setInterval(async () => {
-                if (updatePollBusy) return;
-                updatePollBusy = true;
-                try {
-                    await loadFeeds();
-                    const epModal = document.getElementById('episodesModal');
-                    if (epModal && epModal.classList.contains('show')) {
-                        const feedId = epModal.dataset.feedId;
-                        if (feedId && updatingFeeds.has(feedId)) await showEpisodes(feedId, false);
+        async function pollFeedStatuses() {
+            if (updatePollBusy) return;
+            updatePollBusy = true;
+            const seq = ++statusFetchSeq;
+            try {
+                const res = await fetch("/api/v1/feeds/status");
+                if (seq !== statusFetchSeq) return;
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const statuses = await res.json();
+                if (seq !== statusFetchSeq) return;
+
+                pollFailureCount = 0;
+                hideConnectionWarning();
+
+                const completedFeeds = [];
+                statuses.forEach(item => {
+                    const isActive = item.status === "running" || item.status === "queued";
+                    if (isActive) {
+                        if (!updatingFeeds.has(item.id)) {
+                            updatingFeeds.add(item.id);
+                            setFeedButtonUpdating(item.id, true);
+                        }
+                    } else if (updatingFeeds.has(item.id)) {
+                        completedFeeds.push(item.id);
                     }
-                    if (updatingFeeds.size === 0) {
-                        clearInterval(updatePollTimer);
-                        updatePollTimer = null;
-                        const allBtn = document.getElementById('btn-update-all-feeds');
-                        if (allBtn) {
-                            allBtn.disabled = false;
-                            allBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Update all';
+                });
+
+                completedFeeds.forEach(id => {
+                    updatingFeeds.delete(id);
+                    setFeedButtonUpdating(id, false);
+                });
+
+                if (completedFeeds.length > 0) {
+                    await loadFeeds();
+                    const epModal = document.getElementById("episodesModal");
+                    if (epModal && epModal.classList.contains("show")) {
+                        const feedId = epModal.dataset.feedId;
+                        if (feedId && completedFeeds.includes(feedId)) {
+                            await showEpisodes(feedId, false);
                         }
                     }
-                } finally {
-                    updatePollBusy = false;
                 }
-            }, 2000);
+
+                if (updatingFeeds.size === 0) {
+                    if (updatePollTimer) {
+                        clearInterval(updatePollTimer);
+                        updatePollTimer = null;
+                    }
+                    const allBtn = document.getElementById("btn-update-all-feeds");
+                    if (allBtn) {
+                        allBtn.disabled = false;
+                        allBtn.innerHTML = "<i class=\"bi bi-arrow-repeat me-1\"></i> Update all";
+                    }
+                }
+            } catch (err) {
+                pollFailureCount++;
+                if (pollFailureCount >= 2) {
+                    showConnectionWarning("Connection lost to Podsync server, retrying...");
+                }
+            } finally {
+                updatePollBusy = false;
+            }
         }
 
-        function renderFeeds(feeds) {
-            const container = document.getElementById('feeds-container');
-            if (feeds.length === 0) {
-                container.innerHTML = `
-                    <div class="col-12 text-center py-5">
-                        <i class="bi bi-inbox text-muted display-4"></i>
-                        <h5 class="fw-bold mt-3">No configured podcasts</h5>
-                        <p class="text-muted small">Click "Add podcast" to configure a VK Video, YouTube, or Vimeo feed</p>
-                    </div>`;
-                return;
-            }
+        function startUpdatePolling() {
+            if (updatePollTimer) return;
+            updatePollTimer = setInterval(pollFeedStatuses, 2000);
+        }
 
-            // In-place update: if cards already exist for these feeds, update numbers/badges without wiping DOM or flickering images/icons
-            const cardKey = feed => JSON.stringify([feed.id, feed.title, feed.author, feed.cover_art, feed.provider, feed.feed_url]);
-            const existingCards = Array.from(container.querySelectorAll('[data-feed-id]'));
-            const structureMatches = existingCards.length === feeds.length &&
-                existingCards.every((card, i) => card.getAttribute('data-render-key') === cardKey(feeds[i]));
+        function renderFeedCardHTML(feed) {
+            const providerClass = "provider-" + String(feed.provider || "unknown").replace(/[^a-z0-9_-]/gi, "");
+            const isUpdating = updatingFeeds.has(feed.id);
+            const letter = (feed.title || feed.id || "P").trim()[0].toUpperCase();
+            const cover = `
+                <div class="flex-shrink-0" style="width: 80px; height: 80px; position: relative;">
+                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="Cover" loading="lazy" onerror="handleCoverError(this)">` : ""}
+                    <div class="feed-cover-placeholder ${feed.cover_art ? "d-none" : ""}">${escapeHtml(letter)}</div>
+                </div>`;
 
-            if (structureMatches) {
-                feeds.forEach(feed => {
-                    const epEl = document.getElementById(`feed-ep-${feed.id}`);
-                    const dlCount = feed.downloaded_count ?? 0;
-                    const totalCount = feed.episode_count ?? 0;
-                    if (epEl) {
-                        epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${dlCount} ep.`;
-                        epEl.title = `${dlCount} downloaded on disk${totalCount > dlCount ? ` (${totalCount} total in feed)` : ""}`;
-                    }
+            return `
+            <div class="card feed-card p-3 h-100">
+                <div class="d-flex gap-3">
+                    ${cover}
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                            <h6 class="fw-bold mb-0 text-truncate" title="${escapeHtml(feed.title || feed.id)}">
+                                ${escapeHtml(feed.title || feed.id)}
+                            </h6>
+                            <span class="badge badge-provider ${providerClass}">${escapeHtml((feed.provider || "").toUpperCase())}</span>
+                        </div>
+                        <div class="text-muted small text-truncate mb-2">
+                            ${feed.author ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
+                        </div>
 
-                    const sizeEl = document.getElementById(`feed-size-${feed.id}`);
-                    if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
+                        <!-- RSS URL Box with Copy and QR -->
+                        <div class="d-flex align-items-center gap-1 mb-2">
+                            <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
+                            <button class="btn btn-light btn-sm border" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                            <button class="btn btn-light btn-sm border" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
+                                <i class="bi bi-qr-code"></i>
+                            </button>
+                        </div>
 
-                    const errEl = document.getElementById(`feed-err-${feed.id}`);
-                    if (errEl) {
-                        errEl.innerHTML = feed.error_count > 0 ? 
-                            `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : '';
-                    }
+                        <!-- Deep Links for Podcast Apps -->
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <a href="${safeUrl(feed.apple_url, ["podcast:"])}" class="deep-link-btn border">
+                                <i class="bi bi-apple"></i> Apple
+                            </a>
+                            <a href="${safeUrl(feed.pocketcasts_url, ["pktc:"])}" class="deep-link-btn border">
+                                <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
+                            </a>
+                            <a href="${safeUrl(feed.overcast_url, ["overcast:"])}" class="deep-link-btn border">
+                                <i class="bi bi-soundwave text-warning"></i> Overcast
+                            </a>
+                            <a href="${safeUrl(feed.feed_url, ["http:", "https:"])}" target="_blank" rel="noopener noreferrer" class="deep-link-btn border">
+                                <i class="bi bi-box-arrow-up-right"></i> XML
+                            </a>
+                        </div>
 
-                    const lastErrEl = document.getElementById(`feed-lasterr-${feed.id}`);
-                    if (lastErrEl) {
-                        lastErrEl.innerHTML = feed.last_error ? `
-                            <div class="mt-2 p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
+                        <div id="feed-lasterr-${escapeHtml(feed.id)}" class="mb-2">
+                            ${feed.last_error ? `
+                            <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
                                 <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
                                     <i class="bi bi-exclamation-octagon-fill me-1"></i>
                                     <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
@@ -375,133 +499,172 @@
                                 <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" ${actionAttrs("logs", feed.id)}>
                                     View Logs
                                 </button>
-                            </div>` : '';
-                    }
+                            </div>` : ""}
+                        </div>
 
-                    const isUpdating = updatingFeeds.has(feed.id);
-                    const btn = document.getElementById(`btn-update-${feed.id}`);
-                    if (btn) {
-                        if (isUpdating) {
-                            btn.disabled = true;
-                            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
-                        } else {
-                            btn.disabled = false;
-                            btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
-                        }
-                    }
-                });
+                        <!-- Stats and Action Buttons -->
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="stat-badge" id="feed-ep-${escapeHtml(feed.id)}" title="${feed.downloaded_count ?? 0} downloaded on disk${(feed.episode_count ?? 0) > (feed.downloaded_count ?? 0) ? ` (${feed.episode_count} total in feed)` : ""}"><i class="bi bi-file-earmark-music"></i> ${feed.downloaded_count ?? 0} ep.</span>
+                                <span class="stat-badge" id="feed-size-${escapeHtml(feed.id)}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
+                                <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ""}</span>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-light btn-sm border" title="View episodes" ${actionAttrs("episodes", feed.id)}>
+                                    <i class="bi bi-list-ul"></i> Episodes
+                                </button>
+                                <button class="btn btn-light btn-sm border" title="Podcast Settings" ${actionAttrs("settings", feed.id)}>
+                                    <i class="bi bi-gear"></i> Settings
+                                </button>
+                                <button class="btn btn-light btn-sm border" id="btn-update-${escapeHtml(feed.id)}" title="Update feed now" ${actionAttrs("update", feed.id)} ${isUpdating ? "disabled" : ""}>
+                                    ${isUpdating ? `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...` : `<i class="bi bi-arrow-repeat me-1"></i> Update`}
+                                </button>
+                                <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" ${actionAttrs("delete-feed", feed.id)}>
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderFeeds(feeds) {
+            const container = document.getElementById("feeds-container");
+            if (!container) return;
+
+            if (feeds.length === 0) {
+                const query = (document.getElementById("feed-search")?.value || "").trim();
+                const typeFilter = document.getElementById("feed-type-filter")?.value || "all";
+                const hasFilter = query !== "" || typeFilter !== "all";
+
+                if (hasFilter && allFeeds && allFeeds.length > 0) {
+                    container.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-search text-muted display-4"></i>
+                            <h5 class="fw-bold mt-3">No matching podcasts</h5>
+                            <p class="text-muted small">No podcasts match your search query or filter criteria.</p>
+                            <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("reset-filters")}><i class="bi bi-x-circle me-1"></i> Reset filters</button>
+                        </div>`;
+                } else {
+                    container.innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <i class="bi bi-inbox text-muted display-4"></i>
+                            <h5 class="fw-bold mt-3">No configured podcasts</h5>
+                            <p class="text-muted small">Click "Add podcast" to configure a VK Video, YouTube, or Vimeo feed</p>
+                            <button class="btn btn-brand btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
+                        </div>`;
+                }
                 return;
             }
 
-            // If any feed does not have cover_art in API summary, load it directly from the podcast XML
+            const existingCards = Array.from(container.querySelectorAll("[data-feed-id]"));
+            if (existingCards.length === 0 && !container.firstElementChild) {
+                container.innerHTML = feeds.map(feed => `
+                <div class="col-12 col-xl-6" data-feed-id="${escapeHtml(feed.id)}" data-cover-art="${escapeHtml(feed.cover_art || "")}">
+                    ${renderFeedCardHTML(feed)}
+                </div>`).join("");
+            } else {
+                const placeholder = container.querySelector(".text-center.py-5");
+                if (placeholder) placeholder.remove();
+
+                const feedMap = new Map(feeds.map(f => [f.id, f]));
+                const existingMap = new Map();
+                existingCards.forEach(card => {
+                    const id = card.getAttribute("data-feed-id");
+                    if (!feedMap.has(id)) {
+                        card.remove();
+                    } else {
+                        existingMap.set(id, card);
+                    }
+                });
+
+                feeds.forEach(feed => {
+                    const card = existingMap.get(feed.id);
+                    if (card) {
+                        const epEl = document.getElementById(`feed-ep-${feed.id}`);
+                        const dlCount = feed.downloaded_count ?? 0;
+                        const totalCount = feed.episode_count ?? 0;
+                        if (epEl) {
+                            epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${dlCount} ep.`;
+                            epEl.title = `${dlCount} downloaded on disk${totalCount > dlCount ? ` (${totalCount} total in feed)` : ""}`;
+                        }
+
+                        const sizeEl = document.getElementById(`feed-size-${feed.id}`);
+                        if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
+
+                        const errEl = document.getElementById(`feed-err-${feed.id}`);
+                        if (errEl) {
+                            errEl.innerHTML = feed.error_count > 0 ?
+                                `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : "";
+                        }
+
+                        const lastErrEl = document.getElementById(`feed-lasterr-${feed.id}`);
+                        if (lastErrEl) {
+                            lastErrEl.innerHTML = feed.last_error ? `
+                                <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
+                                    <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
+                                        <i class="bi bi-exclamation-octagon-fill me-1"></i>
+                                        <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" ${actionAttrs("logs", feed.id)}>
+                                        View Logs
+                                    </button>
+                                </div>` : "";
+                        }
+
+                        setFeedButtonUpdating(feed.id, updatingFeeds.has(feed.id));
+
+                        const oldCover = card.getAttribute("data-cover-art") || "";
+                        const newCover = feed.cover_art || "";
+                        if (oldCover !== newCover) {
+                            card.setAttribute("data-cover-art", newCover);
+                            let img = card.querySelector("img.feed-cover");
+                            const ph = card.querySelector(".feed-cover-placeholder");
+                            if (newCover) {
+                                if (!img && ph && ph.parentElement && document.createElement) {
+                                    img = document.createElement("img");
+                                    img.className = "feed-cover";
+                                    img.alt = "Cover";
+                                    img.loading = "lazy";
+                                    img.onerror = () => handleCoverError(img);
+                                    ph.parentElement.prepend(img);
+                                }
+                                if (img) {
+                                    img.src = safeUrl(newCover);
+                                    img.style.display = "block";
+                                    if (ph) ph.classList.add("d-none");
+                                }
+                            } else {
+                                if (img) img.style.display = "none";
+                                if (ph) ph.classList.remove("d-none");
+                            }
+                        }
+
+                        container.appendChild(card);
+                    } else if (document.createElement) {
+                        const col = document.createElement("div");
+                        col.className = "col-12 col-xl-6";
+                        col.setAttribute("data-feed-id", feed.id);
+                        col.setAttribute("data-cover-art", feed.cover_art || "");
+                        col.innerHTML = renderFeedCardHTML(feed);
+                        container.appendChild(col);
+                    }
+                });
+            }
+
             feeds.forEach(f => {
                 if (!f.cover_art && f.feed_url) {
                     loadCoverFromXML(f.feed_url, f.id);
                 }
             });
-
-            // Full render only when cards structure changes
-            container.innerHTML = feeds.map(feed => {
-                const providerClass = 'provider-' + String(feed.provider || 'unknown').replace(/[^a-z0-9_-]/gi, '');
-                const isUpdating = updatingFeeds.has(feed.id);
-                const letter = (feed.title || feed.id || 'P').trim()[0].toUpperCase();
-                const cover = `
-                    <div class="flex-shrink-0" style="width: 80px; height: 80px; position: relative;">
-                        ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="Cover" loading="lazy" onerror="handleCoverError(this)">` : ''}
-                        <div class="feed-cover-placeholder ${feed.cover_art ? 'd-none' : ''}">${escapeHtml(letter)}</div>
-                    </div>`;
-
-                return `
-                <div class="col-12 col-xl-6" data-feed-id="${escapeHtml(feed.id)}" data-render-key="${escapeHtml(cardKey(feed))}">
-                    <div class="card feed-card p-3 h-100">
-                        <div class="d-flex gap-3">
-                            ${cover}
-                            <div class="flex-grow-1 min-w-0">
-                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
-                                    <h6 class="fw-bold mb-0 text-truncate" title="${escapeHtml(feed.title || feed.id)}">
-                                        ${escapeHtml(feed.title || feed.id)}
-                                    </h6>
-                                    <span class="badge badge-provider ${providerClass}">${escapeHtml((feed.provider || '').toUpperCase())}</span>
-                                </div>
-                                <div class="text-muted small text-truncate mb-2">
-                                    ${feed.author ? `<span>${escapeHtml(feed.author)} • </span>` : ''}ID: <code>${escapeHtml(feed.id)}</code>
-                                </div>
-
-                                <!-- RSS URL Box with Copy and QR -->
-                                <div class="d-flex align-items-center gap-1 mb-2">
-                                    <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
-                                    <button class="btn btn-light btn-sm border" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
-                                        <i class="bi bi-clipboard"></i>
-                                    </button>
-                                    <button class="btn btn-light btn-sm border" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
-                                        <i class="bi bi-qr-code"></i>
-                                    </button>
-                                </div>
-
-                                <!-- Deep Links for Podcast Apps -->
-                                <div class="d-flex flex-wrap gap-1 mb-2">
-                                    <a href="${safeUrl(feed.apple_url, ['podcast:'])}" class="deep-link-btn border">
-                                        <i class="bi bi-apple"></i> Apple
-                                    </a>
-                                    <a href="${safeUrl(feed.pocketcasts_url, ['pktc:'])}" class="deep-link-btn border">
-                                        <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
-                                    </a>
-                                    <a href="${safeUrl(feed.overcast_url, ['overcast:'])}" class="deep-link-btn border">
-                                        <i class="bi bi-soundwave text-warning"></i> Overcast
-                                    </a>
-                                    <a href="${safeUrl(feed.feed_url, ['http:', 'https:'])}" target="_blank" rel="noopener noreferrer" class="deep-link-btn border">
-                                        <i class="bi bi-box-arrow-up-right"></i> XML
-                                    </a>
-                                </div>
-
-                                <div id="feed-lasterr-${escapeHtml(feed.id)}" class="mb-2">
-                                    ${feed.last_error ? `
-                                    <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
-                                        <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
-                                            <i class="bi bi-exclamation-octagon-fill me-1"></i>
-                                            <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
-                                        </div>
-                                        <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" ${actionAttrs("logs", feed.id)}>
-                                            View Logs
-                                        </button>
-                                    </div>` : ''}
-                                </div>
-
-                                <!-- Stats and Action Buttons -->
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
-                                    <div class="d-flex align-items-center gap-3">
-                                        <span class="stat-badge" id="feed-ep-${escapeHtml(feed.id)}" title="${feed.downloaded_count ?? 0} downloaded on disk${(feed.episode_count ?? 0) > (feed.downloaded_count ?? 0) ? ` (${feed.episode_count} total in feed)` : ""}"><i class="bi bi-file-earmark-music"></i> ${feed.downloaded_count ?? 0} ep.</span>
-                                        <span class="stat-badge" id="feed-size-${escapeHtml(feed.id)}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
-                                        <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger"><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ''}</span>
-                                    </div>
-                                    <div class="d-flex gap-1">
-                                        <button class="btn btn-light btn-sm border" title="View episodes" ${actionAttrs("episodes", feed.id)}>
-                                            <i class="bi bi-list-ul"></i> Episodes
-                                        </button>
-                                        <button class="btn btn-light btn-sm border" title="Podcast Settings" ${actionAttrs("settings", feed.id)}>
-                                            <i class="bi bi-gear"></i> Settings
-                                        </button>
-                                        <button class="btn btn-light btn-sm border" id="btn-update-${escapeHtml(feed.id)}" title="Update feed now" ${actionAttrs("update", feed.id)} ${isUpdating ? 'disabled' : ''}>
-                                            ${isUpdating ? '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...' : '<i class="bi bi-arrow-repeat me-1"></i> Update'}
-                                        </button>
-                                        <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" ${actionAttrs("delete-feed", feed.id)}>
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
         }
 
-        function filterFeeds() {
-            const query = (document.getElementById('feed-search')?.value || '').toLowerCase().trim();
-            const typeFilter = document.getElementById('feed-type-filter')?.value || 'all';
+        function getFilteredFeeds() {
+            const query = (document.getElementById("feed-search")?.value || "").toLowerCase().trim();
+            const typeFilter = document.getElementById("feed-type-filter")?.value || "all";
 
-            const filtered = (allFeeds || []).filter(f => {
+            return (allFeeds || []).filter(f => {
                 const matchesQuery = !query || (
                     (f.id && f.id.toLowerCase().includes(query)) ||
                     (f.title && f.title.toLowerCase().includes(query)) ||
@@ -510,12 +673,49 @@
                 );
                 if (!matchesQuery) return false;
 
-                const isAudiobook = (f.provider === 'audiobook') || (f.url && f.url.startsWith('audiobook://'));
-                if (typeFilter === 'channels') return !isAudiobook;
-                if (typeFilter === 'audiobooks') return isAudiobook;
+                const isAudiobook = (f.provider === "audiobook") || (f.url && f.url.startsWith("audiobook://"));
+                if (typeFilter === "channels") return !isAudiobook;
+                if (typeFilter === "audiobooks") return isAudiobook;
                 return true;
             });
+        }
+
+        function filterFeeds() {
+            const searchInput = document.getElementById("feed-search");
+            const selStart = searchInput ? searchInput.selectionStart : null;
+            const selEnd = searchInput ? searchInput.selectionEnd : null;
+            const hadFocus = searchInput ? (document.activeElement === searchInput) : false;
+
+            const filtered = getFilteredFeeds();
             renderFeeds(filtered);
+
+            const query = (document.getElementById("feed-search")?.value || "").trim();
+            const typeFilter = document.getElementById("feed-type-filter")?.value || "all";
+            const isFiltered = query !== "" || typeFilter !== "all";
+            const filterInfoEl = document.getElementById("feeds-filter-info");
+            if (filterInfoEl) {
+                if (isFiltered && allFeeds && allFeeds.length > 0) {
+                    filterInfoEl.textContent = `Showing ${filtered.length} of ${allFeeds.length}`;
+                    filterInfoEl.classList.remove("d-none");
+                } else {
+                    filterInfoEl.classList.add("d-none");
+                }
+            }
+
+            if (hadFocus && searchInput) {
+                searchInput.focus();
+                if (selStart !== null && selEnd !== null) {
+                    searchInput.setSelectionRange(selStart, selEnd);
+                }
+            }
+        }
+
+        function resetFeedFilters() {
+            const searchInput = document.getElementById("feed-search");
+            const typeFilter = document.getElementById("feed-type-filter");
+            if (searchInput) searchInput.value = "";
+            if (typeFilter) typeFilter.value = "all";
+            filterFeeds();
         }
 
         function copyFeedUrl(url) {
@@ -1356,8 +1556,19 @@
                 const res = await fetch('/api/v1/system');
                 const data = await res.json();
 
-                document.getElementById('nav-version').innerText = data.version || 'v2.8.0';
-                document.getElementById('sys-ver').innerText = `${data.version || 'v2.8.0'} (${data.commit || 'local'})`;
+                function normalizeVersion(ver) {
+                    if (!ver || ver === 'dev' || ver === 'nightly') return 'v2.13.9';
+                    return ver.startsWith('v') ? ver : `v${ver}`;
+                }
+                const ver = normalizeVersion(data.version);
+                const navVerEl = document.getElementById('nav-version');
+                if (navVerEl) navVerEl.innerText = ver;
+
+                const sysVerEl = document.getElementById('sys-ver');
+                if (sysVerEl) {
+                    const commit = (data.commit && data.commit !== 'none' && data.commit !== 'local') ? ` (${data.commit})` : '';
+                    sysVerEl.innerText = `${ver}${commit}`;
+                }
                 document.getElementById('sys-uptime').innerText = data.uptime || '-';
                 document.getElementById('sys-ram').innerText = (data.memory_mb || 0).toFixed(1) + ' MB';
                 document.getElementById('sys-goroutines').innerText = data.goroutines || 0;
@@ -2271,6 +2482,10 @@
         function renderAudiobookFeeds() {
             const container = document.getElementById('audiobook-feeds-container');
             if (!container) return;
+            if (currentTab !== 'tab-audiobooks') {
+                tabDirty['tab-audiobooks'] = true;
+                return;
+            }
             const audioFeeds = (allFeeds || []).filter(f => f.provider === 'audiobook');
             if (audioFeeds.length === 0) {
                 container.innerHTML = `
@@ -2478,3 +2693,49 @@
 
             xhr.send(formData);
         }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (updatePollTimer) {
+                    clearInterval(updatePollTimer);
+                    updatePollTimer = null;
+                }
+                if (typeof logsAutoRefreshTimer !== 'undefined' && logsAutoRefreshTimer) {
+                    clearInterval(logsAutoRefreshTimer);
+                    logsAutoRefreshTimer = null;
+                }
+            } else {
+                if (updatingFeeds.size > 0) {
+                    pollFeedStatuses();
+                    startUpdatePolling();
+                }
+                const logsAutoCheckbox = document.getElementById('logs-auto-refresh');
+                if (logsAutoCheckbox && logsAutoCheckbox.checked && currentTab === 'tab-logs') {
+                    if (typeof startLogsAutoRefresh === 'function') startLogsAutoRefresh();
+                }
+            }
+        });
+
+        document.getElementById('mainTabs')?.addEventListener('shown.bs.tab', (e) => {
+            const target = e.target.getAttribute('data-bs-target')?.replace('#', '');
+            if (target) {
+                currentTab = target;
+                if (target === 'tab-feeds') {
+                    if (tabDirty['tab-feeds']) {
+                        tabDirty['tab-feeds'] = false;
+                        filterFeeds();
+                    }
+                } else if (target === 'tab-audiobooks') {
+                    currentTab = 'tab-audiobooks';
+                    tabDirty['tab-audiobooks'] = false;
+                    renderAudiobookFeeds();
+                    if (typeof loadAudiobookDirs === 'function') loadAudiobookDirs();
+                } else if (target === 'tab-downloader') {
+                    if (typeof loadDownloaderConfig === 'function') loadDownloaderConfig();
+                } else if (target === 'tab-mcp') {
+                    if (typeof loadMCPConfig === 'function') loadMCPConfig();
+                } else if (target === 'tab-logs') {
+                    if (typeof loadLogs === 'function') loadLogs();
+                }
+            }
+        });
+

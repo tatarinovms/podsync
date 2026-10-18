@@ -18,6 +18,19 @@ type AdminConfig struct {
 }
 
 // FeedSummary contains high-level information about a feed formatted for the admin UI
+type FeedStatus string
+
+const (
+	FeedStatusIdle    FeedStatus = "idle"
+	FeedStatusQueued  FeedStatus = "queued"
+	FeedStatusRunning FeedStatus = "running"
+)
+
+type FeedStatusItem struct {
+	ID     string     `json:"id"`
+	Status FeedStatus `json:"status"`
+}
+
 type FeedSummary struct {
 	ID              string       `json:"id"`
 	URL             string       `json:"url"`
@@ -246,6 +259,7 @@ type ImportAudiobookRequest struct {
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
+	GetFeedsStatus(ctx context.Context) ([]FeedStatusItem, error)
 	GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error)
 	AddFeed(ctx context.Context, cfg *feed.Config) error
 	UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error

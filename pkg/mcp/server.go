@@ -68,7 +68,7 @@ func (s *Server) dispatch(ctx context.Context, req *JSONRPCRequest) JSONRPCRespo
 			},
 			ServerInfo: Implementation{
 				Name:    "podsync-mcp",
-				Version: "v2.8.0",
+				Version: "v2.13.9",
 			},
 			Instructions: "Podsync MCP Server provides tools to manage podcast feeds, monitor downloads, retry episodes, inspect system status, and configure API tokens for YouTube, VK Video, Vimeo, SoundCloud, and Twitch.",
 		}

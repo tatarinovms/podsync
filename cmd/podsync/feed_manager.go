@@ -148,6 +148,31 @@ func (m *AppFeedManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, erro
 	return result, nil
 }
 
+func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make([]web.FeedStatusItem, 0, len(m.feeds))
+	for id := range m.feeds {
+		status := web.FeedStatusIdle
+		if m.runningUpdates[id] {
+			status = web.FeedStatusRunning
+		} else if m.queuedUpdates[id] > 0 {
+			status = web.FeedStatusQueued
+		}
+		result = append(result, web.FeedStatusItem{
+			ID:     id,
+			Status: status,
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
+
+	return result, nil
+}
+
 func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.FeedSummary, []*model.Episode, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -174,6 +199,9 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 
 // extractCoverArtFromXML reads the generated <feed_id>.xml from storage and extracts <image><url>...</url></image>
 func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
+	if m.storage == nil {
+		return ""
+	}
 	xmlName := fmt.Sprintf("%s.xml", feedID)
 	file, err := m.storage.Open(xmlName)
 	if err != nil || file == nil {
@@ -269,20 +297,19 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	}
 
 	// Generate URLs
-	host := m.cfg.Server.Hostname
-	if host == "" {
-		port := m.cfg.Server.Port
-		if port == 0 {
-			port = 8080
+	host := "http://localhost:8080"
+	mountPath := ""
+	if m.cfg != nil {
+		if m.cfg.Server.Hostname != "" {
+			host = m.cfg.Server.Hostname
+		} else if m.cfg.Server.Port != 0 {
+			host = fmt.Sprintf("http://localhost:%d", m.cfg.Server.Port)
 		}
-		host = fmt.Sprintf("http://localhost:%d", port)
+		if m.cfg.Server.Path != "" {
+			mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
+		}
 	}
 	host = strings.TrimSuffix(host, "/")
-
-	mountPath := ""
-	if m.cfg.Server.Path != "" {
-		mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
-	}
 
 	feedURL := fmt.Sprintf("%s%s/%s.xml", host, mountPath, f.ID)
 	summary.FeedURL = feedURL

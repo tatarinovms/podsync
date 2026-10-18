@@ -57,6 +57,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)
 	mux.Handle("/api/v1/auth/password", s.authMiddleware(http.HandlerFunc(s.handleAuthPassword)))
 
+	mux.HandleFunc("/api/v1/feeds/status", s.handleFeedsStatus)
 	mux.HandleFunc("/api/v1/feeds", s.handleFeeds)
 	mux.HandleFunc("/api/v1/feeds/", s.handleFeedSubroutes)
 
@@ -232,6 +233,26 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleFeedsStatus(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	statuses, err := s.adminMgr.GetFeedsStatus(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, statuses)
+}
+
 func (s *Server) handleFeeds(w http.ResponseWriter, r *http.Request) {
 	if s.adminMgr == nil {
 		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
@@ -336,6 +357,12 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		s.writeError(w, http.StatusBadRequest, "feed id is required")
+		return
+	}
+
+	// Feed status: /api/v1/feeds/status
+	if len(parts) == 1 && parts[0] == "status" {
+		s.handleFeedsStatus(w, r)
 		return
 	}
 

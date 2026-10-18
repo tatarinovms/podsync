@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,7 +125,8 @@ func TestFeedUpdateStatusFollowsQueueAndRun(t *testing.T) {
 }
 
 type mockFeedManagerDB struct {
-	episodes map[string]map[string]*model.Episode
+	episodes          map[string]map[string]*model.Episode
+	walkEpisodesCount int
 }
 
 func (m *mockFeedManagerDB) Close() error          { return nil }
@@ -158,12 +162,119 @@ func (m *mockFeedManagerDB) UpdateEpisode(feedID string, episodeID string, cb fu
 	return nil
 }
 func (m *mockFeedManagerDB) WalkEpisodes(_ context.Context, feedID string, cb func(episode *model.Episode) error) error {
+	m.walkEpisodesCount++
 	for _, ep := range m.episodes[feedID] {
 		if err := cb(ep); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func TestGetFeedsStatusDoesNotTouchDBOrStorage(t *testing.T) {
+	mockDB := &mockFeedManagerDB{
+		episodes: map[string]map[string]*model.Episode{
+			"feed_idle": {},
+		},
+	}
+	mgr := &AppFeedManager{
+		db: mockDB,
+		feeds: map[string]*feed.Config{
+			"feed_idle":    {ID: "feed_idle"},
+			"feed_queued":  {ID: "feed_queued"},
+			"feed_running": {ID: "feed_running"},
+			"feed_both":    {ID: "feed_both"},
+		},
+		queuedUpdates: map[string]int{
+			"feed_queued": 1,
+			"feed_both":   2,
+		},
+		runningUpdates: map[string]bool{
+			"feed_running": true,
+			"feed_both":    true,
+		},
+	}
+
+	statuses, err := mgr.GetFeedsStatus(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, 0, mockDB.walkEpisodesCount, "GetFeedsStatus must not touch DB or walk episodes")
+
+	expected := []web.FeedStatusItem{
+		{ID: "feed_both", Status: web.FeedStatusRunning},
+		{ID: "feed_idle", Status: web.FeedStatusIdle},
+		{ID: "feed_queued", Status: web.FeedStatusQueued},
+		{ID: "feed_running", Status: web.FeedStatusRunning},
+	}
+	assert.Equal(t, expected, statuses)
+
+	// Confirm ListFeeds does walk episodes
+	_, err = mgr.ListFeeds(context.Background())
+	require.NoError(t, err)
+	assert.Greater(t, mockDB.walkEpisodesCount, 0, "ListFeeds should have walked episodes")
+}
+
+func TestFeedsPerformanceComparison(t *testing.T) {
+	const numFeeds = 20
+	const numEpisodesPerFeed = 50
+
+	episodesMap := make(map[string]map[string]*model.Episode)
+	feedsMap := make(map[string]*feed.Config)
+
+	for i := 0; i < numFeeds; i++ {
+		id := fmt.Sprintf("feed_%d", i)
+		feedsMap[id] = &feed.Config{
+			ID:           id,
+			URL:          fmt.Sprintf("https://youtube.com/channel/%s", id),
+			Format:       model.FormatAudio,
+			Quality:      model.QualityHigh,
+			CronSchedule: "@every 12h",
+		}
+		epMap := make(map[string]*model.Episode)
+		for j := 0; j < numEpisodesPerFeed; j++ {
+			epID := fmt.Sprintf("ep_%d_%d", i, j)
+			epMap[epID] = &model.Episode{
+				ID:     epID,
+				Status: model.EpisodeDownloaded,
+				Size:   1024 * 1024 * 10,
+			}
+		}
+		episodesMap[id] = epMap
+	}
+
+	mockDB := &mockFeedManagerDB{
+		episodes: episodesMap,
+	}
+	mgr := &AppFeedManager{
+		db:    mockDB,
+		feeds: feedsMap,
+		cfg:   &Config{},
+	}
+
+	mockDB.walkEpisodesCount = 0
+	startList := time.Now()
+	listData, err := mgr.ListFeeds(context.Background())
+	elapsedList := time.Since(startList)
+	require.NoError(t, err)
+	listBytes, err := json.Marshal(listData)
+	require.NoError(t, err)
+	listDBWalks := mockDB.walkEpisodesCount
+
+	mockDB.walkEpisodesCount = 0
+	startStatus := time.Now()
+	statusData, err := mgr.GetFeedsStatus(context.Background())
+	elapsedStatus := time.Since(startStatus)
+	require.NoError(t, err)
+	statusBytes, err := json.Marshal(statusData)
+	require.NoError(t, err)
+	statusDBWalks := mockDB.walkEpisodesCount
+
+	t.Logf("\n=== Performance Comparison (%d feeds, %d total episodes) ===", numFeeds, numFeeds*numEpisodesPerFeed)
+	t.Logf("ListFeeds (Old Polling):       Payload Size = %d bytes, DB Episode Walks = %d, Elapsed = %v", len(listBytes), listDBWalks, elapsedList)
+	t.Logf("GetFeedsStatus (New Polling):  Payload Size = %d bytes, DB Episode Walks = %d, Elapsed = %v", len(statusBytes), statusDBWalks, elapsedStatus)
+
+	assert.Equal(t, 0, statusDBWalks)
+	assert.Equal(t, numFeeds, listDBWalks)
+	assert.Less(t, len(statusBytes), len(listBytes))
 }
 
 func TestUpdateFeed_LanguageChangeRedownload(t *testing.T) {

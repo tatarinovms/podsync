@@ -51,7 +51,7 @@
                 <a class="navbar-brand d-flex align-items-center gap-2" href="#">
                     <i class="bi bi-broadcast text-primary fs-4"></i>
                     <span class="navbar-brand-gradient fs-4">Podsync</span>
-                    <span class="badge bg-light text-secondary border fs-6 fw-normal ms-1" id="nav-version">v2.8.0</span>
+                    <span class="badge bg-light text-secondary border fs-6 fw-normal ms-1" id="nav-version">v2.13.9</span>
                 </a>
                 
                 <div class="d-flex align-items-center gap-2 ms-auto">
@@ -124,7 +124,7 @@
                 <!-- 1. Feeds Tab -->
                 <div class="tab-pane fade show active" id="tab-feeds">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                        <div class="d-flex gap-2 flex-grow-1" style="max-width: 540px;">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 640px;">
                             <div class="input-group">
                                 <span class="input-group-text border-end-0"><i class="bi bi-search text-muted"></i></span>
                                 <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Search by title or ID..." oninput="filterFeeds()">
@@ -134,12 +134,18 @@
                                 <option value="channels">Channels</option>
                                 <option value="audiobooks">Audiobooks</option>
                             </select>
+                            <span id="feeds-filter-info" class="badge bg-secondary-subtle text-secondary py-2 px-2 text-nowrap d-none"></span>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
                             <button class="btn btn-outline-secondary btn-sm" id="btn-update-all-feeds" onclick="triggerUpdateAll()" title="Update all podcasts now"><i class="bi bi-arrow-repeat me-1"></i> Update all</button>
                             <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
                         </div>
+                    </div>
+
+                    <!-- Connection Alert Banner -->
+                    <div id="feeds-connection-alert" class="alert alert-warning py-2 px-3 small d-none mb-3" role="alert">
+                        <i class="bi bi-wifi-off me-2"></i><span>Connection lost to Podsync server, retrying...</span>
                     </div>
 
                     <!-- Feeds List Grid -->

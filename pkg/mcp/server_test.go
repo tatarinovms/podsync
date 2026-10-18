@@ -33,6 +33,18 @@ func (m *mockAdminManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, er
 	return m.feeds, nil
 }
 
+func (m *mockAdminManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusItem, error) {
+	result := make([]web.FeedStatusItem, 0, len(m.feeds))
+	for _, f := range m.feeds {
+		status := web.FeedStatusIdle
+		if f.Updating {
+			status = web.FeedStatusRunning
+		}
+		result = append(result, web.FeedStatusItem{ID: f.ID, Status: status})
+	}
+	return result, nil
+}
+
 func (m *mockAdminManager) GetFeedDetail(ctx context.Context, id string) (*web.FeedSummary, []*model.Episode, error) {
 	for _, f := range m.feeds {
 		if f.ID == id {
@@ -218,7 +230,7 @@ func setupTestServer() (*Server, *mockAdminManager) {
 			{ID: "TEST", Title: "Test Feed", URL: "https://youtube.com/channel/test"},
 		},
 		stats: &web.SystemStats{
-			Version:   "v2.8.0",
+			Version:   "v2.13.9",
 			HasYtDlp:  true,
 			HasFFmpeg: true,
 			MemoryMB:  42.5,
@@ -352,7 +364,7 @@ func TestToolsCall(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, resp.Error)
 		resData, _ := json.Marshal(resp.Result)
-		assert.Contains(t, string(resData), "v2.8.0")
+		assert.Contains(t, string(resData), "v2.13.9")
 	})
 
 	t.Run("get_downloader_config", func(t *testing.T) {

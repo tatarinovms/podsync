@@ -319,6 +319,9 @@ type mockDownloaderAdminMgr struct {
 func (m *mockDownloaderAdminMgr) ListFeeds(ctx context.Context) ([]FeedSummary, error) {
 	return nil, nil
 }
+func (m *mockDownloaderAdminMgr) GetFeedsStatus(ctx context.Context) ([]FeedStatusItem, error) {
+	return []FeedStatusItem{{ID: "test", Status: FeedStatusIdle}}, nil
+}
 func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error) {
 	return nil, nil, nil
 }
@@ -636,6 +639,35 @@ func TestTriggerUpdateAllAPI(t *testing.T) {
 
 	// 3. GET /api/v1/feeds/update should be MethodNotAllowed
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/feeds/update", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestFeedsStatusEndpoint(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "password",
+		},
+	}
+
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/feeds/status", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"id":"test"`)
+	assert.Contains(t, rec.Body.String(), `"status":"idle"`)
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/feeds/status", nil)
 	req.SetBasicAuth("admin", "password")
 	rec = httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, req)

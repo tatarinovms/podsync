@@ -100,6 +100,12 @@ func (c *HTTPClientManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, e
 	return result, err
 }
 
+func (c *HTTPClientManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusItem, error) {
+	var result []web.FeedStatusItem
+	err := c.doRequest(ctx, http.MethodGet, "/api/v1/feeds/status", nil, &result)
+	return result, err
+}
+
 func (c *HTTPClientManager) GetFeedDetail(ctx context.Context, id string) (*web.FeedSummary, []*model.Episode, error) {
 	var res struct {
 		Feed     *web.FeedSummary `json:"feed"`

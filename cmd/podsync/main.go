@@ -51,7 +51,7 @@ const banner = `
 `
 
 var (
-	version = "dev"
+	version = "v2.13.9"
 	commit  = "none"
 	date    = "unknown"
 	arch    = ""

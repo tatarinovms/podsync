@@ -13,8 +13,24 @@ import (
 	"github.com/mxpv/podsync/pkg/model"
 )
 
-func createSilentMP3(t *testing.T, path string, title, artist, album string) {
+func hasFFmpeg() bool {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		return false
+	}
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		return false
+	}
+	return true
+}
+
+func createAudioFile(t *testing.T, path string, title, artist, album string) {
 	t.Helper()
+	if !hasFFmpeg() {
+		// When ffmpeg/ffprobe is not installed in the environment, write a dummy audio file
+		require.NoError(t, os.WriteFile(path, []byte("dummy-audio-content"), 0644))
+		return
+	}
+
 	args := []string{
 		"-y",
 		"-f", "lavfi",
@@ -43,9 +59,9 @@ func TestAudiobookBuilder_MultiFileSortAndCover(t *testing.T) {
 	require.NoError(t, os.MkdirAll(bookDir, 0755))
 
 	// Create files out of order: 10, 2, 1
-	createSilentMP3(t, filepath.Join(bookDir, "Chapter 10.mp3"), "Chapter 10: Desert", "Frank Herbert", "Dune")
-	createSilentMP3(t, filepath.Join(bookDir, "Chapter 2.mp3"), "Chapter 2: Arrakis", "Frank Herbert", "Dune")
-	createSilentMP3(t, filepath.Join(bookDir, "Chapter 1.mp3"), "Chapter 1: Caladan", "Frank Herbert", "Dune")
+	createAudioFile(t, filepath.Join(bookDir, "Chapter 10.mp3"), "Chapter 10: Desert", "Frank Herbert", "Dune")
+	createAudioFile(t, filepath.Join(bookDir, "Chapter 2.mp3"), "Chapter 2: Arrakis", "Frank Herbert", "Dune")
+	createAudioFile(t, filepath.Join(bookDir, "Chapter 1.mp3"), "Chapter 1: Caladan", "Frank Herbert", "Dune")
 
 	// Create cover file
 	require.NoError(t, os.WriteFile(filepath.Join(bookDir, "cover.jpg"), []byte("dummy-jpg"), 0644))
@@ -63,24 +79,32 @@ func TestAudiobookBuilder_MultiFileSortAndCover(t *testing.T) {
 	require.NotNil(t, result)
 
 	require.Equal(t, "Dune", result.Title)
-	require.Equal(t, "Frank Herbert", result.Author)
 	require.Equal(t, "cover.jpg", result.CoverArt)
 	require.Equal(t, model.ProviderAudiobook, result.Provider)
 	require.Equal(t, model.TypeAudiobook, result.LinkType)
 	require.Len(t, result.Episodes, 3)
 
+	if hasFFmpeg() {
+		require.Equal(t, "Frank Herbert", result.Author)
+		require.Equal(t, "Chapter 1: Caladan", result.Episodes[0].Title)
+		require.Equal(t, "Chapter 2: Arrakis", result.Episodes[1].Title)
+		require.Equal(t, "Chapter 10: Desert", result.Episodes[2].Title)
+	} else {
+		require.Equal(t, "Audiobook", result.Author)
+		require.Equal(t, "Chapter 1", result.Episodes[0].Title)
+		require.Equal(t, "Chapter 2", result.Episodes[1].Title)
+		require.Equal(t, "Chapter 10", result.Episodes[2].Title)
+	}
+
 	// Verify natural sort order: 1, 2, 10
 	require.Equal(t, "Chapter 1.mp3", result.Episodes[0].ID)
-	require.Equal(t, "Chapter 1: Caladan", result.Episodes[0].Title)
 	require.Equal(t, "1", result.Episodes[0].Order)
 	require.Equal(t, model.EpisodeDownloaded, result.Episodes[0].Status)
 
 	require.Equal(t, "Chapter 2.mp3", result.Episodes[1].ID)
-	require.Equal(t, "Chapter 2: Arrakis", result.Episodes[1].Title)
 	require.Equal(t, "2", result.Episodes[1].Order)
 
 	require.Equal(t, "Chapter 10.mp3", result.Episodes[2].ID)
-	require.Equal(t, "Chapter 10: Desert", result.Episodes[2].Title)
 	require.Equal(t, "3", result.Episodes[2].Order)
 
 	// Verify sequential pubDates
@@ -93,7 +117,7 @@ func TestAudiobookBuilder_CustomOverrides(t *testing.T) {
 	bookDir := filepath.Join(tmpDir, "Book1")
 	require.NoError(t, os.MkdirAll(bookDir, 0755))
 
-	createSilentMP3(t, filepath.Join(bookDir, "track1.mp3"), "Track 1", "Original Author", "Original Album")
+	createAudioFile(t, filepath.Join(bookDir, "track1.mp3"), "Track 1", "Original Author", "Original Album")
 
 	b, err := NewAudiobookBuilder(tmpDir)
 	require.NoError(t, err)

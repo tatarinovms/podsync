@@ -1,5 +1,8 @@
 # Episode Filters
 
+**English** | [Русский](./ru/filters.md)
+
+
 Podsync supports filtering episodes by title, description, duration, and age. Filters are configured per feed under `[feeds.<id>.filters]`.
 
 All filters use **AND logic** — an episode must satisfy every configured filter to be downloaded.

@@ -1,5 +1,8 @@
 # How to get YouTube API Key
 
+**English** | [Русский](./ru/how_to_get_youtube_api_key.md)
+
+
 1. Navigate to https://console.developers.google.com
 2. Click `Select a project`.
 ![Select project](img/youtube_select_project.png)

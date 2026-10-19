@@ -1,5 +1,8 @@
 # Podsync on QNAP NAS Guide
 
+**English** | [Русский](./ru/how_to_setup_podsync_on_qnap_nas.md)
+
+
 *Written by [@Rumik](https://github.com/Rumik)*
 
 1. Install Container Station from App Center.

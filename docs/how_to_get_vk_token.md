@@ -1,5 +1,8 @@
 # How to get VK API token
 
+**English** | [Русский](./ru/how_to_get_vk_token.md)
+
+
 VK has removed standalone app creation from their new developer portal. Therefore, obtaining a user access token (`video`, `offline`) can be done either via a direct official VK OAuth link or through a trusted token generator service:
 
 ### Method 1: Direct VK OAuth link (oauth.vk.ru)

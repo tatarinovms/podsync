@@ -1,5 +1,8 @@
 # Deployment & Setup Guide for AI Agents (OpenCode, Hermes)
 
+**English** | [Русский](./ru/deployment_guide_agents.md)
+
+
 This guide provides automated step-by-step instructions for autonomous agents (**OpenCode**, **Hermes Agent / Nous Hermes**, **Antigravity**, **Claude Code**) to deploy, configure, and operate Podsync.
 
 ---

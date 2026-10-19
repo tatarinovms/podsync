@@ -1,5 +1,8 @@
 # Schedule via cron expression
 
+**English** | [Русский](./ru/cron.md)
+
+
 You can use `cron_schedule` field to build more precise update checks schedule.
 A cron expression represents a set of times, using 5 space-separated fields.
 

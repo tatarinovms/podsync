@@ -1,5 +1,8 @@
 # Podsync MCP Server (Model Context Protocol)
 
+**English** | [Русский](./ru/mcp.md)
+
+
 Podsync includes a built-in **MCP (Model Context Protocol)** server that enables autonomous AI assistants and agents (**OpenCode**, **Hermes Agent / Nous Hermes**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) to directly monitor, manage, and interact with podcast feeds, downloads, and errors.
 
 ---

@@ -1,5 +1,8 @@
 # Podsync on Synology NAS Guide
 
+**English** | [Русский](./ru/how_to_setup_podsync_on_synology_nas.md)
+
+
 *Written by [@lucasjanin](https://github.com/lucasjanin)*
 
 This installs `podsync` on a Synology NAS with SSL and port 443

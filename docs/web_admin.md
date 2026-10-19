@@ -1,5 +1,8 @@
 # Web Admin Console
 
+**English** | [Русский](./ru/web_admin.md)
+
+
 Podsync includes a built-in, responsive web management console designed for easy feed administration, episode monitoring, one-click podcast subscriptions, and system observability.
 
 The admin console is completely self-contained (embedded in the Go binary) and requires no external node/npm runtimes or separate static file deployments.

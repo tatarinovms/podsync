@@ -1,5 +1,8 @@
 # How to get Vimeo API token
 
+**English** | [Русский](./ru/how_to_get_vimeo_token.md)
+
+
 1. Create an account on https://vimeo.com
 2. Navigate to https://developer.vimeo.com
 3. Click `New app` button.

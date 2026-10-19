@@ -1,5 +1,8 @@
 # 📚 Audiobooks in Podsync
 
+**English** | [Русский](./ru/audiobooks.md)
+
+
 Podsync includes first-class support for local audiobooks, transforming folders of audio tracks on disk into serial podcast feeds fully compliant with Apple Podcasts, Pocket Casts, Overcast, and Podcast 2.0 standards.
 
 ---

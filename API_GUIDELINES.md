@@ -230,3 +230,87 @@ Downloads log content as attachment (`podsync.log`).
 
 #### `DELETE /api/v1/system/logs`
 Clears in-memory log buffer.
+
+### 3.6 Authentication & Security
+
+#### `GET /api/v1/auth/status`
+Returns current session authentication status, administrator username, and active brute-force rate limit configuration.
+- **Access**: Public / Unauthenticated.
+- **Response**:
+```json
+{
+  "authenticated": true,
+  "enabled": true,
+  "username": "admin",
+  "rate_limit": {
+    "max_attempts": 5,
+    "window": "5m",
+    "lockout": "5m"
+  }
+}
+```
+
+#### `POST /api/v1/auth/login`
+Authenticates user with username and password. On success, sets HTTP-only `podsync_session` cookie. Subject to brute-force rate limiting; returns `429 Too Many Requests` with a `Retry-After: <seconds>` header if limits are exceeded.
+- **Access**: Public.
+- **Request Body**:
+```json
+{
+  "username": "admin",
+  "password": "secretpassword"
+}
+```
+
+#### `POST /api/v1/auth/logout`
+Invalidates current session and clears `podsync_session` cookie.
+- **Access**: Public.
+
+#### `POST /api/v1/auth/password`
+Changes administrator password. Requires authentication and verification of current password.
+- **Access**: Authenticated.
+- **Request Body**:
+```json
+{
+  "old_password": "currentpassword",
+  "new_password": "newsecretpassword"
+}
+```
+
+#### `GET /api/v1/auth/security`
+Returns current brute-force protection and rate limiting parameters.
+- **Access**: Authenticated.
+- **Response**:
+```json
+{
+  "max_attempts": 5,
+  "window": "5m",
+  "lockout": "5m"
+}
+```
+
+#### `POST /api/v1/auth/security` (or `PUT`)
+Updates brute-force rate limiter parameters on the fly in memory and persists them to `config.toml` under `[server.admin]`.
+- **Access**: Authenticated.
+- **Request Body**:
+```json
+{
+  "max_attempts": 5,
+  "window": "5m",
+  "lockout": "15m"
+}
+```
+- **Validation**:
+  - `max_attempts`: integer from 1 to 100.
+  - `window`: duration string (e.g. `1m`, `5m`, `15m`, `30m`, `1h`), minimum 10s.
+  - `lockout`: duration string (e.g. `1m`, `5m`, `15m`, `30m`, `1h`, `24h`), minimum 10s.
+- **Response**:
+```json
+{
+  "success": true,
+  "rate_limit": {
+    "max_attempts": 5,
+    "window": "5m",
+    "lockout": "15m"
+  }
+}
+```

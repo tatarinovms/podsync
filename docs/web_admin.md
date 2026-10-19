@@ -122,6 +122,11 @@ Log in using the configured username and password.
 - Add or update keys directly from the web interface — changes are automatically saved to `config.toml`.
 
 ### 5. System Health & Observability
+- **Security & Rate Limiting**:
+  - Brute-force protection tracking failed login attempts per client IP and username.
+  - Dynamically configurable via Web UI modal or API (`max_attempts`, `window`, `lockout`).
+  - Returns `429 Too Many Requests` with standard `Retry-After` header when thresholds are exceeded.
+
 - The **System** tab provides real-time instance metrics:
   - **Disk Storage**: Total, Used, and Free disk space on the storage volume (`data_dir`) with a visual capacity bar.
   - **Memory Usage**: Real-time RAM allocated by the Podsync process.
@@ -151,6 +156,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/auth/login` | `POST` | Authenticate and obtain session cookie |
 | `/api/v1/auth/logout` | `POST` | Invalidate session |
 | `/api/v1/auth/password` | `POST` | Change admin password (requires current password) |
+| `/api/v1/auth/security` | `GET`, `POST` | Get or update brute-force rate limiting settings (max attempts, window, lockout) |
 | `/api/v1/system/errors` | `GET` | List download errors with diagnostic causes and recommendations |
 | `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |

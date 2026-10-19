@@ -176,6 +176,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `POST` | `/api/v1/auth/login` | Session login with JSON credentials |
 | `POST` | `/api/v1/auth/logout` | Session logout |
 | `POST` | `/api/v1/auth/password` | Change admin password |
+| `GET`, `POST` | `/api/v1/auth/security` | View or update brute-force rate limiting settings |
 | `GET` | `/api/v1/feeds` | List all podcast feeds with active episode counts and disk usage |
 | `POST` | `/api/v1/feeds` | Add new channel/playlist feed with auto-sync to `config.toml` |
 | `GET` | `/api/v1/feeds/{id}` | Detailed feed info and episode status |

@@ -102,11 +102,28 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 		bindAddress = ""
 	}
 
+	maxAttempts := cfg.Admin.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 5
+	}
+	window := 5 * time.Minute
+	if cfg.Admin.WindowPeriod != "" {
+		if d, err := time.ParseDuration(cfg.Admin.WindowPeriod); err == nil && d > 0 {
+			window = d
+		}
+	}
+	lockout := 5 * time.Minute
+	if cfg.Admin.LockoutPeriod != "" {
+		if d, err := time.ParseDuration(cfg.Admin.LockoutPeriod); err == nil && d > 0 {
+			lockout = d
+		}
+	}
+
 	srv := Server{
 		db:          database,
 		cfg:         cfg,
 		sessions:    NewSessionManager(),
-		rateLimiter: NewLoginRateLimiter(5, 5*time.Minute, 5*time.Minute),
+		rateLimiter: NewLoginRateLimiter(maxAttempts, window, lockout),
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", bindAddress, port)

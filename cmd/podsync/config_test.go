@@ -689,3 +689,56 @@ data_dir = "/data"
 		assert.Equal(t, "/env/audiobooks", cfg.Audiobooks.Dir)
 	})
 }
+
+func TestAdminRateLimitConfig(t *testing.T) {
+	t.Run("from toml", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+max_attempts = 10
+window = "15m"
+lockout = "30m"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		config, err := LoadConfig(path)
+		assert.NoError(t, err)
+		require.NotNil(t, config)
+
+		assert.Equal(t, 10, config.Server.Admin.MaxAttempts)
+		assert.Equal(t, "15m", config.Server.Admin.WindowPeriod)
+		assert.Equal(t, "30m", config.Server.Admin.LockoutPeriod)
+	})
+
+	t.Run("from env", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_ADMIN_MAX_ATTEMPTS", "7")
+		t.Setenv("PODSYNC_ADMIN_WINDOW", "10m")
+		t.Setenv("PODSYNC_ADMIN_LOCKOUT", "20m")
+
+		config, err := LoadConfig(path)
+		assert.NoError(t, err)
+		require.NotNil(t, config)
+
+		assert.Equal(t, 7, config.Server.Admin.MaxAttempts)
+		assert.Equal(t, "10m", config.Server.Admin.WindowPeriod)
+		assert.Equal(t, "20m", config.Server.Admin.LockoutPeriod)
+	})
+}

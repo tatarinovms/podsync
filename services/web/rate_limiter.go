@@ -184,3 +184,24 @@ func getClientIP(r *http.Request) string {
 	}
 	return r.RemoteAddr
 }
+
+func (l *LoginRateLimiter) MaxAttempts() int {
+	if l == nil {
+		return 5
+	}
+	return l.maxByUser
+}
+
+func (l *LoginRateLimiter) Window() time.Duration {
+	if l == nil {
+		return 5 * time.Minute
+	}
+	return l.window
+}
+
+func (l *LoginRateLimiter) Lockout() time.Duration {
+	if l == nil {
+		return 5 * time.Minute
+	}
+	return l.lockout
+}

@@ -146,10 +146,22 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	rateLimitInfo := map[string]interface{}{
+		"max_attempts": 5,
+		"window":       "5m",
+		"lockout":      "5m",
+	}
+	if s.rateLimiter != nil {
+		rateLimitInfo["max_attempts"] = s.rateLimiter.MaxAttempts()
+		rateLimitInfo["window"] = s.rateLimiter.Window().String()
+		rateLimitInfo["lockout"] = s.rateLimiter.Lockout().String()
+	}
+
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
 		"enabled":       s.cfg.Admin.Enabled,
 		"authenticated": authenticated,
 		"username":      username,
+		"rate_limit":    rateLimitInfo,
 	})
 }
 

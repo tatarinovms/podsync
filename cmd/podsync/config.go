@@ -355,6 +355,17 @@ func (c *Config) applyEnv() {
 	if val, ok := os.LookupEnv("PODSYNC_ADMIN_PASSWORD"); ok {
 		c.Server.Admin.Password = val
 	}
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_MAX_ATTEMPTS"); ok {
+		if count, err := strconv.Atoi(val); err == nil && count > 0 {
+			c.Server.Admin.MaxAttempts = count
+		}
+	}
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_WINDOW"); ok && val != "" {
+		c.Server.Admin.WindowPeriod = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_ADMIN_LOCKOUT"); ok && val != "" {
+		c.Server.Admin.LockoutPeriod = val
+	}
 }
 
 // StringSlice is a toml extension that lets you to specify either a string

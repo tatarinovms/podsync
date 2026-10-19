@@ -154,8 +154,8 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.rateLimiter != nil {
 		rateLimitInfo["max_attempts"] = s.rateLimiter.MaxAttempts()
-		rateLimitInfo["window"] = s.rateLimiter.Window().String()
-		rateLimitInfo["lockout"] = s.rateLimiter.Lockout().String()
+		rateLimitInfo["window"] = formatConfigDuration(s.rateLimiter.Window())
+		rateLimitInfo["lockout"] = formatConfigDuration(s.rateLimiter.Lockout())
 	}
 
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{

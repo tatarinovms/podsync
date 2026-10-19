@@ -2009,6 +2009,31 @@ func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPas
 	return nil
 }
 
+func (m *AppFeedManager) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.configPath != "" {
+		tree, err := toml.LoadFile(m.configPath)
+		if err != nil {
+			return errors.Wrap(err, "failed to load config file")
+		}
+		tree.Set("server.admin.max_attempts", int64(maxAttempts))
+		tree.Set("server.admin.window", window)
+		tree.Set("server.admin.lockout", lockout)
+
+		if err := writeConfigTree(m.configPath, tree); err != nil {
+			return errors.Wrap(err, "failed to save config file")
+		}
+	}
+
+	m.cfg.Server.Admin.MaxAttempts = maxAttempts
+	m.cfg.Server.Admin.WindowPeriod = window
+	m.cfg.Server.Admin.LockoutPeriod = lockout
+
+	return nil
+}
+
 func (m *AppFeedManager) RecordFeedUpdateError(feedID string, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

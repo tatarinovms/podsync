@@ -322,7 +322,12 @@
                             <div class="card p-4 h-100">
                                 <div class="d-flex align-items-center justify-content-between mb-3">
                                     <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
+                                            <i class="bi bi-sliders me-1"></i>Configure
+                                        </button>
+                                    </div>
                                 </div>
                                 <p class="small text-muted mb-3">
                                     Brute-force protection automatically tracks and blocks suspicious authentication attempts across Web UI and HTTP Basic Auth:
@@ -330,7 +335,7 @@
                                 <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
                                     <li class="d-flex align-items-center justify-content-between">
                                         <span class="text-muted">Max failed attempts:</span>
-                                        <span class="fw-semibold">5 attempts / 5 min</span>
+                                        <span class="fw-semibold" id="sec-max-attempts-text">5 attempts / 5m</span>
                                     </li>
                                     <li class="d-flex align-items-center justify-content-between">
                                         <span class="text-muted">Tracking scope:</span>
@@ -338,7 +343,7 @@
                                     </li>
                                     <li class="d-flex align-items-center justify-content-between">
                                         <span class="text-muted">Lockout penalty:</span>
-                                        <span class="fw-semibold">HTTP 429 + <code>Retry-After</code></span>
+                                        <span class="fw-semibold" id="sec-lockout-text">HTTP 429 + <code>Retry-After</code> (5m)</span>
                                     </li>
                                     <li class="d-flex align-items-center justify-content-between">
                                         <span class="text-muted">Protected endpoints:</span>
@@ -1663,6 +1668,64 @@
     </div>
 
         <!-- Modal: Change Password -->
+    <!-- Security Settings Modal -->
+    <div class="modal fade" id="securitySettingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold mb-0">
+                        <i class="bi bi-shield-lock text-primary me-2"></i>Security &amp; Rate Limit Settings
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="securitySettingsForm" onsubmit="submitSecuritySettings(event)">
+                    <div class="modal-body p-4">
+                        <div id="sec-settings-error" class="alert alert-danger d-none py-2 small mb-3"></div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Max Failed Attempts</label>
+                            <input type="number" id="sec-input-max-attempts" class="form-control form-control-sm" min="1" max="100" value="5" required>
+                            <div class="form-text small">Number of failed login attempts allowed before triggering lockout.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Observation Window</label>
+                            <select id="sec-input-window" class="form-select form-select-sm">
+                                <option value="1m">1 minute</option>
+                                <option value="5m" selected>5 minutes</option>
+                                <option value="10m">10 minutes</option>
+                                <option value="15m">15 minutes</option>
+                                <option value="30m">30 minutes</option>
+                                <option value="1h">1 hour</option>
+                            </select>
+                            <div class="form-text small">Time window during which failed attempts are tracked.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Lockout Duration (HTTP 429 Retry-After)</label>
+                            <select id="sec-input-lockout" class="form-select form-select-sm">
+                                <option value="1m">1 minute</option>
+                                <option value="5m" selected>5 minutes</option>
+                                <option value="10m">10 minutes</option>
+                                <option value="15m">15 minutes</option>
+                                <option value="30m">30 minutes</option>
+                                <option value="1h">1 hour</option>
+                                <option value="24h">24 hours</option>
+                            </select>
+                            <div class="form-text small">How long the client IP and username remain locked out when exceeding limit.</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top bg-body-tertiary">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" id="sec-settings-save-btn" class="btn btn-brand btn-sm">
+                            <i class="bi bi-check-lg me-1"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="changePasswordModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content shadow">
@@ -1712,6 +1775,6 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=4"></script>
+    <script src="./admin.js?v=5"></script>
 </body>
 </html>

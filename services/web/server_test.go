@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
@@ -409,6 +410,10 @@ func (m *mockDownloaderAdminMgr) ChangePassword(ctx context.Context, oldPassword
 	return nil
 }
 
+func (m *mockDownloaderAdminMgr) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
+	return nil
+}
+
 func (m *mockDownloaderAdminMgr) GetSystemLogs(ctx context.Context, filter LogFilter) (*LogResult, error) {
 	return &LogResult{
 		Entries: []LogEntry{
@@ -797,4 +802,67 @@ func TestAdminAssets(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code, path)
 		assert.NotEmpty(t, rec.Body.String(), path)
 	}
+}
+
+func TestSecuritySettingsAPI(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:       true,
+			Username:      "admin",
+			Password:      "password",
+			MaxAttempts:   5,
+			WindowPeriod:  "5m",
+			LockoutPeriod: "10m",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	// 1. GET /api/v1/auth/security
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/security", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"max_attempts":5`)
+	assert.Contains(t, rec.Body.String(), `"window":"5m"`)
+	assert.Contains(t, rec.Body.String(), `"lockout":"10m"`)
+
+	// 2. POST /api/v1/auth/security with valid settings
+	body := `{"max_attempts": 10, "window": "15m", "lockout": "30m"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/security", strings.NewReader(body))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"success":true`)
+	assert.Equal(t, 10, srv.rateLimiter.MaxAttempts())
+	assert.Equal(t, 15*time.Minute, srv.rateLimiter.Window())
+	assert.Equal(t, 30*time.Minute, srv.rateLimiter.Lockout())
+
+	// 3. GET /api/v1/auth/security again to verify updated values
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/auth/security", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"max_attempts":10`)
+	assert.Contains(t, rec.Body.String(), `"window":"15m"`)
+	assert.Contains(t, rec.Body.String(), `"lockout":"30m"`)
+
+	// 4. Invalid max_attempts (> 100)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/security", strings.NewReader(`{"max_attempts": 200, "window": "5m", "lockout": "5m"}`))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	// 5. Invalid duration (< 10s)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/auth/security", strings.NewReader(`{"max_attempts": 5, "window": "2s", "lockout": "5m"}`))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }

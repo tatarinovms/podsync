@@ -162,6 +162,10 @@ func (m *mockAdminManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusIn
 	}, nil
 }
 
+func (m *mockAdminManager) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
+	return nil
+}
+
 func (m *mockAdminManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
 	return nil
 }

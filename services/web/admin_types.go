@@ -292,6 +292,7 @@ type AdminManager interface {
 	GetRecentDownloads(ctx context.Context, feedID string, limit int) ([]RecentDownloadItem, error)
 	GetSyncStatus(ctx context.Context) (*SyncStatusInfo, error)
 	ChangePassword(ctx context.Context, oldPassword, newPassword string) error
+	UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error
 
 	// Logs management
 	GetSystemLogs(ctx context.Context, filter LogFilter) (*LogResult, error)

@@ -56,6 +56,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/login", s.handleAuthLogin)
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)
 	mux.Handle("/api/v1/auth/password", s.authMiddleware(http.HandlerFunc(s.handleAuthPassword)))
+	mux.Handle("/api/v1/auth/security", s.authMiddleware(http.HandlerFunc(s.handleAuthSecurity)))
 
 	mux.Handle("/api/v1/feeds/status", s.authMiddleware(http.HandlerFunc(s.handleFeedsStatus)))
 	mux.Handle("/api/v1/feeds", s.authMiddleware(http.HandlerFunc(s.handleFeeds)))
@@ -266,6 +267,83 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "Password changed successfully",
 	})
+}
+
+type UpdateSecurityRequest struct {
+	MaxAttempts int    `json:"max_attempts"`
+	Window      string `json:"window"`
+	Lockout     string `json:"lockout"`
+}
+
+func (s *Server) handleAuthSecurity(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		rateLimitInfo := map[string]interface{}{
+			"max_attempts": 5,
+			"window":       "5m",
+			"lockout":      "5m",
+		}
+		if s.rateLimiter != nil {
+			rateLimitInfo["max_attempts"] = s.rateLimiter.MaxAttempts()
+			rateLimitInfo["window"] = formatConfigDuration(s.rateLimiter.Window())
+			rateLimitInfo["lockout"] = formatConfigDuration(s.rateLimiter.Lockout())
+		}
+		s.writeJSON(w, http.StatusOK, rateLimitInfo)
+
+	case http.MethodPost, http.MethodPut:
+		var req UpdateSecurityRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+
+		if req.MaxAttempts <= 0 {
+			req.MaxAttempts = 5
+		}
+		if req.MaxAttempts > 100 {
+			s.writeError(w, http.StatusBadRequest, "max_attempts must be between 1 and 100")
+			return
+		}
+
+		windowDur, err := time.ParseDuration(req.Window)
+		if err != nil || windowDur < 10*time.Second {
+			s.writeError(w, http.StatusBadRequest, "invalid window duration (e.g. 1m, 5m, 15m, minimum 10s)")
+			return
+		}
+
+		lockoutDur, err := time.ParseDuration(req.Lockout)
+		if err != nil || lockoutDur < 10*time.Second {
+			s.writeError(w, http.StatusBadRequest, "invalid lockout duration (e.g. 1m, 5m, 15m, minimum 10s)")
+			return
+		}
+
+		windowStr := req.Window
+		lockoutStr := req.Lockout
+
+		if err := s.adminMgr.UpdateAdminSecurity(r.Context(), req.MaxAttempts, windowStr, lockoutStr); err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		s.UpdateSecurityConfig(req.MaxAttempts, windowDur, lockoutDur)
+
+		s.writeJSON(w, http.StatusOK, map[string]interface{}{
+			"success": true,
+			"rate_limit": map[string]interface{}{
+				"max_attempts": req.MaxAttempts,
+				"window":       windowStr,
+				"lockout":      lockoutStr,
+			},
+		})
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func (s *Server) handleFeedsStatus(w http.ResponseWriter, r *http.Request) {

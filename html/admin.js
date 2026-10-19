@@ -234,6 +234,108 @@
             }
         }
 
+        async function submitSecuritySettings(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('sec-settings-save-btn');
+            const errAlert = document.getElementById('sec-settings-error');
+            const attemptsVal = parseInt(document.getElementById('sec-input-max-attempts').value, 10);
+            const windowVal = document.getElementById('sec-input-window').value;
+            const lockoutVal = document.getElementById('sec-input-lockout').value;
+
+            if (errAlert) errAlert.classList.add('d-none');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+            }
+
+            try {
+                const res = await fetch('/api/v1/auth/security', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        max_attempts: attemptsVal,
+                        window: windowVal,
+                        lockout: lockoutVal
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Failed to update security settings');
+                }
+
+                closeModal('securitySettingsModal');
+                showToast('Security settings updated successfully!');
+                await loadAuthSecurity();
+            } catch (err) {
+                if (errAlert) {
+                    errAlert.innerText = err.message;
+                    errAlert.classList.remove('d-none');
+                }
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Settings';
+                }
+            }
+        }
+
+        async function loadAuthSecurity() {
+            try {
+                const res = await fetch('/api/v1/auth/security');
+                if (!res.ok) return;
+                const data = await res.json();
+                const attempts = data.max_attempts || 5;
+                const win = data.window || '5m';
+                const lockout = data.lockout || '5m';
+
+                const attemptsEl = document.getElementById('sec-max-attempts-text');
+                if (attemptsEl) {
+                    attemptsEl.innerText = `${attempts} attempts / ${win}`;
+                }
+
+                const lockoutEl = document.getElementById('sec-lockout-text');
+                if (lockoutEl) {
+                    lockoutEl.innerHTML = `HTTP 429 + <code>Retry-After</code> (${lockout})`;
+                }
+
+                const inputAttempts = document.getElementById('sec-input-max-attempts');
+                if (inputAttempts) inputAttempts.value = attempts;
+
+                const inputWindow = document.getElementById('sec-input-window');
+                if (inputWindow) {
+                    ensureOptionAndSelect(inputWindow, win);
+                }
+
+                const inputLockout = document.getElementById('sec-input-lockout');
+                if (inputLockout) {
+                    ensureOptionAndSelect(inputLockout, lockout);
+                }
+            } catch (err) {
+                console.warn('Failed to load auth security settings:', err);
+            }
+        }
+
+        function ensureOptionAndSelect(selectEl, val) {
+            if (!selectEl) return;
+            let found = false;
+            for (let i = 0; i < selectEl.options.length; i++) {
+                if (selectEl.options[i].value === val) {
+                    selectEl.selectedIndex = i;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.text = val;
+                selectEl.appendChild(opt);
+                selectEl.value = val;
+            }
+        }
+
+
         async function logout() {
             if (updatePollTimer) {
                 clearInterval(updatePollTimer);
@@ -255,6 +357,7 @@
             loadTokens();
             loadSystem();
             loadMCPConfig();
+            loadAuthSecurity();
         }
 
         // Feeds
@@ -3084,7 +3187,17 @@
                     if (typeof loadMCPConfig === 'function') loadMCPConfig();
                 } else if (target === 'tab-logs') {
                     if (typeof loadLogs === 'function') loadLogs();
+                } else if (target === 'tab-system') {
+                    loadSystem();
+                    loadAuthSecurity();
                 }
             }
         });
 
+
+
+        document.getElementById('securitySettingsModal')?.addEventListener('show.bs.modal', () => {
+            loadAuthSecurity();
+            const errAlert = document.getElementById('sec-settings-error');
+            if (errAlert) errAlert.classList.add('d-none');
+        });

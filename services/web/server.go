@@ -252,3 +252,10 @@ func noIndexMiddleware(next http.Handler) http.Handler {
 func (s *Server) UpdateAdminPassword(newPassword string) {
 	s.cfg.Admin.Password = newPassword
 }
+
+func (s *Server) UpdateSecurityConfig(maxAttempts int, window, lockout time.Duration) {
+	s.rateLimiter = NewLoginRateLimiter(maxAttempts, window, lockout)
+	s.cfg.Admin.MaxAttempts = maxAttempts
+	s.cfg.Admin.WindowPeriod = formatConfigDuration(window)
+	s.cfg.Admin.LockoutPeriod = formatConfigDuration(lockout)
+}

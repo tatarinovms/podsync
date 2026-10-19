@@ -269,6 +269,15 @@ func (c *HTTPClientManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusI
 	return &result, nil
 }
 
+func (c *HTTPClientManager) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
+	payload := map[string]interface{}{
+		"max_attempts": maxAttempts,
+		"window":       window,
+		"lockout":      lockout,
+	}
+	return c.doRequest(ctx, http.MethodPost, "/api/v1/auth/security", payload, nil)
+}
+
 func (c *HTTPClientManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
 	payload := map[string]string{
 		"old_password": oldPassword,

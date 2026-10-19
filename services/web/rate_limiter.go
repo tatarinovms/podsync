@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"math"
 	"net"
 	"net/http"
@@ -204,4 +205,23 @@ func (l *LoginRateLimiter) Lockout() time.Duration {
 		return 5 * time.Minute
 	}
 	return l.lockout
+}
+
+func formatConfigDuration(d time.Duration) string {
+	if d <= 0 {
+		return "5m"
+	}
+	if d%(24*time.Hour) == 0 {
+		return fmt.Sprintf("%dh", d/time.Hour)
+	}
+	if d%time.Hour == 0 {
+		return fmt.Sprintf("%dh", d/time.Hour)
+	}
+	if d%time.Minute == 0 {
+		return fmt.Sprintf("%dm", d/time.Minute)
+	}
+	if d%time.Second == 0 {
+		return fmt.Sprintf("%ds", d/time.Second)
+	}
+	return d.String()
 }

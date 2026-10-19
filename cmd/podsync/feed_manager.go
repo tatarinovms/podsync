@@ -566,7 +566,7 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 	}
 
 	if m.queue != nil {
-		job, created, err := m.queue.EnqueueUpdate(ctx, id)
+		job, created, err := m.queue.EnqueueManualUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -616,7 +616,7 @@ func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error)
 	var queued []string
 	for _, f := range feedList {
 		if m.queue != nil {
-			_, created, err := m.queue.EnqueueUpdate(ctx, f.ID)
+			_, created, err := m.queue.EnqueueManualUpdate(ctx, f.ID)
 			if err != nil {
 				log.WithField("feed_id", f.ID).WithError(err).Warn("failed to enqueue update in jobqueue")
 				continue
@@ -626,10 +626,6 @@ func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error)
 				m.markQueuedLocked(f.ID)
 				m.mu.Unlock()
 				queued = append(queued, f.ID)
-				select {
-				case m.updates <- f:
-				default:
-				}
 			}
 			continue
 		}
@@ -728,7 +724,7 @@ func (m *AppFeedManager) QueueScheduledUpdate(id string) {
 	}
 
 	if m.queue != nil {
-		job, created, err := m.queue.EnqueueUpdate(context.Background(), id)
+		job, created, err := m.queue.EnqueueScheduledUpdate(context.Background(), id)
 		if err != nil {
 			log.WithField("feed_id", id).WithError(err).Warn("failed to enqueue scheduled update in jobqueue")
 			return

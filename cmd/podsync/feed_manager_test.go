@@ -855,3 +855,62 @@ func TestFeedManager_TriggerUpdateDoesNotPushToChannelWhenQueueActive(t *testing
 	require.NotNil(t, job)
 	assert.Equal(t, "update/f1", job.ID)
 }
+
+func TestFeedManager_TriggerUpdateAllNoDuplicateJobWhenClaimed(t *testing.T) {
+	ctx := context.Background()
+	storage, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = storage.Close() })
+
+	q := jobqueue.NewJobQueue(storage, 5)
+	updates := make(chan *feed.Config, 10)
+	mgr := &AppFeedManager{
+		queue:          q,
+		feeds:          map[string]*feed.Config{"f1": {ID: "f1", URL: "https://youtube.com/channel/test"}},
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		updates:        updates,
+	}
+
+	// 1. Simulate legacy channel ingestion listener (main.go:273) in background
+	stopListener := make(chan struct{})
+	defer close(stopListener)
+	go func() {
+		for {
+			select {
+			case f := <-updates:
+				if f != nil {
+					_, _, _ = q.EnqueueUpdate(ctx, f.ID)
+				}
+			case <-stopListener:
+				return
+			}
+		}
+	}()
+
+	// 2. User clicks "Update all"
+	queued, err := mgr.TriggerUpdateAll(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"f1"}, queued)
+
+	// 3. Worker immediately claims the job
+	job, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.Equal(t, "update/f1", job.ID)
+	assert.Equal(t, model.JobStatusRunning, job.Status)
+
+	// Wait briefly to confirm no rogue message arrived through updates channel to set PendingRerun
+	time.Sleep(50 * time.Millisecond)
+	currentJob, err := q.GetJob(ctx, job.ID)
+	require.NoError(t, err)
+	assert.False(t, currentJob.PendingRerun)
+
+	// 4. Worker completes the job
+	require.NoError(t, q.MarkDone(ctx, job.ID, job.ClaimToken))
+
+	// 5. Job must be DONE, not re-queued!
+	finalJob, err := q.GetJob(ctx, job.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusDone, finalJob.Status)
+}

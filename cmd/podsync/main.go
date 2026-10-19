@@ -277,7 +277,7 @@ func main() {
 				select {
 				case _feed := <-updates:
 					if _feed != nil {
-						_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, _feed.ID)
+						_, _, _ = feedManager.JobQueue().EnqueueScheduledUpdate(ctx, _feed.ID)
 					}
 				case <-ctx.Done():
 					return ctx.Err()
@@ -406,7 +406,7 @@ func main() {
 					size, xmlErr := storage.Size(ctx, _feed.ID+".xml")
 					if dbErr != nil || xmlErr != nil || size == 0 {
 						if feedManager.JobQueue() != nil {
-							_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, _feed.ID)
+							_, _, _ = feedManager.JobQueue().EnqueueScheduledUpdate(ctx, _feed.ID)
 						} else {
 							feedManager.MarkFeedUpdateQueued(_feed.ID)
 							select {
@@ -437,7 +437,7 @@ func main() {
 				// This prevents unwanted updates when using fixed schedules in Docker deployments
 				if !hasExplicitCronSchedule {
 					if feedManager.JobQueue() != nil {
-						_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, cronFeed.ID)
+						_, _, _ = feedManager.JobQueue().EnqueueScheduledUpdate(ctx, cronFeed.ID)
 					} else {
 						feedManager.MarkFeedUpdateQueued(cronFeed.ID)
 						updates <- cronFeed

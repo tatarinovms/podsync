@@ -55,8 +55,11 @@ func (q *JobQueue) SetPollPeriod(d time.Duration) {
 }
 
 // EnqueueUpdate creates or returns an active update job for the given feed ID.
-// Returns (job, created, err). If a job is already queued, running or retrying, created=false.
-func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.UpdateJob, bool, error) {
+// If isManual is true, an existing retrying job has its backoff reset to now,
+// and an existing running job has its pending rerun flag set.
+// If isManual is false (default, for scheduled/cron), existing running/retrying jobs are respected without modifying backoff.
+func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string, isManual ...bool) (*model.UpdateJob, bool, error) {
+	manual := len(isManual) > 0 && isManual[0]
 	if strings.TrimSpace(feedID) == "" {
 		return nil, false, errors.New("empty feed_id")
 	}
@@ -68,19 +71,21 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.Upd
 	existing, err := q.db.GetJob(ctx, jobID)
 	if err == nil {
 		if existing != nil && existing.IsActive() {
-			if existing.Status == model.JobStatusRunning {
-				if !existing.PendingRerun {
-					existing.PendingRerun = true
+			if manual {
+				if existing.Status == model.JobStatusRunning {
+					if !existing.PendingRerun {
+						existing.PendingRerun = true
+						if err := q.db.SaveJob(ctx, existing); err != nil {
+							return nil, false, errors.Wrapf(err, "failed to persist pending rerun for job %q", jobID)
+						}
+					}
+				} else if existing.Status == model.JobStatusRetrying {
+					existing.AvailableAt = time.Now().UTC()
 					if err := q.db.SaveJob(ctx, existing); err != nil {
-						return nil, false, errors.Wrapf(err, "failed to persist pending rerun for job %q", jobID)
+						return nil, false, errors.Wrapf(err, "failed to persist reset backoff for job %q", jobID)
 					}
+					q.notify()
 				}
-			} else if existing.Status == model.JobStatusRetrying {
-				existing.AvailableAt = time.Now().UTC()
-				if err := q.db.SaveJob(ctx, existing); err != nil {
-					return nil, false, errors.Wrapf(err, "failed to persist reset backoff for job %q", jobID)
-					}
-				q.notify()
 			}
 			return existing, false, nil
 		}
@@ -106,6 +111,16 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.Upd
 
 	q.notify()
 	return job, true, nil
+}
+
+// EnqueueManualUpdate enqueues an update requested explicitly by a user or API call.
+func (q *JobQueue) EnqueueManualUpdate(ctx context.Context, feedID string) (*model.UpdateJob, bool, error) {
+	return q.EnqueueUpdate(ctx, feedID, true)
+}
+
+// EnqueueScheduledUpdate enqueues a scheduled update triggered by cron or startup schedule.
+func (q *JobQueue) EnqueueScheduledUpdate(ctx context.Context, feedID string) (*model.UpdateJob, bool, error) {
+	return q.EnqueueUpdate(ctx, feedID, false)
 }
 
 // EnqueueRetry creates or returns an active retry job for the given feed and episode ID.

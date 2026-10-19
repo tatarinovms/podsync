@@ -53,7 +53,7 @@ func TestJobQueue_EnqueueAndDeduplication(t *testing.T) {
 	assert.NotNil(t, claimed.StartedAt)
 
 	// 4. Duplicate enqueue while running -> must deduplicate and record pending rerun!
-	job3, created3, err := q.EnqueueUpdate(ctx, "feed1")
+	job3, created3, err := q.EnqueueManualUpdate(ctx, "feed1")
 	require.NoError(t, err)
 	assert.False(t, created3)
 	assert.Equal(t, model.JobStatusRunning, job3.Status)
@@ -380,7 +380,7 @@ func TestJobQueue_PendingRerunWhileRunning(t *testing.T) {
 	assert.NotEmpty(t, claimed.ClaimToken)
 
 	// 2. Retry or update triggered while running -> sets PendingRerun
-	dupJob, created2, err := q.EnqueueUpdate(ctx, "feed_rerun")
+	dupJob, created2, err := q.EnqueueManualUpdate(ctx, "feed_rerun")
 	require.NoError(t, err)
 	assert.False(t, created2)
 	assert.True(t, dupJob.PendingRerun)
@@ -508,7 +508,7 @@ func TestJobQueue_PendingRerunOnFailedRunDoesNotBackoff(t *testing.T) {
 	assert.Equal(t, model.JobStatusRunning, claimed.Status)
 
 	// 2. User retries episode while feed is currently running -> sets PendingRerun
-	_, created2, err := q.EnqueueUpdate(ctx, "feed_fail_rerun")
+	_, created2, err := q.EnqueueManualUpdate(ctx, "feed_fail_rerun")
 	require.NoError(t, err)
 	assert.False(t, created2)
 
@@ -557,4 +557,82 @@ func TestJobQueue_MissingOrInvalidTokenRejected(t *testing.T) {
 	// Valid token -> succeeds
 	err = q.MarkDone(ctx, claimed.ID, claimed.ClaimToken)
 	require.NoError(t, err)
+}
+
+func TestJobQueue_ScheduledUpdateRespectsBackoff(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Initial enqueue & claim
+	_, created, err := q.EnqueueScheduledUpdate(ctx, "feed_cron_backoff")
+	require.NoError(t, err)
+	assert.True(t, created)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	// 2. Job fails with HTTP 429 rate limit -> 30 minute backoff
+	now := time.Now().UTC()
+	retried, err := q.MarkFailed(ctx, claimed.ID, errors.New("HTTP Error 429: Too Many Requests"), claimed.ClaimToken)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusRetrying, retried.Status)
+	assert.Equal(t, 1, retried.Attempts)
+	originalAvailableAt := retried.AvailableAt
+	assert.True(t, originalAvailableAt.After(now.Add(25*time.Minute)))
+
+	// 3. Cron ticks and calls EnqueueScheduledUpdate -> MUST NOT reset backoff!
+	schedJob, schedCreated, err := q.EnqueueScheduledUpdate(ctx, "feed_cron_backoff")
+	require.NoError(t, err)
+	assert.False(t, schedCreated)
+	assert.Equal(t, originalAvailableAt, schedJob.AvailableAt)
+	assert.Equal(t, model.JobStatusRetrying, schedJob.Status)
+	assert.Equal(t, 1, schedJob.Attempts)
+
+	// Verify worker cannot claim it (backoff respected)
+	claimedPremature, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, claimedPremature)
+
+	// 4. User explicitly clicks "Update" -> EnqueueManualUpdate MUST reset backoff to now!
+	manualJob, manualCreated, err := q.EnqueueManualUpdate(ctx, "feed_cron_backoff")
+	require.NoError(t, err)
+	assert.False(t, manualCreated)
+	assert.True(t, manualJob.AvailableAt.Before(time.Now().UTC().Add(2*time.Second)))
+
+	// Now worker can claim it immediately!
+	claimedManual, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimedManual)
+	assert.Equal(t, model.JobStatusRunning, claimedManual.Status)
+}
+
+func TestJobQueue_ScheduledUpdateDuringRunningDoesNotSetPendingRerun(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Initial enqueue & claim
+	_, created, err := q.EnqueueScheduledUpdate(ctx, "feed_cron_running")
+	require.NoError(t, err)
+	assert.True(t, created)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, model.JobStatusRunning, claimed.Status)
+
+	// 2. Cron ticks while update is running -> EnqueueScheduledUpdate MUST NOT set PendingRerun!
+	schedJob, schedCreated, err := q.EnqueueScheduledUpdate(ctx, "feed_cron_running")
+	require.NoError(t, err)
+	assert.False(t, schedCreated)
+	assert.False(t, schedJob.PendingRerun)
+
+	// 3. Current run fails with HTTP 429
+	// Since PendingRerun is false, MarkFailed MUST enforce full 30m backoff!
+	now := time.Now().UTC()
+	failedJob, err := q.MarkFailed(ctx, claimed.ID, errors.New("HTTP Error 429: Too Many Requests"), claimed.ClaimToken)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusRetrying, failedJob.Status)
+	assert.Equal(t, 1, failedJob.Attempts)
+	assert.True(t, failedJob.AvailableAt.After(now.Add(25*time.Minute)))
 }

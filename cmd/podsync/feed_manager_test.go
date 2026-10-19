@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/ytdl"
 
 	"github.com/robfig/cron/v3"
@@ -783,4 +785,46 @@ func TestConcurrentAPIWhileFeedUpdates(t *testing.T) {
 	<-ctx.Done()
 	close(stop)
 	wg.Wait()
+}
+
+func TestFeedManager_TriggerUpdateMultipleTimesNoCounterLeak(t *testing.T) {
+	ctx := context.Background()
+	storage, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = storage.Close() })
+
+	q := jobqueue.NewJobQueue(storage, 5)
+	mgr := &AppFeedManager{
+		queue:          q,
+		feeds:          map[string]*feed.Config{"f1": {ID: "f1", URL: "https://youtube.com/channel/test"}},
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		updates:        make(chan *feed.Config, 10),
+	}
+
+	// Trigger 5 times concurrently or sequentially
+	for i := 0; i < 5; i++ {
+		require.NoError(t, mgr.TriggerUpdate(ctx, "f1"))
+	}
+
+	// Counter must be exactly 1, not 5
+	assert.Equal(t, 1, mgr.queuedUpdates["f1"])
+
+	// Claim and start
+	job, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+
+	started := mgr.TryStartFeedUpdate("f1")
+	assert.True(t, started)
+	assert.Equal(t, 0, mgr.queuedUpdates["f1"])
+
+	// Finish update
+	mgr.MarkFeedUpdateFinished("f1")
+	require.NoError(t, q.MarkDone(ctx, job.ID, job.ClaimToken))
+
+	status, err := mgr.GetFeedsStatus(ctx)
+	require.NoError(t, err)
+	require.Len(t, status, 1)
+	assert.Equal(t, web.FeedStatusIdle, status[0].Status)
 }

@@ -52,14 +52,26 @@ func TestJobQueue_EnqueueAndDeduplication(t *testing.T) {
 	assert.Equal(t, model.JobStatusRunning, claimed.Status)
 	assert.NotNil(t, claimed.StartedAt)
 
-	// 4. Duplicate enqueue while running -> must still deduplicate!
+	// 4. Duplicate enqueue while running -> must deduplicate and record pending rerun!
 	job3, created3, err := q.EnqueueUpdate(ctx, "feed1")
 	require.NoError(t, err)
 	assert.False(t, created3)
 	assert.Equal(t, model.JobStatusRunning, job3.Status)
+	assert.True(t, job3.PendingRerun)
 
-	// 5. Complete job -> status becomes done
+	// 5. Complete current run -> re-queues for the rerun requested in step 4
 	err = q.MarkDone(ctx, claimed.ID)
+	require.NoError(t, err)
+
+	requeuedJob, err := q.GetJob(ctx, "update/feed1")
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusQueued, requeuedJob.Status)
+
+	// 6. Complete the rerun -> status becomes done
+	claimed2, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed2)
+	err = q.MarkDone(ctx, claimed2.ID)
 	require.NoError(t, err)
 
 	doneJob, err := q.GetJob(ctx, "update/feed1")
@@ -67,7 +79,7 @@ func TestJobQueue_EnqueueAndDeduplication(t *testing.T) {
 	assert.Equal(t, model.JobStatusDone, doneJob.Status)
 	assert.NotNil(t, doneJob.FinishedAt)
 
-	// 6. Enqueue after done -> new job is created!
+	// 7. Enqueue after done -> new job is created!
 	job4, created4, err := q.EnqueueUpdate(ctx, "feed1")
 	require.NoError(t, err)
 	assert.True(t, created4)
@@ -350,4 +362,133 @@ func TestJobQueue_SetPollPeriod(t *testing.T) {
 	assert.Equal(t, DefaultPollPeriod, q.pollPeriod)
 	q.SetPollPeriod(10 * time.Second)
 	assert.Equal(t, 10*time.Second, q.pollPeriod)
+}
+
+func TestJobQueue_PendingRerunWhileRunning(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Initial enqueue & claim
+	_, created, err := q.EnqueueUpdate(ctx, "feed_rerun")
+	require.NoError(t, err)
+	assert.True(t, created)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, model.JobStatusRunning, claimed.Status)
+	assert.NotEmpty(t, claimed.ClaimToken)
+
+	// 2. Retry or update triggered while running -> sets PendingRerun
+	dupJob, created2, err := q.EnqueueUpdate(ctx, "feed_rerun")
+	require.NoError(t, err)
+	assert.False(t, created2)
+	assert.True(t, dupJob.PendingRerun)
+
+	// 3. Worker finishes and calls MarkDone -> must transition back to Queued!
+	err = q.MarkDone(ctx, claimed.ID, claimed.ClaimToken)
+	require.NoError(t, err)
+
+	requeued, err := q.GetJob(ctx, claimed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusQueued, requeued.Status)
+	assert.False(t, requeued.PendingRerun)
+	assert.Nil(t, requeued.StartedAt)
+
+	// 4. Next worker can now claim this rerun
+	claimed2, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed2)
+	assert.Equal(t, model.JobStatusRunning, claimed2.Status)
+
+	// 5. Worker finishes this rerun with no further requests -> marks Done
+	err = q.MarkDone(ctx, claimed2.ID, claimed2.ClaimToken)
+	require.NoError(t, err)
+
+	doneJob, err := q.GetJob(ctx, claimed2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusDone, doneJob.Status)
+}
+
+func TestJobQueue_ClaimTokenAndGenerationRevocation(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Worker 1 claims job
+	_, _, err := q.EnqueueUpdate(ctx, "feed_watchdog")
+	require.NoError(t, err)
+
+	w1Job, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, w1Job)
+	w1Token := w1Job.ClaimToken
+	assert.NotEmpty(t, w1Token)
+	assert.Equal(t, uint64(1), w1Job.Generation)
+
+	// 2. Watchdog runs (simulate 3 hours running)
+	threeHoursAgo := time.Now().UTC().Add(-3 * time.Hour)
+	w1Job.StartedAt = &threeHoursAgo
+	require.NoError(t, q.db.SaveJob(ctx, w1Job))
+
+	recovered, err := q.RecoverStaleRunning(ctx, 2*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 1, recovered)
+
+	// Verify job was revoked
+	revokedJob, err := q.GetJob(ctx, w1Job.ID)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2), revokedJob.Generation)
+	assert.Empty(t, revokedJob.ClaimToken)
+	assert.Equal(t, model.JobStatusQueued, revokedJob.Status)
+
+	// 3. Stale Worker 1 finishes and tries to mark done -> MUST FAIL with ErrClaimExpired!
+	err = q.MarkDone(ctx, w1Job.ID, w1Token)
+	assert.Equal(t, ErrClaimExpired, err)
+
+	// 4. Stale Worker 1 tries to mark failed -> MUST ALSO FAIL with ErrClaimExpired!
+	_, err = q.MarkFailed(ctx, w1Job.ID, errors.New("timeout"), w1Token)
+	assert.Equal(t, ErrClaimExpired, err)
+
+	// 5. Worker 2 claims the recovered job
+	w2Job, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, w2Job)
+	assert.Equal(t, uint64(3), w2Job.Generation)
+	assert.NotEqual(t, w1Token, w2Job.ClaimToken)
+
+	// 6. Worker 2 successfully completes
+	err = q.MarkDone(ctx, w2Job.ID, w2Job.ClaimToken)
+	require.NoError(t, err)
+
+	finalJob, err := q.GetJob(ctx, w2Job.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusDone, finalJob.Status)
+}
+
+func TestJobQueue_YieldJob(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	_, _, err := q.EnqueueUpdate(ctx, "feed_yield")
+	require.NoError(t, err)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	// Yield job with 200ms delay
+	err = q.YieldJob(ctx, claimed.ID, claimed.ClaimToken, 200*time.Millisecond)
+	require.NoError(t, err)
+
+	// Cannot be claimed immediately
+	claimedAgain, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, claimedAgain)
+
+	// Wait 250ms -> can be claimed now
+	time.Sleep(250 * time.Millisecond)
+	claimedThird, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimedThird)
+	assert.Equal(t, model.JobStatusRunning, claimedThird.Status)
 }

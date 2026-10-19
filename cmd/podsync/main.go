@@ -297,6 +297,7 @@ func main() {
 			for {
 				var _feed *feed.Config
 				var currentJobID string
+				var currentClaimToken string
 
 				if feedManager.JobQueue() != nil {
 					job, err := feedManager.JobQueue().WaitForJob(ctx)
@@ -307,10 +308,11 @@ func main() {
 						return err
 					}
 					currentJobID = job.ID
+					currentClaimToken = job.ClaimToken
 					_feed = feedManager.GetFeedConfig(job.FeedID)
 					if _feed == nil {
 						log.WithField("feed_id", job.FeedID).Warn("job feed not found in configuration, marking failed")
-						_, _ = feedManager.JobQueue().MarkFailed(ctx, job.ID, fmt.Errorf("feed %q not found in configuration", job.FeedID))
+						_, _ = feedManager.JobQueue().MarkFailed(ctx, job.ID, fmt.Errorf("feed %q not found in configuration", job.FeedID), currentClaimToken)
 						continue
 					}
 				} else {
@@ -323,9 +325,9 @@ func main() {
 				}
 
 				if !feedManager.TryStartFeedUpdate(_feed.ID) {
-					log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, skipping duplicate")
+					log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, yielding job back to queue")
 					if currentJobID != "" && feedManager.JobQueue() != nil {
-						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID)
+						_ = feedManager.JobQueue().YieldJob(ctx, currentJobID, currentClaimToken, 15*time.Second)
 					}
 					continue
 				}
@@ -337,12 +339,12 @@ func main() {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 					feedManager.RecordFeedUpdateError(_feed.ID, err)
 					if currentJobID != "" && feedManager.JobQueue() != nil {
-						_, _ = feedManager.JobQueue().MarkFailed(ctx, currentJobID, err)
+						_, _ = feedManager.JobQueue().MarkFailed(ctx, currentJobID, err, currentClaimToken)
 					}
 				} else {
 					feedManager.ClearFeedUpdateError(_feed.ID)
 					if currentJobID != "" && feedManager.JobQueue() != nil {
-						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID)
+						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID, currentClaimToken)
 					}
 					log.WithField("feed_id", _feed.ID).Info("feed update complete")
 				}

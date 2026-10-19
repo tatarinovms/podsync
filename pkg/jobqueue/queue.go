@@ -2,6 +2,7 @@ package jobqueue
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,8 @@ import (
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/model"
 )
+
+var ErrClaimExpired = errors.New("job claim expired or revoked by watchdog")
 
 const (
 	DefaultMaxAttempts = 5
@@ -65,6 +68,16 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.Upd
 	existing, err := q.db.GetJob(ctx, jobID)
 	if err == nil {
 		if existing != nil && existing.IsActive() {
+			if existing.Status == model.JobStatusRunning {
+				if !existing.PendingRerun {
+					existing.PendingRerun = true
+					_ = q.db.SaveJob(ctx, existing)
+				}
+			} else if existing.Status == model.JobStatusRetrying {
+				existing.AvailableAt = time.Now().UTC()
+				_ = q.db.SaveJob(ctx, existing)
+				q.notify()
+			}
 			return existing, false, nil
 		}
 	} else if err != model.ErrNotFound {
@@ -158,6 +171,8 @@ func (q *JobQueue) ClaimNextJob(ctx context.Context) (*model.UpdateJob, error) {
 
 	candidate.Status = model.JobStatusRunning
 	candidate.StartedAt = &now
+	candidate.Generation++
+	candidate.ClaimToken = fmt.Sprintf("%d-%d", candidate.Generation, now.UnixNano())
 	if err := q.db.SaveJob(ctx, candidate); err != nil {
 		return nil, errors.Wrapf(err, "failed to claim job %q", candidate.ID)
 	}
@@ -215,7 +230,9 @@ func (q *JobQueue) calculateNextWakeup(ctx context.Context) time.Duration {
 }
 
 // MarkDone marks a job as successfully completed.
-func (q *JobQueue) MarkDone(ctx context.Context, jobID string) error {
+// If claimToken is provided and does not match the active claim, ErrClaimExpired is returned.
+// If PendingRerun is set, the job is re-queued for an immediate follow-up run.
+func (q *JobQueue) MarkDone(ctx context.Context, jobID string, claimToken ...string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -224,22 +241,63 @@ func (q *JobQueue) MarkDone(ctx context.Context, jobID string) error {
 		return errors.Wrapf(err, "failed to get job %q to mark done", jobID)
 	}
 
+	if len(claimToken) > 0 && claimToken[0] != "" {
+		if job.ClaimToken != claimToken[0] {
+			log.WithFields(log.Fields{
+				"job_id":      jobID,
+				"expected":    job.ClaimToken,
+				"claim_token": claimToken[0],
+			}).Warn("ignoring MarkDone for revoked or expired claim")
+			return ErrClaimExpired
+		}
+	}
+
 	now := time.Now().UTC()
+	if job.PendingRerun {
+		job.Status = model.JobStatusQueued
+		job.PendingRerun = false
+		job.Attempts = 0
+		job.AvailableAt = now
+		job.StartedAt = nil
+		job.FinishedAt = nil
+		job.ClaimToken = ""
+		job.Generation++
+		if err := q.db.SaveJob(ctx, job); err != nil {
+			return errors.Wrapf(err, "failed to requeue job %q for pending rerun", jobID)
+		}
+		q.notify()
+		log.WithField("job_id", jobID).Info("re-queued job for pending rerun requested during previous run")
+		return nil
+	}
+
 	job.Status = model.JobStatusDone
 	job.FinishedAt = &now
 	job.LastError = ""
+	job.ClaimToken = ""
 
 	return q.db.SaveJob(ctx, job)
 }
 
 // MarkFailed transitions a job either to retrying with exponential backoff or to failed.
-func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error) (*model.UpdateJob, error) {
+// If claimToken is provided and does not match the active claim, ErrClaimExpired is returned.
+func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error, claimToken ...string) (*model.UpdateJob, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
 	job, err := q.db.GetJob(ctx, jobID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get job %q to mark failed", jobID)
+	}
+
+	if len(claimToken) > 0 && claimToken[0] != "" {
+		if job.ClaimToken != claimToken[0] {
+			log.WithFields(log.Fields{
+				"job_id":      jobID,
+				"expected":    job.ClaimToken,
+				"claim_token": claimToken[0],
+			}).Warn("ignoring MarkFailed for revoked or expired claim")
+			return nil, ErrClaimExpired
+		}
 	}
 
 	now := time.Now().UTC()
@@ -256,6 +314,7 @@ func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error) (
 
 	job.Attempts++
 	job.LastError = errMsg
+	job.ClaimToken = ""
 
 	if isFatal || job.Attempts >= job.MaxAttempts {
 		job.Status = model.JobStatusFailed
@@ -286,6 +345,39 @@ func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error) (
 	return job, nil
 }
 
+// YieldJob releases a claimed job back into Queued status with a delay,
+// typically when the feed is currently busy in another worker.
+func (q *JobQueue) YieldJob(ctx context.Context, jobID, claimToken string, delay time.Duration) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	job, err := q.db.GetJob(ctx, jobID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get job %q to yield", jobID)
+	}
+
+	if claimToken != "" && job.ClaimToken != claimToken {
+		return ErrClaimExpired
+	}
+
+	now := time.Now().UTC()
+	job.Status = model.JobStatusQueued
+	job.AvailableAt = now.Add(delay)
+	job.StartedAt = nil
+	job.ClaimToken = ""
+	job.Generation++
+
+	if err := q.db.SaveJob(ctx, job); err != nil {
+		return errors.Wrapf(err, "failed to yield job %q", jobID)
+	}
+
+	log.WithFields(log.Fields{
+		"job_id": jobID,
+		"delay":  delay.String(),
+	}).Debug("job yielded back to queue")
+	return nil
+}
+
 // RecoverStaleJobs recovers jobs left in Running state from a previous server crash or restart.
 // Running jobs are moved back to Queued or Retrying with their StartedAt reset.
 func (q *JobQueue) RecoverStaleJobs(ctx context.Context) (int, error) {
@@ -297,6 +389,8 @@ func (q *JobQueue) RecoverStaleJobs(ctx context.Context) (int, error) {
 
 	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
 		if j.Status == model.JobStatusRunning {
+			j.Generation++
+			j.ClaimToken = ""
 			if j.Attempts > 0 {
 				j.Status = model.JobStatusRetrying
 				j.AvailableAt = now.Add(15 * time.Second)
@@ -424,6 +518,8 @@ func (q *JobQueue) RecoverStaleRunning(ctx context.Context, maxRunningDuration t
 				startTime = *j.StartedAt
 			}
 			if now.Sub(startTime) > maxRunningDuration {
+				j.Generation++
+				j.ClaimToken = ""
 				if j.Attempts > 0 {
 					j.Status = model.JobStatusRetrying
 					j.AvailableAt = now.Add(15 * time.Second)

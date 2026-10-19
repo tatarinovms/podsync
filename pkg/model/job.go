@@ -32,7 +32,10 @@ type UpdateJob struct {
 	LastError   string     `json:"last_error,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	StartedAt   *time.Time `json:"started_at,omitempty"`
-	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	FinishedAt   *time.Time `json:"finished_at,omitempty"`
+	PendingRerun bool       `json:"pending_rerun,omitempty"`
+	Generation   uint64     `json:"generation,omitempty"`
+	ClaimToken   string     `json:"claim_token,omitempty"`
 }
 
 // IsActive returns true if the job is in a state that should prevent duplicate queueing.

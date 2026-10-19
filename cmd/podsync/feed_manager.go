@@ -558,14 +558,12 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 }
 
 func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
-	m.mu.Lock()
+	m.mu.RLock()
 	f, ok := m.feeds[id]
+	m.mu.RUnlock()
 	if !ok {
-		m.mu.Unlock()
 		return errors.Errorf("feed %q not found", id)
 	}
-	m.markQueuedLocked(id)
-	m.mu.Unlock()
 
 	if m.queue != nil {
 		job, created, err := m.queue.EnqueueUpdate(ctx, id)
@@ -574,9 +572,13 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 		}
 		if !created {
 			log.Infof("feed %q update already in progress (job: %s, status: %s)", id, job.ID, job.Status)
-		} else {
-			log.Infof("manually triggered update for feed %q (job: %s)", id, job.ID)
+			return nil
 		}
+		m.mu.Lock()
+		m.markQueuedLocked(id)
+		m.mu.Unlock()
+
+		log.Infof("manually triggered update for feed %q (job: %s)", id, job.ID)
 		select {
 		case m.updates <- f:
 		default:
@@ -584,13 +586,20 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 		return nil
 	}
 
+	// Legacy channel fallback (m.queue == nil)
+	m.mu.Lock()
+	m.markQueuedLocked(id)
+	m.mu.Unlock()
+
 	select {
 	case m.updates <- f:
 		log.Infof("manually triggered update for feed %q", id)
 		return nil
 	default:
 		m.mu.Lock()
-		m.queuedUpdates[id]--
+		if m.queuedUpdates[id] > 0 {
+			m.queuedUpdates[id]--
+		}
 		m.mu.Unlock()
 		return errors.New("update queue is currently full, please try again shortly")
 	}
@@ -610,27 +619,44 @@ func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error)
 
 	var queued []string
 	for _, f := range feedList {
+		if m.queue != nil {
+			_, created, err := m.queue.EnqueueUpdate(ctx, f.ID)
+			if err != nil {
+				log.WithField("feed_id", f.ID).WithError(err).Warn("failed to enqueue update in jobqueue")
+				continue
+			}
+			if created {
+				m.mu.Lock()
+				m.markQueuedLocked(f.ID)
+				m.mu.Unlock()
+				queued = append(queued, f.ID)
+				select {
+				case m.updates <- f:
+				default:
+				}
+			}
+			continue
+		}
+
 		m.mu.Lock()
+		if m.queuedUpdates[f.ID] > 0 || (m.runningUpdates != nil && m.runningUpdates[f.ID]) {
+			m.mu.Unlock()
+			continue
+		}
 		m.markQueuedLocked(f.ID)
 		m.mu.Unlock()
-
-		if m.queue != nil {
-			_, _, _ = m.queue.EnqueueUpdate(ctx, f.ID)
-		}
 
 		select {
 		case m.updates <- f:
 			log.Infof("manually triggered update for feed %q", f.ID)
 			queued = append(queued, f.ID)
 		default:
-			if m.queue == nil {
-				m.mu.Lock()
+			m.mu.Lock()
+			if m.queuedUpdates[f.ID] > 0 {
 				m.queuedUpdates[f.ID]--
-				m.mu.Unlock()
-				log.Warnf("failed to queue update for feed %q: queue full", f.ID)
-			} else {
-				queued = append(queued, f.ID)
 			}
+			m.mu.Unlock()
+			log.Warnf("failed to queue update for feed %q: queue full", f.ID)
 		}
 	}
 
@@ -790,11 +816,11 @@ func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID str
 		ep.ErrorAt = nil
 		return nil
 	})
-	if err == nil {
-		m.invalidateStats(feedID)
-		_ = m.TriggerUpdate(ctx, feedID)
+	if err != nil {
+		return err
 	}
-	return err
+	m.invalidateStats(feedID)
+	return m.TriggerUpdate(ctx, feedID)
 }
 
 func (m *AppFeedManager) JobQueue() *jobqueue.JobQueue {

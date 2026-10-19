@@ -59,10 +59,10 @@ The MCP server provides 22 specialized tools:
 ### Downloader & Authentication
 | Tool Name | Arguments | Description |
 |---|---|---|
-| **`get_downloader_config`** | `{}` | Get yt-dlp downloader configuration, cookies status, and proxy settings. |
-| **`update_downloader_config`** | `timeout`, `proxy`, `cookies_from_browser`, `language` | Update yt-dlp downloader options. |
+| **`get_downloader_config`** | `{}` | Get yt-dlp binary path, custom binary override, version, self-update status, timeout, cookies status, and proxy settings. |
+| **`update_downloader_config`** | `timeout`, `proxy`, `cookies_from_browser`, `language`, `custom_binary`, `self_update` | Update yt-dlp downloader options, proxy, preferred audio language, custom binary override, or self-update behavior. |
 | **`test_downloader`** | `url` *(opt)* | Test yt-dlp downloader against a video URL to verify cookies and connectivity. |
-| **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Vimeo, SoundCloud, and Twitch. |
+| **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Rutube, Vimeo, SoundCloud, and Twitch. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |
 | **`delete_tokens`** | `provider` *(req)*, `index` *(opt)* | Delete a specific API token by index, or clear all configured tokens for a provider from `config.toml`. |
 
@@ -70,7 +70,7 @@ The MCP server provides 22 specialized tools:
 | Tool Name | Arguments | Description |
 |---|---|---|
 | **`list_audiobook_dirs`** | `{}` | List available directories in audiobooks storage, showing track count, total size, cover status, and linked feed status. |
-| **`import_audiobook`** | `dir_name` *(req)*, `feed_id`, `title`, `author`, `description`, `cron_schedule` | Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format). |
+| **`import_audiobook`** | `dir_name` *(req)*, `feed_id`, `title`, `author`, `description` | Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format). Audiobooks do not use cron schedules. |
 | **`delete_audiobook_dir`** | `dir_name` *(req)* | Delete an audiobook folder and all its audio files from disk (and remove any linked podcast feed). |
 
 ### Resources & Prompts
@@ -134,6 +134,12 @@ opencode mcp list
 ```
 
 ---
+
+
+### Stdio Proxy vs Standalone Mode
+When starting with `podsync --config config.toml --mcp`:
+1. **HTTP Proxy Mode**: Podsync checks if a primary daemon is already running locally on `http://localhost:<server.port>`. If reachable, `--mcp` connects as a lightweight HTTP client proxy via Basic Auth credentials from `[server.admin]`. Note: this check targets `localhost` on the configured `server.port` (without reverse-proxy path or TLS wrappers).
+2. **Standalone Daemon Mode**: If no local server is listening on `localhost:<server.port>`, the `--mcp` process initializes the database, storage, and feed manager directly to serve MCP tool requests.
 
 ### Method B: Hermes Agent (Nous Hermes)
 

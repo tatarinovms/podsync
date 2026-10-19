@@ -27,7 +27,7 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Smart Token Extraction**: Paste the entire OAuth redirect URL when adding VK API tokens — Podsync automatically parses out the access token.
 - **Accurate Disk Usage & Active Episodes**: Card metrics accurately reflect only active (downloaded) episodes and their true disk footprint, while cleaned/purged episodes are clearly distinguished in episode inspection.
 - **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations.
-- **Model Context Protocol (MCP) Server**: Built-in MCP server with 21 tools for AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
+- **Model Context Protocol (MCP) Server**: Built-in MCP server with 22 tools for AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
 - **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, tokens, downloaders, and audiobooks.
@@ -70,6 +70,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 - [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
 - [Web Admin Console Guide](./docs/web_admin.md)
+- [Audiobooks Guide](./docs/audiobooks.md)
 - [Model Context Protocol (MCP) Guide](./docs/mcp.md)
 - [How to get VK API token](./docs/how_to_get_vk_token.md)
 - [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
@@ -211,7 +212,7 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
 
 ### MCP Tools:
 - **Feed Management**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
-- **Audiobooks**: `list_audiobook_dirs`, `import_audiobook`
+- **Audiobooks**: `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
 - **System & Logs**: `get_system_stats`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`
 - **Downloader & Diagnostics**: `get_downloader_config`, `update_downloader_config`, `test_downloader`
 - **Tokens**: `get_tokens`, `update_tokens`, `delete_tokens`

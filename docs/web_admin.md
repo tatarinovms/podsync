@@ -40,7 +40,7 @@ Example in `docker-compose.yml`:
 ```yaml
 services:
   podsync:
-    image: tatarinovms/podsync:latest
+    image: ghcr.io/tatarinovms/podsync:latest
     container_name: podsync
     restart: unless-stopped
     ports:
@@ -140,7 +140,7 @@ Log in using the configured username and password.
 
 The admin console is powered by a JSON REST API that can also be used for automation:
 
-All endpoints require authentication (Session Cookie or HTTP Basic Auth).
+Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic Auth), except public authentication endpoints (`/api/v1/auth/status`, `/api/v1/auth/login`, `/api/v1/auth/logout`).
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -153,12 +153,24 @@ All endpoints require authentication (Session Cookie or HTTP Basic Auth).
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `/api/v1/feeds` | `GET` | List all configured feeds with stats |
 | `/api/v1/feeds` | `POST` | Add a new feed |
+| `/api/v1/feeds/status` | `GET` | Lightweight in-memory feed status (state: idle, queued, running; last_error, update times) |
+| `/api/v1/feeds/update` | `POST` | Trigger bulk update for all configured feeds at once |
 | `/api/v1/feeds/{id}` | `GET` | Get feed details and list of episodes |
+| `/api/v1/feeds/{id}` | `PUT` | Update feed configuration settings (cron, format, quality, page_size, retention, language) |
 | `/api/v1/feeds/{id}` | `DELETE` | Delete feed (optional: `?delete_files=true`) |
 | `/api/v1/feeds/{id}/update` | `POST` | Trigger an immediate feed update |
 | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | `POST` | Reset episode status to retry download |
 | `/api/v1/tokens` | `GET` | Get masked tokens for all providers |
 | `/api/v1/tokens` | `POST` | Update tokens for a provider |
+| `/api/v1/tokens` | `DELETE` | Delete single token by provider & index or clear all tokens for provider |
+| `/api/v1/audiobooks/dirs` | `GET` | List audiobook directories, chapter counts, sizes, and linked feeds |
+| `/api/v1/audiobooks/import` | `POST` | Import local audiobook folder into Podcast 2.0 serial feed |
+| `/api/v1/audiobooks/upload` | `POST` | Upload audiobook audio tracks and cover directly via multipart/form-data |
+| `/api/v1/audiobooks/dirs` | `DELETE` | Delete audiobook folder and linked feed from disk |
+| `/api/v1/system/logs` | `GET` | Query recent system logs with level/search/feed_id filtering |
+| `/api/v1/system/logs/level` | `POST` | Change server logging level on the fly (info, debug, warn, error) |
+| `/api/v1/system/logs/download` | `GET` | Download complete server log file as text |
+| `/api/v1/mcp/config` | `GET` | Get MCP stdio and SSE client connection configuration |
 | `/api/v1/system` | `GET` | Get system metrics, disk usage, and dependencies |
 | `/api/v1/downloader` | `GET` | Get yt-dlp downloader configuration, cookies status, and proxy |
 | `/api/v1/downloader` | `POST` | Update downloader settings (timeout, proxy, browser, self-update) |

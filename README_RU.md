@@ -27,7 +27,7 @@ Podsync — это лёгкий и универсальный сервис-ге�
 - **Умное извлечение токенов VK**: При добавлении токена VK можно просто вставить целиком URL редиректа из адресной строки браузера — Podsync сам извлечёт токен доступа.
 - **Точные метрики диска и активных эпизодов**: На карточках отображаются только фактически скачанные эпизоды и их реальный объём, а очищенные (удалённые по лимиту) выпуски аккуратно отображаются в детальном просмотре ленты.
 - **Темы оформления Catppuccin Mocha & Latte**: Палитра Catppuccin в веб-консоли с плавным переключением тёмного и светлого режимов, пастельными бейджами статусов и анимацией.
-- **Сервер Model Context Protocol (MCP)**: Встроенный MCP-сервер с 21 инструментом для интеграции с AI-ассистентами (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) по stdio и SSE, преднастроенный навык ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)) и генератор конфигурации. Подробнее см. в [Руководстве по MCP](./docs/mcp.md).
+- **Сервер Model Context Protocol (MCP)**: Встроенный MCP-сервер с 22 инструментами для интеграции с AI-ассистентами (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) по stdio и SSE, преднастроенный навык ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)) и генератор конфигурации. Подробнее см. в [Руководстве по MCP](./docs/mcp.md).
 - **Настраиваемый шаблон имён файлов `filename_template`**: Пользовательские имена сохраняемых медиафайлов и пути enclosure в RSS (например, `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **Миграция имён файлов**: CLI-инструмент (`--migrate-filenames`, `--migrate-filenames-dry-run`) для переименования ранее скачанных файлов под новый шаблон.
 - **Расширенные переменные окружения**: Удобный запуск в Docker с поддержкой переменных для учётных данных, ключей, аудиокниг, прокси и кук.
@@ -205,13 +205,13 @@ Podsync содержит встроенную панель управления,
 
 ## Сервер Model Context Protocol (MCP)
 
-Podsync содержит встроенный **MCP Server** с 21 инструментом, позволяющий AI-ассистентам (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) напрямую проверять и настраивать ленты, запускать загрузки, перезапускать сбойные эпизоды, импортировать аудиокниги, читать логи и отслеживать состояние системы.
+Podsync содержит встроенный **MCP Server** с 22 инструментами, позволяющий AI-ассистентам (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) напрямую проверять и настраивать ленты, запускать загрузки, перезапускать сбойные эпизоды, импортировать аудиокниги, читать логи и отслеживать состояние системы.
 
 Готовый навык для агентов расположен в [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). Подробности см. в [Руководстве по MCP](./docs/mcp.md).
 
 ### Инструменты MCP:
 - **Управление лентами**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
-- **Аудиокниги**: `list_audiobook_dirs`, `import_audiobook`
+- **Аудиокниги**: `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
 - **Система и логи**: `get_system_stats`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`
 - **Загрузчик и диагностика**: `get_downloader_config`, `update_downloader_config`, `test_downloader`
 - **Токены и ключи**: `get_tokens`, `update_tokens`, `delete_tokens`

@@ -56,7 +56,7 @@ Example directory layout on the server:
 ### 2. Via Web UI File Upload
 
 You can upload audio tracks directly from your browser:
-- Drag and drop audio files (or a `.zip` archive) into the upload area on the **Audiobooks** tab;
+- Drag and drop audio files (e.g. `.mp3`, `.m4b`, `.m4a`) and optional cover image (`cover.jpg`/`cover.png`) directly into the upload area on the **Audiobooks** tab (upload raw audio files; ZIP archives are not automatically extracted by the server);
 - Set the target book folder name;
 - Check **"Auto-import as Podcast feed"** to automatically create the feed upon upload completion;
 - **Upload Limit**: Supports uploads up to **1 GiB** per batch with streaming multipart processing.

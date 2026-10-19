@@ -26,8 +26,11 @@ The MCP server operates in two interchangeable modes:
 └──────────────────┘          └──────────────────┘
 ```
 
-1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output. If Podsync is already running as a daemon or container, the CLI tool automatically proxies calls to the running instance over HTTP, avoiding database lock conflicts.
-2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines or in containers to connect over HTTP/HTTPS with Basic Auth.
+1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output.
+   - **Auto-Proxy**: When launched, the CLI checks if a Podsync daemon is already running locally on `http://localhost:<server.port>` using `[server.admin]` credentials. If reachable, it automatically acts as an HTTP client proxy, routing all tool calls through the running daemon to prevent BadgerDB lock conflicts (`resource temporarily unavailable`).
+   - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote SSE Mode** instead.
+   - **Standalone Mode**: If no daemon is listening on `localhost:<server.port>`, the CLI opens the database directly in standalone mode.
+2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
 
 ---
 

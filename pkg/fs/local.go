@@ -60,18 +60,38 @@ func (l *Local) GetMount(prefix string) (string, bool) {
 	return dir, ok
 }
 
-func (l *Local) resolvePath(name string) (string, error) {
+// resolveTarget returns the root path and relative target path within that root.
+// Both base data directory and mounted directories are treated as secure roots.
+func (l *Local) resolveTarget(name string) (string, string, error) {
 	cleanName := filepath.Clean(filepath.FromSlash(strings.TrimPrefix(name, "/")))
-	root := filepath.Clean(l.rootDir)
 	if cleanName == "." || cleanName == "" {
-		return root, nil
+		if l.rootDir == "" {
+			return "", "", os.ErrNotExist
+		}
+		return l.rootDir, ".", nil
 	}
-	fullPath := filepath.Join(root, cleanName)
-	rel, err := filepath.Rel(root, fullPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
-		return "", errors.Errorf("invalid path traversal %q", name)
+
+	parts := strings.Split(cleanName, string(filepath.Separator))
+	if len(parts) > 0 {
+		l.mountLock.RLock()
+		targetDir, ok := l.mounts[parts[0]]
+		l.mountLock.RUnlock()
+		if ok {
+			rest := "."
+			if len(parts) > 1 {
+				rest = filepath.Join(parts[1:]...)
+				if rest == "" {
+					rest = "."
+				}
+			}
+			return targetDir, rest, nil
+		}
 	}
-	return fullPath, nil
+
+	if l.rootDir == "" {
+		return "", "", os.ErrNotExist
+	}
+	return l.rootDir, cleanName, nil
 }
 
 func (l *Local) Open(name string) (http.File, error) {
@@ -82,39 +102,18 @@ func (l *Local) Open(name string) (http.File, error) {
 		}
 	}
 
-	cleanName := filepath.FromSlash(strings.TrimPrefix(name, "/"))
-	parts := strings.Split(cleanName, string(filepath.Separator))
-
-	if len(parts) > 1 {
-		l.mountLock.RLock()
-		targetDir, ok := l.mounts[parts[0]]
-		l.mountLock.RUnlock()
-		if ok {
-			rest := filepath.Join(parts[1:]...)
-			mountedPath := filepath.Join(targetDir, rest)
-			file, err := os.Open(mountedPath)
-			if err == nil {
-				if l.NoListing {
-					stat, err := file.Stat()
-					if err != nil {
-						file.Close()
-						return nil, err
-					}
-					if stat.IsDir() {
-						file.Close()
-						return nil, os.ErrNotExist
-					}
-				}
-				return file, nil
-			}
-		}
-	}
-
-	path, err := l.resolvePath(name)
+	rootPath, relPath, err := l.resolveTarget(name)
 	if err != nil {
 		return nil, os.ErrNotExist
 	}
-	file, err := os.Open(path)
+
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	file, err := root.Open(relPath)
 	if err != nil {
 		return nil, err
 	}
@@ -136,57 +135,72 @@ func (l *Local) Open(name string) (http.File, error) {
 }
 
 func (l *Local) Delete(_ctx context.Context, name string) error {
-	path, err := l.resolvePath(name)
+	rootPath, relPath, err := l.resolveTarget(name)
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to delete file %s: %w", path, err)
+
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	if err := root.Remove(relPath); err != nil {
+		return fmt.Errorf("failed to delete file %s: %w", name, err)
 	}
 	return nil
 }
 
 func (l *Local) Create(_ctx context.Context, name string, reader io.Reader) (int64, error) {
-	path, err := l.resolvePath(name)
+	rootPath, relPath, err := l.resolveTarget(name)
 	if err != nil {
 		return 0, err
 	}
-	logger := log.WithField("name", name)
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return 0, errors.Wrapf(err, "failed to mkdir: %s", path)
+	if err := os.MkdirAll(rootPath, 0755); err != nil {
+		return 0, errors.Wrapf(err, "failed to mkdir root: %s", rootPath)
 	}
 
-	logger.Infof("creating file: %s", path)
-	tmpPath := fmt.Sprintf("%s.tmp.%d", path, time.Now().UnixNano())
-	written, err := l.copyFile(reader, tmpPath)
+	root, err := os.OpenRoot(rootPath)
 	if err != nil {
-		_ = os.Remove(tmpPath)
-		return 0, errors.Wrap(err, "failed to copy file")
+		return 0, err
+	}
+	defer root.Close()
+
+	dir := filepath.Dir(relPath)
+	if dir != "." && dir != "" {
+		if err := root.MkdirAll(dir, 0755); err != nil {
+			return 0, errors.Wrapf(err, "failed to mkdir: %s", dir)
+		}
 	}
 
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return 0, errors.Wrap(err, "failed to rename temp file to target")
-	}
+	logger := log.WithField("name", name)
+	logger.Infof("creating file: %s in root %s", relPath, rootPath)
 
-	logger.Debugf("written %d bytes", written)
-	return written, nil
-}
-
-func (l *Local) copyFile(source io.Reader, destinationPath string) (int64, error) {
-	dest, err := os.Create(destinationPath)
+	tmpRelPath := fmt.Sprintf("%s.tmp.%d", relPath, time.Now().UnixNano())
+	dest, err := root.OpenFile(tmpRelPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to create destination file")
 	}
 
-	defer dest.Close()
-
-	written, err := io.Copy(dest, source)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to copy data")
+	written, copyErr := io.Copy(dest, reader)
+	closeErr := dest.Close()
+	if copyErr != nil {
+		_ = root.Remove(tmpRelPath)
+		return 0, errors.Wrap(copyErr, "failed to copy data")
+	}
+	if closeErr != nil {
+		_ = root.Remove(tmpRelPath)
+		return 0, errors.Wrap(closeErr, "failed to close destination file")
 	}
 
+	if err := root.Rename(tmpRelPath, relPath); err != nil {
+		_ = root.Remove(tmpRelPath)
+		return 0, errors.Wrap(err, "failed to rename temp file to target")
+	}
+
+	logger.Debugf("written %d bytes", written)
 	return written, nil
 }
 
@@ -203,4 +217,19 @@ func (l *Local) Size(_ctx context.Context, name string) (int64, error) {
 	}
 
 	return stat.Size(), nil
+}
+
+func (l *Local) copyFile(source io.Reader, destinationPath string) (int64, error) {
+	dest, err := os.Create(destinationPath)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to create destination file")
+	}
+	defer dest.Close()
+
+	written, err := io.Copy(dest, source)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to copy data")
+	}
+
+	return written, nil
 }

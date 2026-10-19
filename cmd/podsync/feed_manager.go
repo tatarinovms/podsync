@@ -1676,8 +1676,8 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID string, limit int) ([]web.DownloadErrorItem, error) {
 	if limit <= 0 {
 		limit = 20
-	} else if limit > 100 {
-		limit = 100
+	} else if limit > 1000 {
+		limit = 1000
 	}
 
 	m.mu.RLock()
@@ -2280,21 +2280,26 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 	}
 
 	baseDir := m.GetAudiobooksDir()
-	if filepath.IsAbs(cleanedDir) || cleanedDir == "." {
+	if filepath.IsAbs(cleanedDir) || cleanedDir == "." || cleanedDir == ".." || strings.HasPrefix(cleanedDir, ".."+string(filepath.Separator)) {
 		return nil, errors.New("book must be a subdirectory of the audiobook library")
 	}
-	rootPath, err := filepath.EvalSymlinks(baseDir)
+	root, err := os.OpenRoot(baseDir)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot access audiobook library")
 	}
-	fullPath, err := filepath.EvalSymlinks(filepath.Join(rootPath, cleanedDir))
+	defer root.Close()
+
+	stat, err := root.Stat(cleanedDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errors.Errorf("audiobook folder %q does not exist", cleanedDir)
+		}
 		return nil, errors.Wrap(err, "cannot access audiobook folder")
 	}
-	rel, err := filepath.Rel(rootPath, fullPath)
-	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return nil, errors.New("book folder is outside the audiobook library")
+	if !stat.IsDir() {
+		return nil, errors.Errorf("%q is not a directory", cleanedDir)
 	}
+	fullPath := filepath.Join(baseDir, cleanedDir)
 
 	newFeed := &feed.Config{
 		ID:           id,
@@ -2402,7 +2407,7 @@ func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string)
 	}
 
 	cleanDir := filepath.Clean(dirName)
-	if cleanDir == "." || cleanDir == "/" || strings.HasPrefix(cleanDir, "..") || strings.Contains(cleanDir, string(filepath.Separator)+"..") {
+	if cleanDir == "." || cleanDir == "/" || cleanDir == ".." || strings.HasPrefix(cleanDir, ".."+string(filepath.Separator)) || filepath.IsAbs(cleanDir) {
 		return errors.New("invalid directory path")
 	}
 
@@ -2411,8 +2416,13 @@ func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string)
 		return errors.New("audiobooks directory is not configured")
 	}
 
-	targetPath := filepath.Join(baseDir, cleanDir)
-	stat, err := os.Stat(targetPath)
+	root, err := os.OpenRoot(baseDir)
+	if err != nil {
+		return errors.Wrap(err, "failed to open audiobooks root directory")
+	}
+	defer root.Close()
+
+	stat, err := root.Stat(cleanDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return errors.Errorf("audiobook directory %q not found", dirName)
@@ -2423,11 +2433,7 @@ func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string)
 		return errors.Errorf("%q is not a directory", dirName)
 	}
 
-	// Security: verify targetPath is strictly inside baseDir
-	rel, err := filepath.Rel(baseDir, targetPath)
-	if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
-		return errors.New("cannot delete outside of audiobooks directory")
-	}
+	targetPath := filepath.Join(baseDir, cleanDir)
 
 	// If this directory is linked to any active feed(s), delete the feed(s) cleanly
 	m.mu.Lock()
@@ -2447,9 +2453,9 @@ func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string)
 		}
 	}
 
-	// Remove folder from disk
-	if err := os.RemoveAll(targetPath); err != nil {
-		return errors.Wrapf(err, "failed to delete audiobook directory %q", targetPath)
+	// Remove folder from disk via root
+	if err := root.RemoveAll(cleanDir); err != nil {
+		return errors.Wrapf(err, "failed to delete audiobook directory %q", dirName)
 	}
 
 	log.Infof("successfully deleted audiobook directory from disk: %s", targetPath)

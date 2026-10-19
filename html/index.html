@@ -139,6 +139,7 @@
                         <div class="d-flex flex-wrap gap-2">
                             <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
                             <button class="btn btn-outline-secondary btn-sm" id="btn-update-all-feeds" onclick="triggerUpdateAll()" title="Update all podcasts now"><i class="bi bi-arrow-repeat me-1"></i> Update all</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btn-retry-all-feeds" onclick="triggerRetryAll()" title="Retry all failed episodes across all feeds"><i class="bi bi-arrow-counterclockwise me-1"></i> Retry all</button>
                             <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
                         </div>
                     </div>
@@ -309,6 +310,63 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>Podsync Version</span>
                                         <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security & Authentication -->
+                    <div class="row g-4 mt-1">
+                        <div class="col-12 col-lg-6">
+                            <div class="card p-4 h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                </div>
+                                <p class="small text-muted mb-3">
+                                    Brute-force protection automatically tracks and blocks suspicious authentication attempts across Web UI and HTTP Basic Auth:
+                                </p>
+                                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Max failed attempts:</span>
+                                        <span class="fw-semibold">5 attempts / 5 min</span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Tracking scope:</span>
+                                        <span class="fw-semibold">Client IP &amp; Username</span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Lockout penalty:</span>
+                                        <span class="fw-semibold">HTTP 429 + <code>Retry-After</code></span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Protected endpoints:</span>
+                                        <span class="fw-semibold"><code>/auth/login</code>, Basic Auth</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <div class="card p-4 h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                        <i class="bi bi-pencil-square me-1"></i>Change Password
+                                    </button>
+                                </div>
+                                <p class="small text-muted mb-3">
+                                    Manage the web console and API administrator password. Changes are immediately saved to configuration.
+                                </p>
+                                <div class="border rounded p-3 bg-body-tertiary small">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted">Username:</span>
+                                        <span id="sys-auth-username" class="fw-semibold font-monospace">admin</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">Authentication:</span>
+                                        <span class="badge bg-primary-subtle text-primary">Session Cookie &amp; Basic Auth</span>
                                     </div>
                                 </div>
                             </div>
@@ -1654,6 +1712,6 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=3"></script>
+    <script src="./admin.js?v=4"></script>
 </body>
 </html>

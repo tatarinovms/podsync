@@ -128,9 +128,21 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !authenticated {
-		if u, p, ok := r.BasicAuth(); ok && s.checkCredentials(u, p) {
-			authenticated = true
-			username = u
+		if u, p, ok := r.BasicAuth(); ok {
+			ip := getClientIP(r)
+			if retryAfter, blocked := s.rateLimiter.IsBlocked(ip, u); blocked {
+				sec := int(retryAfter.Seconds())
+				w.Header().Set("Retry-After", strconv.Itoa(sec))
+				s.writeError(w, http.StatusTooManyRequests, fmt.Sprintf("Too many failed login attempts. Retry after %d seconds.", sec))
+				return
+			}
+			if s.checkCredentials(u, p) {
+				s.rateLimiter.RecordSuccess(ip, u)
+				authenticated = true
+				username = u
+			} else {
+				s.rateLimiter.RecordFailure(ip, u)
+			}
 		}
 	}
 
@@ -153,10 +165,21 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := getClientIP(r)
+	if retryAfter, blocked := s.rateLimiter.IsBlocked(ip, req.Username); blocked {
+		sec := int(retryAfter.Seconds())
+		w.Header().Set("Retry-After", strconv.Itoa(sec))
+		s.writeError(w, http.StatusTooManyRequests, fmt.Sprintf("Too many failed login attempts. Retry after %d seconds.", sec))
+		return
+	}
+
 	if !s.checkCredentials(req.Username, req.Password) {
+		s.rateLimiter.RecordFailure(ip, req.Username)
 		s.writeError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
+
+	s.rateLimiter.RecordSuccess(ip, req.Username)
 
 	token, err := s.sessions.CreateSession(req.Username)
 	if err != nil {

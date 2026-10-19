@@ -207,7 +207,7 @@ func TestLocal_PathTraversal(t *testing.T) {
 	stor, err := NewLocal(tmpDir, false, false)
 	require.NoError(t, err)
 
-	// Path traversal should fail
+	// Path traversal should fail in root directory
 	_, err = stor.Create(testCtx, "../../../etc/passwd_fake", bytes.NewBuffer([]byte("bad")))
 	assert.Error(t, err)
 
@@ -215,5 +215,15 @@ func TestLocal_PathTraversal(t *testing.T) {
 	assert.Error(t, err)
 
 	err = stor.Delete(testCtx, "../../something")
+	assert.Error(t, err)
+
+	// Path traversal should also fail in mounted directories
+	mountDir := t.TempDir()
+	stor.Mount("audiobook", mountDir)
+
+	_, err = stor.Open("/audiobook/../../etc/passwd")
+	assert.Error(t, err)
+
+	err = stor.Delete(testCtx, "/audiobook/../../something")
 	assert.Error(t, err)
 }

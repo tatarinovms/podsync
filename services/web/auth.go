@@ -3,7 +3,9 @@ package web
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -124,10 +126,26 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		// Check 2: HTTP Basic Auth (useful for CLI/curl scripts)
 		username, password, hasBasic := r.BasicAuth()
 		if hasBasic {
+			ip := getClientIP(r)
+			if retryAfter, blocked := s.rateLimiter.IsBlocked(ip, username); blocked {
+				sec := int(retryAfter.Seconds())
+				w.Header().Set("Retry-After", strconv.Itoa(sec))
+				if strings.HasPrefix(path, "/api/") {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusTooManyRequests)
+					w.Write([]byte(fmt.Sprintf(`{"error":"Too many failed login attempts. Retry after %d seconds."}`, sec)))
+					return
+				}
+				http.Error(w, fmt.Sprintf("Too many failed login attempts. Retry after %d seconds.", sec), http.StatusTooManyRequests)
+				return
+			}
+
 			if s.checkCredentials(username, password) {
+				s.rateLimiter.RecordSuccess(ip, username)
 				next.ServeHTTP(w, r)
 				return
 			}
+			s.rateLimiter.RecordFailure(ip, username)
 		}
 
 		// If unauthenticated API call -> return 401 JSON

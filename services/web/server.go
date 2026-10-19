@@ -16,11 +16,12 @@ import (
 
 type Server struct {
 	http.Server
-	db         db.Storage
-	cfg        Config
-	sessions   *SessionManager
-	adminMgr   AdminManager
-	mcpHandler http.Handler
+	db          db.Storage
+	cfg         Config
+	sessions    *SessionManager
+	adminMgr    AdminManager
+	mcpHandler  http.Handler
+	rateLimiter *LoginRateLimiter
 }
 
 type Config struct {
@@ -102,9 +103,10 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	}
 
 	srv := Server{
-		db:       database,
-		cfg:      cfg,
-		sessions: NewSessionManager(),
+		db:          database,
+		cfg:         cfg,
+		sessions:    NewSessionManager(),
+		rateLimiter: NewLoginRateLimiter(5, 5*time.Minute, 5*time.Minute),
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", bindAddress, port)

@@ -134,6 +134,8 @@
                     document.getElementById('login-view').classList.add('d-none');
                     document.getElementById('dashboard-view').classList.remove('d-none');
                     document.getElementById('nav-username').innerText = data.username || 'Admin';
+                    const sysAuthUser = document.getElementById('sys-auth-username');
+                    if (sysAuthUser) sysAuthUser.innerText = data.username || 'admin';
                     loadDashboard();
                 } else {
                     document.getElementById('login-view').classList.remove('d-none');
@@ -859,6 +861,49 @@
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
+                }
+            }
+        }
+
+        async function triggerRetryAll() {
+            const btn = document.getElementById('btn-retry-all-feeds');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Retrying...`;
+            }
+
+            try {
+                const res = await fetch('/api/v1/system/errors?limit=1000');
+                if (!res.ok) {
+                    throw new Error(await res.text() || 'Failed to fetch error list');
+                }
+                const errorItems = await res.json();
+                if (!errorItems || errorItems.length === 0) {
+                    showToast('No failed episodes found to retry');
+                    return;
+                }
+
+                let successCount = 0;
+                for (const item of errorItems) {
+                    if (!item.feed_id || !item.episode_id) continue;
+                    try {
+                        const retryRes = await fetch(`/api/v1/feeds/${encodeURIComponent(item.feed_id)}/episodes/${encodeURIComponent(item.episode_id)}/retry`, {
+                            method: 'POST'
+                        });
+                        if (retryRes.ok) {
+                            successCount++;
+                        }
+                    } catch (_) {}
+                }
+
+                showToast(`Reset ${successCount} episode(s), will retry on next update`);
+                await loadFeeds();
+            } catch (err) {
+                showToast(`Retry all failed: ${err.message}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-arrow-counterclockwise me-1"></i> Retry all`;
                 }
             }
         }

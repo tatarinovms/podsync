@@ -20,6 +20,8 @@ const (
 	feedPath      = "feed/%s"
 	episodePrefix = "episode/%s/"
 	episodePath   = "episode/%s/%s" // FeedID + EpisodeID
+	jobPrefix     = "job/"
+	jobPath       = "job/%s"
 )
 
 // BadgerConfig represents BadgerDB configuration parameters
@@ -266,6 +268,50 @@ func (b *Badger) walkEpisodes(txn *badger.Txn, feedID string, cb func(episode *m
 		}
 
 		return cb(feed)
+	})
+}
+
+func (b *Badger) SaveJob(_ context.Context, job *model.UpdateJob) error {
+	if job == nil || job.ID == "" {
+		return errors.New("invalid job or empty job ID")
+	}
+	key := b.getKey(jobPath, job.ID)
+	return b.db.Update(func(txn *badger.Txn) error {
+		return b.setObj(txn, key, job, true)
+	})
+}
+
+func (b *Badger) GetJob(_ context.Context, jobID string) (*model.UpdateJob, error) {
+	key := b.getKey(jobPath, jobID)
+	var job model.UpdateJob
+	err := b.db.View(func(txn *badger.Txn) error {
+		return b.getObj(txn, key, &job)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (b *Badger) WalkJobs(_ context.Context, cb func(job *model.UpdateJob) error) error {
+	return b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = b.getKey(jobPrefix)
+		opts.PrefetchValues = true
+		return b.iterator(txn, opts, func(item *badger.Item) error {
+			job := &model.UpdateJob{}
+			if err := b.unmarshalObj(item, job); err != nil {
+				return err
+			}
+			return cb(job)
+		})
+	})
+}
+
+func (b *Badger) DeleteJob(_ context.Context, jobID string) error {
+	key := b.getKey(jobPath, jobID)
+	return b.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete(key)
 	})
 }
 

@@ -33,8 +33,8 @@ venv/
 /podsync
 podsync.log
 
-db
+/db/
 config.toml
-data
+/data/
 
 .gemini/

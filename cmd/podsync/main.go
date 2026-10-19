@@ -264,30 +264,80 @@ func main() {
 		log.Info("gracefully stopped")
 	}()
 
+	if feedManager.JobQueue() != nil {
+		if recovered, err := feedManager.JobQueue().RecoverStaleJobs(ctx); err != nil {
+			log.WithError(err).Warn("failed to recover stale jobs at startup")
+		} else if recovered > 0 {
+			log.Infof("recovered %d interrupted job(s) from previous run", recovered)
+		}
+
+		// Ingestion listener for legacy channel pushes
+		group.Go(func() error {
+			for {
+				select {
+				case _feed := <-updates:
+					if _feed != nil {
+						_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, _feed.ID)
+					}
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+	}
+
 	// Run updates worker pool
 	workerCount := 2
 	for i := 0; i < workerCount; i++ {
 		workerID := i + 1
 		group.Go(func() error {
 			for {
-				select {
-				case _feed := <-updates:
-					if !feedManager.TryStartFeedUpdate(_feed.ID) {
-						log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, skipping duplicate")
+				var _feed *feed.Config
+				var currentJobID string
+
+				if feedManager.JobQueue() != nil {
+					job, err := feedManager.JobQueue().WaitForJob(ctx)
+					if err != nil {
+						if err == context.Canceled {
+							return nil
+						}
+						return err
+					}
+					currentJobID = job.ID
+					_feed = feedManager.GetFeedConfig(job.FeedID)
+					if _feed == nil {
+						log.WithField("feed_id", job.FeedID).Warn("job feed not found in configuration, marking failed")
+						_, _ = feedManager.JobQueue().MarkFailed(ctx, job.ID, fmt.Errorf("feed %q not found in configuration", job.FeedID))
 						continue
 					}
-					log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
-					if err := manager.Update(ctx, _feed); err != nil {
-						log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
-						feedManager.RecordFeedUpdateError(_feed.ID, err)
-					} else {
-						feedManager.ClearFeedUpdateError(_feed.ID)
-						log.WithField("feed_id", _feed.ID).Info("feed update complete")
+				} else {
+					select {
+					case f := <-updates:
+						_feed = f
+					case <-ctx.Done():
+						return ctx.Err()
 					}
-					feedManager.MarkFeedUpdateFinished(_feed.ID)
-				case <-ctx.Done():
-					return ctx.Err()
 				}
+
+				if !feedManager.TryStartFeedUpdate(_feed.ID) {
+					log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, skipping duplicate")
+					continue
+				}
+				log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
+				if err := manager.Update(ctx, _feed); err != nil {
+					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
+					feedManager.RecordFeedUpdateError(_feed.ID, err)
+					if currentJobID != "" && feedManager.JobQueue() != nil {
+						_, _ = feedManager.JobQueue().MarkFailed(ctx, currentJobID, err)
+					}
+				} else {
+					feedManager.ClearFeedUpdateError(_feed.ID)
+					if currentJobID != "" && feedManager.JobQueue() != nil {
+						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID)
+					}
+					log.WithField("feed_id", _feed.ID).Info("feed update complete")
+				}
+				feedManager.MarkFeedUpdateFinished(_feed.ID)
 			}
 		})
 	}

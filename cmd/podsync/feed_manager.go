@@ -27,6 +27,7 @@ import (
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
+	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/logbuffer"
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/pkg/ytdl"
@@ -71,6 +72,7 @@ type AppFeedManager struct {
 	coverCache     sync.Map
 	statsMu        sync.RWMutex
 	statsCache     map[string]feedStats
+	queue          *jobqueue.JobQueue
 }
 
 func NewAppFeedManager(
@@ -88,7 +90,12 @@ func NewAppFeedManager(
 	version, commit, buildDate string,
 	logBuffer *logbuffer.Buffer,
 ) *AppFeedManager {
+	var q *jobqueue.JobQueue
+	if database != nil {
+		q = jobqueue.NewJobQueue(database, 5)
+	}
 	mgr := &AppFeedManager{
+		queue:          q,
 		configPath:     configPath,
 		cfg:            cfg,
 		feeds:          feeds,
@@ -172,14 +179,39 @@ func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusIt
 	result := make([]web.FeedStatusItem, 0, len(m.feeds))
 	for id := range m.feeds {
 		status := web.FeedStatusIdle
+		var lastErr string
+		var attempts int
+		var nextRetry *time.Time
+
 		if m.runningUpdates[id] {
 			status = web.FeedStatusRunning
 		} else if m.queuedUpdates[id] > 0 {
 			status = web.FeedStatusQueued
 		}
+
+		if m.queue != nil {
+			if job, _ := m.queue.GetActiveJobForFeed(ctx, id); job != nil {
+				switch job.Status {
+				case model.JobStatusRunning:
+					status = web.FeedStatusRunning
+				case model.JobStatusQueued:
+					status = web.FeedStatusQueued
+				case model.JobStatusRetrying:
+					status = web.FeedStatusRetrying
+					lastErr = job.LastError
+					attempts = job.Attempts
+					t := job.AvailableAt
+					nextRetry = &t
+				}
+			}
+		}
+
 		result = append(result, web.FeedStatusItem{
-			ID:     id,
-			Status: status,
+			ID:          id,
+			Status:      status,
+			LastError:   lastErr,
+			Attempts:    attempts,
+			NextRetryAt: nextRetry,
 		})
 	}
 
@@ -513,31 +545,50 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 
 func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	f, ok := m.feeds[id]
-
 	if !ok {
+		m.mu.Unlock()
 		return errors.Errorf("feed %q not found", id)
 	}
-
 	m.markQueuedLocked(id)
+	m.mu.Unlock()
+
+	if m.queue != nil {
+		job, created, err := m.queue.EnqueueUpdate(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !created {
+			log.Infof("feed %q update already in progress (job: %s, status: %s)", id, job.ID, job.Status)
+		} else {
+			log.Infof("manually triggered update for feed %q (job: %s)", id, job.ID)
+		}
+		select {
+		case m.updates <- f:
+		default:
+		}
+		return nil
+	}
+
 	select {
 	case m.updates <- f:
 		log.Infof("manually triggered update for feed %q", id)
 		return nil
 	default:
+		m.mu.Lock()
 		m.queuedUpdates[id]--
+		m.mu.Unlock()
 		return errors.New("update queue is currently full, please try again shortly")
 	}
 }
 
 func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
 	feedList := make([]*feed.Config, 0, len(m.feeds))
 	for _, f := range m.feeds {
 		feedList = append(feedList, f)
 	}
+	m.mu.RUnlock()
 
 	if len(feedList) == 0 {
 		return []string{}, nil
@@ -545,14 +596,27 @@ func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error)
 
 	var queued []string
 	for _, f := range feedList {
+		m.mu.Lock()
 		m.markQueuedLocked(f.ID)
+		m.mu.Unlock()
+
+		if m.queue != nil {
+			_, _, _ = m.queue.EnqueueUpdate(ctx, f.ID)
+		}
+
 		select {
 		case m.updates <- f:
 			log.Infof("manually triggered update for feed %q", f.ID)
 			queued = append(queued, f.ID)
 		default:
-			m.queuedUpdates[f.ID]--
-			log.Warnf("failed to queue update for feed %q: queue full", f.ID)
+			if m.queue == nil {
+				m.mu.Lock()
+				m.queuedUpdates[f.ID]--
+				m.mu.Unlock()
+				log.Warnf("failed to queue update for feed %q: queue full", f.ID)
+			} else {
+				queued = append(queued, f.ID)
+			}
 		}
 	}
 
@@ -619,12 +683,36 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 }
 
 func (m *AppFeedManager) QueueScheduledUpdate(id string) {
-	m.mu.Lock()
+	m.mu.RLock()
 	current := m.feeds[id]
+	m.mu.RUnlock()
+
 	if current == nil {
-		m.mu.Unlock()
 		return
 	}
+
+	if m.queue != nil {
+		job, created, err := m.queue.EnqueueUpdate(context.Background(), id)
+		if err != nil {
+			log.WithField("feed_id", id).WithError(err).Warn("failed to enqueue scheduled update in jobqueue")
+			return
+		}
+		if !created {
+			log.WithField("feed_id", id).Debugf("feed update already active (status: %s), skipping duplicate scheduled update", job.Status)
+			return
+		}
+		m.mu.Lock()
+		m.markQueuedLocked(id)
+		m.mu.Unlock()
+
+		select {
+		case m.updates <- current:
+		default:
+		}
+		return
+	}
+
+	m.mu.Lock()
 	if m.queuedUpdates[id] > 0 || (m.runningUpdates != nil && m.runningUpdates[id]) {
 		m.mu.Unlock()
 		log.WithField("feed_id", id).Debug("feed update already queued or running, skipping duplicate")
@@ -690,8 +778,22 @@ func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID str
 	})
 	if err == nil {
 		m.invalidateStats(feedID)
+		if m.queue != nil {
+			_, _, _ = m.queue.EnqueueRetry(ctx, feedID, episodeID)
+		}
+		_ = m.TriggerUpdate(ctx, feedID)
 	}
 	return err
+}
+
+func (m *AppFeedManager) JobQueue() *jobqueue.JobQueue {
+	return m.queue
+}
+
+func (m *AppFeedManager) GetFeedConfig(id string) *feed.Config {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.feeds[id]
 }
 
 func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {

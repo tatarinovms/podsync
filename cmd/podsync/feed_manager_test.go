@@ -195,6 +195,14 @@ func (m *mockFeedManagerDB) WalkEpisodes(_ context.Context, feedID string, cb fu
 	}
 	return nil
 }
+func (m *mockFeedManagerDB) SaveJob(_ context.Context, _ *model.UpdateJob) error { return nil }
+func (m *mockFeedManagerDB) GetJob(_ context.Context, _ string) (*model.UpdateJob, error) {
+	return nil, model.ErrNotFound
+}
+func (m *mockFeedManagerDB) WalkJobs(_ context.Context, _ func(job *model.UpdateJob) error) error {
+	return nil
+}
+func (m *mockFeedManagerDB) DeleteJob(_ context.Context, _ string) error { return nil }
 
 func TestGetFeedsStatusDoesNotTouchDBOrStorage(t *testing.T) {
 	mockDB := &mockFeedManagerDB{

@@ -228,3 +228,78 @@ func TestAudiobookSnapshotRefreshesAndRemovesChapters(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got.Episodes)
 }
+
+func TestBadger_Jobs(t *testing.T) {
+	dir := t.TempDir()
+	db, err := NewBadger(&Config{Dir: dir})
+	require.NoError(t, err)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	// 1. Not found
+	_, err = db.GetJob(ctx, "update/test")
+	assert.Equal(t, model.ErrNotFound, err)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	job := &model.UpdateJob{
+		ID:          "update/test",
+		FeedID:      "test",
+		Kind:        model.JobKindUpdate,
+		Status:      model.JobStatusQueued,
+		Attempts:    0,
+		MaxAttempts: 5,
+		AvailableAt: now,
+		CreatedAt:   now,
+	}
+
+	// 2. SaveJob
+	err = db.SaveJob(ctx, job)
+	require.NoError(t, err)
+
+	// 3. GetJob
+	saved, err := db.GetJob(ctx, "update/test")
+	require.NoError(t, err)
+	assert.Equal(t, job.ID, saved.ID)
+	assert.Equal(t, model.JobStatusQueued, saved.Status)
+
+	// 4. Update status to running
+	saved.Status = model.JobStatusRunning
+	started := now.Add(time.Second)
+	saved.StartedAt = &started
+	err = db.SaveJob(ctx, saved)
+	require.NoError(t, err)
+
+	updated, err := db.GetJob(ctx, "update/test")
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusRunning, updated.Status)
+	assert.NotNil(t, updated.StartedAt)
+
+	// 5. WalkJobs
+	job2 := &model.UpdateJob{
+		ID:          "retry/test/ep1",
+		FeedID:      "test",
+		EpisodeID:   "ep1",
+		Kind:        model.JobKindRetry,
+		Status:      model.JobStatusRetrying,
+		Attempts:    1,
+		MaxAttempts: 5,
+		AvailableAt: now.Add(time.Minute),
+		CreatedAt:   now,
+	}
+	require.NoError(t, db.SaveJob(ctx, job2))
+
+	var list []*model.UpdateJob
+	err = db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+		list = append(list, j)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Len(t, list, 2)
+
+	// 6. DeleteJob
+	err = db.DeleteJob(ctx, "update/test")
+	require.NoError(t, err)
+	_, err = db.GetJob(ctx, "update/test")
+	assert.Equal(t, model.ErrNotFound, err)
+}

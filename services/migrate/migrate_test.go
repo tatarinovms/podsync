@@ -63,6 +63,15 @@ func (t *testDB) WalkEpisodes(_ context.Context, feedID string, cb func(episode 
 	return nil
 }
 
+func (t *testDB) SaveJob(_ context.Context, _ *model.UpdateJob) error {
+	return errors.New("not implemented")
+}
+func (t *testDB) GetJob(_ context.Context, _ string) (*model.UpdateJob, error) {
+	return nil, errors.New("not implemented")
+}
+func (t *testDB) WalkJobs(_ context.Context, _ func(job *model.UpdateJob) error) error { return nil }
+func (t *testDB) DeleteJob(_ context.Context, _ string) error                          { return errors.New("not implemented") }
+
 var _ db.Storage = (*testDB)(nil)
 
 type flakySizeStorage struct {

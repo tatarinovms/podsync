@@ -42,4 +42,16 @@ type Storage interface {
 
 	// WalkEpisodes iterates over episodes that belong to the given feed ID
 	WalkEpisodes(ctx context.Context, feedID string, cb func(episode *model.Episode) error) error
+
+	// SaveJob inserts or updates a task job
+	SaveJob(ctx context.Context, job *model.UpdateJob) error
+
+	// GetJob retrieves a task job by ID
+	GetJob(ctx context.Context, jobID string) (*model.UpdateJob, error)
+
+	// WalkJobs iterates over all task jobs
+	WalkJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error
+
+	// DeleteJob deletes a job by ID
+	DeleteJob(ctx context.Context, jobID string) error
 }

@@ -22,14 +22,19 @@ type AdminConfig struct {
 type FeedStatus string
 
 const (
-	FeedStatusIdle    FeedStatus = "idle"
-	FeedStatusQueued  FeedStatus = "queued"
-	FeedStatusRunning FeedStatus = "running"
+	FeedStatusIdle     FeedStatus = "idle"
+	FeedStatusQueued   FeedStatus = "queued"
+	FeedStatusRunning  FeedStatus = "running"
+	FeedStatusRetrying FeedStatus = "retrying"
+	FeedStatusFailed   FeedStatus = "failed"
 )
 
 type FeedStatusItem struct {
-	ID     string     `json:"id"`
-	Status FeedStatus `json:"status"`
+	ID          string     `json:"id"`
+	Status      FeedStatus `json:"status"`
+	LastError   string     `json:"last_error,omitempty"`
+	Attempts    int        `json:"attempts,omitempty"`
+	NextRetryAt *time.Time `json:"next_retry_at,omitempty"`
 }
 
 type FeedSummary struct {

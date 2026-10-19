@@ -205,3 +205,149 @@ func TestCalculateBackoff(t *testing.T) {
 	assert.Equal(t, 2*time.Hour, CalculateBackoff(3, true))
 	assert.Equal(t, 6*time.Hour, CalculateBackoff(4, true))
 }
+
+func TestJobQueue_PruneHistory(t *testing.T) {
+	q, storage := setupTestQueue(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	oldFinished := now.Add(-40 * 24 * time.Hour)
+	recentFinished := now.Add(-5 * 24 * time.Hour)
+
+	oldDone := &model.UpdateJob{
+		ID:         "update/old_done",
+		FeedID:     "old_done",
+		Kind:       model.JobKindUpdate,
+		Status:     model.JobStatusDone,
+		FinishedAt: &oldFinished,
+		CreatedAt:  oldFinished.Add(-10 * time.Minute),
+	}
+	require.NoError(t, storage.SaveJob(ctx, oldDone))
+
+	oldFailed := &model.UpdateJob{
+		ID:         "update/old_failed",
+		FeedID:     "old_failed",
+		Kind:       model.JobKindUpdate,
+		Status:     model.JobStatusFailed,
+		FinishedAt: &oldFinished,
+		CreatedAt:  oldFinished.Add(-10 * time.Minute),
+	}
+	require.NoError(t, storage.SaveJob(ctx, oldFailed))
+
+	recentDone := &model.UpdateJob{
+		ID:         "update/recent_done",
+		FeedID:     "recent_done",
+		Kind:       model.JobKindUpdate,
+		Status:     model.JobStatusDone,
+		FinishedAt: &recentFinished,
+		CreatedAt:  recentFinished.Add(-10 * time.Minute),
+	}
+	require.NoError(t, storage.SaveJob(ctx, recentDone))
+
+	runningJob := &model.UpdateJob{
+		ID:        "update/running_job",
+		FeedID:    "running_job",
+		Kind:      model.JobKindUpdate,
+		Status:    model.JobStatusRunning,
+		CreatedAt: oldFinished,
+	}
+	require.NoError(t, storage.SaveJob(ctx, runningJob))
+
+	// Prune history older than 30 days
+	pruned, err := q.PruneHistory(ctx, 30*24*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 2, pruned)
+
+	// Old done & failed must be deleted
+	_, err = storage.GetJob(ctx, "update/old_done")
+	assert.Equal(t, model.ErrNotFound, err)
+	_, err = storage.GetJob(ctx, "update/old_failed")
+	assert.Equal(t, model.ErrNotFound, err)
+
+	// Recent done and running job must remain
+	j, err := storage.GetJob(ctx, "update/recent_done")
+	require.NoError(t, err)
+	assert.NotNil(t, j)
+
+	j2, err := storage.GetJob(ctx, "update/running_job")
+	require.NoError(t, err)
+	assert.NotNil(t, j2)
+}
+
+func TestJobQueue_RecoverStaleRunning(t *testing.T) {
+	q, storage := setupTestQueue(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	threeHoursAgo := now.Add(-3 * time.Hour)
+
+	stuckJob := &model.UpdateJob{
+		ID:        "update/stuck_feed",
+		FeedID:    "stuck_feed",
+		Kind:      model.JobKindUpdate,
+		Status:    model.JobStatusRunning,
+		Attempts:  1,
+		StartedAt: &threeHoursAgo,
+		CreatedAt: threeHoursAgo.Add(-5 * time.Minute),
+	}
+	require.NoError(t, storage.SaveJob(ctx, stuckJob))
+
+	recovered, err := q.RecoverStaleRunning(ctx, 2*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 1, recovered)
+
+	updated, err := storage.GetJob(ctx, "update/stuck_feed")
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusRetrying, updated.Status)
+	assert.Nil(t, updated.StartedAt)
+	assert.Contains(t, updated.LastError, "timed out by watchdog")
+}
+
+func TestJobQueue_GetActiveJobsMap(t *testing.T) {
+	q, storage := setupTestQueue(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+
+	queuedJob := &model.UpdateJob{
+		ID:        "update/feed_q",
+		FeedID:    "feed_q",
+		Kind:      model.JobKindUpdate,
+		Status:    model.JobStatusQueued,
+		CreatedAt: now,
+	}
+	require.NoError(t, storage.SaveJob(ctx, queuedJob))
+
+	runningJob := &model.UpdateJob{
+		ID:        "update/feed_r",
+		FeedID:    "feed_r",
+		Kind:      model.JobKindUpdate,
+		Status:    model.JobStatusRunning,
+		CreatedAt: now,
+	}
+	require.NoError(t, storage.SaveJob(ctx, runningJob))
+
+	doneJob := &model.UpdateJob{
+		ID:         "update/feed_d",
+		FeedID:     "feed_d",
+		Kind:       model.JobKindUpdate,
+		Status:     model.JobStatusDone,
+		FinishedAt: &now,
+		CreatedAt:  now,
+	}
+	require.NoError(t, storage.SaveJob(ctx, doneJob))
+
+	activeMap, err := q.GetActiveJobsMap(ctx)
+	require.NoError(t, err)
+	assert.Len(t, activeMap, 2)
+	assert.NotNil(t, activeMap["feed_q"])
+	assert.NotNil(t, activeMap["feed_r"])
+	assert.Nil(t, activeMap["feed_d"])
+}
+
+func TestJobQueue_SetPollPeriod(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	assert.Equal(t, DefaultPollPeriod, q.pollPeriod)
+	q.SetPollPeriod(10 * time.Second)
+	assert.Equal(t, 10*time.Second, q.pollPeriod)
+}

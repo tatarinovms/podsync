@@ -45,6 +45,12 @@ func (q *JobQueue) notify() {
 	}
 }
 
+func (q *JobQueue) SetPollPeriod(d time.Duration) {
+	if d > 0 {
+		q.pollPeriod = d
+	}
+}
+
 // EnqueueUpdate creates or returns an active update job for the given feed ID.
 // Returns (job, created, err). If a job is already queued, running or retrying, created=false.
 func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.UpdateJob, bool, error) {
@@ -57,8 +63,12 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.Upd
 
 	jobID := "update/" + feedID
 	existing, err := q.db.GetJob(ctx, jobID)
-	if err == nil && existing != nil && existing.IsActive() {
-		return existing, false, nil
+	if err == nil {
+		if existing != nil && existing.IsActive() {
+			return existing, false, nil
+		}
+	} else if err != model.ErrNotFound {
+		return nil, false, errors.Wrapf(err, "failed to check existing job %q", jobID)
 	}
 
 	now := time.Now().UTC()
@@ -92,8 +102,12 @@ func (q *JobQueue) EnqueueRetry(ctx context.Context, feedID, episodeID string) (
 
 	jobID := "retry/" + feedID + "/" + episodeID
 	existing, err := q.db.GetJob(ctx, jobID)
-	if err == nil && existing != nil && existing.IsActive() {
-		return existing, false, nil
+	if err == nil {
+		if existing != nil && existing.IsActive() {
+			return existing, false, nil
+		}
+	} else if err != model.ErrNotFound {
+		return nil, false, errors.Wrapf(err, "failed to check existing job %q", jobID)
 	}
 
 	now := time.Now().UTC()
@@ -338,6 +352,107 @@ func (q *JobQueue) ListJobs(ctx context.Context) ([]*model.UpdateJob, error) {
 		return nil
 	})
 	return list, err
+}
+
+// GetActiveJobsMap returns a map of feedID -> active job in a single pass.
+func (q *JobQueue) GetActiveJobsMap(ctx context.Context) (map[string]*model.UpdateJob, error) {
+	result := make(map[string]*model.UpdateJob)
+	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+		if j.IsActive() && j.FeedID != "" {
+			result[j.FeedID] = j
+		}
+		return nil
+	})
+	return result, err
+}
+
+// PruneHistory deletes finished (done or failed) jobs older than maxAge.
+func (q *JobQueue) PruneHistory(ctx context.Context, maxAge time.Duration) (int, error) {
+	if maxAge <= 0 {
+		return 0, nil
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	now := time.Now().UTC()
+	var toDelete []string
+
+	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+		if j.Status == model.JobStatusDone || j.Status == model.JobStatusFailed {
+			finished := j.CreatedAt
+			if j.FinishedAt != nil {
+				finished = *j.FinishedAt
+			}
+			if now.Sub(finished) > maxAge {
+				toDelete = append(toDelete, j.ID)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to query finished jobs for pruning")
+	}
+
+	for _, id := range toDelete {
+		if err := q.db.DeleteJob(ctx, id); err != nil {
+			log.WithField("job_id", id).WithError(err).Warn("failed to prune old job")
+		}
+	}
+
+	if len(toDelete) > 0 {
+		log.Infof("pruned %d old completed job(s) from history", len(toDelete))
+	}
+	return len(toDelete), nil
+}
+
+// RecoverStaleRunning checks for jobs that have been in Running state longer than maxRunningDuration
+// (e.g. worker hung or crashed silently) and resets them to Retrying or Queued.
+func (q *JobQueue) RecoverStaleRunning(ctx context.Context, maxRunningDuration time.Duration) (int, error) {
+	if maxRunningDuration <= 0 {
+		maxRunningDuration = 2 * time.Hour
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	now := time.Now().UTC()
+	recovered := 0
+
+	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+		if j.Status == model.JobStatusRunning {
+			startTime := j.CreatedAt
+			if j.StartedAt != nil {
+				startTime = *j.StartedAt
+			}
+			if now.Sub(startTime) > maxRunningDuration {
+				if j.Attempts > 0 {
+					j.Status = model.JobStatusRetrying
+					j.AvailableAt = now.Add(15 * time.Second)
+				} else {
+					j.Status = model.JobStatusQueued
+					j.AvailableAt = now
+				}
+				j.StartedAt = nil
+				j.LastError = "job execution timed out by watchdog"
+				if err := q.db.SaveJob(ctx, j); err != nil {
+					return err
+				}
+				recovered++
+				log.WithFields(log.Fields{
+					"job_id":   j.ID,
+					"duration": now.Sub(startTime).String(),
+				}).Warn("watchdog recovered timed out running job")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to check stale running jobs")
+	}
+
+	if recovered > 0 {
+		q.notify()
+	}
+	return recovered, nil
 }
 
 // CalculateBackoff determines retry delay according to attempts:

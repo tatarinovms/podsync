@@ -6,6 +6,17 @@
 [cleanup]
 keep_last = 50  # Keep last 50 episodes globally (unless overridden per feed)
 
+# Background update queue and worker pool settings.
+# Can also be set via environment variables:
+#   PODSYNC_JOBS_WORKERS=2
+#   PODSYNC_JOBS_MAX_ATTEMPTS=5
+#   PODSYNC_JOBS_HISTORY_DAYS=30
+[jobs]
+workers = 2          # Number of concurrent download workers (default: 2)
+max_attempts = 5     # Maximum retry attempts before marking job as permanently failed (default: 5)
+poll_period = "2s"   # Polling interval for newly available tasks (default: 2s)
+history_days = 30    # Keep finished/failed jobs history for this many days (default: 30)
+
 # Web server related configuration.
 [server]
 # HTTP server port.

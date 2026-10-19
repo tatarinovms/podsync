@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -41,6 +42,15 @@ type Config struct {
 	Cleanup *feed.Cleanup `toml:"cleanup"`
 	// Audiobooks configuration
 	Audiobooks AudiobooksConfig `toml:"audiobooks"`
+	// Jobs configuration
+	Jobs JobsConfig `toml:"jobs"`
+}
+
+type JobsConfig struct {
+	Workers     int    `toml:"workers"`
+	MaxAttempts int    `toml:"max_attempts"`
+	PollPeriod  string `toml:"poll_period"`
+	HistoryDays int    `toml:"history_days"`
 }
 
 type AudiobooksConfig struct {
@@ -219,6 +229,19 @@ func (c *Config) applyDefaults(configPath string) {
 		c.Audiobooks.Dir = filepath.Join(configDir, "audiobooks")
 	}
 
+	if c.Jobs.Workers <= 0 {
+		c.Jobs.Workers = 2
+	}
+	if c.Jobs.MaxAttempts <= 0 {
+		c.Jobs.MaxAttempts = 5
+	}
+	if c.Jobs.PollPeriod == "" {
+		c.Jobs.PollPeriod = "2s"
+	}
+	if c.Jobs.HistoryDays <= 0 {
+		c.Jobs.HistoryDays = 30
+	}
+
 	for _, _feed := range c.Feeds {
 		if _feed.UpdatePeriod == 0 {
 			_feed.UpdatePeriod = model.DefaultUpdatePeriod
@@ -290,6 +313,22 @@ func (c *Config) applyEnv() {
 
 	if val, ok := os.LookupEnv("PODSYNC_AUDIOBOOKS_DIR"); ok && val != "" {
 		c.Audiobooks.Dir = val
+	}
+
+	if val, ok := os.LookupEnv("PODSYNC_JOBS_WORKERS"); ok {
+		if count, err := strconv.Atoi(val); err == nil && count > 0 {
+			c.Jobs.Workers = count
+		}
+	}
+	if val, ok := os.LookupEnv("PODSYNC_JOBS_MAX_ATTEMPTS"); ok {
+		if attempts, err := strconv.Atoi(val); err == nil && attempts > 0 {
+			c.Jobs.MaxAttempts = attempts
+		}
+	}
+	if val, ok := os.LookupEnv("PODSYNC_JOBS_HISTORY_DAYS"); ok {
+		if days, err := strconv.Atoi(val); err == nil && days > 0 {
+			c.Jobs.HistoryDays = days
+		}
 	}
 
 	// Downloader environment variables

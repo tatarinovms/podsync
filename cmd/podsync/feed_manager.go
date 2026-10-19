@@ -92,7 +92,16 @@ func NewAppFeedManager(
 ) *AppFeedManager {
 	var q *jobqueue.JobQueue
 	if database != nil {
-		q = jobqueue.NewJobQueue(database, 5)
+		maxAttempts := 5
+		if cfg != nil && cfg.Jobs.MaxAttempts > 0 {
+			maxAttempts = cfg.Jobs.MaxAttempts
+		}
+		q = jobqueue.NewJobQueue(database, maxAttempts)
+		if cfg != nil && cfg.Jobs.PollPeriod != "" {
+			if d, err := time.ParseDuration(cfg.Jobs.PollPeriod); err == nil && d > 0 {
+				q.SetPollPeriod(d)
+			}
+		}
 	}
 	mgr := &AppFeedManager{
 		queue:          q,
@@ -173,6 +182,11 @@ func (m *AppFeedManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, erro
 }
 
 func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusItem, error) {
+	var activeJobs map[string]*model.UpdateJob
+	if m.queue != nil {
+		activeJobs, _ = m.queue.GetActiveJobsMap(ctx)
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -189,8 +203,8 @@ func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusIt
 			status = web.FeedStatusQueued
 		}
 
-		if m.queue != nil {
-			if job, _ := m.queue.GetActiveJobForFeed(ctx, id); job != nil {
+		if activeJobs != nil {
+			if job := activeJobs[id]; job != nil {
 				switch job.Status {
 				case model.JobStatusRunning:
 					status = web.FeedStatusRunning
@@ -778,9 +792,6 @@ func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID str
 	})
 	if err == nil {
 		m.invalidateStats(feedID)
-		if m.queue != nil {
-			_, _, _ = m.queue.EnqueueRetry(ctx, feedID, episodeID)
-		}
 		_ = m.TriggerUpdate(ctx, feedID)
 	}
 	return err

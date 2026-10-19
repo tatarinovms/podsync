@@ -287,7 +287,10 @@ func main() {
 	}
 
 	// Run updates worker pool
-	workerCount := 2
+	workerCount := cfg.Jobs.Workers
+	if workerCount <= 0 {
+		workerCount = 2
+	}
 	for i := 0; i < workerCount; i++ {
 		workerID := i + 1
 		group.Go(func() error {
@@ -321,10 +324,16 @@ func main() {
 
 				if !feedManager.TryStartFeedUpdate(_feed.ID) {
 					log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, skipping duplicate")
+					if currentJobID != "" && feedManager.JobQueue() != nil {
+						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID)
+					}
 					continue
 				}
 				log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
-				if err := manager.Update(ctx, _feed); err != nil {
+				updateCtx, updateCancel := context.WithTimeout(ctx, 2*time.Hour)
+				err := manager.Update(updateCtx, _feed)
+				updateCancel()
+				if err != nil {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 					feedManager.RecordFeedUpdateError(_feed.ID, err)
 					if currentJobID != "" && feedManager.JobQueue() != nil {
@@ -338,6 +347,29 @@ func main() {
 					log.WithField("feed_id", _feed.ID).Info("feed update complete")
 				}
 				feedManager.MarkFeedUpdateFinished(_feed.ID)
+			}
+		})
+	}
+
+	// Periodic job queue maintenance (watchdog for stuck running jobs & history pruning)
+	if feedManager.JobQueue() != nil {
+		group.Go(func() error {
+			ticker := time.NewTicker(10 * time.Minute)
+			defer ticker.Stop()
+
+			historyAge := time.Duration(cfg.Jobs.HistoryDays) * 24 * time.Hour
+			for {
+				select {
+				case <-ticker.C:
+					if _, err := feedManager.JobQueue().RecoverStaleRunning(ctx, 2*time.Hour); err != nil {
+						log.WithError(err).Warn("watchdog failed to recover stale running jobs")
+					}
+					if _, err := feedManager.JobQueue().PruneHistory(ctx, historyAge); err != nil {
+						log.WithError(err).Warn("failed to prune old job history")
+					}
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
 		})
 	}

@@ -99,6 +99,11 @@ func (u *Manager) Update(ctx context.Context, feedConfig *feed.Config) error {
 	}
 
 	if err := u.downloadEpisodes(ctx, feedConfig, episodesToDownload); err != nil {
+		if err == ytdl.ErrTooManyRequests {
+			_ = u.buildXML(ctx, feedConfig)
+			_ = u.buildOPML(ctx)
+			return err
+		}
 		return errors.Wrap(err, "download failed")
 	}
 
@@ -299,7 +304,14 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 			// retry next time
 			if err == ytdl.ErrTooManyRequests {
 				logger.Warn("server responded with a 'Too Many Requests' error")
-				break
+				now := time.Now().UTC()
+				_ = u.db.UpdateEpisode(feedID, episode.ID, func(ep *model.Episode) error {
+					ep.Status = model.EpisodeError
+					ep.Error = err.Error()
+					ep.ErrorAt = &now
+					return nil
+				})
+				return err
 			}
 
 			// Execute episode download error hooks

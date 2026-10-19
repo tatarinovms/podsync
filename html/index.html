@@ -1065,29 +1065,26 @@
                                 <!-- 1. General & Schedule -->
                                 <div class="tab-pane fade show active" id="af-tab-general">
                                     <div class="row g-2 mb-3">
-                                        <div class="col-sm-4">
+                                        <div class="col-sm-6">
                                             <label class="form-label small fw-semibold">Media Format</label>
                                             <select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
                                                 <option value="audio">Audio (MP3 / M4A)</option>
                                                 <option value="video" selected>Video (MP4)</option>
                                             </select>
                                         </div>
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Quality</label>
+                                        <div class="col-sm-6" id="new-feed-max-height-col">
+                                            <label class="form-label small fw-semibold">Video Quality</label>
+                                            <select id="new-feed-max-height" class="form-select form-select-sm">
+                                                <option value="480">480p</option>
+                                                <option value="720" selected>720p (HD)</option>
+                                                <option value="1080">1080p (Full HD)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-6" id="new-feed-audio-quality-col" style="display: none;">
+                                            <label class="form-label small fw-semibold">Audio Quality</label>
                                             <select id="new-feed-quality" class="form-select form-select-sm">
                                                 <option value="high" selected>High</option>
                                                 <option value="low">Low</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-4" id="new-feed-max-height-col">
-                                            <label class="form-label small fw-semibold">Max Height (Video)</label>
-                                            <select id="new-feed-max-height" class="form-select form-select-sm">
-                                                <option value="0" selected>Default (Original)</option>
-                                                <option value="480">480p</option>
-                                                <option value="720">720p (HD)</option>
-                                                <option value="1080">1080p (Full HD)</option>
-                                                <option value="1440">1440p (2K)</option>
-                                                <option value="2160">2160p (4K)</option>
                                             </select>
                                         </div>
                                     </div>
@@ -1157,9 +1154,9 @@
                                 <div class="tab-pane fade" id="af-tab-cleanup">
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
-                                        <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="0" placeholder="0 = unlimited (keep all episodes)">
+                                        <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="50" placeholder="0 = unlimited (keep all episodes)">
                                         <div class="form-text small mt-1">
-                                            <i class="bi bi-info-circle me-1"></i>Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
+                                            <i class="bi bi-info-circle me-1"></i>Automatically synced with Page Size by default. Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
                                         </div>
                                     </div>
                                 </div>
@@ -1657,6 +1654,6 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=2"></script>
+    <script src="./admin.js?v=3"></script>
 </body>
 </html>

@@ -26,7 +26,7 @@ func TestBuildArgs(t *testing.T) {
 			format:   model.FormatAudio,
 			output:   "/tmp/1",
 			videoURL: "http://url",
-			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "bestaudio", "--output", "/tmp/1", "http://url"},
+			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "bestaudio/best", "--output", "/tmp/1", "http://url"},
 		},
 		{
 			name:     "Audio low quality",
@@ -34,7 +34,7 @@ func TestBuildArgs(t *testing.T) {
 			quality:  model.QualityLow,
 			output:   "/tmp/1",
 			videoURL: "http://url",
-			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "worstaudio", "--output", "/tmp/1", "http://url"},
+			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "worstaudio/worst", "--output", "/tmp/1", "http://url"},
 		},
 		{
 			name:     "Audio best quality",
@@ -42,7 +42,7 @@ func TestBuildArgs(t *testing.T) {
 			quality:  model.QualityHigh,
 			output:   "/tmp/1",
 			videoURL: "http://url",
-			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "bestaudio", "--output", "/tmp/1", "http://url"},
+			expect:   []string{"--extract-audio", "--audio-format", "mp3", "--format", "bestaudio/best", "--output", "/tmp/1", "http://url"},
 		},
 		{
 			name:     "Video unknown quality",
@@ -211,7 +211,7 @@ func TestBuildArgsWithLanguage(t *testing.T) {
 		Quality: model.QualityHigh,
 	}
 	audioArgs := dl.buildArgs(audioFeed, ep, "/tmp/out.mp3")
-	assert.Contains(t, audioArgs, "bestaudio[language^=ru]/bestaudio")
+	assert.Contains(t, audioArgs, "bestaudio[language^=ru]/bestaudio/best")
 	assert.Contains(t, audioArgs, "--extractor-args")
 	assert.Contains(t, audioArgs, "youtube:lang=ru")
 

@@ -439,14 +439,14 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 		// Audio, mp3, high by default
 		var format string
 		if lang != "" {
-			format = fmt.Sprintf("bestaudio[language^=%s]/bestaudio", lang)
+			format = fmt.Sprintf("bestaudio[language^=%s]/bestaudio/best", lang)
 			if feedConfig.Quality == model.QualityLow {
-				format = fmt.Sprintf("worstaudio[language^=%s]/worstaudio", lang)
+				format = fmt.Sprintf("worstaudio[language^=%s]/worstaudio/worst", lang)
 			}
 		} else {
-			format = "bestaudio"
+			format = "bestaudio/best"
 			if feedConfig.Quality == model.QualityLow {
-				format = "worstaudio"
+				format = "worstaudio/worst"
 			}
 		}
 

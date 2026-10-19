@@ -60,7 +60,7 @@ func TestJobQueue_EnqueueAndDeduplication(t *testing.T) {
 	assert.True(t, job3.PendingRerun)
 
 	// 5. Complete current run -> re-queues for the rerun requested in step 4
-	err = q.MarkDone(ctx, claimed.ID)
+	err = q.MarkDone(ctx, claimed.ID, claimed.ClaimToken)
 	require.NoError(t, err)
 
 	requeuedJob, err := q.GetJob(ctx, "update/feed1")
@@ -71,7 +71,7 @@ func TestJobQueue_EnqueueAndDeduplication(t *testing.T) {
 	claimed2, err := q.ClaimNextJob(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, claimed2)
-	err = q.MarkDone(ctx, claimed2.ID)
+	err = q.MarkDone(ctx, claimed2.ID, claimed2.ClaimToken)
 	require.NoError(t, err)
 
 	doneJob, err := q.GetJob(ctx, "update/feed1")
@@ -102,7 +102,7 @@ func TestJobQueue_RetryBackoff(t *testing.T) {
 	tempErr := errors.New("temporary network timeout dial tcp 1.2.3.4:443")
 	now := time.Now().UTC()
 
-	retried, err := q.MarkFailed(ctx, job.ID, tempErr)
+	retried, err := q.MarkFailed(ctx, job.ID, tempErr, claimed.ClaimToken)
 	require.NoError(t, err)
 	assert.Equal(t, model.JobStatusRetrying, retried.Status)
 	assert.Equal(t, 1, retried.Attempts)
@@ -132,10 +132,10 @@ func TestJobQueue_FatalErrorsImmediatelyFail(t *testing.T) {
 	// 1. Missing token error
 	job, _, err := q.EnqueueUpdate(ctx, "feed_auth_err")
 	require.NoError(t, err)
-	_, err = q.ClaimNextJob(ctx)
+	claimedAuth, err := q.ClaimNextJob(ctx)
 	require.NoError(t, err)
 
-	failedJob, err := q.MarkFailed(ctx, job.ID, errors.New("YouTube API token is missing or invalid"))
+	failedJob, err := q.MarkFailed(ctx, job.ID, errors.New("YouTube API token is missing or invalid"), claimedAuth.ClaimToken)
 	require.NoError(t, err)
 	assert.Equal(t, model.JobStatusFailed, failedJob.Status)
 	assert.Contains(t, failedJob.LastError, "API token missing or invalid")
@@ -144,10 +144,10 @@ func TestJobQueue_FatalErrorsImmediatelyFail(t *testing.T) {
 	// 2. 404 Channel not found
 	job404, _, err := q.EnqueueUpdate(ctx, "feed_404")
 	require.NoError(t, err)
-	_, err = q.ClaimNextJob(ctx)
+	claimed404, err := q.ClaimNextJob(ctx)
 	require.NoError(t, err)
 
-	failedJob404, err := q.MarkFailed(ctx, job404.ID, errors.New("ERROR: [youtube:tab] The channel does not exist (HTTP 404)"))
+	failedJob404, err := q.MarkFailed(ctx, job404.ID, errors.New("ERROR: [youtube:tab] The channel does not exist (HTTP 404)"), claimed404.ClaimToken)
 	require.NoError(t, err)
 	assert.Equal(t, model.JobStatusFailed, failedJob404.Status)
 	assert.Contains(t, failedJob404.LastError, "Resource not found (HTTP 404)")
@@ -159,11 +159,11 @@ func TestJobQueue_RateLimitBackoff(t *testing.T) {
 
 	job, _, err := q.EnqueueUpdate(ctx, "feed_429")
 	require.NoError(t, err)
-	_, err = q.ClaimNextJob(ctx)
+	claimed429, err := q.ClaimNextJob(ctx)
 	require.NoError(t, err)
 
 	now := time.Now().UTC()
-	retried, err := q.MarkFailed(ctx, job.ID, errors.New("HTTP Error 429: Too Many Requests"))
+	retried, err := q.MarkFailed(ctx, job.ID, errors.New("HTTP Error 429: Too Many Requests"), claimed429.ClaimToken)
 	require.NoError(t, err)
 	assert.Equal(t, model.JobStatusRetrying, retried.Status)
 	// Rate limit attempt 1 uses 30 minute delay
@@ -491,4 +491,70 @@ func TestJobQueue_YieldJob(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, claimedThird)
 	assert.Equal(t, model.JobStatusRunning, claimedThird.Status)
+}
+
+func TestJobQueue_PendingRerunOnFailedRunDoesNotBackoff(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Initial enqueue & claim
+	_, created, err := q.EnqueueUpdate(ctx, "feed_fail_rerun")
+	require.NoError(t, err)
+	assert.True(t, created)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, model.JobStatusRunning, claimed.Status)
+
+	// 2. User retries episode while feed is currently running -> sets PendingRerun
+	_, created2, err := q.EnqueueUpdate(ctx, "feed_fail_rerun")
+	require.NoError(t, err)
+	assert.False(t, created2)
+
+	// 3. Current run fails with HTTP 429 rate limit
+	// Normally 429 schedules 30m delay, BUT because PendingRerun is set, it MUST requeue immediately!
+	now := time.Now().UTC()
+	retried, err := q.MarkFailed(ctx, claimed.ID, errors.New("HTTP Error 429: Too Many Requests"), claimed.ClaimToken)
+	require.NoError(t, err)
+	assert.Equal(t, model.JobStatusQueued, retried.Status)
+	assert.Equal(t, 0, retried.Attempts)
+	assert.False(t, retried.PendingRerun)
+	assert.True(t, retried.AvailableAt.Before(now.Add(2*time.Second)))
+
+	// 4. Job can be claimed immediately without 30m wait
+	claimedAgain, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimedAgain)
+	assert.Equal(t, model.JobStatusRunning, claimedAgain.Status)
+}
+
+func TestJobQueue_MissingOrInvalidTokenRejected(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	_, _, err := q.EnqueueUpdate(ctx, "feed_token_enforce")
+	require.NoError(t, err)
+
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+
+	// Empty token -> rejected
+	err = q.MarkDone(ctx, claimed.ID, "")
+	assert.Equal(t, ErrClaimExpired, err)
+
+	_, err = q.MarkFailed(ctx, claimed.ID, errors.New("err"), "")
+	assert.Equal(t, ErrClaimExpired, err)
+
+	err = q.YieldJob(ctx, claimed.ID, "", time.Second)
+	assert.Equal(t, ErrClaimExpired, err)
+
+	// Wrong token -> rejected
+	err = q.MarkDone(ctx, claimed.ID, "wrong-token")
+	assert.Equal(t, ErrClaimExpired, err)
+
+	// Valid token -> succeeds
+	err = q.MarkDone(ctx, claimed.ID, claimed.ClaimToken)
+	require.NoError(t, err)
 }

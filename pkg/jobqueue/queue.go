@@ -71,11 +71,15 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string) (*model.Upd
 			if existing.Status == model.JobStatusRunning {
 				if !existing.PendingRerun {
 					existing.PendingRerun = true
-					_ = q.db.SaveJob(ctx, existing)
+					if err := q.db.SaveJob(ctx, existing); err != nil {
+						return nil, false, errors.Wrapf(err, "failed to persist pending rerun for job %q", jobID)
+					}
 				}
 			} else if existing.Status == model.JobStatusRetrying {
 				existing.AvailableAt = time.Now().UTC()
-				_ = q.db.SaveJob(ctx, existing)
+				if err := q.db.SaveJob(ctx, existing); err != nil {
+					return nil, false, errors.Wrapf(err, "failed to persist reset backoff for job %q", jobID)
+					}
 				q.notify()
 			}
 			return existing, false, nil
@@ -230,9 +234,9 @@ func (q *JobQueue) calculateNextWakeup(ctx context.Context) time.Duration {
 }
 
 // MarkDone marks a job as successfully completed.
-// If claimToken is provided and does not match the active claim, ErrClaimExpired is returned.
+// Requires a valid claimToken matching the active claim, otherwise ErrClaimExpired is returned.
 // If PendingRerun is set, the job is re-queued for an immediate follow-up run.
-func (q *JobQueue) MarkDone(ctx context.Context, jobID string, claimToken ...string) error {
+func (q *JobQueue) MarkDone(ctx context.Context, jobID string, claimToken string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -241,15 +245,13 @@ func (q *JobQueue) MarkDone(ctx context.Context, jobID string, claimToken ...str
 		return errors.Wrapf(err, "failed to get job %q to mark done", jobID)
 	}
 
-	if len(claimToken) > 0 && claimToken[0] != "" {
-		if job.ClaimToken != claimToken[0] {
-			log.WithFields(log.Fields{
-				"job_id":      jobID,
-				"expected":    job.ClaimToken,
-				"claim_token": claimToken[0],
-			}).Warn("ignoring MarkDone for revoked or expired claim")
-			return ErrClaimExpired
-		}
+	if strings.TrimSpace(claimToken) == "" || job.ClaimToken != claimToken {
+		log.WithFields(log.Fields{
+			"job_id":      jobID,
+			"expected":    job.ClaimToken,
+			"claim_token": claimToken,
+		}).Warn("ignoring MarkDone for revoked, expired, or missing claim")
+		return ErrClaimExpired
 	}
 
 	now := time.Now().UTC()
@@ -279,8 +281,9 @@ func (q *JobQueue) MarkDone(ctx context.Context, jobID string, claimToken ...str
 }
 
 // MarkFailed transitions a job either to retrying with exponential backoff or to failed.
-// If claimToken is provided and does not match the active claim, ErrClaimExpired is returned.
-func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error, claimToken ...string) (*model.UpdateJob, error) {
+// Requires a valid claimToken matching the active claim, otherwise ErrClaimExpired is returned.
+// If PendingRerun is set, the job is immediately re-queued for a fresh retry without backoff delay.
+func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error, claimToken string) (*model.UpdateJob, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -289,15 +292,13 @@ func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error, c
 		return nil, errors.Wrapf(err, "failed to get job %q to mark failed", jobID)
 	}
 
-	if len(claimToken) > 0 && claimToken[0] != "" {
-		if job.ClaimToken != claimToken[0] {
-			log.WithFields(log.Fields{
-				"job_id":      jobID,
-				"expected":    job.ClaimToken,
-				"claim_token": claimToken[0],
-			}).Warn("ignoring MarkFailed for revoked or expired claim")
-			return nil, ErrClaimExpired
-		}
+	if strings.TrimSpace(claimToken) == "" || job.ClaimToken != claimToken {
+		log.WithFields(log.Fields{
+			"job_id":      jobID,
+			"expected":    job.ClaimToken,
+			"claim_token": claimToken,
+		}).Warn("ignoring MarkFailed for revoked, expired, or missing claim")
+		return nil, ErrClaimExpired
 	}
 
 	now := time.Now().UTC()
@@ -310,6 +311,25 @@ func (q *JobQueue) MarkFailed(ctx context.Context, jobID string, jobErr error, c
 	}
 	if fatalMsg != "" {
 		errMsg = fatalMsg
+	}
+
+	// If a rerun was requested while this job was running, do not delay it with backoff!
+	if job.PendingRerun && !isFatal {
+		job.PendingRerun = false
+		job.Status = model.JobStatusQueued
+		job.Attempts = 0
+		job.AvailableAt = now
+		job.StartedAt = nil
+		job.FinishedAt = nil
+		job.ClaimToken = ""
+		job.Generation++
+		job.LastError = errMsg
+		if err := q.db.SaveJob(ctx, job); err != nil {
+			return nil, errors.Wrapf(err, "failed to requeue failed job %q for pending rerun", jobID)
+		}
+		q.notify()
+		log.WithField("job_id", jobID).Info("re-queued job immediately for pending rerun requested during failed run")
+		return job, nil
 	}
 
 	job.Attempts++
@@ -356,7 +376,7 @@ func (q *JobQueue) YieldJob(ctx context.Context, jobID, claimToken string, delay
 		return errors.Wrapf(err, "failed to get job %q to yield", jobID)
 	}
 
-	if claimToken != "" && job.ClaimToken != claimToken {
+	if strings.TrimSpace(claimToken) == "" || job.ClaimToken != claimToken {
 		return ErrClaimExpired
 	}
 

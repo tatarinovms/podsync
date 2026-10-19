@@ -405,11 +405,15 @@ func main() {
 					_, dbErr := database.GetFeed(ctx, _feed.ID)
 					size, xmlErr := storage.Size(ctx, _feed.ID+".xml")
 					if dbErr != nil || xmlErr != nil || size == 0 {
-						feedManager.MarkFeedUpdateQueued(_feed.ID)
-						select {
-						case updates <- _feed:
-						case <-ctx.Done():
-							return ctx.Err()
+						if feedManager.JobQueue() != nil {
+							_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, _feed.ID)
+						} else {
+							feedManager.MarkFeedUpdateQueued(_feed.ID)
+							select {
+							case updates <- _feed:
+							case <-ctx.Done():
+								return ctx.Err()
+							}
 						}
 					}
 					continue
@@ -432,8 +436,12 @@ func main() {
 				// Only perform initial update if no explicit cron schedule is configured
 				// This prevents unwanted updates when using fixed schedules in Docker deployments
 				if !hasExplicitCronSchedule {
-					feedManager.MarkFeedUpdateQueued(cronFeed.ID)
-					updates <- cronFeed
+					if feedManager.JobQueue() != nil {
+						_, _, _ = feedManager.JobQueue().EnqueueUpdate(ctx, cronFeed.ID)
+					} else {
+						feedManager.MarkFeedUpdateQueued(cronFeed.ID)
+						updates <- cronFeed
+					}
 				}
 			}
 

@@ -579,10 +579,6 @@ func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
 		m.mu.Unlock()
 
 		log.Infof("manually triggered update for feed %q (job: %s)", id, job.ID)
-		select {
-		case m.updates <- f:
-		default:
-		}
 		return nil
 	}
 
@@ -744,11 +740,6 @@ func (m *AppFeedManager) QueueScheduledUpdate(id string) {
 		m.mu.Lock()
 		m.markQueuedLocked(id)
 		m.mu.Unlock()
-
-		select {
-		case m.updates <- current:
-		default:
-		}
 		return
 	}
 

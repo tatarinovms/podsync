@@ -828,3 +828,30 @@ func TestFeedManager_TriggerUpdateMultipleTimesNoCounterLeak(t *testing.T) {
 	require.Len(t, status, 1)
 	assert.Equal(t, web.FeedStatusIdle, status[0].Status)
 }
+
+func TestFeedManager_TriggerUpdateDoesNotPushToChannelWhenQueueActive(t *testing.T) {
+	ctx := context.Background()
+	storage, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = storage.Close() })
+
+	q := jobqueue.NewJobQueue(storage, 5)
+	updates := make(chan *feed.Config, 10)
+	mgr := &AppFeedManager{
+		queue:          q,
+		feeds:          map[string]*feed.Config{"f1": {ID: "f1", URL: "https://youtube.com/channel/test"}},
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		updates:        updates,
+	}
+
+	require.NoError(t, mgr.TriggerUpdate(ctx, "f1"))
+	// Must NOT send into updates channel to prevent duplicate processing by legacy listener
+	assert.Empty(t, updates)
+
+	// But job must be present in persistent queue
+	job, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	assert.Equal(t, "update/f1", job.ID)
+}

@@ -39,6 +39,14 @@ type feedErrorEntry struct {
 	Time  time.Time
 }
 
+type feedStats struct {
+	episodeCount    int
+	downloadedCount int
+	errorCount      int
+	totalSize       int64
+	updatedAt       time.Time
+}
+
 type AppFeedManager struct {
 	mu             sync.RWMutex
 	configPath     string
@@ -61,6 +69,8 @@ type AppFeedManager struct {
 	queuedUpdates  map[string]int
 	runningUpdates map[string]bool
 	coverCache     sync.Map
+	statsMu        sync.RWMutex
+	statsCache     map[string]feedStats
 }
 
 func NewAppFeedManager(
@@ -98,6 +108,7 @@ func NewAppFeedManager(
 		feedErrors:     make(map[string]feedErrorEntry),
 		queuedUpdates:  make(map[string]int),
 		runningUpdates: make(map[string]bool),
+		statsCache:     make(map[string]feedStats),
 	}
 	mgr.MountAllAudiobooks()
 	return mgr
@@ -343,11 +354,11 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		cleanAuthor := strings.TrimSpace(strings.ToLower(summary.Author))
 		if cleanAuthor == "<notfound>" || cleanAuthor == "notfound" || strings.Contains(cleanAuthor, "notfound") {
 			if summary.Title != "" {
-			summary.Author = summary.Title
-		} else {
-			summary.Author = ""
+				summary.Author = summary.Title
+			} else {
+				summary.Author = ""
+			}
 		}
-	}
 	}
 
 	// Always extract/override cover art from the generated XML (<image><url>...</url></image>)
@@ -361,21 +372,8 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 		}
 	}
 
-	// Count episodes, errors, total size
-	var epCount, dlCount, errCount int
-	var totalSize int64
-	_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
-		epCount++
-		switch ep.Status {
-		case model.EpisodeDownloaded:
-			dlCount++
-			totalSize += ep.Size
-		case model.EpisodeError:
-			errCount++
-		}
-		return nil
-	})
-
+	// Count episodes, errors, total size via cached statistics
+	epCount, dlCount, errCount, totalSize := m.getFeedStats(ctx, f)
 	summary.EpisodeCount = epCount
 	summary.DownloadedCount = dlCount
 	summary.ErrorCount = errCount
@@ -574,15 +572,76 @@ func (m *AppFeedManager) MarkFeedUpdateQueued(id string) {
 	m.markQueuedLocked(id)
 }
 
+func (m *AppFeedManager) invalidateStats(id string) {
+	m.statsMu.Lock()
+	delete(m.statsCache, id)
+	m.statsMu.Unlock()
+}
+
+func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int, int, int, int64) {
+	m.statsMu.RLock()
+	if s, ok := m.statsCache[f.ID]; ok && time.Since(s.updatedAt) < 15*time.Second {
+		m.statsMu.RUnlock()
+		return s.episodeCount, s.downloadedCount, s.errorCount, s.totalSize
+	}
+	m.statsMu.RUnlock()
+
+	var epCount, dlCount, errCount int
+	var totalSize int64
+	if m.db != nil {
+		_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
+			epCount++
+			switch ep.Status {
+			case model.EpisodeDownloaded:
+				dlCount++
+				totalSize += ep.Size
+			case model.EpisodeError:
+				errCount++
+			}
+			return nil
+		})
+	}
+
+	m.statsMu.Lock()
+	if m.statsCache == nil {
+		m.statsCache = make(map[string]feedStats)
+	}
+	m.statsCache[f.ID] = feedStats{
+		episodeCount:    epCount,
+		downloadedCount: dlCount,
+		errorCount:      errCount,
+		totalSize:       totalSize,
+		updatedAt:       time.Now(),
+	}
+	m.statsMu.Unlock()
+
+	return epCount, dlCount, errCount, totalSize
+}
+
 func (m *AppFeedManager) QueueScheduledUpdate(id string) {
 	m.mu.Lock()
 	current := m.feeds[id]
-	if current != nil {
-		m.markQueuedLocked(id)
+	if current == nil {
+		m.mu.Unlock()
+		return
 	}
+	if m.queuedUpdates[id] > 0 || (m.runningUpdates != nil && m.runningUpdates[id]) {
+		m.mu.Unlock()
+		log.WithField("feed_id", id).Debug("feed update already queued or running, skipping duplicate")
+		return
+	}
+	m.markQueuedLocked(id)
 	m.mu.Unlock()
-	if current != nil {
-		m.updates <- current
+
+	select {
+	case m.updates <- current:
+	default:
+		m.mu.Lock()
+		if m.queuedUpdates[id] > 0 {
+			m.queuedUpdates[id]--
+		}
+		m.mu.Unlock()
+		log.WithField("feed_id", id).Warn("updates channel full, dropping queue request")
 	}
 }
 
@@ -598,20 +657,41 @@ func (m *AppFeedManager) MarkFeedUpdateStarted(id string) {
 	m.runningUpdates[id] = true
 }
 
+func (m *AppFeedManager) TryStartFeedUpdate(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.runningUpdates != nil && m.runningUpdates[id] {
+		return false
+	}
+	if m.queuedUpdates[id] > 0 {
+		m.queuedUpdates[id]--
+	}
+	if m.runningUpdates == nil {
+		m.runningUpdates = make(map[string]bool)
+	}
+	m.runningUpdates[id] = true
+	return true
+}
+
 func (m *AppFeedManager) MarkFeedUpdateFinished(id string) {
 	m.mu.Lock()
 	delete(m.runningUpdates, id)
 	m.mu.Unlock()
 	m.coverCache.Delete(id)
+	m.invalidateStats(id)
 }
 
 func (m *AppFeedManager) RetryEpisode(ctx context.Context, feedID, episodeID string) error {
-	return m.db.UpdateEpisode(feedID, episodeID, func(ep *model.Episode) error {
+	err := m.db.UpdateEpisode(feedID, episodeID, func(ep *model.Episode) error {
 		ep.Status = model.EpisodeNew
 		ep.Error = ""
 		ep.ErrorAt = nil
 		return nil
 	})
+	if err == nil {
+		m.invalidateStats(feedID)
+	}
+	return err
 }
 
 func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
@@ -826,7 +906,12 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 
 func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var unlocked bool
+	defer func() {
+		if !unlocked {
+			m.mu.Unlock()
+		}
+	}()
 
 	f, exists := m.feeds[id]
 	if !exists {
@@ -914,15 +999,6 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	if m.cfg != nil && m.cfg.Feeds != nil {
 		m.cfg.Feeds[id] = f
 	}
-	if m.db != nil {
-		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
-			dbFeed.PrivateFeed = f.PrivateFeed
-			dbFeed.Episodes = nil // Metadata-only update must not replace a concurrent chapter scan.
-			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
-				log.WithError(err).Warnf("failed to update private feed state for %q", id)
-			}
-		}
-	}
 
 	// Reschedule cron if cron_schedule changed
 	if isAudiobookFeed(f) && m.cron != nil {
@@ -945,6 +1021,21 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 				m.cronEntries[id] = cronID
 			} else {
 				log.WithError(err).Warnf("failed to re-register cron for feed %q", id)
+			}
+		}
+	}
+
+	m.invalidateStats(id)
+	queueErr := m.queueUpdateLocked(f)
+	unlocked = true
+	m.mu.Unlock()
+
+	if m.db != nil {
+		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
+			dbFeed.PrivateFeed = f.PrivateFeed
+			dbFeed.Episodes = nil // Metadata-only update must not replace a concurrent chapter scan.
+			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
+				log.WithError(err).Warnf("failed to update private feed state for %q", id)
 			}
 		}
 	}
@@ -972,7 +1063,7 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		})
 	}
 
-	return m.queueUpdateLocked(f)
+	return queueErr
 }
 
 func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {

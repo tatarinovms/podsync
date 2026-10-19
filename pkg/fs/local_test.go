@@ -201,3 +201,19 @@ func TestLocal_Mount(t *testing.T) {
 	_, ok = stor.GetMount("dune")
 	require.False(t, ok)
 }
+
+func TestLocal_PathTraversal(t *testing.T) {
+	tmpDir := t.TempDir()
+	stor, err := NewLocal(tmpDir, false, false)
+	require.NoError(t, err)
+
+	// Path traversal should fail
+	_, err = stor.Create(testCtx, "../../../etc/passwd_fake", bytes.NewBuffer([]byte("bad")))
+	assert.Error(t, err)
+
+	_, err = stor.Open("../../../etc/passwd")
+	assert.Error(t, err)
+
+	err = stor.Delete(testCtx, "../../something")
+	assert.Error(t, err)
+}

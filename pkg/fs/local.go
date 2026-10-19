@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -59,9 +60,18 @@ func (l *Local) GetMount(prefix string) (string, bool) {
 	return dir, ok
 }
 
-func (l *Local) resolvePath(name string) string {
-	cleanName := filepath.FromSlash(strings.TrimPrefix(name, "/"))
-	return filepath.Join(l.rootDir, cleanName)
+func (l *Local) resolvePath(name string) (string, error) {
+	cleanName := filepath.Clean(filepath.FromSlash(strings.TrimPrefix(name, "/")))
+	root := filepath.Clean(l.rootDir)
+	if cleanName == "." || cleanName == "" {
+		return root, nil
+	}
+	fullPath := filepath.Join(root, cleanName)
+	rel, err := filepath.Rel(root, fullPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", errors.Errorf("invalid path traversal %q", name)
+	}
+	return fullPath, nil
 }
 
 func (l *Local) Open(name string) (http.File, error) {
@@ -100,7 +110,10 @@ func (l *Local) Open(name string) (http.File, error) {
 		}
 	}
 
-	path := l.resolvePath(name)
+	path, err := l.resolvePath(name)
+	if err != nil {
+		return nil, os.ErrNotExist
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -123,7 +136,10 @@ func (l *Local) Open(name string) (http.File, error) {
 }
 
 func (l *Local) Delete(_ctx context.Context, name string) error {
-	path := l.resolvePath(name)
+	path, err := l.resolvePath(name)
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("failed to delete file %s: %w", path, err)
 	}
@@ -131,19 +147,27 @@ func (l *Local) Delete(_ctx context.Context, name string) error {
 }
 
 func (l *Local) Create(_ctx context.Context, name string, reader io.Reader) (int64, error) {
-	var (
-		path   = l.resolvePath(name)
-		logger = log.WithField("name", name)
-	)
+	path, err := l.resolvePath(name)
+	if err != nil {
+		return 0, err
+	}
+	logger := log.WithField("name", name)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return 0, errors.Wrapf(err, "failed to mkdir: %s", path)
 	}
 
 	logger.Infof("creating file: %s", path)
-	written, err := l.copyFile(reader, path)
+	tmpPath := fmt.Sprintf("%s.tmp.%d", path, time.Now().UnixNano())
+	written, err := l.copyFile(reader, tmpPath)
 	if err != nil {
+		_ = os.Remove(tmpPath)
 		return 0, errors.Wrap(err, "failed to copy file")
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return 0, errors.Wrap(err, "failed to rename temp file to target")
 	}
 
 	logger.Debugf("written %d bytes", written)

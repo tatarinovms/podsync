@@ -264,25 +264,33 @@ func main() {
 		log.Info("gracefully stopped")
 	}()
 
-	// Run updates listener
-	group.Go(func() error {
-		for {
-			select {
-			case _feed := <-updates:
-				feedManager.MarkFeedUpdateStarted(_feed.ID)
-				if err := manager.Update(ctx, _feed); err != nil {
-					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
-					feedManager.RecordFeedUpdateError(_feed.ID, err)
-				} else {
-					feedManager.ClearFeedUpdateError(_feed.ID)
-					log.WithField("feed_id", _feed.ID).Info("feed update complete")
+	// Run updates worker pool
+	workerCount := 2
+	for i := 0; i < workerCount; i++ {
+		workerID := i + 1
+		group.Go(func() error {
+			for {
+				select {
+				case _feed := <-updates:
+					if !feedManager.TryStartFeedUpdate(_feed.ID) {
+						log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, skipping duplicate")
+						continue
+					}
+					log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
+					if err := manager.Update(ctx, _feed); err != nil {
+						log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
+						feedManager.RecordFeedUpdateError(_feed.ID, err)
+					} else {
+						feedManager.ClearFeedUpdateError(_feed.ID)
+						log.WithField("feed_id", _feed.ID).Info("feed update complete")
+					}
+					feedManager.MarkFeedUpdateFinished(_feed.ID)
+				case <-ctx.Done():
+					return ctx.Err()
 				}
-				feedManager.MarkFeedUpdateFinished(_feed.ID)
-			case <-ctx.Done():
-				return ctx.Err()
 			}
-		}
-	})
+		})
+	}
 
 	// Run cron scheduler (only in daemon mode, not in MCP stdio mode)
 	if !opts.MCP {

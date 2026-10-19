@@ -279,11 +279,6 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 				return err
 			}
 
-			// Rebuild XML feed immediately so this existing episode is reflected
-			if xmlErr := u.buildXML(ctx, feedConfig); xmlErr != nil {
-				logger.WithError(xmlErr).Warn("failed to rebuild XML feed for existing file")
-			}
-
 			continue
 		} else if os.IsNotExist(err) {
 			// Will download, do nothing here
@@ -374,11 +369,6 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 			return nil
 		}); err != nil {
 			return err
-		}
-
-		// Rebuild XML feed immediately so newly downloaded episode is available in RSS right away
-		if xmlErr := u.buildXML(ctx, feedConfig); xmlErr != nil {
-			logger.WithError(xmlErr).Warn("failed to rebuild XML feed after episode download")
 		}
 
 		downloaded++

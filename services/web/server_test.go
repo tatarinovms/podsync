@@ -2,6 +2,8 @@ package web
 
 import (
 	"bytes"
+	"fmt"
+	"sync"
 	"context"
 	"encoding/json"
 	"io"
@@ -865,4 +867,57 @@ func TestSecuritySettingsAPI(t *testing.T) {
 	rec = httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestServer_ConcurrentSecurityConfigUpdate(t *testing.T) {
+	cfg := Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:       true,
+			Username:      "admin",
+			Password:      "password",
+			MaxAttempts:   5,
+			WindowPeriod:  "5m",
+			LockoutPeriod: "5m",
+		},
+	}
+	srv := New(cfg, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	var wg sync.WaitGroup
+
+	// 20 workers calling UpdateSecurityConfig
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			srv.UpdateSecurityConfig((n%50)+1, time.Duration((n%10)+1)*time.Minute, time.Duration((n%10)+1)*time.Minute)
+		}(i)
+	}
+
+	// 20 workers calling UpdateAdminPassword
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			srv.UpdateAdminPassword(fmt.Sprintf("pwd-%d", n))
+		}(i)
+	}
+
+	// 20 workers calling checkCredentials and auth routes
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			srv.checkCredentials("admin", fmt.Sprintf("pwd-%d", n))
+
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/security", nil)
+			req.SetBasicAuth("admin", "password")
+			rec := httptest.NewRecorder()
+			srv.Handler.ServeHTTP(rec, req)
+		}(i)
+	}
+
+	wg.Wait()
 }

@@ -320,11 +320,11 @@
                     <div class="row g-4 mt-1">
                         <div class="col-12 col-lg-6">
                             <div class="card p-4 h-100">
-                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                                     <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
-                                    <div class="d-flex align-items-center gap-2">
+                                    <div class="d-flex flex-shrink-0 align-items-center gap-2">
                                         <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
-                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
+                                        <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
                                             <i class="bi bi-sliders me-1"></i>Configure
                                         </button>
                                     </div>
@@ -347,7 +347,7 @@
                                     </li>
                                     <li class="d-flex align-items-center justify-content-between">
                                         <span class="text-muted">Protected endpoints:</span>
-                                        <span class="fw-semibold"><code>/auth/login</code>, Basic Auth</span>
+                                        <span class="fw-semibold"><code>/api/v1/auth/login</code>, Basic Auth</span>
                                     </li>
                                 </ul>
                             </div>
@@ -355,9 +355,9 @@
 
                         <div class="col-12 col-lg-6">
                             <div class="card p-4 h-100">
-                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                                     <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
-                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                    <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                         <i class="bi bi-pencil-square me-1"></i>Change Password
                                     </button>
                                 </div>
@@ -1667,13 +1667,12 @@
         </div>
     </div>
 
-        <!-- Modal: Change Password -->
     <!-- Security Settings Modal -->
-    <div class="modal fade" id="securitySettingsModal" tabindex="-1">
+    <div class="modal fade" id="securitySettingsModal" tabindex="-1" aria-labelledby="securitySettingsTitle">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-bottom">
-                    <h5 class="modal-title fw-bold mb-0">
+                    <h5 class="modal-title fw-bold mb-0" id="securitySettingsTitle">
                         <i class="bi bi-shield-lock text-primary me-2"></i>Security &amp; Rate Limit Settings
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1683,13 +1682,13 @@
                         <div id="sec-settings-error" class="alert alert-danger d-none py-2 small mb-3"></div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Max Failed Attempts</label>
+                            <label for="sec-input-max-attempts" class="form-label small fw-semibold">Max Failed Attempts</label>
                             <input type="number" id="sec-input-max-attempts" class="form-control form-control-sm" min="1" max="100" value="5" required>
                             <div class="form-text small">Number of failed login attempts allowed before triggering lockout.</div>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Observation Window</label>
+                            <label for="sec-input-window" class="form-label small fw-semibold">Observation Window</label>
                             <select id="sec-input-window" class="form-select form-select-sm">
                                 <option value="1m">1 minute</option>
                                 <option value="5m" selected>5 minutes</option>
@@ -1702,7 +1701,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Lockout Duration (HTTP 429 Retry-After)</label>
+                            <label for="sec-input-lockout" class="form-label small fw-semibold">Lockout Duration (HTTP 429 Retry-After)</label>
                             <select id="sec-input-lockout" class="form-select form-select-sm">
                                 <option value="1m">1 minute</option>
                                 <option value="5m" selected>5 minutes</option>
@@ -1726,27 +1725,28 @@
         </div>
     </div>
 
-    <div class="modal fade" id="changePasswordModal" tabindex="-1">
+    <!-- Modal: Change Password -->
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordTitle">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content shadow">
                 <div class="modal-header">
-                    <h6 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
+                    <h6 class="modal-title fw-bold" id="changePasswordTitle"><i class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="changePasswordForm" onsubmit="submitChangePassword(event)">
                     <div class="modal-body">
                         <div id="pw-error-alert" class="alert alert-danger py-1 px-2 small d-none mb-3"></div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Current Password</label>
+                            <label for="input-old-pw" class="form-label small fw-semibold">Current Password</label>
                             <input type="password" class="form-control form-control-sm" id="input-old-pw" required autocomplete="current-password">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">New Password</label>
+                            <label for="input-new-pw" class="form-label small fw-semibold">New Password</label>
                             <input type="password" class="form-control form-control-sm" id="input-new-pw" required autocomplete="new-password" minlength="4">
                             <div class="form-text small">Minimum 4 characters.</div>
                         </div>
                         <div class="mb-2">
-                            <label class="form-label small fw-semibold">Confirm New Password</label>
+                            <label for="input-confirm-pw" class="form-label small fw-semibold">Confirm New Password</label>
                             <input type="password" class="form-control form-control-sm" id="input-confirm-pw" required autocomplete="new-password">
                         </div>
                     </div>
@@ -1775,6 +1775,6 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=5"></script>
+    <script src="./admin.js?v=6"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -166,6 +167,19 @@ func (c *Config) validate() error {
 	if c.Server.Admin.Enabled {
 		if c.Server.Admin.Username == "" || c.Server.Admin.Password == "" {
 			result = multierror.Append(result, errors.New("server.admin.username and server.admin.password are required when admin is enabled"))
+		}
+		if c.Server.Admin.MaxAttempts < 0 || c.Server.Admin.MaxAttempts > 100 {
+			result = multierror.Append(result, errors.New("server.admin.max_attempts must be between 1 and 100 (or 0 for default 5)"))
+		}
+		if c.Server.Admin.WindowPeriod != "" {
+			if d, err := time.ParseDuration(c.Server.Admin.WindowPeriod); err != nil || d < 10*time.Second {
+				result = multierror.Append(result, errors.New("server.admin.window must be a valid duration >= 10s (e.g. 1m, 5m, 15m)"))
+			}
+		}
+		if c.Server.Admin.LockoutPeriod != "" {
+			if d, err := time.ParseDuration(c.Server.Admin.LockoutPeriod); err != nil || d < 10*time.Second {
+				result = multierror.Append(result, errors.New("server.admin.lockout must be a valid duration >= 10s (e.g. 1m, 5m, 15m)"))
+			}
 		}
 	}
 
@@ -357,6 +371,9 @@ func (c *Config) applyEnv() {
 	}
 	if val, ok := os.LookupEnv("PODSYNC_ADMIN_MAX_ATTEMPTS"); ok {
 		if count, err := strconv.Atoi(val); err == nil && count > 0 {
+			if count > 100 {
+				count = 100
+			}
 			c.Server.Admin.MaxAttempts = count
 		}
 	}

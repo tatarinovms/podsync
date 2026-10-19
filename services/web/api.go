@@ -158,8 +158,12 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 		rateLimitInfo["lockout"] = formatConfigDuration(s.rateLimiter.Lockout())
 	}
 
+	s.cfgMu.RLock()
+	adminEnabled := s.cfg.Admin.Enabled
+	s.cfgMu.RUnlock()
+
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
-		"enabled":       s.cfg.Admin.Enabled,
+		"enabled":       adminEnabled,
 		"authenticated": authenticated,
 		"username":      username,
 		"rate_limit":    rateLimitInfo,
@@ -255,6 +259,9 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.adminUpdateMu.Lock()
+	defer s.adminUpdateMu.Unlock()
+
 	if err := s.adminMgr.ChangePassword(r.Context(), req.OldPassword, req.NewPassword); err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -324,6 +331,9 @@ func (s *Server) handleAuthSecurity(w http.ResponseWriter, r *http.Request) {
 
 		windowStr := req.Window
 		lockoutStr := req.Lockout
+
+		s.adminUpdateMu.Lock()
+		defer s.adminUpdateMu.Unlock()
 
 		if err := s.adminMgr.UpdateAdminSecurity(r.Context(), req.MaxAttempts, windowStr, lockoutStr); err != nil {
 			s.writeError(w, http.StatusInternalServerError, err.Error())
@@ -666,10 +676,17 @@ func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 		execPath = "podsync"
 	}
 
-	authStr := fmt.Sprintf("%s:%s", s.cfg.Admin.Username, s.cfg.Admin.Password)
+	s.cfgMu.RLock()
+	username := s.cfg.Admin.Username
+	password := s.cfg.Admin.Password
+	configPath := s.cfg.Admin.ConfigPath
+	port := s.cfg.Port
+	hostname := s.cfg.Hostname
+	s.cfgMu.RUnlock()
+
+	authStr := fmt.Sprintf("%s:%s", username, password)
 	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(authStr))
 
-	configPath := s.cfg.Admin.ConfigPath
 	if configPath == "" {
 		configPath = "config.toml"
 	}
@@ -678,13 +695,13 @@ func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.writeJSON(w, http.StatusOK, map[string]interface{}{
-		"username":          s.cfg.Admin.Username,
-		"password":          s.cfg.Admin.Password,
+		"username":          username,
+		"password":          password,
 		"basic_auth_header": basicAuthHeader,
 		"binary_path":       execPath,
 		"config_path":       configPath,
-		"port":              s.cfg.Port,
-		"hostname":          s.cfg.Hostname,
+		"port":              port,
+		"hostname":          hostname,
 		"mcp_enabled":       true,
 	})
 }

@@ -2,6 +2,8 @@ package web
 
 import (
 	"bytes"
+	"math"
+	"sync"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -121,4 +123,55 @@ func TestBasicAuth_RateLimiting429(t *testing.T) {
 	w = basicReq("admin", "bad3")
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.NotEmpty(t, w.Header().Get("Retry-After"))
+}
+
+func TestLoginRateLimiter_MaxAttemptsOverflow(t *testing.T) {
+	// Pass math.MaxInt as maxAttempts - must clamp to 100 without integer overflow
+	limiter := NewLoginRateLimiter(math.MaxInt, 5*time.Minute, 5*time.Minute)
+	assert.Equal(t, 100, limiter.MaxAttempts())
+	assert.Equal(t, 200, limiter.maxByIP)
+
+	// 1 failed attempt must NOT block
+	limiter.RecordFailure("1.2.3.4", "admin")
+	_, blocked := limiter.IsBlocked("1.2.3.4", "admin")
+	assert.False(t, blocked, "single failure should not trigger lockout when maxAttempts is large")
+
+	// UpdateConfig with math.MaxInt must also clamp
+	limiter.UpdateConfig(math.MaxInt, 10*time.Minute, 15*time.Minute)
+	assert.Equal(t, 100, limiter.MaxAttempts())
+	assert.Equal(t, 200, limiter.maxByIP)
+	assert.Equal(t, 10*time.Minute, limiter.Window())
+	assert.Equal(t, 15*time.Minute, limiter.Lockout())
+}
+
+func TestLoginRateLimiter_ConcurrentAccess(t *testing.T) {
+	limiter := NewLoginRateLimiter(5, 5*time.Minute, 5*time.Minute)
+	var wg sync.WaitGroup
+
+	// 20 workers calling UpdateConfig concurrently
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(attempt int) {
+			defer wg.Done()
+			limiter.UpdateConfig((attempt%20)+1, time.Duration((attempt%10)+1)*time.Minute, time.Duration((attempt%10)+1)*time.Minute)
+		}(i)
+	}
+
+	// 20 workers calling checks and records concurrently
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			ip := "192.168.1." + string(rune('0'+(id%10)))
+			user := "user" + string(rune('0'+(id%5)))
+			limiter.RecordFailure(ip, user)
+			limiter.IsBlocked(ip, user)
+			limiter.MaxAttempts()
+			limiter.Window()
+			limiter.Lockout()
+			limiter.RecordSuccess(ip, user)
+		}(i)
+	}
+
+	wg.Wait()
 }

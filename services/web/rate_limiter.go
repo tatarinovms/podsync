@@ -34,6 +34,9 @@ func NewLoginRateLimiter(maxAttempts int, window time.Duration, lockout time.Dur
 	if maxAttempts <= 0 {
 		maxAttempts = 5
 	}
+	if maxAttempts > 100 {
+		maxAttempts = 100
+	}
 	if window <= 0 {
 		window = 5 * time.Minute
 	}
@@ -50,6 +53,35 @@ func NewLoginRateLimiter(maxAttempts int, window time.Duration, lockout time.Dur
 		pairAttempts: make(map[string]*failedAttemptRecord),
 		userAttempts: make(map[string]*failedAttemptRecord),
 	}
+}
+
+
+// UpdateConfig updates rate limiter parameters thread-safely in-place.
+func (l *LoginRateLimiter) UpdateConfig(maxAttempts int, window, lockout time.Duration) {
+	if l == nil {
+		return
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = 5
+	}
+	if maxAttempts > 100 {
+		maxAttempts = 100
+	}
+	if window <= 0 {
+		window = 5 * time.Minute
+	}
+	if lockout <= 0 {
+		lockout = 5 * time.Minute
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.maxByUser = maxAttempts
+	l.maxByUserIP = maxAttempts
+	l.maxByIP = maxAttempts * 2
+	l.window = window
+	l.lockout = lockout
 }
 
 // IsBlocked checks if the given IP or username is currently locked out.
@@ -190,6 +222,8 @@ func (l *LoginRateLimiter) MaxAttempts() int {
 	if l == nil {
 		return 5
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.maxByUser
 }
 
@@ -197,6 +231,8 @@ func (l *LoginRateLimiter) Window() time.Duration {
 	if l == nil {
 		return 5 * time.Minute
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.window
 }
 
@@ -204,6 +240,8 @@ func (l *LoginRateLimiter) Lockout() time.Duration {
 	if l == nil {
 		return 5 * time.Minute
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	return l.lockout
 }
 

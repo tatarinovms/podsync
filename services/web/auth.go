@@ -103,7 +103,11 @@ func (sm *SessionManager) cleanup() {
 // AuthMiddleware protects routes when admin authentication is enabled
 func (s *Server) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !s.cfg.Admin.Enabled {
+		s.cfgMu.RLock()
+		adminEnabled := s.cfg.Admin.Enabled
+		s.cfgMu.RUnlock()
+
+		if !adminEnabled {
 			http.NotFound(w, r)
 			return
 		}
@@ -169,8 +173,10 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) checkCredentials(username, password string) bool {
+	s.cfgMu.RLock()
 	expectedUser := s.cfg.Admin.Username
 	expectedPass := s.cfg.Admin.Password
+	s.cfgMu.RUnlock()
 
 	if expectedUser == "" || expectedPass == "" {
 		log.Warn("Admin enabled but username or password is empty")

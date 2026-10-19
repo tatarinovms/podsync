@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"sync"
 	"expvar"
 	"fmt"
 	"net/http"
@@ -16,12 +17,14 @@ import (
 
 type Server struct {
 	http.Server
-	db          db.Storage
-	cfg         Config
-	sessions    *SessionManager
-	adminMgr    AdminManager
-	mcpHandler  http.Handler
-	rateLimiter *LoginRateLimiter
+	db            db.Storage
+	cfgMu         sync.RWMutex
+	cfg           Config
+	sessions      *SessionManager
+	adminMgr      AdminManager
+	adminUpdateMu sync.Mutex
+	mcpHandler    http.Handler
+	rateLimiter   *LoginRateLimiter
 }
 
 type Config struct {
@@ -105,6 +108,9 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	maxAttempts := cfg.Admin.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = 5
+	}
+	if maxAttempts > 100 {
+		maxAttempts = 100
 	}
 	window := 5 * time.Minute
 	if cfg.Admin.WindowPeriod != "" {
@@ -250,12 +256,18 @@ func noIndexMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) UpdateAdminPassword(newPassword string) {
+	s.cfgMu.Lock()
 	s.cfg.Admin.Password = newPassword
+	s.cfgMu.Unlock()
 }
 
 func (s *Server) UpdateSecurityConfig(maxAttempts int, window, lockout time.Duration) {
-	s.rateLimiter = NewLoginRateLimiter(maxAttempts, window, lockout)
+	if s.rateLimiter != nil {
+		s.rateLimiter.UpdateConfig(maxAttempts, window, lockout)
+	}
+	s.cfgMu.Lock()
 	s.cfg.Admin.MaxAttempts = maxAttempts
 	s.cfg.Admin.WindowPeriod = formatConfigDuration(window)
 	s.cfg.Admin.LockoutPeriod = formatConfigDuration(lockout)
+	s.cfgMu.Unlock()
 }

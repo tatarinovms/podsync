@@ -137,9 +137,9 @@
                     const sysAuthUser = document.getElementById('sys-auth-username');
                     if (sysAuthUser) sysAuthUser.innerText = data.username || 'admin';
                     if (data.rate_limit) {
-                        const attemptsEl = document.getElementById('sec-max-attempts');
+                        const attemptsEl = document.getElementById('sec-max-attempts-text');
                         if (attemptsEl) attemptsEl.innerText = `${data.rate_limit.max_attempts} attempts / ${data.rate_limit.window}`;
-                        const lockoutEl = document.getElementById('sec-lockout');
+                        const lockoutEl = document.getElementById('sec-lockout-text');
                         if (lockoutEl) lockoutEl.innerHTML = `HTTP 429 + <code>Retry-After</code> (${data.rate_limit.lockout})`;
                     }
                     loadDashboard();

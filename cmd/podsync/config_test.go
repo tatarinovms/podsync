@@ -741,4 +741,62 @@ password = "secretpassword"
 		assert.Equal(t, "10m", config.Server.Admin.WindowPeriod)
 		assert.Equal(t, "20m", config.Server.Admin.LockoutPeriod)
 	})
+
+	t.Run("invalid max_attempts rejected", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+max_attempts = 150
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		_, err := LoadConfig(path)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "max_attempts")
+	})
+
+	t.Run("invalid window rejected", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+window = "2s"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		_, err := LoadConfig(path)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "window")
+	})
+
+	t.Run("env overflow value clamped to 100", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[server.admin]
+enabled = true
+username = "admin"
+password = "secretpassword"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_ADMIN_MAX_ATTEMPTS", "9999999999")
+
+		config, err := LoadConfig(path)
+		require.NoError(t, err)
+		assert.Equal(t, 100, config.Server.Admin.MaxAttempts)
+	})
 }

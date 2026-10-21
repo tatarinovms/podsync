@@ -1271,16 +1271,7 @@
                         artEl.innerHTML = `<i class="bi bi-rss fs-3"></i>`;
                     }
 
-                    // Auto-fill title and author if empty
-                    const titleInput = document.getElementById('new-feed-custom-title');
-                    const authorInput = document.getElementById('new-feed-custom-author');
-                    const coverInput = document.getElementById('new-feed-custom-cover');
-                    if (titleInput && !titleInput.value && data.title) titleInput.value = data.title;
-                    if (authorInput && !authorInput.value && data.author) authorInput.value = data.author;
-                    if (coverInput && !coverInput.value && data.cover_art) {
-                        coverInput.value = data.cover_art;
-                        updateCoverPreview('new-feed');
-                    }
+
 
                     // For RSS podcasts, force audio format
                     const formatSelect = document.getElementById('new-feed-format');
@@ -1385,11 +1376,18 @@
 
         if (addFeedModalEl) {
             addFeedModalEl.addEventListener('show.bs.modal', () => {
+                const form = document.getElementById('add-feed-form');
+                if (form) form.reset();
+                const previewCard = document.getElementById('rss-preview-card');
+                if (previewCard) previewCard.classList.add('d-none');
+                updateCoverPreview('new-feed');
                 keepLastManual = false;
                 if (newFeedPageSizeEl && newFeedKeepLastEl) {
                     newFeedKeepLastEl.value = newFeedPageSizeEl.value || '50';
                 }
                 toggleAddMaxHeight();
+                const idInput = document.getElementById('new-feed-id');
+                if (idInput) idInput.dataset.manual = 'false';
             });
         }
 

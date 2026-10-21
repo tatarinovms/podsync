@@ -1,6 +1,8 @@
 package builder
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"strings"
@@ -109,7 +111,34 @@ func ParseURL(link string) (model.Info, error) {
 		return info, nil
 	}
 
-	return model.Info{}, errors.New("unsupported URL host")
+	return parseRSSURL(link, parsed)
+}
+
+func parseRSSURL(link string, parsed *url.URL) (model.Info, error) {
+	slug := sanitizeSlug(parsed.Host + "_" + parsed.Path)
+	if slug == "" {
+		hasher := sha256.New()
+		hasher.Write([]byte(link))
+		slug = hex.EncodeToString(hasher.Sum(nil))[:12]
+	}
+
+	return model.Info{
+		Provider: model.ProviderRSS,
+		LinkType: model.TypeRSS,
+		ItemID:   slug,
+	}, nil
+}
+
+func sanitizeSlug(s string) string {
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
+	})
+	clean := strings.Join(parts, "_")
+	clean = strings.Trim(clean, "_")
+	if len(clean) > 32 {
+		clean = clean[:32]
+	}
+	return clean
 }
 
 func parseURL(link string) (*url.URL, error) {

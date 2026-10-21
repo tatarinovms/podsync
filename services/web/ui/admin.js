@@ -1223,6 +1223,92 @@
         }
 
         // Add Feed
+        let feedPreviewDebounceTimer = null;
+
+        function handleFeedUrlInput(url) {
+            suggestFeedId(url);
+            if (feedPreviewDebounceTimer) clearTimeout(feedPreviewDebounceTimer);
+            feedPreviewDebounceTimer = setTimeout(() => {
+                triggerFeedPreview();
+            }, 600);
+        }
+
+        async function triggerFeedPreview() {
+            const urlInput = document.getElementById('new-feed-url');
+            const previewCard = document.getElementById('rss-preview-card');
+            if (!urlInput || !previewCard) return;
+
+            const url = urlInput.value.trim();
+            if (!url || !url.startsWith('http')) {
+                previewCard.classList.add('d-none');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/feeds/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (!res.ok) {
+                    previewCard.classList.add('d-none');
+                    return;
+                }
+
+                const data = await res.json();
+                if (data.provider === 'rss') {
+                    previewCard.classList.remove('d-none');
+                    document.getElementById('rss-preview-title').textContent = data.title || 'Podcast Feed';
+                    document.getElementById('rss-preview-author').textContent = data.author || '';
+                    document.getElementById('rss-preview-episodes').textContent = data.total_episodes || '0';
+                    document.getElementById('rss-preview-size').textContent = formatBytes(data.total_bytes);
+
+                    const artEl = document.getElementById('rss-preview-art');
+                    if (data.cover_art) {
+                        artEl.innerHTML = `<img src="${safeUrl(data.cover_art)}" class="w-100 h-100 object-fit-cover" alt="" onerror="this.parentElement.innerHTML='<i class=\"bi bi-rss fs-3\"></i>'">`;
+                    } else {
+                        artEl.innerHTML = `<i class="bi bi-rss fs-3"></i>`;
+                    }
+
+                    // Auto-fill title and author if empty
+                    const titleInput = document.getElementById('new-feed-custom-title');
+                    const authorInput = document.getElementById('new-feed-custom-author');
+                    const coverInput = document.getElementById('new-feed-custom-cover');
+                    if (titleInput && !titleInput.value && data.title) titleInput.value = data.title;
+                    if (authorInput && !authorInput.value && data.author) authorInput.value = data.author;
+                    if (coverInput && !coverInput.value && data.cover_art) {
+                        coverInput.value = data.cover_art;
+                        updateCoverPreview('new-feed');
+                    }
+
+                    // For RSS podcasts, force audio format
+                    const formatSelect = document.getElementById('new-feed-format');
+                    if (formatSelect) {
+                        formatSelect.value = 'audio';
+                        toggleAddMaxHeight();
+                    }
+                } else {
+                    previewCard.classList.add('d-none');
+                }
+            } catch (err) {
+                previewCard.classList.add('d-none');
+            }
+        }
+
+        function setRssScope(scope) {
+            const pageSizeEl = document.getElementById('new-feed-pagesize');
+            const keepLastEl = document.getElementById('new-feed-keeplast');
+            if (scope === 'all') {
+                if (pageSizeEl) pageSizeEl.value = '0';
+                if (keepLastEl) keepLastEl.value = '0';
+            } else {
+                const count = parseInt(scope, 10) || 10;
+                if (pageSizeEl) pageSizeEl.value = count;
+                if (keepLastEl) keepLastEl.value = count;
+            }
+        }
+
         function suggestFeedId(url) {
             if (!url) return;
             const idInput = document.getElementById('new-feed-id');
@@ -1234,6 +1320,14 @@
                 const path = parsed.pathname.replace(/^\/+/g, '').replace(/\/+$/g, '');
                 const parts = path.split('/');
                 let slug = parts[parts.length - 1] || '';
+                slug = slug.replace(/\.(xml|rss|atom)$/i, '');
+                if (slug.toLowerCase() === 'feed' || slug.toLowerCase() === 'rss' || slug.toLowerCase() === 'podcast') {
+                    if (parts.length > 1) {
+                        slug = parts[parts.length - 2];
+                    } else {
+                        slug = parsed.hostname.split('.')[0];
+                    }
+                }
                 slug = slug.replace(/[@\-.]/g, '_').toUpperCase();
                 if (slug) {
                     idInput.value = slug;

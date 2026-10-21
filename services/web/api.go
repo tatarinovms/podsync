@@ -82,6 +82,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/audiobooks/upload", s.authMiddleware(http.HandlerFunc(s.handleAudiobookUpload)))
 	mux.Handle("/api/v1/audiobooks/config", s.authMiddleware(http.HandlerFunc(s.handleAudiobookConfig)))
 	mux.Handle("/api/v1/covers/upload", s.authMiddleware(http.HandlerFunc(s.handleCoverUpload)))
+	mux.Handle("/api/v1/feeds/preview", s.authMiddleware(http.HandlerFunc(s.handleFeedPreview)))
 }
 
 func cleanToken(providerStr, tok string) string {
@@ -1264,4 +1265,69 @@ func (s *Server) handleCoverUploadCommon(w http.ResponseWriter, r *http.Request,
 	}
 
 	s.writeJSON(w, http.StatusOK, res)
+}
+
+type FeedPreviewRequest struct {
+	URL string `json:"url"`
+}
+
+type FeedPreviewResponse struct {
+	Provider      string     `json:"provider"`
+	Title         string     `json:"title"`
+	Description   string     `json:"description"`
+	Author        string     `json:"author"`
+	CoverArt      string     `json:"cover_art"`
+	TotalEpisodes int        `json:"total_episodes"`
+	TotalBytes    int64      `json:"total_bytes"`
+	LatestPubDate *time.Time `json:"latest_pub_date,omitempty"`
+}
+
+func (s *Server) handleFeedPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req FeedPreviewRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	rawURL := strings.TrimSpace(req.URL)
+	if rawURL == "" {
+		s.writeError(w, http.StatusBadRequest, "url is required")
+		return
+	}
+
+	info, err := builder.ParseURL(rawURL)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid feed URL: "+err.Error())
+		return
+	}
+
+	if info.Provider == model.ProviderRSS {
+		rssBuilder := builder.NewRSSBuilder()
+		meta, err := rssBuilder.FetchFeed(r.Context(), rawURL)
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, "failed to fetch RSS feed: "+err.Error())
+			return
+		}
+
+		s.writeJSON(w, http.StatusOK, FeedPreviewResponse{
+			Provider:      string(model.ProviderRSS),
+			Title:         meta.Title,
+			Description:   meta.Description,
+			Author:        meta.Author,
+			CoverArt:      meta.CoverArt,
+			TotalEpisodes: meta.TotalEpisodes,
+			TotalBytes:    meta.TotalBytes,
+			LatestPubDate: meta.LatestPubDate,
+		})
+		return
+	}
+
+	s.writeJSON(w, http.StatusOK, FeedPreviewResponse{
+		Provider: string(info.Provider),
+	})
 }

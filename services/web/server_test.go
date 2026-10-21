@@ -964,3 +964,55 @@ func TestCoverUploadEndpoint(t *testing.T) {
 	assert.Equal(t, "/test_feed/cover.jpg", res.RelURL)
 	assert.Equal(t, "test_feed", res.FeedID)
 }
+
+func TestFeedPreviewEndpoint(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Preview Cast</title>
+    <description>A test preview show</description>
+    <itunes:author>Preview Author</itunes:author>
+    <itunes:image href="https://example.com/cover.png"/>
+    <item>
+      <title>Test Ep 1</title>
+      <enclosure url="https://example.com/1.mp3" length="1000000" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.Write([]byte(rssXML))
+	}))
+	defer ts.Close()
+
+	mgr := &mockDownloaderAdminMgr{}
+	srv := New(Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "pass",
+		},
+	}, &mockFileSystem{}, nil)
+	srv.SetAdminManager(mgr)
+
+	body := fmt.Sprintf(`{"url":"%s/feed.xml"}`, ts.URL)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/feeds/preview", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp FeedPreviewResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "rss", resp.Provider)
+	assert.Equal(t, "Preview Cast", resp.Title)
+	assert.Equal(t, "Preview Author", resp.Author)
+	assert.Equal(t, "https://example.com/cover.png", resp.CoverArt)
+	assert.Equal(t, 1, resp.TotalEpisodes)
+	assert.Equal(t, int64(1000000), resp.TotalBytes)
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sort"
 	"sync"
@@ -134,7 +135,7 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	var key string
 	if keyProvider, ok := u.keys[info.Provider]; ok {
 		key = keyProvider.Get()
-	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud && info.Provider != model.ProviderAudiobook {
+	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud && info.Provider != model.ProviderAudiobook && info.Provider != model.ProviderRSS {
 		return errors.Errorf("key provider %q not loaded", info.Provider)
 	}
 
@@ -297,7 +298,12 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 		// while still being processed by youtube-dl (e.g. a file is being downloaded from YT or encoding in progress)
 
 		logger.Infof("! downloading episode %s", episode.VideoURL)
-		tempFile, err := u.downloader.Download(ctx, feedConfig, episode)
+		var tempFile io.ReadCloser
+		if info, pErr := builder.ParseURL(feedConfig.URL); pErr == nil && info.Provider == model.ProviderRSS {
+			tempFile, err = u.downloadDirectHTTP(ctx, episode)
+		} else {
+			tempFile, err = u.downloader.Download(ctx, feedConfig, episode)
+		}
 		if err != nil {
 			// YouTube might block host with HTTP Error 429: Too Many Requests
 			// We still need to generate XML, so just stop sending download requests and
@@ -508,4 +514,64 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 	}
 
 	return result
+}
+
+func (u *Manager) downloadDirectHTTP(ctx context.Context, episode *model.Episode) (io.ReadCloser, error) {
+	tmpFile, err := os.CreateTemp("", "podsync_rss_download_*")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create temp file")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, episode.VideoURL, nil)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.Wrap(err, "failed to create HTTP request")
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Podsync/2.0; +https://github.com/mxpv/podsync)")
+
+	client := &http.Client{
+		Timeout: 30 * time.Minute,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.Wrap(err, "HTTP download failed")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.Errorf("server returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	n, err := io.Copy(tmpFile, resp.Body)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.Wrap(err, "failed to write download to temp file")
+	}
+
+	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return nil, errors.Wrap(err, "failed to seek to start of temp file")
+	}
+
+	log.Debugf("successfully downloaded direct HTTP episode (%d bytes)", n)
+	return &tempFileReadCloser{File: tmpFile}, nil
+}
+
+type tempFileReadCloser struct {
+	*os.File
+}
+
+func (t *tempFileReadCloser) Close() error {
+	name := t.File.Name()
+	err := t.File.Close()
+	_ = os.Remove(name)
+	return err
 }

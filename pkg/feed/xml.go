@@ -190,6 +190,18 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			default:
 				enclosureType = itunes.MP3
 			}
+		} else if feed.Provider == model.ProviderRSS {
+			ext := strings.ToLower(filepath.Ext(episodeName))
+			switch ext {
+			case ".m4a", ".m4b":
+				enclosureType = itunes.M4A
+			case ".mp4", ".m4v":
+				enclosureType = itunes.MP4
+			case ".mov":
+				enclosureType = itunes.MOV
+			default:
+				enclosureType = itunes.MP3
+			}
 		}
 
 		item.AddEnclosure(downloadURL, enclosureType, episode.Size)

@@ -197,6 +197,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/audiobooks/import` | `POST` | Import local audiobook folder into Podcast 2.0 serial feed |
 | `/api/v1/audiobooks/upload` | `POST` | Upload audiobook audio tracks and cover directly via multipart/form-data |
 | `/api/v1/covers/upload` | `POST` | Upload custom cover art image (JPEG, PNG, WebP) with live preview |
+| `/api/v1/feeds/preview` | `POST` | Inspect remote feed / RSS URL, parse metadata, episode count, and size |
 | `/api/v1/audiobooks/dirs` | `DELETE` | Delete audiobook folder and linked feed from disk |
 | `/api/v1/audiobooks/config` | `GET` | Get configured audiobooks directory path and status |
 | `/api/v1/system/logs` | `GET` | Query recent system logs with level/search/feed_id filtering |

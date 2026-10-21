@@ -10,6 +10,7 @@ const (
 	TypeHandle    = Type("handle")
 	TypeVideo     = Type("video")
 	TypeAudiobook = Type("audiobook")
+	TypeRSS       = Type("rss")
 )
 
 type Provider string
@@ -22,11 +23,12 @@ const (
 	ProviderVkVideo    = Provider("vkvideo")
 	ProviderRutube     = Provider("rutube")
 	ProviderAudiobook  = Provider("audiobook")
+	ProviderRSS        = Provider("rss")
 )
 
 // Info represents data extracted from URL
 type Info struct {
-	LinkType Type     // Either group, channel, user, playlist, or handle
-	Provider Provider // Youtube, Vimeo, SoundCloud, Twitch, or VkVideo
+	LinkType Type     // Either group, channel, user, playlist, handle, or rss
+	Provider Provider // Youtube, Vimeo, SoundCloud, Twitch, VkVideo, Audiobook, or RSS
 	ItemID   string
 }

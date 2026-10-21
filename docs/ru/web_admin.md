@@ -195,6 +195,7 @@ http://<хост-podsync>:<порт>/admin/
 | `/api/v1/audiobooks/import` | `POST` | Импортировать локальную папку в серийную ленту Podcast 2.0 |
 | `/api/v1/audiobooks/upload` | `POST` | Загрузить аудиофайлы и обложку книги через multipart/form-data |
 | `/api/v1/covers/upload` | `POST` | Загрузка файла обложки (JPEG, PNG, WebP) с мгновенным предпросмотром |
+| `/api/v1/feeds/preview` | `POST` | Предпросмотр исходной RSS-ленты или URL: извлечение названия, автора, обложки и веса |
 | `/api/v1/audiobooks/dirs` | `DELETE` | Удалить папку аудиокниги и связанную ленту с диска |
 | `/api/v1/audiobooks/config` | `GET` | Получить путь к корневой директории аудиокниг и статус |
 | `/api/v1/system/logs` | `GET` | Запрос системных логов с фильтрацией по уровню, тексту или feed_id |

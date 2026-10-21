@@ -1352,14 +1352,49 @@
                             <div id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
                             <div class="row g-2">
                                 <div class="col-md-7">
-                                    <label class="form-label small fw-semibold">Source URL (Rutube / VK Video / YouTube / Vimeo / etc) <span class="text-danger">*</span></label>
-                                    <input type="url" id="new-feed-url" class="form-control form-control-sm" required placeholder="https://rutube.ru/channel/25758171/" oninput="suggestFeedId(this.value)">
-                                    <div class="form-text small">Channels, playlists, communities, and users are supported.</div>
+                                    <label class="form-label small fw-semibold">Source URL (YouTube / VK Video / Rutube / RSS Feed / etc) <span class="text-danger">*</span></label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="url" id="new-feed-url" class="form-control" required placeholder="https://beardycast.com/feed/" oninput="handleFeedUrlInput(this.value)">
+                                        <button class="btn btn-outline-secondary" type="button" id="btn-preview-feed" onclick="triggerFeedPreview()" title="Fetch feed info"><i aria-hidden="true" class="bi bi-search"></i></button>
+                                    </div>
+                                    <div class="form-text small">Paste a channel, playlist, or ready-made podcast RSS link for local mirroring.</div>
                                 </div>
                                 <div class="col-md-5">
                                     <label class="form-label small fw-semibold">Feed ID (URL slug) <span class="text-danger">*</span></label>
-                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER">
-                                    <div class="form-text small">Used in RSS URL: <code>/CLANBEAVER.xml</code></div>
+                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="BEARDYCAST">
+                                    <div class="form-text small">Used in RSS URL: <code>/BEARDYCAST.xml</code></div>
+                                </div>
+                            </div>
+                            <!-- RSS Live Preview Card -->
+                            <div id="rss-preview-card" class="card mt-3 p-2 bg-body border d-none">
+                                <div class="d-flex gap-3 align-items-center">
+                                    <div id="rss-preview-art" class="rounded flex-shrink-0 bg-secondary d-flex align-items-center justify-content-center text-white fw-bold" style="width: 64px; height: 64px; overflow: hidden;">
+                                        <i class="bi bi-rss fs-3"></i>
+                                    </div>
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                            <span class="badge bg-primary text-white" id="rss-preview-badge">RSS Mirror</span>
+                                            <strong id="rss-preview-title" class="text-truncate d-block"></strong>
+                                        </div>
+                                        <div class="text-muted small text-truncate" id="rss-preview-author"></div>
+                                        <div class="text-muted small mt-1 d-flex gap-3 flex-wrap">
+                                            <span><i class="bi bi-headphones me-1"></i><span id="rss-preview-episodes">0</span> episodes</span>
+                                            <span><i class="bi bi-hdd me-1"></i><span id="rss-preview-size">0 MB</span> total</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <span class="small text-muted">Download Scope:</span>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-all" value="all" onchange="setRssScope('all')">
+                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-all">All episodes</label>
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-10" value="10" onchange="setRssScope(10)" checked>
+                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-10">Last 10</label>
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-25" value="25" onchange="setRssScope(25)">
+                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-25">Last 25</label>
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-50" value="50" onchange="setRssScope(50)">
+                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-50">Last 50</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>

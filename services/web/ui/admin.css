@@ -462,10 +462,7 @@
             color: var(--ctp-text);
         }
 
-        .feed-card:hover {
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
-            transform: translateY(-2px);
-        }
+
 
         .dashboard-banner {
             background-color: var(--bg-card) !important;
@@ -876,7 +873,7 @@
                 padding-left: 0.75rem !important;
                 padding-right: 0.75rem !important;
             }
-            .feed-card, .card {
+            .card {
                 padding: 0.85rem !important;
             }
             .feed-card .btn, .card .btn {
@@ -942,8 +939,8 @@
 .status-filter:hover { color: var(--ctp-mauve); }
 .feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 20px; }
 .feed-grid > .library-empty { grid-column: 1 / -1; padding: 64px 20px; text-align: center; }
-.feed-grid .feed-card { display: flex; flex-direction: column; gap: 20px; padding: 22px; border-radius: var(--library-radius); border: 1px solid var(--card-border); background: var(--ctp-mantle); box-shadow: none; transform: none; transition: border-color .15s ease; }
-.feed-grid .feed-card:hover { border-color: var(--ctp-overlay0); box-shadow: none; transform: none; }
+.feed-card { display: flex; flex-direction: column; gap: 20px; padding: 22px; border-radius: var(--library-radius); border: 1px solid var(--card-border); background: var(--ctp-mantle); box-shadow: none; transform: none; transition: border-color .15s ease; }
+.feed-card:hover { border-color: var(--ctp-overlay0); box-shadow: none; transform: none; }
 .feed-card-top { display: flex; align-items: flex-start; gap: 16px; }
 .feed-art { width: 64px; height: 64px; flex-shrink: 0; position: relative; }
 .feed-art .feed-cover, .feed-art .feed-cover-placeholder { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; }
@@ -1011,7 +1008,7 @@ button.feed-state { border: 0; background: transparent; padding: 0; text-align: 
     .library-filters { flex-wrap: wrap; }
     .status-filter { min-height: 44px; padding-inline: 10px; }
     .feed-grid { gap: 14px; }
-    .feed-grid .feed-card { padding: 18px !important; }
+    .feed-card { padding: 18px !important; }
     .feed-grid[data-view="list"] .feed-card { display: flex; }
     .feed-grid[data-view="list"] .feed-card-bottom .feed-state { display: inline-flex; }
     .feed-card-bottom { display: grid; grid-template-columns: 1fr 1fr; }

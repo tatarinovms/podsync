@@ -3049,22 +3049,38 @@
             const audioFeeds = (allFeeds || []).filter(f => f.provider === 'audiobook');
             if (audioFeeds.length === 0) {
                 container.innerHTML = `
-                    <div class="col-12 text-center text-muted py-4">
-                        <i aria-hidden="true" class="bi bi-book me-2"></i>No audiobook podcast feeds configured yet. Import a local directory above!
+                    <div class="library-empty">
+                        <i aria-hidden="true" class="bi bi-book fs-1 text-muted"></i>
+                        <h2 class="h5 mt-3">No audiobook feeds yet</h2>
+                        <p class="text-muted">Import a discovered local folder above to generate an audiobook podcast feed.</p>
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = audioFeeds.map(feed => {
-                return `
-                    <div class="col-12 col-md-6 col-xl-4">
-                        <div data-feed-id="${escapeHtml(feed.id)}" data-render-key="${escapeHtml(feedRenderKey(feed))}">
-                            ${renderFeedCardHTML(feed)}
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            const existing = new Map(Array.from(container.querySelectorAll('[data-feed-id]')).map(el => [el.getAttribute('data-feed-id'), el]));
+            if (!existing.size) {
+                container.innerHTML = audioFeeds.map(feed => `<div data-feed-id="${escapeHtml(feed.id)}" data-render-key="${escapeHtml(feedRenderKey(feed))}">${renderFeedCardHTML(feed)}</div>`).join('');
+                return;
+            }
+            const ids = new Set(audioFeeds.map(f => f.id));
+            existing.forEach((el, id) => { if (!ids.has(id)) el.remove(); });
+            let previous = null;
+            for (const feed of audioFeeds) {
+                let el = existing.get(feed.id);
+                const key = feedRenderKey(feed);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.setAttribute('data-feed-id', feed.id);
+                }
+                if (el.getAttribute('data-render-key') !== key) {
+                    el.innerHTML = renderFeedCardHTML(feed);
+                    el.setAttribute('data-render-key', key);
+                }
+                const expected = previous ? previous.nextElementSibling : container.firstElementChild;
+                if (expected !== el) container.insertBefore(el, expected);
+                previous = el;
+            }
         }
 
         function openImportModal(dirName, title, author) {

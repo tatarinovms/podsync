@@ -517,61 +517,25 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 }
 
 func (u *Manager) downloadDirectHTTP(ctx context.Context, episode *model.Episode) (io.ReadCloser, error) {
-	tmpFile, err := os.CreateTemp("", "podsync_rss_download_*")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create temp file")
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, episode.VideoURL, nil)
 	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
 		return nil, errors.Wrap(err, "failed to create HTTP request")
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Podsync/2.0; +https://github.com/mxpv/podsync)")
 
-	client := &http.Client{
-		Timeout: 30 * time.Minute,
-	}
+	// Stream directly from remote server to destination disk without buffering in RAM (/tmp).
+	// We rely on ctx for cancellation/timeouts, allowing multi-hour uncut episodes to download reliably.
+	client := &http.Client{}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
 		return nil, errors.Wrap(err, "HTTP download failed")
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
+		resp.Body.Close()
 		return nil, errors.Errorf("server returned status %d: %s", resp.StatusCode, resp.Status)
 	}
 
-	n, err := io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return nil, errors.Wrap(err, "failed to write download to temp file")
-	}
-
-	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return nil, errors.Wrap(err, "failed to seek to start of temp file")
-	}
-
-	log.Debugf("successfully downloaded direct HTTP episode (%d bytes)", n)
-	return &tempFileReadCloser{File: tmpFile}, nil
-}
-
-type tempFileReadCloser struct {
-	*os.File
-}
-
-func (t *tempFileReadCloser) Close() error {
-	name := t.File.Name()
-	err := t.File.Close()
-	_ = os.Remove(name)
-	return err
+	return resp.Body, nil
 }

@@ -914,3 +914,37 @@ func TestFeedManager_TriggerUpdateAllNoDuplicateJobWhenClaimed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, model.JobStatusDone, finalJob.Status)
 }
+
+func TestSaveCoverImage(t *testing.T) {
+	dataDir := t.TempDir()
+	storage, err := fs.NewLocal(dataDir, false, false)
+	require.NoError(t, err)
+
+	mgr := &AppFeedManager{
+		cfg: &Config{
+			Server:  web.Config{Hostname: "https://example.com"},
+			Storage: fs.Config{Type: "local", Local: fs.LocalConfig{DataDir: dataDir}},
+		},
+		storage: storage,
+	}
+
+	// 1. With feed ID
+	res, err := mgr.SaveCoverImage(context.Background(), "my_feed", "podcast.PNG", strings.NewReader("fake-png-content"))
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com/my_feed/cover.png", res.URL)
+	assert.Equal(t, "/my_feed/cover.png", res.RelURL)
+	assert.Equal(t, "my_feed", res.FeedID)
+	assert.Equal(t, "cover.png", res.Filename)
+
+	savedData, err := os.ReadFile(filepath.Join(dataDir, "my_feed", "cover.png"))
+	require.NoError(t, err)
+	assert.Equal(t, "fake-png-content", string(savedData))
+
+	// 2. Without feed ID (generic covers/)
+	res2, err := mgr.SaveCoverImage(context.Background(), "", "art.jpg", strings.NewReader("fake-jpg-content"))
+	require.NoError(t, err)
+	assert.Contains(t, res2.URL, "https://example.com/covers/cover_")
+	assert.Contains(t, res2.RelURL, "/covers/cover_")
+	assert.Equal(t, "", res2.FeedID)
+	assert.True(t, strings.HasSuffix(res2.Filename, ".jpg"))
+}

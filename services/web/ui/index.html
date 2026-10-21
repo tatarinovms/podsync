@@ -530,7 +530,7 @@
                                         <label class="form-label small fw-semibold">Test Video URL</label>
                                         <div class="input-group input-group-sm">
                                             <input type="url" id="dl-test-url" class="form-control" value="https://www.youtube.com/watch?v=w9h5wyk-rdg">
-                                            <button type="button" id="btn-test-downloader" class="btn btn-primary" onclick="testDownloaderLive()">
+                                            <button type="button" id="btn-test-downloader" class="btn btn-brand btn-sm" onclick="testDownloaderLive()">
                                                 <span id="test-dl-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
                                                 Test Now
                                             </button>
@@ -659,8 +659,8 @@
                                         <span class="small text-muted">Add to <code>opencode.json</code> (Project root or <code>~/.config/opencode/opencode.json</code>):</span>
                                         <div class="d-flex gap-2 align-items-center">
                                             <div class="btn-group btn-group-sm">
-                                                <button type="button" id="btn-opencode-remote" class="btn btn-primary" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
-                                                <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary" onclick="setOpencodeMode('local')">Local (Stdio)</button>
+                                                <button type="button" id="btn-opencode-remote" class="btn btn-brand btn-sm" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
+                                                <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary btn-sm" onclick="setOpencodeMode('local')">Local (Stdio)</button>
                                             </div>
                                             <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                         </div>
@@ -932,15 +932,31 @@
                     <header class="feed-detail-heading"><div id="detail-cover" class="detail-cover"></div><div class="flex-grow-1 min-w-0"><div class="eyebrow" id="detail-provider">PODCAST</div><h1 id="episodes-feed-title" tabindex="-1">Podcast</h1><p class="text-muted mb-0" id="episodes-feed-subtitle"></p></div><button class="btn btn-brand" onclick="showSubscription(document.getElementById('episodesModal').dataset.feedId)"><i aria-hidden="true" class="bi bi-rss me-2"></i>Subscribe</button></header>
                     <nav class="detail-navigation" aria-label="Podcast sections"><button class="active" data-section="episodes" aria-current="page" onclick="showFeedSection('episodes')">Episodes</button><button data-section="settings" onclick="showFeedSection('settings')">Settings</button><button data-section="history" onclick="showFeedSection('history')">History</button></nav>
                     <div id="detail-episodes" class="card p-0 overflow-hidden">
-                    <div class="d-flex flex-column flex-sm-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
-                        <input id="episodes-search" type="search" class="form-control form-control-sm" placeholder="Search episodes" aria-label="Search episodes" oninput="resetEpisodePage()">
-                        <select id="episodes-status-filter" class="form-select form-select-sm w-auto" aria-label="Episode status" onchange="resetEpisodePage()">
-                            <option value="all">All statuses</option>
-                            <option value="downloaded">Downloaded / available</option>
-                            <option value="new">Pending</option>
-                            <option value="error">Errors</option>
-                            <option value="cleaned">Cleaned</option>
-                        </select>
+                    <div class="d-flex flex-column flex-md-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
+                        <input id="episodes-search" type="search" class="form-control form-control-sm flex-grow-1" placeholder="Search episodes" aria-label="Search episodes" oninput="resetEpisodePage()">
+                        <div class="d-flex flex-wrap gap-2">
+                            <select id="episodes-status-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode status" onchange="resetEpisodePage()">
+                                <option value="all">All statuses</option>
+                                <option value="downloaded">Downloaded / available</option>
+                                <option value="new">Pending</option>
+                                <option value="error">Errors</option>
+                                <option value="cleaned">Cleaned</option>
+                            </select>
+                            <select id="episodes-duration-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode duration" onchange="resetEpisodePage()">
+                                <option value="all">All durations</option>
+                                <option value="short">&lt; 15 min</option>
+                                <option value="medium">15–60 min</option>
+                                <option value="long">&gt; 60 min</option>
+                            </select>
+                            <select id="episodes-sort" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Sort episodes" onchange="resetEpisodePage()">
+                                <option value="default">Default order</option>
+                                <option value="date-desc">Date: Newest first</option>
+                                <option value="date-asc">Date: Oldest first</option>
+                                <option value="duration-desc">Duration: Longest first</option>
+                                <option value="duration-asc">Duration: Shortest first</option>
+                                <option value="title-asc">Title: A–Z</option>
+                            </select>
+                        </div>
                     </div>
                     <div id="episodes-list" class="list-group list-group-flush">
                         <!-- Loaded dynamically -->
@@ -1028,11 +1044,11 @@
                                             <input type="text" id="fs-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
                                         </div>
                                         <div class="d-flex gap-1 flex-wrap">
-                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('@every 1h')">1h</button>
-                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('@every 6h')">6h</button>
-                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('@every 12h')">12h</button>
-                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('@every 24h')">24h</button>
-                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setPresetCron('0 4 * * *')">Daily 04:00</button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('@every 1h')">1h</button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('@every 6h')">6h</button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('@every 12h')">12h</button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('@every 24h')">24h</button>
+                                            <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('0 4 * * *')">Daily 04:00</button>
                                         </div>
                                         <div class="form-text small text-muted" id="fs-cron-help">Schedule to periodically check for new media files.</div>
                                     </div>
@@ -1155,8 +1171,17 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
-                                    <input type="url" id="fs-custom-cover" class="form-control form-control-sm" placeholder="https://example.com/cover.jpg">
-                                    <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
+                                    <div class="input-group input-group-sm mb-1">
+                                        <input type="url" id="fs-custom-cover" class="form-control" placeholder="https://example.com/cover.jpg" oninput="updateCoverPreview('fs')">
+                                        <label class="btn btn-outline-secondary btn-sm" for="fs-cover-file" title="Upload cover image">
+                                            <i aria-hidden="true" class="bi bi-upload me-1"></i>Upload file
+                                        </label>
+                                        <input type="file" id="fs-cover-file" class="d-none" accept="image/jpeg,image/png,image/webp,image/gif" onchange="uploadCoverArt('fs')">
+                                    </div>
+                                    <div class="form-text small">Overrides the channel avatar with a custom podcast cover image. Enter a URL or upload a file (JPEG, PNG, WebP).</div>
+                                    <div id="fs-cover-preview" class="mt-2 d-none">
+                                        <img id="fs-cover-preview-img" src="" alt="Cover preview" class="rounded border shadow-sm" style="max-width: 120px; max-height: 120px; object-fit: cover;">
+                                    </div>
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-8">
@@ -1191,7 +1216,7 @@
 
                         <div class="modal-footer border-top px-0 pb-0 mt-3">
                             <button type="button" class="btn btn-secondary btn-sm" onclick="showFeedSection('episodes')">Cancel</button>
-                            <button type="submit" class="btn btn-primary btn-sm">
+                            <button type="submit" class="btn btn-brand btn-sm">
                                 <i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings
                             </button>
                         </div>
@@ -1246,9 +1271,9 @@
                                 <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-end gap-2 pt-2">
-                            <button type="button" class="btn btn-outline-secondary" onclick="closeModal(this.closest('.modal'))">Cancel</button>
-                            <button type="submit" class="btn btn-brand" id="btn-submit-import-audiobook"><i aria-hidden="true" class="bi bi-check-lg me-1"></i> Create Feed</button>
+                        <div class="modal-footer border-top px-0 pb-0 pt-3 mt-3">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                            <button type="submit" class="btn btn-brand btn-sm" id="btn-submit-import-audiobook"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Create Feed</button>
                         </div>
                     </form>
                 </div>
@@ -1298,9 +1323,9 @@
                                 <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-end gap-2 pt-2">
-                            <button type="button" class="btn btn-outline-secondary" onclick="closeModal(this.closest('.modal'))">Cancel</button>
-                            <button type="submit" class="btn btn-brand" id="btn-submit-upload-audiobook"><i aria-hidden="true" class="bi bi-upload me-1"></i> Start Upload</button>
+                        <div class="modal-footer border-top px-0 pb-0 pt-3 mt-3">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                            <button type="submit" class="btn btn-brand btn-sm" id="btn-submit-upload-audiobook"><i aria-hidden="true" class="bi bi-upload me-1"></i>Start Upload</button>
                         </div>
                     </form>
                 </div>
@@ -1409,11 +1434,11 @@
                                                 <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
                                             </div>
                                             <div class="d-flex gap-1 flex-wrap">
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 1h')">1h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 6h')">6h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 12h')">12h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 24h')">24h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('0 4 * * *')">Daily 04:00</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 1h')">1h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 6h')">6h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 12h')">12h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 24h')">24h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('0 4 * * *')">Daily 04:00</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1530,8 +1555,17 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
-                                        <input type="url" id="new-feed-custom-cover" class="form-control form-control-sm" placeholder="https://example.com/cover.jpg">
-                                        <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
+                                        <div class="input-group input-group-sm mb-1">
+                                            <input type="url" id="new-feed-custom-cover" class="form-control" placeholder="https://example.com/cover.jpg" oninput="updateCoverPreview('new-feed')">
+                                            <label class="btn btn-outline-secondary btn-sm" for="new-feed-cover-file" title="Upload cover image">
+                                                <i aria-hidden="true" class="bi bi-upload me-1"></i>Upload file
+                                            </label>
+                                            <input type="file" id="new-feed-cover-file" class="d-none" accept="image/jpeg,image/png,image/webp,image/gif" onchange="uploadCoverArt('new-feed')">
+                                        </div>
+                                        <div class="form-text small">Overrides the channel avatar with a custom podcast cover image. Enter a URL or upload a file (JPEG, PNG, WebP).</div>
+                                        <div id="new-feed-cover-preview" class="mt-2 d-none">
+                                            <img id="new-feed-cover-preview-img" src="" alt="Cover preview" class="rounded border shadow-sm" style="max-width: 120px; max-height: 120px; object-fit: cover;">
+                                        </div>
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-8">
@@ -1610,7 +1644,7 @@
                         <button type="button" class="btn btn-outline-danger btn-sm" id="btn-retry-all-errors" style="display: none;">
                             <i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i> Retry All
                         </button>
-                        <button type="button" class="btn btn-light btn-sm" onclick="closeModal(this.closest('.modal'))">Close</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Close</button>
                     </div>
                 </div>
             </div>
@@ -1665,7 +1699,7 @@
                         </div>
                     </div>
                     <div class="modal-footer border-top bg-body-tertiary">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
                         <button type="submit" id="sec-settings-save-btn" class="btn btn-brand btn-sm">
                             <i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings
                         </button>
@@ -1701,8 +1735,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
-                        <button type="submit" id="btn-save-pw" class="btn btn-primary btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Update Password</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                        <button type="submit" id="btn-save-pw" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Update Password</button>
                     </div>
                 </form>
             </div>

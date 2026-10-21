@@ -231,6 +231,19 @@ func (m *mockAdminManager) DeleteAudiobookDir(ctx context.Context, dirName strin
 	return nil
 }
 
+func (m *mockAdminManager) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*web.CoverUploadResult, error) {
+	rel := "/" + feedID + "/cover.jpg"
+	if feedID == "" {
+		rel = "/covers/cover.jpg"
+	}
+	return &web.CoverUploadResult{
+		URL:      "http://localhost:8080" + rel,
+		RelURL:   rel,
+		FeedID:   feedID,
+		Filename: "cover.jpg",
+	}, nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{

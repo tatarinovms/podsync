@@ -81,6 +81,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/audiobooks/import", s.authMiddleware(http.HandlerFunc(s.handleAudiobookImport)))
 	mux.Handle("/api/v1/audiobooks/upload", s.authMiddleware(http.HandlerFunc(s.handleAudiobookUpload)))
 	mux.Handle("/api/v1/audiobooks/config", s.authMiddleware(http.HandlerFunc(s.handleAudiobookConfig)))
+	mux.Handle("/api/v1/covers/upload", s.authMiddleware(http.HandlerFunc(s.handleCoverUpload)))
 }
 
 func cleanToken(providerStr, tok string) string {
@@ -521,6 +522,12 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.writeJSON(w, http.StatusOK, map[string]bool{"queued": true})
+		return
+	}
+
+	// 1.5. /api/v1/feeds/{id}/cover
+	if len(parts) == 2 && parts[1] == "cover" {
+		s.handleFeedCoverUpload(w, r, feedID)
 		return
 	}
 
@@ -1189,4 +1196,72 @@ func (s *Server) handleAudiobookConfig(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, map[string]string{
 		"audiobooks_dir": s.adminMgr.GetAudiobooksDir(),
 	})
+}
+
+func (s *Server) handleCoverUpload(w http.ResponseWriter, r *http.Request) {
+	s.handleCoverUploadCommon(w, r, "")
+}
+
+func (s *Server) handleFeedCoverUpload(w http.ResponseWriter, r *http.Request, feedID string) {
+	s.handleCoverUploadCommon(w, r, feedID)
+}
+
+func (s *Server) handleCoverUploadCommon(w http.ResponseWriter, r *http.Request, explicitFeedID string) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	const maxUploadSize = 15 << 20 // 15 MiB
+	if r.ContentLength > maxUploadSize {
+		s.writeError(w, http.StatusRequestEntityTooLarge, "cover image exceeds 15 MiB limit")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		var limitErr *http.MaxBytesError
+		if errors.As(err, &limitErr) {
+			s.writeError(w, http.StatusRequestEntityTooLarge, "cover image exceeds 15 MiB limit")
+			return
+		}
+		s.writeError(w, http.StatusBadRequest, "failed to parse multipart form: "+err.Error())
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		file, header, err = r.FormFile("cover")
+		if err != nil {
+			file, header, err = r.FormFile("image")
+		}
+	}
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "no image file uploaded (expected form field 'file' or 'cover')")
+		return
+	}
+	defer file.Close()
+
+	feedID := explicitFeedID
+	if feedID == "" {
+		feedID = strings.TrimSpace(r.FormValue("feed_id"))
+	}
+
+	res, err := s.adminMgr.SaveCoverImage(r.Context(), feedID, header.Filename, file)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, "failed to save cover image: "+err.Error())
+		return
+	}
+
+	if feedID != "" && (r.URL.Query().Get("save") == "true" || explicitFeedID != "") {
+		_ = s.adminMgr.UpdateFeed(r.Context(), feedID, &FeedConfigUpdate{
+			Custom: feed.Custom{CoverArt: res.URL},
+		})
+	}
+
+	s.writeJSON(w, http.StatusOK, res)
 }

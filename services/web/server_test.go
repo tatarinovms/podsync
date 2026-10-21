@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"mime/multipart"
 	"fmt"
 	"sync"
 	"context"
@@ -462,6 +463,19 @@ func (m *mockDownloaderAdminMgr) DeleteAudiobookDir(ctx context.Context, dirName
 	return nil
 }
 
+func (m *mockDownloaderAdminMgr) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*CoverUploadResult, error) {
+	rel := "/" + feedID + "/cover.jpg"
+	if feedID == "" {
+		rel = "/covers/cover.jpg"
+	}
+	return &CoverUploadResult{
+		URL:      "http://localhost:8080" + rel,
+		RelURL:   rel,
+		FeedID:   feedID,
+		Filename: "cover.jpg",
+	}, nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -920,4 +934,33 @@ func TestServer_ConcurrentSecurityConfigUpdate(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestCoverUploadEndpoint(t *testing.T) {
+	srv := New(Config{Port: 8080, Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	require.NoError(t, writer.WriteField("feed_id", "test_feed"))
+	part, err := writer.CreateFormFile("file", "artwork.png")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("fake-image-bytes"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/covers/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var res CoverUploadResult
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+	assert.Equal(t, "http://localhost:8080/test_feed/cover.jpg", res.URL)
+	assert.Equal(t, "/test_feed/cover.jpg", res.RelURL)
+	assert.Equal(t, "test_feed", res.FeedID)
 }

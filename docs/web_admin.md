@@ -116,8 +116,8 @@ Log in using the configured username and password.
 Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`) instead of a modal popup:
 - **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.
 - **Sub-navigation Tabs**:
-  - **Episodes**: Full media library with real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), in-browser audio playback, file download links, and individual retry buttons.
-  - **Settings**: Adjust feed parameters (update schedule, video/audio format, quality presets 480p/720p/1080p, retention limits, language) directly on the show page.
+  - **Episodes**: Full media library with real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), duration filtering (&lt; 15 min, 15–60 min, &gt; 60 min), flexible sorting by date (newest/oldest), duration (longest/shortest), and title (A–Z), in-browser audio playback, file download links, and individual retry buttons.
+  - **Settings**: Adjust feed parameters (update schedule, video/audio format, quality presets 480p/720p/1080p, retention limits, language, custom cover art URL or image file upload with live preview) directly on the show page.
   - **History**: Dedicated timeline of synchronization events, download activity, and errors for this specific feed.
 - **Back to Library**: Seamless one-click return to the main library preserving active filters and scroll position.
 
@@ -196,6 +196,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/audiobooks/dirs` | `GET` | List audiobook directories, chapter counts, sizes, and linked feeds |
 | `/api/v1/audiobooks/import` | `POST` | Import local audiobook folder into Podcast 2.0 serial feed |
 | `/api/v1/audiobooks/upload` | `POST` | Upload audiobook audio tracks and cover directly via multipart/form-data |
+| `/api/v1/covers/upload` | `POST` | Upload custom cover art image (JPEG, PNG, WebP) with live preview |
 | `/api/v1/audiobooks/dirs` | `DELETE` | Delete audiobook folder and linked feed from disk |
 | `/api/v1/audiobooks/config` | `GET` | Get configured audiobooks directory path and status |
 | `/api/v1/system/logs` | `GET` | Query recent system logs with level/search/feed_id filtering |

@@ -55,12 +55,63 @@ async function run() {
     await slow;
     assert.equal(el('episodes-feed-title').innerText,'Podcast: Fast');
 
+    // Test sorting and duration filtering
+    const sortEpisodes = [
+        {id:'ep-old',title:'Old Episode',status:'downloaded',duration:300,pub_date:'2024-01-01T00:00:00Z'},
+        {id:'ep-new',title:'New Episode',status:'downloaded',duration:5400,pub_date:'2026-05-01T00:00:00Z'},
+        {id:'ep-mid',title:'Mid Episode',status:'downloaded',duration:1800,pub_date:'2025-06-01T00:00:00Z'}
+    ];
+    context.fetch = async () => ({ok:true,json:async()=>({feed:{title:'Sort Test'},episodes:sortEpisodes})});
+    await context.showEpisodes('sort-feed');
+
+    // Date descending: New -> Mid -> Old
+    el('episodes-sort').value = 'date-desc';
+    context.renderEpisodeList();
+    let idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
+    let idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
+    let idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
+    assert(idxNew < idxMid && idxMid < idxOld, 'date-desc sort failed');
+
+    // Date ascending: Old -> Mid -> New
+    el('episodes-sort').value = 'date-asc';
+    context.renderEpisodeList();
+    idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
+    idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
+    idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
+    assert(idxOld < idxMid && idxMid < idxNew, 'date-asc sort failed');
+
+    // Duration descending: New (5400) -> Mid (1800) -> Old (300)
+    el('episodes-sort').value = 'duration-desc';
+    context.renderEpisodeList();
+    idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
+    idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
+    idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
+    assert(idxNew < idxMid && idxMid < idxOld, 'duration-desc sort failed');
+
+    // Duration filter: short (< 15m / 900s) -> only Old (300)
+    el('episodes-duration-filter').value = 'short';
+    context.renderEpisodeList();
+    assert(el('episodes-list').innerHTML.includes('Old Episode'));
+    assert(!el('episodes-list').innerHTML.includes('Mid Episode'));
+    assert(!el('episodes-list').innerHTML.includes('New Episode'));
+
+    // Duration filter: long (> 60m / 3600s) -> only New (5400)
+    el('episodes-duration-filter').value = 'long';
+    context.renderEpisodeList();
+    assert(!el('episodes-list').innerHTML.includes('Old Episode'));
+    assert(!el('episodes-list').innerHTML.includes('Mid Episode'));
+    assert(el('episodes-list').innerHTML.includes('New Episode'));
+
+    // Reset duration filter
+    el('episodes-duration-filter').value = 'all';
+    el('episodes-sort').value = 'default';
+
     context.fetch = async()=>({ok:true,json:async()=>({feed:{title:'Book',provider:'audiobook'},episodes:[
         {id:'01.mp3',title:'Chapter',order:'1',status:'downloaded',pub_date:'2020-01-01',media_url:'/book/01.mp3'}
     ]})});
     await context.showEpisodes('book');
     assert(el('episodes-list').innerHTML.includes('1. Chapter'));
     assert(!el('episodes-list').innerHTML.includes('2020'));
-    console.log('Episode rendering, filtering, media links, and request ordering tests passed');
+    console.log('Episode rendering, filtering, sorting, media links, and request ordering tests passed');
 }
 run().catch(err=>{console.error(err);process.exitCode=1;});

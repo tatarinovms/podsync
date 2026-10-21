@@ -91,6 +91,14 @@ type FeedConfigUpdate struct {
 }
 
 // SystemStats contains runtime statistics and server metrics
+// CoverUploadResult describes the result of uploading a podcast or feed cover image
+type CoverUploadResult struct {
+	URL      string `json:"url"`
+	RelURL   string `json:"rel_url"`
+	FeedID   string `json:"feed_id,omitempty"`
+	Filename string `json:"filename"`
+}
+
 type SystemStats struct {
 	Version    string    `json:"version"`
 	Commit     string    `json:"commit"`
@@ -307,4 +315,5 @@ type AdminManager interface {
 	GetAudiobooksDir() string
 	SaveAudiobookFile(bookDir string, filename string, r io.Reader) error
 	DeleteAudiobookDir(ctx context.Context, dirName string) error
+	SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*CoverUploadResult, error)
 }

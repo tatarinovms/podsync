@@ -269,6 +269,41 @@
         .text-muted, .text-secondary { color: var(--ctp-subtext0) !important; }
 
         /* 2. Buttons: Primary (Mauve), Secondary (Ghost/Surface2), Danger (Red) */
+        .btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1.5 !important;
+            vertical-align: middle;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            padding: 6px 14px;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-sm, .btn-group-sm > .btn {
+            padding: 5px 12px !important;
+            font-size: 0.85rem !important;
+            border-radius: 7px;
+            line-height: 1.45 !important;
+        }
+        .btn-xs {
+            padding: 2px 8px !important;
+            font-size: 0.78rem !important;
+            line-height: 1.35 !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+        }
+
+        /* Modal and form footer action buttons (balanced width & height) */
+        .modal-footer .btn,
+        #detail-settings .modal-footer .btn {
+            min-width: 105px;
+            padding: 6px 16px !important;
+            font-size: 0.875rem !important;
+            font-weight: 600;
+            line-height: 1.5 !important;
+        }
+
         .btn-primary, .btn-brand, .btn-outline-primary {
             background-color: var(--btn-primary-bg) !important;
             color: var(--btn-primary-text) !important;
@@ -803,6 +838,11 @@
             }
             #episodesModal .modal-dialog {
                 margin: 0.5rem;
+            }
+            .modal-footer .btn,
+            #detail-settings .modal-footer .btn {
+                min-height: 44px;
+                padding: 8px 16px !important;
             }
         }
 

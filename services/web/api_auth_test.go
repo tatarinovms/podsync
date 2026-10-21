@@ -17,7 +17,7 @@ func TestAdministrativeRoutesRequireAuthentication(t *testing.T) {
 		"/api/v1/system/status", "/api/v1/system/logs", "/api/v1/system/logs/level", "/api/v1/system/logs/download",
 		"/api/v1/downloader", "/api/v1/downloader/cookies", "/api/v1/downloader/test", "/api/v1/mcp/config",
 		"/api/v1/audiobooks/dirs", "/api/v1/audiobooks/import", "/api/v1/audiobooks/upload", "/api/v1/audiobooks/config",
-		"/api/v1/auth/password", "/api/v1/auth/security",
+		"/api/v1/auth/password", "/api/v1/auth/security", "/api/v1/covers/upload", "/api/v1/feeds/book/cover",
 	}
 	for _, path := range paths {
 		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {

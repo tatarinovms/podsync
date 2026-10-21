@@ -926,6 +926,7 @@
             document.getElementById('fs-custom-author').value = custom.author || '';
             document.getElementById('fs-custom-desc').value = custom.description || '';
             document.getElementById('fs-custom-cover').value = custom.cover_art || '';
+            updateCoverPreview('fs');
             document.getElementById('fs-custom-category').value = custom.category || '';
             document.getElementById('fs-custom-lang').value = custom.lang || '';
             document.getElementById('fs-custom-explicit').checked = !!custom.explicit;
@@ -1043,6 +1044,78 @@
                 val = val ? `${val} --cookies ${cFile}` : `--cookies ${cFile}`;
             }
             input.value = val;
+        }
+
+        function updateCoverPreview(prefix) {
+            const input = document.getElementById(`${prefix}-custom-cover`);
+            const preview = document.getElementById(`${prefix}-cover-preview`);
+            const previewImg = document.getElementById(`${prefix}-cover-preview-img`);
+            if (!input || !preview || !previewImg) return;
+            const url = input.value.trim();
+            if (url && safeUrl(url)) {
+                previewImg.src = safeUrl(url);
+                previewImg.onload = () => preview.classList.remove('d-none');
+                previewImg.onerror = () => preview.classList.add('d-none');
+            } else {
+                preview.classList.add('d-none');
+            }
+        }
+
+        async function uploadCoverArt(prefix) {
+            const fileInput = document.getElementById(`${prefix}-cover-file`);
+            const coverInput = document.getElementById(`${prefix}-custom-cover`);
+            if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+            const file = fileInput.files[0];
+
+            let feedId = '';
+            if (prefix === 'fs') {
+                feedId = document.getElementById('fs-feed-id')?.value || '';
+            } else if (prefix === 'new-feed') {
+                feedId = document.getElementById('new-feed-id')?.value || '';
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            if (feedId) formData.append('feed_id', feedId);
+
+            const uploadBtn = document.querySelector(`label[for="${prefix}-cover-file"]`);
+            const origHtml = uploadBtn ? uploadBtn.innerHTML : '';
+            if (uploadBtn) {
+                uploadBtn.classList.add('disabled');
+                uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Uploading...';
+            }
+
+            try {
+                const res = await fetch('/api/v1/covers/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) {
+                    throw new Error(await res.text());
+                }
+                const data = await res.json();
+                if (data && data.url) {
+                    if (coverInput) {
+                        coverInput.value = data.url;
+                        updateCoverPreview(prefix);
+                    }
+                    showToast('Cover art uploaded successfully');
+                    if (prefix === 'fs' && feedId) {
+                        const detailCover = document.getElementById('detail-cover');
+                        if (detailCover) {
+                            detailCover.innerHTML = `<img src="${safeUrl(data.url)}" alt="" onerror="this.style.display='none'">`;
+                        }
+                    }
+                }
+            } catch (err) {
+                alert('Failed to upload cover art: ' + err.message);
+            } finally {
+                if (uploadBtn) {
+                    uploadBtn.classList.remove('disabled');
+                    uploadBtn.innerHTML = origHtml;
+                }
+                fileInput.value = '';
+            }
         }
 
         async function saveFeedSettings(event) {
@@ -1219,6 +1292,7 @@
         if (addFeedFormEl) {
             addFeedFormEl.addEventListener('reset', () => {
                 keepLastManual = false;
+                updateCoverPreview('new-feed');
                 setTimeout(() => {
                     if (newFeedPageSizeEl && newFeedKeepLastEl) {
                         newFeedKeepLastEl.value = newFeedPageSizeEl.value || '50';
@@ -1350,6 +1424,8 @@
                 showFeedSection('episodes', false);
                 document.getElementById('episodes-search').value = '';
                 document.getElementById('episodes-status-filter').value = 'all';
+                if (document.getElementById('episodes-duration-filter')) document.getElementById('episodes-duration-filter').value = 'all';
+                if (document.getElementById('episodes-sort')) document.getElementById('episodes-sort').value = 'default';
                 document.getElementById('episodes-feed-subtitle').innerText = isAudiobook ? 'Loading chapters...' : 'Loading episodes...';
                 listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
             }
@@ -1378,11 +1454,46 @@
             if (!episodeView) return;
             const { feedId, title, isAudiobook, episodes } = episodeView;
             const listEl = document.getElementById('episodes-list');
-            const query = document.getElementById('episodes-search').value.trim().toLowerCase();
-            const status = document.getElementById('episodes-status-filter').value;
-            const visible = episodes.filter(ep =>
-                (status === 'all' || ep.status === status) &&
-                (String(ep.title || '') + ' ' + String(ep.id || '')).toLowerCase().includes(query));
+            const query = (document.getElementById('episodes-search')?.value || '').trim().toLowerCase();
+            const status = document.getElementById('episodes-status-filter')?.value || 'all';
+            const durationFilter = document.getElementById('episodes-duration-filter')?.value || 'all';
+            const sort = document.getElementById('episodes-sort')?.value || 'default';
+
+            let visible = episodes.filter(ep => {
+                if (status !== 'all' && ep.status !== status) return false;
+                if (query && !(String(ep.title || '') + ' ' + String(ep.id || '')).toLowerCase().includes(query)) return false;
+                if (durationFilter !== 'all') {
+                    const dur = Number(ep.duration) || 0;
+                    if (durationFilter === 'short' && (dur <= 0 || dur >= 900)) return false;
+                    if (durationFilter === 'medium' && (dur < 900 || dur > 3600)) return false;
+                    if (durationFilter === 'long' && dur <= 3600) return false;
+                }
+                return true;
+            });
+
+            if (sort === 'date-desc') {
+                visible.sort((a, b) => {
+                    const da = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                    const db = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                    const va = Number.isNaN(da) || da < 0 ? 0 : da;
+                    const vb = Number.isNaN(db) || db < 0 ? 0 : db;
+                    return vb - va;
+                });
+            } else if (sort === 'date-asc') {
+                visible.sort((a, b) => {
+                    const da = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                    const db = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                    const va = Number.isNaN(da) || da < 0 ? 0 : da;
+                    const vb = Number.isNaN(db) || db < 0 ? 0 : db;
+                    return va - vb;
+                });
+            } else if (sort === 'duration-desc') {
+                visible.sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0));
+            } else if (sort === 'duration-asc') {
+                visible.sort((a, b) => (Number(a.duration) || 0) - (Number(b.duration) || 0));
+            } else if (sort === 'title-asc') {
+                visible.sort((a, b) => String(a.title || a.id || '').localeCompare(String(b.title || b.id || '')));
+            }
             const count = value => episodes.filter(ep => ep.status === value).length;
             const parts = [`${isAudiobook ? 'Available' : 'Downloaded'}: ${count('downloaded')}`];
             for (const [value, label] of [['new', 'Pending'], ['error', 'Errors'], ['cleaned', 'Cleaned']]) {

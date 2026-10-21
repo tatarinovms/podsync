@@ -384,3 +384,7 @@ func (c *HTTPClientManager) DeleteAudiobookDir(ctx context.Context, dirName stri
 	path := fmt.Sprintf("/api/v1/audiobooks/dirs?name=%s", url.QueryEscape(dirName))
 	return c.doRequest(ctx, http.MethodDelete, path, nil, nil)
 }
+
+func (c *HTTPClientManager) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*web.CoverUploadResult, error) {
+	return nil, fmt.Errorf("remote cover save not implemented in proxy")
+}

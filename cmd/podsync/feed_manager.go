@@ -2486,3 +2486,87 @@ func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string)
 	log.Infof("successfully deleted audiobook directory from disk: %s", targetPath)
 	return nil
 }
+
+func (m *AppFeedManager) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*web.CoverUploadResult, error) {
+	m.mu.RLock()
+	dataDir := ""
+	if m.cfg != nil {
+		dataDir = m.cfg.Storage.Local.DataDir
+	}
+	publicURL := web.Config{}.PublicURL()
+	if m.cfg != nil {
+		publicURL = m.cfg.Server.PublicURL()
+	}
+	m.mu.RUnlock()
+
+	if dataDir == "" {
+		return nil, errors.New("storage data directory is not configured")
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
+		// valid
+	default:
+		ext = ".jpg"
+	}
+
+	var targetDir, targetFilename, relURL string
+	cleanFeedID := strings.TrimSpace(feedID)
+
+	if cleanFeedID != "" {
+		baseID := filepath.Base(filepath.Clean(cleanFeedID))
+		if baseID == "." || baseID == "/" || baseID == ".." || strings.Contains(cleanFeedID, "..") {
+			return nil, errors.New("invalid feed ID")
+		}
+
+		mountedDir := ""
+		if m.storage != nil {
+			if mounter, ok := m.storage.(fs.Mounter); ok {
+				if dir, ok := mounter.GetMount(baseID); ok && dir != "" {
+					mountedDir = dir
+				}
+			}
+		}
+
+		if mountedDir != "" {
+			targetDir = mountedDir
+		} else {
+			targetDir = filepath.Join(dataDir, baseID)
+		}
+
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return nil, errors.Wrap(err, "failed to create feed cover directory")
+		}
+
+		targetFilename = "cover" + ext
+		relURL = fmt.Sprintf("/%s/%s", baseID, targetFilename)
+	} else {
+		targetDir = filepath.Join(dataDir, "covers")
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return nil, errors.Wrap(err, "failed to create covers directory")
+		}
+
+		targetFilename = fmt.Sprintf("cover_%d%s", time.Now().UnixNano(), ext)
+		relURL = fmt.Sprintf("/covers/%s", targetFilename)
+	}
+
+	targetPath := filepath.Join(targetDir, targetFilename)
+	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open cover target file")
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, r); err != nil {
+		return nil, errors.Wrap(err, "failed to write cover file")
+	}
+
+	fullURL := strings.TrimRight(publicURL, "/") + relURL
+	return &web.CoverUploadResult{
+		URL:      fullURL,
+		RelURL:   relURL,
+		FeedID:   cleanFeedID,
+		Filename: targetFilename,
+	}, nil
+}

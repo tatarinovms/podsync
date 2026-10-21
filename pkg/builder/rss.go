@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -36,13 +37,13 @@ type rssFeedXML struct {
 }
 
 type rssChannelXML struct {
-	Title       string          `xml:"title"`
-	Description string          `xml:"description"`
-	Link        string          `xml:"link"`
-	Language    string          `xml:"language"`
-	Author      string          `xml:"author"`
-	Image       rssImageXML     `xml:"image"`
-	Items       []rssItemXML    `xml:"item"`
+	Title       string       `xml:"title"`
+	Description string       `xml:"description"`
+	Link        string       `xml:"link"`
+	Language    string       `xml:"language"`
+	Author      string       `xml:"author"`
+	Image       rssImageXML  `xml:"image"`
+	Items       []rssItemXML `xml:"item"`
 }
 
 type rssImageXML struct {
@@ -103,7 +104,6 @@ func (b *RSSBuilder) Build(ctx context.Context, cfg *feed.Config) (*model.Feed, 
 		Format:      cfg.Format,
 		Quality:     cfg.Quality,
 		PageSize:    cfg.PageSize,
-		Episodes:    make([]*model.Episode, 0, len(parsedFeed.Episodes)),
 	}
 
 	if result.Format == "" {
@@ -113,9 +113,32 @@ func (b *RSSBuilder) Build(ctx context.Context, cfg *feed.Config) (*model.Feed, 
 		result.Quality = model.QualityHigh
 	}
 
-	for _, ep := range parsedFeed.Episodes {
-		result.Episodes = append(result.Episodes, ep)
+	episodes := make([]*model.Episode, len(parsedFeed.Episodes))
+	copy(episodes, parsedFeed.Episodes)
+
+	// Sort episodes based on PlaylistSort
+	if cfg.PlaylistSort == model.SortingAsc {
+		sort.SliceStable(episodes, func(i, j int) bool {
+			if !episodes[i].PubDate.IsZero() && !episodes[j].PubDate.IsZero() {
+				return episodes[i].PubDate.Before(episodes[j].PubDate)
+			}
+			return i > j
+		})
+	} else {
+		// Default: descending (newest first)
+		sort.SliceStable(episodes, func(i, j int) bool {
+			if !episodes[i].PubDate.IsZero() && !episodes[j].PubDate.IsZero() {
+				return episodes[i].PubDate.After(episodes[j].PubDate)
+			}
+			return i < j
+		})
 	}
+
+	if cfg.PageSize > 0 && len(episodes) > cfg.PageSize {
+		episodes = episodes[:cfg.PageSize]
+	}
+
+	result.Episodes = episodes
 
 	return result, nil
 }

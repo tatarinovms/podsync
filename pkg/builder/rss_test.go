@@ -1,12 +1,16 @@
 package builder
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
 )
 
@@ -98,4 +102,44 @@ func TestDetectMediaExtension(t *testing.T) {
 	assert.Equal(t, "aac", DetectMediaExtension("https://cdn.com/stream", "audio/aac"))
 	assert.Equal(t, "ogg", DetectMediaExtension("https://cdn.com/stream", "audio/ogg"))
 	assert.Equal(t, "mp3", DetectMediaExtension("https://cdn.com/stream", ""))
+}
+
+func TestRSSBuilder_Build_PageSize(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.Write([]byte(sampleRSS))
+	}))
+	defer srv.Close()
+
+	builder := NewRSSBuilder()
+
+	// 1. PageSize = 1, Descending (default): should return only episode 400
+	feedDesc, err := builder.Build(context.Background(), &feed.Config{
+		ID:       "test-feed",
+		URL:      srv.URL,
+		PageSize: 1,
+	})
+	require.NoError(t, err)
+	require.Len(t, feedDesc.Episodes, 1)
+	assert.Equal(t, "bc-400", feedDesc.Episodes[0].ID)
+
+	// 2. PageSize = 1, Ascending: should return only episode 399 (oldest)
+	feedAsc, err := builder.Build(context.Background(), &feed.Config{
+		ID:           "test-feed",
+		URL:          srv.URL,
+		PageSize:     1,
+		PlaylistSort: model.SortingAsc,
+	})
+	require.NoError(t, err)
+	require.Len(t, feedAsc.Episodes, 1)
+	assert.Equal(t, "bc-399", feedAsc.Episodes[0].ID)
+
+	// 3. PageSize = 0 (All episodes): should return all 2 episodes
+	feedAll, err := builder.Build(context.Background(), &feed.Config{
+		ID:       "test-feed",
+		URL:      srv.URL,
+		PageSize: 0,
+	})
+	require.NoError(t, err)
+	require.Len(t, feedAll.Episodes, 2)
 }

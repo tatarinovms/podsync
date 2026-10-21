@@ -68,10 +68,10 @@ case "$ARCH" in
   *) echo "Неподдерживаемая архитектура: $ARCH" && exit 1 ;;
 esac
 
-# Получение последней версии через GitHub API (или фиксированная fallback-версия "v2.18.0")
+# Получение последней версии через GitHub API (или фиксированная fallback-версия "v2.18.1")
 LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
-  LATEST_TAG="v2.18.0"
+  LATEST_TAG="v2.18.1"
 fi
 VERSION_NUM="${LATEST_TAG#v}"
 
@@ -383,7 +383,7 @@ esac
 
 LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
-  LATEST_TAG="v2.18.0"
+  LATEST_TAG="v2.18.1"
 fi
 VERSION_NUM="${LATEST_TAG#v}"
 

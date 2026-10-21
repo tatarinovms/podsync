@@ -3318,15 +3318,31 @@
 
         function toggleNavigation() {
             const layout = document.querySelector('.app-layout');
+            if (!layout) return;
             const open = !layout.classList.contains('navigation-open');
             layout.classList[open ? 'add' : 'remove']('navigation-open');
-            document.querySelector('.mobile-menu-toggle').setAttribute('aria-expanded', String(open));
+            document.querySelector('.mobile-menu-toggle')?.setAttribute('aria-expanded', String(open));
         }
 
         function closeNavigation() {
             document.querySelector('.app-layout')?.classList.remove('navigation-open');
             document.querySelector('.mobile-menu-toggle')?.setAttribute('aria-expanded', 'false');
         }
+
+        document.addEventListener('click', (e) => {
+            const layout = document.querySelector('.app-layout');
+            if (layout?.classList.contains('navigation-open')) {
+                const sidebar = document.querySelector('.app-sidebar');
+                const toggle = document.querySelector('.mobile-menu-toggle');
+                if (sidebar && !sidebar.contains(e.target) && toggle && !toggle.contains(e.target)) {
+                    closeNavigation();
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeNavigation();
+        });
 
         function setRoute(hash) {
             if (!restoringRoute && window.location.hash !== hash) window.history?.pushState(null, '', hash);

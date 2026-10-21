@@ -69,10 +69,10 @@ case "$ARCH" in
   *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
 esac
 
-# Get latest release version from GitHub API (or set fixed VERSION="v2.16.0")
+# Get latest release version from GitHub API (or set fixed VERSION="v2.17.0")
 LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
-  LATEST_TAG="v2.16.0"
+  LATEST_TAG="v2.17.0"
 fi
 VERSION_NUM="${LATEST_TAG#v}"
 
@@ -395,7 +395,7 @@ esac
 
 LATEST_TAG=$(curl -s "https://api.github.com/repos/tatarinovms/podsync/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if [ -z "$LATEST_TAG" ]; then
-  LATEST_TAG="v2.16.0"
+  LATEST_TAG="v2.17.0"
 fi
 VERSION_NUM="${LATEST_TAG#v}"
 

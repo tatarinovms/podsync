@@ -7,7 +7,7 @@
     <title>Podsync Management Console</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=3">
+    <link rel="stylesheet" href="./admin.css?v=4">
 </head>
 <body>
 
@@ -15,13 +15,13 @@
     <div id="login-view" class="d-none min-vh-100 d-flex align-items-center justify-content-center p-3 position-relative">
         <div class="position-absolute top-0 end-0 p-3">
             <button class="btn btn-light btn-sm border d-flex align-items-center gap-2 shadow-sm" onclick="toggleTheme()" title="Toggle Catppuccin theme (Latte / Mocha)">
-                <i class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
+                <i aria-hidden="true" class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
                 <span class="small fw-semibold theme-toggle-name">Catppuccin Latte</span>
             </button>
         </div>
         <div class="card p-4 p-md-5 shadow-lg" style="max-width: 420px; width: 100%;">
             <div class="text-center mb-4">
-                <i class="bi bi-broadcast fs-1 text-primary"></i>
+                <i aria-hidden="true" class="bi bi-broadcast fs-1 text-primary"></i>
                 <h3 class="fw-bold mt-2 navbar-brand-gradient">Podsync Admin</h3>
                 <p class="text-muted small">Podcast and API Management</p>
             </div>
@@ -48,109 +48,80 @@
         <!-- Top Navbar -->
         <nav class="navbar navbar-expand-lg border-bottom sticky-top py-2">
             <div class="container-fluid px-4">
-                <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                    <i class="bi bi-broadcast text-primary fs-4"></i>
+                <button class="btn btn-light mobile-menu-toggle" type="button" aria-label="Toggle navigation" aria-controls="mainTabs" aria-expanded="false" onclick="toggleNavigation()"><i aria-hidden="true" class="bi bi-list"></i></button>
+                <a class="navbar-brand d-flex align-items-center gap-2" href="#feeds">
+                    <i aria-hidden="true" class="bi bi-broadcast text-primary fs-4"></i>
                     <span class="navbar-brand-gradient fs-4">Podsync</span>
-                    <span class="badge bg-light text-secondary border fs-6 fw-normal ms-1" id="nav-version">v2.13.9</span>
+                    <span class="badge bg-light text-secondary border fs-6 fw-normal ms-1 d-none" id="nav-version"></span>
                 </a>
                 
                 <div class="d-flex align-items-center gap-2 ms-auto">
                     <button class="btn btn-light btn-sm border d-flex align-items-center gap-2" onclick="toggleTheme()" title="Toggle Catppuccin theme (Latte / Mocha)">
-                        <i class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
+                        <i aria-hidden="true" class="theme-toggle-icon bi bi-sun-fill text-warning"></i>
                         <span class="d-none d-sm-inline small fw-semibold theme-toggle-name">Catppuccin Latte</span>
                     </button>
                     <a href="/podsync.opml" download="podsync.opml" class="btn btn-outline-secondary btn-sm d-none d-sm-inline-flex align-items-center gap-1" title="Download OPML podcast subscription file">
-                        <i class="bi bi-download"></i> OPML
+                        <i aria-hidden="true" class="bi bi-download"></i> OPML
                     </a>
                     <div class="dropdown">
-                        <button class="btn btn-light btn-sm border dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i>
+                        <button class="btn btn-light btn-sm border dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown" aria-label="Account menu">
+                            <i aria-hidden="true" class="bi bi-person-circle"></i>
                             <span id="nav-username" class="fw-semibold">Admin</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                            <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><i class="bi bi-key me-2"></i>Change Password</button></li>
+                            <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><i aria-hidden="true" class="bi bi-key me-2"></i>Change Password</button></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><button class="dropdown-item text-danger" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Sign out</button></li>
+                            <li><button class="dropdown-item text-danger" onclick="logout()"><i aria-hidden="true" class="bi bi-box-arrow-right me-2"></i>Sign out</button></li>
                         </ul>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <div class="container-fluid px-4 py-4">
-            <!-- Navigation Tabs -->
-            <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
-                <li class="nav-item">
-                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-feeds" onclick="loadFeeds()">
-                        <i class="bi bi-collection-play me-1"></i> Podcasts (<span id="feeds-count">0</span>)
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audiobooks" onclick="loadAudiobooksTab()">
-                        <i class="bi bi-book me-1"></i> Audiobooks
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-tokens">
-                        <i class="bi bi-key me-1"></i> API Keys
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system">
-                        <i class="bi bi-hdd-network me-1"></i> System & Storage
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-downloader" onclick="loadDownloaderConfig()">
-                        <i class="bi bi-cloud-arrow-down me-1"></i> Downloader &amp; Cookies
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mcp" onclick="loadMCPConfig()">
-                        <i class="bi bi-robot me-1"></i> MCP Server
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-logs" onclick="loadLogs()">
-                        <i class="bi bi-terminal me-1"></i> Logs
-                        <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-1 d-none">0</span>
-                    </button>
-                </li>
-            </ul>
+        <div class="app-layout">
+            <aside class="app-sidebar" aria-label="Main navigation">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist" aria-orientation="vertical">
+                    <li class="nav-section" role="presentation">LIBRARY</li>
+                    <li class="nav-item"><button class="nav-link active" role="tab" aria-selected="true" data-bs-toggle="tab" data-bs-target="#tab-feeds"><i aria-hidden="true" class="bi bi-collection-play"></i> Podcasts <span class="nav-count" id="feeds-count">0</span></button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-audiobooks"><i aria-hidden="true" class="bi bi-book"></i> Audiobooks</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-logs"><i aria-hidden="true" class="bi bi-activity"></i> Activity <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button></li>
+                    <li class="nav-section" role="presentation">SETTINGS</li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-tokens"><i aria-hidden="true" class="bi bi-key"></i> API keys</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-downloader"><i aria-hidden="true" class="bi bi-cloud-arrow-down"></i> Downloader</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System &amp; storage</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-mcp"><i aria-hidden="true" class="bi bi-robot"></i> MCP server</button></li>
+                </ul>
+                <div class="sidebar-note"><i aria-hidden="true" class="bi bi-broadcast"></i><span>Your media.<br>Your own feed.</span></div>
+            </aside>
 
             <!-- Tab Content -->
-            <div class="tab-content">
+            <main class="tab-content app-content" id="main-content">
                 
                 <!-- 1. Feeds Tab -->
                 <div class="tab-pane fade show active" id="tab-feeds">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 640px;">
-                            <div class="input-group">
-                                <span class="input-group-text border-end-0"><i class="bi bi-search text-muted"></i></span>
-                                <input type="text" id="feed-search" class="form-control border-start-0 ps-0" placeholder="Search by title or ID..." oninput="filterFeeds()">
-                            </div>
-                            <select id="feed-type-filter" class="form-select form-select-sm" style="max-width: 140px;" onchange="filterFeeds()">
-                                <option value="all" selected>All Types</option>
-                                <option value="channels">Channels</option>
-                                <option value="audiobooks">Audiobooks</option>
-                            </select>
-                            <span id="feeds-filter-info" class="badge bg-secondary-subtle text-secondary py-2 px-2 text-nowrap d-none"></span>
-                        </div>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="loadFeeds()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh list</button>
-                            <button class="btn btn-outline-secondary btn-sm" id="btn-update-all-feeds" onclick="triggerUpdateAll()" title="Update all podcasts now"><i class="bi bi-arrow-repeat me-1"></i> Update all</button>
-                            <button class="btn btn-outline-secondary btn-sm" id="btn-retry-all-feeds" onclick="triggerRetryAll()" title="Retry all failed episodes across all feeds"><i class="bi bi-arrow-counterclockwise me-1"></i> Retry all</button>
-                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
-                        </div>
+                    <header class="library-heading">
+                        <div><div class="eyebrow">YOUR LIBRARY</div><h1>Podcasts</h1><p class="text-muted mb-0">Your subscriptions, ready when you are.</p></div>
+                        <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Add podcast</button>
+                    </header>
+                    <div class="library-toolbar">
+                        <div class="library-search"><i aria-hidden="true" class="bi bi-search"></i><input type="search" id="feed-search" class="form-control" placeholder="Search your library…" aria-label="Search podcasts" oninput="filterFeeds()"></div>
+                        <select id="feed-type-filter" class="form-select" aria-label="Podcast type" onchange="filterFeeds()"><option value="all">All types</option><option value="channels">Channels</option><option value="audiobooks">Audiobooks</option></select>
+                        <select id="feed-sort" class="form-select" aria-label="Sort podcasts" onchange="filterFeeds()"><option value="title">Title A–Z</option><option value="updated">Recently updated</option><option value="size">Largest first</option></select>
+                        <div class="view-switch" role="group" aria-label="Library view"><button id="view-grid" class="btn active" aria-label="Card view" aria-pressed="true" onclick="setLibraryView('grid')"><i aria-hidden="true" class="bi bi-grid"></i></button><button id="view-list" class="btn" aria-label="List view" aria-pressed="false" onclick="setLibraryView('list')"><i aria-hidden="true" class="bi bi-list-ul"></i></button></div>
                     </div>
+                    <div class="library-filters">
+                        <div class="status-filters" role="group" aria-label="Filter by status"><button class="status-filter active" data-status="all" aria-pressed="true" onclick="setFeedStatus('all')">All <span id="count-all">0</span></button><button class="status-filter" data-status="updating" aria-pressed="false" onclick="setFeedStatus('updating')">Updating <span id="count-updating">0</span></button><button class="status-filter" data-status="errors" aria-pressed="false" onclick="setFeedStatus('errors')">Needs attention <span id="count-errors">0</span></button></div>
+                        <div class="dropdown"><button class="btn btn-light btn-sm dropdown-toggle" data-bs-toggle="dropdown">Library actions</button><ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item" onclick="loadFeeds()"><i aria-hidden="true" class="bi bi-arrow-clockwise me-2"></i>Refresh list</button></li><li><button class="dropdown-item" id="btn-update-all-feeds" onclick="triggerUpdateAll()">Update all</button></li><li><button class="dropdown-item" id="btn-retry-all-feeds" onclick="triggerRetryAll()">Retry failed episodes</button></li></ul></div>
+                    </div>
+                    <div id="feeds-filter-info" class="small text-muted mb-3 d-none" role="status"></div>
 
                     <!-- Connection Alert Banner -->
                     <div id="feeds-connection-alert" class="alert alert-warning py-2 px-3 small d-none mb-3" role="alert">
-                        <i class="bi bi-wifi-off me-2"></i><span>Connection lost to Podsync server, retrying...</span>
+                        <i aria-hidden="true" class="bi bi-wifi-off me-2"></i><span>Connection lost to Podsync server, retrying...</span>
                     </div>
 
                     <!-- Feeds List Grid -->
-                    <div id="feeds-container" class="row g-3">
+                    <div id="feeds-container" class="feed-grid">
                         <div class="col-12 text-center py-5 text-muted">
                             <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
                             <div>Loading podcasts...</div>
@@ -162,21 +133,21 @@
                 <div class="tab-pane fade" id="tab-audiobooks">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                         <div>
-                            <h5 class="fw-bold mb-1"><i class="bi bi-book me-2 text-primary"></i>Audiobooks &amp; Local Folders</h5>
+                            <h5 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-book me-2 text-primary"></i>Audiobooks &amp; Local Folders</h5>
                             <div class="text-muted small">
                                 Storage path: <code id="audiobooks-dir-display">/audiobooks</code>
                             </div>
                         </div>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="loadAudiobookDirs()"><i class="bi bi-arrow-clockwise me-1"></i> Rescan folders</button>
-                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadAudiobookModal"><i class="bi bi-cloud-arrow-up me-1"></i> Upload audiobook</button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="loadAudiobookDirs()"><i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i> Rescan folders</button>
+                            <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#uploadAudiobookModal"><i aria-hidden="true" class="bi bi-cloud-arrow-up me-1"></i> Upload audiobook</button>
                         </div>
                     </div>
 
                     <!-- Server Folders (Auto-discovery) -->
                     <div class="card p-4 mb-4">
                         <div class="d-flex align-items-center justify-content-between mb-3">
-                            <h6 class="fw-bold mb-0"><i class="bi bi-folder2-open me-2 text-primary"></i>Server Folders (Discovered on disk)</h6>
+                            <h6 class="fw-bold mb-0"><i aria-hidden="true" class="bi bi-folder2-open me-2 text-primary"></i>Server Folders (Discovered on disk)</h6>
                             <span class="badge bg-secondary" id="audiobook-dirs-count">0 folders</span>
                         </div>
                         <p class="text-muted small mb-3">
@@ -207,7 +178,7 @@
 
                     <!-- Active Audiobook Feeds -->
                     <div class="card p-4">
-                        <h6 class="fw-bold mb-3"><i class="bi bi-broadcast me-2 text-primary"></i>Active Audiobook Podcast Feeds</h6>
+                        <h6 class="fw-bold mb-3"><i aria-hidden="true" class="bi bi-broadcast me-2 text-primary"></i>Active Audiobook Podcast Feeds</h6>
                         <div id="audiobook-feeds-container" class="row g-3">
                             <!-- Rendered dynamically -->
                         </div>
@@ -219,7 +190,7 @@
                     <div class="row g-4">
                         <div class="col-12 col-xl-8">
                             <div class="card p-4">
-                                <h5 class="fw-bold mb-3"><i class="bi bi-shield-lock me-2 text-primary"></i>API Keys Configuration</h5>
+                                <h5 class="fw-bold mb-3"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>API Keys Configuration</h5>
                                 <p class="text-muted small mb-4">
                                     API keys are used to query video and playlist metadata. If a key is defined via an environment variable (ENV), it takes the highest priority.
                                 </p>
@@ -230,23 +201,23 @@
                         </div>
                         <div class="col-12 col-xl-4">
                             <div class="card p-4 bg-light">
-                                <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>Instructions</h6>
+                                <h6 class="fw-bold mb-3"><i aria-hidden="true" class="bi bi-info-circle me-2 text-primary"></i>Instructions</h6>
                                 <ul class="list-unstyled small d-flex flex-column gap-3 mb-0">
                                     <li>
                                         <div class="d-flex align-items-center mb-1">
-                                            <i class="bi bi-check-circle-fill text-success me-2"></i><strong>VK Video:</strong>
+                                            <i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>VK Video:</strong>
                                         </div>
                                         <div class="ms-4">
-                                            <a href="https://vkhost.github.io" target="_blank" class="fw-bold text-decoration-none"><i class="bi bi-box-arrow-up-right me-1"></i>vkhost.github.io</a>
+                                            <a href="https://vkhost.github.io" target="_blank" class="fw-bold text-decoration-none"><i aria-hidden="true" class="bi bi-box-arrow-up-right me-1"></i>vkhost.github.io</a>
                                             <span class="text-muted">(select Kate Mobile and click "Allow")</span>
                                         </div>
                                     </li>
-                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console &rarr; YouTube Data API v3</li>
-                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Vimeo:</strong> Developer App Access Token</li>
-                                    <li><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Twitch:</strong> Twitch Developer Console (ID:SECRET)</li>
+                                    <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console &rarr; YouTube Data API v3</li>
+                                    <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>Vimeo:</strong> Developer App Access Token</li>
+                                    <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>Twitch:</strong> Twitch Developer Console (ID:SECRET)</li>
                                 </ul>
                                 <div class="mt-3 p-2 rounded border small text-muted" style="background-color: var(--ctp-crust);">
-                                    <i class="bi bi-info-circle text-primary me-1"></i>
+                                    <i aria-hidden="true" class="bi bi-info-circle text-primary me-1"></i>
                                     <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. You can copy the entire URL from your browser's address bar (or just the token) — Podsync will automatically extract the token for you!
                                 </div>
                             </div>
@@ -321,11 +292,11 @@
                         <div class="col-12 col-lg-6">
                             <div class="card p-4 h-100">
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
                                     <div class="d-flex flex-shrink-0 align-items-center gap-2">
                                         <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
                                         <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
-                                            <i class="bi bi-sliders me-1"></i>Configure
+                                            <i aria-hidden="true" class="bi bi-sliders me-1"></i>Configure
                                         </button>
                                     </div>
                                 </div>
@@ -356,9 +327,9 @@
                         <div class="col-12 col-lg-6">
                             <div class="card p-4 h-100">
                                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
                                     <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
-                                        <i class="bi bi-pencil-square me-1"></i>Change Password
+                                        <i aria-hidden="true" class="bi bi-pencil-square me-1"></i>Change Password
                                     </button>
                                 </div>
                                 <p class="small text-muted mb-3">
@@ -386,15 +357,15 @@
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                                 <div>
-                                    <h4 class="fw-bold mb-1"><i class="bi bi-cloud-arrow-down me-2"></i>Downloader &amp; Cookies Configuration</h4>
+                                    <h4 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-cloud-arrow-down me-2"></i>Downloader &amp; Cookies Configuration</h4>
                                     <p class="mb-0 opacity-75">Configure yt-dlp downloader engine, cookies (to bypass YouTube bot checks and age-gates), and proxy settings.</p>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="dl-status-badge">
-                                        <i class="bi bi-gear-fill me-1 text-primary"></i> <span id="dl-badge-text">yt-dlp Ready</span>
+                                        <i aria-hidden="true" class="bi bi-gear-fill me-1 text-primary"></i> <span id="dl-badge-text">yt-dlp Ready</span>
                                     </span>
                                     <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="ffmpeg-status-badge">
-                                        <i class="bi bi-film me-1 text-info"></i> <span id="ffmpeg-badge-text">ffmpeg Ready</span>
+                                        <i aria-hidden="true" class="bi bi-film me-1 text-info"></i> <span id="ffmpeg-badge-text">ffmpeg Ready</span>
                                     </span>
                                 </div>
                             </div>
@@ -403,7 +374,7 @@
 
                     <!-- Bot Warning & Tips -->
                     <div class="alert alert-info d-flex align-items-start gap-3 shadow-sm mb-4">
-                        <i class="bi bi-info-circle-fill fs-4 flex-shrink-0 text-info mt-1"></i>
+                        <i aria-hidden="true" class="bi bi-info-circle-fill fs-4 flex-shrink-0 text-info mt-1"></i>
                         <div class="small">
                             <strong>Why are cookies needed?</strong> YouTube frequently blocks downloads from servers or cloud instances with the error:
                             <div class="rss-box text-warning p-2 my-2 small">
@@ -418,7 +389,7 @@
                         <div class="col-lg-7">
                             <div class="card h-100 shadow-sm">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                    <h6 class="mb-0 fw-bold"><i class="bi bi-cookie me-2 text-warning"></i>YouTube &amp; yt-dlp Cookies</h6>
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-cookie me-2 text-warning"></i>YouTube &amp; yt-dlp Cookies</h6>
                                     <div class="d-flex align-items-center gap-2">
                                         <span id="cookies-status-indicator" class="badge bg-secondary">Checking...</span>
                                     </div>
@@ -452,7 +423,7 @@
                                             <div class="d-flex gap-2">
                                                 <input type="file" id="cookies-file-input" class="d-none" accept=".txt" onchange="uploadCookiesFile(event)">
                                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('cookies-file-input').click()">
-                                                    <i class="bi bi-upload me-1"></i> Upload file
+                                                    <i aria-hidden="true" class="bi bi-upload me-1"></i> Upload file
                                                 </button>
                                             </div>
                                         </div>
@@ -488,10 +459,10 @@
 
                                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-2">
                                         <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearCookiesContent()">
-                                            <i class="bi bi-trash me-1"></i> Clear Cookies
+                                            <i aria-hidden="true" class="bi bi-trash me-1"></i> Clear Cookies
                                         </button>
                                         <button type="button" class="btn btn-brand btn-sm" onclick="saveCookiesContent()">
-                                            <i class="bi bi-check-lg me-1"></i> Save Cookies
+                                            <i aria-hidden="true" class="bi bi-check-lg me-1"></i> Save Cookies
                                         </button>
                                     </div>
                                 </div>
@@ -503,7 +474,7 @@
                             <!-- Downloader Options -->
                             <div class="card shadow-sm mb-4">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                    <h6 class="mb-0 fw-bold"><i class="bi bi-sliders me-2 text-primary"></i>Downloader Options</h6>
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-sliders me-2 text-primary"></i>Downloader Options</h6>
                                     <div class="d-flex align-items-center gap-2 small">
                                         <span class="badge bg-body-secondary text-body" id="dl-engine-pill">yt-dlp: -</span>
                                         <span class="badge bg-body-secondary text-body" id="dl-ffmpeg-pill">ffmpeg: -</span>
@@ -541,7 +512,7 @@
 
                                         <div class="d-flex justify-content-end">
                                             <button type="submit" class="btn btn-brand btn-sm">
-                                                <i class="bi bi-save me-1"></i> Save Downloader Settings
+                                                <i aria-hidden="true" class="bi bi-save me-1"></i> Save Downloader Settings
                                             </button>
                                         </div>
                                     </form>
@@ -551,7 +522,7 @@
                             <!-- Live Connectivity & Bot Verification Test Card -->
                             <div class="card shadow-sm">
                                 <div class="card-header bg-transparent py-3">
-                                    <h6 class="mb-0 fw-bold"><i class="bi bi-patch-check me-2 text-success"></i>Verify yt-dlp &amp; Cookies</h6>
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-patch-check me-2 text-success"></i>Verify yt-dlp &amp; Cookies</h6>
                                 </div>
                                 <div class="card-body">
                                     <p class="small text-muted mb-3">Run a live extraction with yt-dlp using your configured cookies and proxy to ensure YouTube bot detection is bypassed.</p>
@@ -581,10 +552,10 @@
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                                 <div>
-                                    <h4 class="fw-bold mb-1"><i class="bi bi-robot me-2"></i>Model Context Protocol (MCP) Server</h4>
+                                    <h4 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-robot me-2"></i>Model Context Protocol (MCP) Server</h4>
                                     <p class="mb-0 opacity-75">Connect AI assistants (OpenCode v2, Claude Desktop, Cursor, Cline, Antigravity) to manage feeds and retry episodes directly.</p>
                                 </div>
-                                <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm"><i class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
+                                <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm"><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
                             </div>
                         </div>
                     </div>
@@ -594,14 +565,14 @@
                         <div class="col-lg-6">
                             <div class="card h-100 shadow-sm">
                                 <div class="card-header bg-transparent py-3">
-                                    <h6 class="mb-0 fw-bold"><i class="bi bi-shield-lock me-2 text-primary"></i>Credentials &amp; Endpoints</h6>
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Credentials &amp; Endpoints</h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold text-muted">SSE Stream Endpoint</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-sse-url" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-sse-url', this)"><i class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-sse-url', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div class="row g-2 mb-3">
@@ -609,15 +580,15 @@
                                             <label class="form-label small fw-semibold text-muted">Admin Username</label>
                                             <div class="input-group">
                                                 <input type="text" id="mcp-username" class="form-control form-control-sm" readonly>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-username', this)"><i class="bi bi-clipboard"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-username', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
                                         <div class="col-sm-6">
                                             <label class="form-label small fw-semibold text-muted">Admin Password</label>
                                             <div class="input-group">
                                                 <input type="password" id="mcp-password" class="form-control form-control-sm" readonly>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i class="bi bi-eye"></i></button>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-password', this)" title="Copy"><i class="bi bi-clipboard"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-password', this)" title="Copy"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
                                     </div>
@@ -625,7 +596,7 @@
                                         <label class="form-label small fw-semibold text-muted">HTTP Basic Auth Header</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-basic-auth" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-basic-auth', this)"><i class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-basic-auth', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                 </div>
@@ -635,28 +606,28 @@
                         <div class="col-lg-6">
                             <div class="card h-100 shadow-sm">
                                 <div class="card-header bg-transparent py-3">
-                                    <h6 class="mb-0 fw-bold"><i class="bi bi-terminal me-2 text-primary"></i>Local Stdio Execution</h6>
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-terminal me-2 text-primary"></i>Local Stdio Execution</h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold text-muted">Executable Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-binary-path" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-binary-path', this)"><i class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-binary-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold text-muted">Config File Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-config-path" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-config-path', this)"><i class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-config-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div>
                                         <label class="form-label small fw-semibold text-muted">Command Line</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-cmdline" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-cmdline', this)"><i class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-cmdline', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                 </div>
@@ -667,7 +638,7 @@
                     <!-- Client Configuration Snippets -->
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-code-slash me-2 text-primary"></i>Ready-to-Use Client Configurations</h6>
+                            <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-code-slash me-2 text-primary"></i>Ready-to-Use Client Configurations</h6>
                             <ul class="nav nav-pills" id="clientTabs" role="tablist">
                                 <li class="nav-item">
                                     <button class="nav-link active py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-opencode">OpenCode v2</button>
@@ -691,7 +662,7 @@
                                                 <button type="button" id="btn-opencode-remote" class="btn btn-primary" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
                                                 <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary" onclick="setOpencodeMode('local')">Local (Stdio)</button>
                                             </div>
-                                            <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                            <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                         </div>
                                     </div>
                                     <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
@@ -701,7 +672,7 @@
                                 <div class="tab-pane fade" id="client-claude">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                         <span class="small text-muted">Add to <code>claude_desktop_config.json</code> under <code>"mcpServers"</code>:</span>
-                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('claude-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('claude-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy JSON</button>
                                     </div>
                                     <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
                                 </div>
@@ -710,7 +681,7 @@
                                 <div class="tab-pane fade" id="client-cursor">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                         <span class="small text-muted">Add under <strong>Cursor Settings &gt; Features &gt; MCP</strong>:</span>
-                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('cursor-snippet', this)"><i class="bi bi-clipboard me-1"></i> Copy Config</button>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('cursor-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy Config</button>
                                     </div>
                                     <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
                                 </div>
@@ -721,7 +692,7 @@
                     <!-- Agent Skill Card -->
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-transparent py-3">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightning-charge me-2 text-warning"></i>Agent Skill (Ready to feed to Autonomous Agents)</h6>
+                            <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-lightning-charge me-2 text-warning"></i>Agent Skill (Ready to feed to Autonomous Agents)</h6>
                         </div>
                         <div class="card-body">
                             <p class="small text-muted mb-3">
@@ -730,7 +701,7 @@
                             <div class="input-group mb-2">
                                 <span class="input-group-text small bg-light">Skill Path</span>
                                 <input type="text" id="mcp-skill-path" class="form-control font-monospace form-control-sm" readonly>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-skill-path', this)"><i class="bi bi-clipboard"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-skill-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                             </div>
                         </div>
                     </div>
@@ -738,7 +709,7 @@
                     <!-- Available Tools Reference -->
                     <div class="card shadow-sm">
                         <div class="card-header bg-transparent py-3">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-tools me-2 text-primary"></i>Exposed MCP Tools &amp; Actions</h6>
+                            <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-tools me-2 text-primary"></i>Exposed MCP Tools &amp; Actions</h6>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0 small">
@@ -882,13 +853,13 @@
                                 </div>
 
                                 <div class="input-group input-group-sm ms-md-2" style="max-width: 280px;">
-                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <span class="input-group-text"><i aria-hidden="true" class="bi bi-search"></i></span>
                                     <input type="text" id="logs-search-input" class="form-control" placeholder="Search logs (e.g. error, vk, download)..." oninput="debounceLogsFilter()">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="clearLogsSearch()" title="Clear search"><i class="bi bi-x-lg"></i></button>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearLogsSearch()" title="Clear search"><i aria-hidden="true" class="bi bi-x-lg"></i></button>
                                 </div>
 
                                 <div class="input-group input-group-sm" style="max-width: 190px;">
-                                    <span class="input-group-text"><i class="bi bi-funnel"></i> Feed:</span>
+                                    <span class="input-group-text"><i aria-hidden="true" class="bi bi-funnel"></i> Feed:</span>
                                     <select id="logs-feed-select" class="form-select" onchange="onLogsFeedChange()">
                                         <option value="">All Feeds</option>
                                     </select>
@@ -928,10 +899,10 @@
                                 </div>
 
                                 <div class="btn-group btn-group-sm">
-                                    <button class="btn btn-outline-secondary" onclick="loadLogs(true)" title="Refresh logs"><i class="bi bi-arrow-repeat"></i></button>
-                                    <button class="btn btn-outline-secondary" onclick="copyLogsToClipboard()" title="Copy logs to clipboard"><i class="bi bi-clipboard"></i></button>
-                                    <a class="btn btn-outline-secondary" href="/api/v1/system/logs/download" target="_blank" title="Download .log file"><i class="bi bi-download"></i></a>
-                                    <button class="btn btn-outline-danger" onclick="clearLogsBuffer()" title="Clear log buffer"><i class="bi bi-trash"></i></button>
+                                    <button class="btn btn-outline-secondary" onclick="loadLogs(true)" title="Refresh logs"><i aria-hidden="true" class="bi bi-arrow-repeat"></i></button>
+                                    <button class="btn btn-outline-secondary" onclick="copyLogsToClipboard()" title="Copy logs to clipboard"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                    <a class="btn btn-outline-secondary" href="/api/v1/system/logs/download" target="_blank" title="Download .log file"><i aria-hidden="true" class="bi bi-download"></i></a>
+                                    <button class="btn btn-outline-danger" onclick="clearLogsBuffer()" title="Clear log buffer"><i aria-hidden="true" class="bi bi-trash"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -956,403 +927,14 @@
                     </div>
                 </div>
 
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Import Audiobook -->
-    <div class="modal fade" id="importAudiobookModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <div>
-                        <h5 class="modal-title fw-bold">Import Local Audiobook</h5>
-                        <div class="text-muted small">Create serial podcast RSS feed from server folder</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <form id="import-audiobook-form" onsubmit="event.preventDefault(); submitImportAudiobook();">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Directory Name <span class="text-danger">*</span></label>
-                            <input type="text" id="import-dir-name" class="form-control" readonly required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Feed ID (Slug) <span class="text-danger">*</span></label>
-                            <input type="text" id="import-feed-id" class="form-control" placeholder="e.g. 1984-orwell" required>
-                            <div class="form-text small">Unique URL slug (a-z, 0-9, dash, underscore)</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Book Title</label>
-                            <input type="text" id="import-feed-title" class="form-control" placeholder="Defaults to directory name or ID3 album">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Author / Narrator</label>
-                            <input type="text" id="import-feed-author" class="form-control" placeholder="Defaults to parsed author or ID3 artist">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Description</label>
-                            <textarea id="import-feed-desc" class="form-control" rows="2" placeholder="Optional book synopsis"></textarea>
-                        </div>
-                        <div class="border rounded p-2 bg-body-tertiary mb-3">
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="import-feed-private">
-                                <label class="form-check-label small fw-semibold" for="import-feed-private">Private podcast (Block aggregators)</label>
-                                <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex justify-content-end gap-2 pt-2">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-brand" id="btn-submit-import-audiobook"><i class="bi bi-check-lg me-1"></i> Create Feed</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Upload Audiobook -->
-    <div class="modal fade" id="uploadAudiobookModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <div>
-                        <h5 class="modal-title fw-bold">Upload Audiobook Files</h5>
-                        <div class="text-muted small">Upload tracks and optional cover image to the server</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <form id="upload-audiobook-form" onsubmit="event.preventDefault(); submitUploadAudiobook();">
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Book Folder Name <span class="text-danger">*</span></label>
-                            <input type="text" id="upload-book-dir" class="form-control" placeholder="e.g. George Orwell - 1984" required>
-                            <div class="form-text small">Folder will be created in the audiobooks directory</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Audio Files (MP3, M4B, M4A, etc.) <span class="text-danger">*</span></label>
-                            <input type="file" id="upload-audio-files" class="form-control" multiple accept=".mp3,.m4b,.m4a,.aac,.ogg,.opus,.flac" required>
-                            <div class="form-text small">Select all audio chapters/tracks (multi-select supported)</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label small fw-bold">Cover Image (Optional)</label>
-                            <input type="file" id="upload-cover-file" class="form-control" accept="image/jpeg,image/png">
-                            <div class="form-text small">Optional JPG/PNG cover art (or will be extracted from ID3 tags)</div>
-                        </div>
-                        <div class="form-check form-switch mb-3">
-                            <input class="form-check-input" type="checkbox" id="upload-auto-import" checked>
-                            <label class="form-check-label small" for="upload-auto-import">Automatically import and create podcast feed after upload</label>
-                        </div>
-                        <!-- Progress bar -->
-                        <div id="upload-progress-container" class="d-none mb-3">
-                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                <span id="upload-progress-status">Uploading files...</span>
-                                <span id="upload-progress-pct">0%</span>
-                            </div>
-                            <div class="progress" style="height: 10px;">
-                                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
-                            </div>
-                        </div>
-                        <div class="d-flex justify-content-end gap-2 pt-2">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-brand" id="btn-submit-upload-audiobook"><i class="bi bi-upload me-1"></i> Start Upload</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Add Feed -->
-    <div class="modal fade" id="addFeedModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0">
-                            <i class="bi bi-plus-circle text-primary me-2"></i>Add Podcast
-                        </h5>
-                        <div class="text-muted small mt-1">Configure source URL, download format, schedule, and feed options</div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-0">
-                    <form id="add-feed-form">
-                        <div class="p-3 border-bottom bg-body-tertiary">
-                            <div id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
-                            <div class="row g-2">
-                                <div class="col-md-7">
-                                    <label class="form-label small fw-semibold">Source URL (Rutube / VK Video / YouTube / Vimeo / etc) <span class="text-danger">*</span></label>
-                                    <input type="url" id="new-feed-url" class="form-control form-control-sm" required placeholder="https://rutube.ru/channel/25758171/" oninput="suggestFeedId(this.value)">
-                                    <div class="form-text small">Channels, playlists, communities, and users are supported.</div>
-                                </div>
-                                <div class="col-md-5">
-                                    <label class="form-label small fw-semibold">Feed ID (URL slug) <span class="text-danger">*</span></label>
-                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER">
-                                    <div class="form-text small">Used in RSS URL: <code>/CLANBEAVER.xml</code></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Nav tabs -->
-                        <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary" id="addFeedTabs" role="tablist">
-                            <li class="nav-item">
-                                <button type="button" class="nav-link active small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-general">
-                                    <i class="bi bi-clock me-1"></i>General &amp; Schedule
-                                </button>
-                            </li>
-                            <li class="nav-item">
-                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-cleanup">
-                                    <i class="bi bi-trash3 me-1"></i>Retention
-                                </button>
-                            </li>
-                            <li class="nav-item">
-                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-filters">
-                                    <i class="bi bi-funnel me-1"></i>Filters
-                                </button>
-                            </li>
-                            <li class="nav-item">
-                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-custom">
-                                    <i class="bi bi-card-text me-1"></i>RSS Overrides
-                                </button>
-                            </li>
-                            <li class="nav-item">
-                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-advanced">
-                                    <i class="bi bi-terminal me-1"></i>Advanced
-                                </button>
-                            </li>
-                        </ul>
-
-                        <div class="p-3">
-                            <div class="tab-content">
-                                <!-- 1. General & Schedule -->
-                                <div class="tab-pane fade show active" id="af-tab-general">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Media Format</label>
-                                            <select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
-                                                <option value="audio">Audio (MP3 / M4A)</option>
-                                                <option value="video" selected>Video (MP4)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6" id="new-feed-max-height-col">
-                                            <label class="form-label small fw-semibold">Video Quality</label>
-                                            <select id="new-feed-max-height" class="form-select form-select-sm">
-                                                <option value="480">480p</option>
-                                                <option value="720" selected>720p (HD)</option>
-                                                <option value="1080">1080p (Full HD)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6" id="new-feed-audio-quality-col" style="display: none;">
-                                            <label class="form-label small fw-semibold">Audio Quality</label>
-                                            <select id="new-feed-quality" class="form-select form-select-sm">
-                                                <option value="high" selected>High</option>
-                                                <option value="low">Low</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
-                                            <input type="number" id="new-feed-pagesize" class="form-control form-control-sm" min="1" max="500" value="50">
-                                            <div class="form-text small">Number of recent episodes to query from channel.</div>
-                                        </div>
-                                        <div class="col-sm-8">
-                                            <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
-                                            <div class="input-group input-group-sm mb-1">
-                                                <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
-                                            </div>
-                                            <div class="d-flex gap-1 flex-wrap">
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 1h')">1h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 6h')">6h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 12h')">12h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 24h')">24h</button>
-                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('0 4 * * *')">Daily 04:00</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Playlist Sorting</label>
-                                            <select id="new-feed-playlist-sort" class="form-select form-select-sm">
-                                                <option value="" selected>Default (Source order)</option>
-                                                <option value="asc">Ascending (Oldest first)</option>
-                                                <option value="desc">Descending (Newest first)</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Preferred Audio Language</label>
-                                            <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
-                                            <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
-                                        </div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
-                                            <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="new-feed-cookies-hint">Global cookies: data/cookies.txt</span>
-                                        </div>
-                                        <div class="input-group input-group-sm mb-1">
-                                            <input type="text" id="new-feed-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --js-runtimes deno:/root/.deno/bin/deno --geo-bypass">
-                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertGlobalCookiesToArgs('new-feed')" title="Append/Update global --cookies in arguments">
-                                                <i class="bi bi-cookie me-1"></i>+ Cookies
-                                            </button>
-                                        </div>
-                                        <div class="form-text small">Arguments passed directly to yt-dlp (e.g. <code>--js-runtimes deno:...</code>). Global cookies/proxy from Downloader settings are applied automatically.</div>
-                                    </div>
-                                    <div class="border rounded p-2 bg-body-tertiary">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input" type="checkbox" id="new-feed-opml" checked>
-                                            <label class="form-check-label small fw-semibold" for="new-feed-opml">Include in OPML export</label>
-                                            <div class="form-text small">Allows podcast apps to import this feed via the OPML button.</div>
-                                        </div>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" id="new-feed-private-feed">
-                                            <label class="form-check-label small fw-semibold" for="new-feed-private-feed">Private podcast (Block aggregators)</label>
-                                            <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 2. Retention & Cleanup -->
-                                <div class="tab-pane fade" id="af-tab-cleanup">
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
-                                        <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="50" placeholder="0 = unlimited (keep all episodes)">
-                                        <div class="form-text small mt-1">
-                                            <i class="bi bi-info-circle me-1"></i>Automatically synced with Page Size by default. Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 3. Filters -->
-                                <div class="tab-pane fade" id="af-tab-filters">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Title Include Match (Regex)</label>
-                                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)podcast|interview">
-                                            <div class="form-text small">Only download episodes matching this regex.</div>
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Title Exclude Match (Regex)</label>
-                                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)short|teaser|live">
-                                            <div class="form-text small">Skip episodes matching this regex.</div>
-                                        </div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Description Include (Regex)</label>
-                                            <input type="text" id="new-feed-filter-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Description Exclude (Regex)</label>
-                                            <input type="text" id="new-feed-filter-notdesc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
-                                        </div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Min Duration (Seconds)</label>
-                                            <input type="number" id="new-feed-min-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 600 (10 min)">
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Max Duration (Seconds)</label>
-                                            <input type="number" id="new-feed-max-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 7200 (2 hours)">
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Max Age (Days)</label>
-                                            <input type="number" id="new-feed-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 4. Custom RSS Overrides -->
-                                <div class="tab-pane fade" id="af-tab-custom">
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Custom Title</label>
-                                            <input type="text" id="new-feed-custom-title" class="form-control form-control-sm" placeholder="Overrides source channel title">
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Custom Author</label>
-                                            <input type="text" id="new-feed-custom-author" class="form-control form-control-sm" placeholder="Overrides source channel author">
-                                        </div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Custom Description</label>
-                                        <textarea id="new-feed-custom-desc" class="form-control form-control-sm" rows="2" placeholder="Custom podcast description for RSS feed"></textarea>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
-                                        <input type="url" id="new-feed-custom-cover" class="form-control form-control-sm" placeholder="https://example.com/cover.jpg">
-                                        <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-sm-8">
-                                            <label class="form-label small fw-semibold">Category (iTunes)</label>
-                                            <input type="text" id="new-feed-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
-                                        </div>
-                                        <div class="col-sm-4 d-flex align-items-end pb-1">
-                                            <div class="form-check form-switch mb-1">
-                                                <input class="form-check-input" type="checkbox" id="new-feed-custom-explicit">
-                                                <label class="form-check-label small fw-semibold" for="new-feed-custom-explicit">Explicit content</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 5. Advanced -->
-                                <div class="tab-pane fade" id="af-tab-advanced">
-                                    <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Filename Template</label>
-                                        <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
-                                        <div class="form-text small">Supported tokens: <code>{{id}}</code>, <code>{{title}}</code>, <code>{{pub_date}}</code>, <code>{{feed_id}}</code>. Leave empty for default.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="modal-footer border-top px-3 py-2">
-                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
-                                <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
-                                <i class="bi bi-plus-circle me-1"></i>Create &amp; Start
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: QR Code -->
-    <div class="modal fade" id="qrModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content text-center p-4">
-                <h5 class="fw-bold mb-1" id="qr-feed-title">Podcast</h5>
-                <p class="text-muted small mb-3">Scan with your smartphone camera to open in podcast app</p>
-                <div class="d-flex justify-content-center mb-3">
-                    <canvas id="qr-canvas"></canvas>
-                </div>
-                <div class="rss-box text-break small mb-3" id="qr-feed-url"></div>
-                <button type="button" class="btn btn-light btn-sm w-100" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Episodes Viewer -->
-    <div class="modal fade" id="episodesModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title fw-bold" id="episodes-feed-title">Episode List</h5>
-                        <p class="text-muted small mb-0" id="episodes-feed-subtitle"></p>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-0">
+                <section class="tab-pane feed-detail" id="episodesModal" aria-label="Podcast details">
+                    <button class="btn btn-light mb-4" onclick="returnToLibrary()"><i aria-hidden="true" class="bi bi-arrow-left me-2"></i>Back to library</button>
+                    <header class="feed-detail-heading"><div id="detail-cover" class="detail-cover"></div><div class="flex-grow-1 min-w-0"><div class="eyebrow" id="detail-provider">PODCAST</div><h1 id="episodes-feed-title" tabindex="-1">Podcast</h1><p class="text-muted mb-0" id="episodes-feed-subtitle"></p></div><button class="btn btn-brand" onclick="showSubscription(document.getElementById('episodesModal').dataset.feedId)"><i aria-hidden="true" class="bi bi-rss me-2"></i>Subscribe</button></header>
+                    <nav class="detail-navigation" aria-label="Podcast sections"><button class="active" data-section="episodes" aria-current="page" onclick="showFeedSection('episodes')">Episodes</button><button data-section="settings" onclick="showFeedSection('settings')">Settings</button><button data-section="history" onclick="showFeedSection('history')">History</button></nav>
+                    <div id="detail-episodes" class="card p-0 overflow-hidden">
                     <div class="d-flex flex-column flex-sm-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
-                        <input id="episodes-search" type="search" class="form-control form-control-sm" placeholder="Search episodes" aria-label="Search episodes" oninput="renderEpisodeList()">
-                        <select id="episodes-status-filter" class="form-select form-select-sm w-auto" aria-label="Episode status" onchange="renderEpisodeList()">
+                        <input id="episodes-search" type="search" class="form-control form-control-sm" placeholder="Search episodes" aria-label="Search episodes" oninput="resetEpisodePage()">
+                        <select id="episodes-status-filter" class="form-select form-select-sm w-auto" aria-label="Episode status" onchange="resetEpisodePage()">
                             <option value="all">All statuses</option>
                             <option value="downloaded">Downloaded / available</option>
                             <option value="new">Pending</option>
@@ -1363,91 +945,43 @@
                     <div id="episodes-list" class="list-group list-group-flush">
                         <!-- Loaded dynamically -->
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+                        <div class="episode-pagination" id="episode-pagination"><button class="btn btn-light btn-sm" id="episodes-prev" onclick="changeEpisodePage(-1)">Previous</button><span id="episodes-page-label" class="small text-muted" role="status"></span><button class="btn btn-light btn-sm" id="episodes-next" onclick="changeEpisodePage(1)">Next</button></div>
+                    </div>
+                    <div id="detail-settings" class="card d-none"><div class="p-3"><h2 class="h5" id="feed-settings-title">Podcast settings</h2><div class="text-muted small" id="feed-settings-subtitle"></div></div>
 
-    <!-- Modal: Feed Error Log Viewer -->
-    <div class="modal fade" id="feedErrorsModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <div>
-                        <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="feed-errors-title">
-                            <i class="bi bi-exclamation-triangle-fill"></i> Error Log
-                        </h5>
-                        <p class="text-muted small mb-0" id="feed-errors-subtitle">Loading error details...</p>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-3" id="feed-errors-body">
-                    <!-- Loaded dynamically -->
-                </div>
-                <div class="modal-footer border-top d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-open-server-logs">
-                        <i class="bi bi-terminal me-1"></i> Open Server Logs Tab
-                    </button>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-danger btn-sm" id="btn-retry-all-errors" style="display: none;">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Retry All
-                        </button>
-                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Feed Settings -->
-    <div class="modal fade" id="feedSettingsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header border-bottom">
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0" id="feed-settings-title">
-                            <i class="bi bi-sliders text-primary me-2"></i>Podcast Settings
-                        </h5>
-                        <div class="text-muted small mt-1" id="feed-settings-subtitle">ID: <code>-</code></div>
-                    </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-0">
                     <!-- Nav tabs -->
                     <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary" id="feedSettingsTabs" role="tablist">
                         <li class="nav-item" id="fs-nav-general">
                             <button class="nav-link active small fw-semibold" id="fs-btn-general" data-bs-toggle="tab" data-bs-target="#fs-tab-general">
-                                <i class="bi bi-clock me-1"></i>General &amp; Schedule
+                                <i aria-hidden="true" class="bi bi-clock me-1"></i>General &amp; Schedule
                             </button>
                         </li>
                         <li class="nav-item" id="fs-nav-cleanup">
                             <button class="nav-link small fw-semibold" id="fs-btn-cleanup" data-bs-toggle="tab" data-bs-target="#fs-tab-cleanup">
-                                <i class="bi bi-trash3 me-1"></i>Retention
+                                <i aria-hidden="true" class="bi bi-trash3 me-1"></i>Retention
                             </button>
                         </li>
                         <li class="nav-item" id="fs-nav-filters">
                             <button class="nav-link small fw-semibold" id="fs-btn-filters" data-bs-toggle="tab" data-bs-target="#fs-tab-filters">
-                                <i class="bi bi-funnel me-1"></i>Filters
+                                <i aria-hidden="true" class="bi bi-funnel me-1"></i>Filters
                             </button>
                         </li>
                         <li class="nav-item" id="fs-nav-custom">
                             <button class="nav-link small fw-semibold" id="fs-btn-custom" data-bs-toggle="tab" data-bs-target="#fs-tab-custom">
-                                <i class="bi bi-card-text me-1"></i>RSS Overrides
+                                <i aria-hidden="true" class="bi bi-card-text me-1"></i>RSS Overrides
                             </button>
                         </li>
                         <li class="nav-item" id="fs-nav-advanced">
                             <button class="nav-link small fw-semibold" id="fs-btn-advanced" data-bs-toggle="tab" data-bs-target="#fs-tab-advanced">
-                                <i class="bi bi-terminal me-1"></i>Advanced
+                                <i aria-hidden="true" class="bi bi-terminal me-1"></i>Advanced
                             </button>
                         </li>
                     </ul>
 
+                    <div id="settings-load-status" class="px-3 pb-3 text-muted d-none" role="status"></div>
                     <form id="feed-settings-form" onsubmit="saveFeedSettings(event)" class="p-3">
                         <input type="hidden" id="fs-feed-id">
-                        
+
                         <div class="tab-content">
                             <!-- 1. General & Schedule -->
                             <div class="tab-pane fade show active" id="fs-tab-general">
@@ -1533,7 +1067,7 @@
                                     <div class="input-group input-group-sm mb-1">
                                         <input type="text" id="fs-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --js-runtimes deno:/root/.deno/bin/deno --geo-bypass">
                                         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertGlobalCookiesToArgs('fs')" title="Append/Update global --cookies in arguments">
-                                            <i class="bi bi-cookie me-1"></i>+ Cookies
+                                            <i aria-hidden="true" class="bi bi-cookie me-1"></i>+ Cookies
                                         </button>
                                     </div>
                                     <div class="form-text small">Arguments passed directly to yt-dlp (e.g. <code>--js-runtimes deno:...</code>). Global cookies/proxy from Downloader settings are applied automatically.</div>
@@ -1558,7 +1092,7 @@
                                     <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
                                     <input type="number" id="fs-keep-last" class="form-control form-control-sm" min="0" max="5000" placeholder="0 = unlimited (keep all episodes)">
                                     <div class="form-text small mt-1">
-                                        <i class="bi bi-info-circle me-1"></i>Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
+                                        <i aria-hidden="true" class="bi bi-info-circle me-1"></i>Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
                                     </div>
                                 </div>
                             </div>
@@ -1656,12 +1190,428 @@
                         </div>
 
                         <div class="modal-footer border-top px-0 pb-0 mt-3">
-                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="showFeedSection('episodes')">Cancel</button>
                             <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="bi bi-check-lg me-1"></i>Save Settings
+                                <i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings
                             </button>
                         </div>
                     </form>
+                    </div>
+                    <div id="detail-history" class="card p-3 d-none"><div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 mb-0">Recent activity</h2><button class="btn btn-light btn-sm" onclick="loadFeedHistory()">Refresh</button></div><p class="text-muted small">Recent entries retained in the server log.</p><div id="feed-history-list" role="status"></div></div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal fade" id="subscribeModal" tabindex="-1" aria-labelledby="subscribe-title"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="subscribe-title">Subscribe</h2><button class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"></button></div><div class="modal-body" id="subscribe-body"></div></div></div></div>
+
+    <!-- Modal: Import Audiobook -->
+    <div class="modal fade" id="importAudiobookModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold">Import Local Audiobook</h5>
+                        <div class="text-muted small">Create serial podcast RSS feed from server folder</div>
+                    </div>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="import-audiobook-form" onsubmit="event.preventDefault(); submitImportAudiobook();">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Directory Name <span class="text-danger">*</span></label>
+                            <input type="text" id="import-dir-name" class="form-control" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Feed ID (Slug) <span class="text-danger">*</span></label>
+                            <input type="text" id="import-feed-id" class="form-control" placeholder="e.g. 1984-orwell" required>
+                            <div class="form-text small">Unique URL slug (a-z, 0-9, dash, underscore)</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Book Title</label>
+                            <input type="text" id="import-feed-title" class="form-control" placeholder="Defaults to directory name or ID3 album">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Author / Narrator</label>
+                            <input type="text" id="import-feed-author" class="form-control" placeholder="Defaults to parsed author or ID3 artist">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Description</label>
+                            <textarea id="import-feed-desc" class="form-control" rows="2" placeholder="Optional book synopsis"></textarea>
+                        </div>
+                        <div class="border rounded p-2 bg-body-tertiary mb-3">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" id="import-feed-private">
+                                <label class="form-check-label small fw-semibold" for="import-feed-private">Private podcast (Block aggregators)</label>
+                                <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 pt-2">
+                            <button type="button" class="btn btn-outline-secondary" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                            <button type="submit" class="btn btn-brand" id="btn-submit-import-audiobook"><i aria-hidden="true" class="bi bi-check-lg me-1"></i> Create Feed</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Upload Audiobook -->
+    <div class="modal fade" id="uploadAudiobookModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold">Upload Audiobook Files</h5>
+                        <div class="text-muted small">Upload tracks and optional cover image to the server</div>
+                    </div>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="upload-audiobook-form" onsubmit="event.preventDefault(); submitUploadAudiobook();">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Book Folder Name <span class="text-danger">*</span></label>
+                            <input type="text" id="upload-book-dir" class="form-control" placeholder="e.g. George Orwell - 1984" required>
+                            <div class="form-text small">Folder will be created in the audiobooks directory</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Audio Files (MP3, M4B, M4A, etc.) <span class="text-danger">*</span></label>
+                            <input type="file" id="upload-audio-files" class="form-control" multiple accept=".mp3,.m4b,.m4a,.aac,.ogg,.opus,.flac" required>
+                            <div class="form-text small">Select all audio chapters/tracks (multi-select supported)</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Cover Image (Optional)</label>
+                            <input type="file" id="upload-cover-file" class="form-control" accept="image/jpeg,image/png">
+                            <div class="form-text small">Optional JPG/PNG cover art (or will be extracted from ID3 tags)</div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="upload-auto-import" checked>
+                            <label class="form-check-label small" for="upload-auto-import">Automatically import and create podcast feed after upload</label>
+                        </div>
+                        <!-- Progress bar -->
+                        <div id="upload-progress-container" class="d-none mb-3">
+                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                <span id="upload-progress-status">Uploading files...</span>
+                                <span id="upload-progress-pct">0%</span>
+                            </div>
+                            <div class="progress" style="height: 10px;">
+                                <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 pt-2">
+                            <button type="button" class="btn btn-outline-secondary" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                            <button type="submit" class="btn btn-brand" id="btn-submit-upload-audiobook"><i aria-hidden="true" class="bi bi-upload me-1"></i> Start Upload</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add Feed -->
+    <div class="modal fade" id="addFeedModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">
+                            <i aria-hidden="true" class="bi bi-plus-circle text-primary me-2"></i>Add Podcast
+                        </h5>
+                        <div class="text-muted small mt-1">Configure source URL, download format, schedule, and feed options</div>
+                    </div>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <form id="add-feed-form">
+                        <div class="p-3 border-bottom bg-body-tertiary">
+                            <div id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
+                            <div class="row g-2">
+                                <div class="col-md-7">
+                                    <label class="form-label small fw-semibold">Source URL (Rutube / VK Video / YouTube / Vimeo / etc) <span class="text-danger">*</span></label>
+                                    <input type="url" id="new-feed-url" class="form-control form-control-sm" required placeholder="https://rutube.ru/channel/25758171/" oninput="suggestFeedId(this.value)">
+                                    <div class="form-text small">Channels, playlists, communities, and users are supported.</div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small fw-semibold">Feed ID (URL slug) <span class="text-danger">*</span></label>
+                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER">
+                                    <div class="form-text small">Used in RSS URL: <code>/CLANBEAVER.xml</code></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="px-3 pt-3"><button type="button" class="btn btn-light btn-sm" id="add-advanced-toggle" aria-expanded="false" onclick="toggleAddAdvanced(this)"><i aria-hidden="true" class="bi bi-sliders me-2"></i>Advanced options</button></div>
+                        <!-- Nav tabs -->
+                        <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary d-none" id="addFeedTabs" role="tablist">
+                            <li class="nav-item">
+                                <button type="button" class="nav-link active small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-general">
+                                    <i aria-hidden="true" class="bi bi-clock me-1"></i>General &amp; Schedule
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-cleanup">
+                                    <i aria-hidden="true" class="bi bi-trash3 me-1"></i>Retention
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-filters">
+                                    <i aria-hidden="true" class="bi bi-funnel me-1"></i>Filters
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-custom">
+                                    <i aria-hidden="true" class="bi bi-card-text me-1"></i>RSS Overrides
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link small fw-semibold" data-bs-toggle="tab" data-bs-target="#af-tab-advanced">
+                                    <i aria-hidden="true" class="bi bi-terminal me-1"></i>Advanced
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="p-3">
+                            <div class="tab-content">
+                                <!-- 1. General & Schedule -->
+                                <div class="tab-pane fade show active" id="af-tab-general">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Media Format</label>
+                                            <select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
+                                                <option value="audio">Audio (MP3 / M4A)</option>
+                                                <option value="video" selected>Video (MP4)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-6" id="new-feed-max-height-col">
+                                            <label class="form-label small fw-semibold">Video Quality</label>
+                                            <select id="new-feed-max-height" class="form-select form-select-sm">
+                                                <option value="480">480p</option>
+                                                <option value="720" selected>720p (HD)</option>
+                                                <option value="1080">1080p (Full HD)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-6" id="new-feed-audio-quality-col" style="display: none;">
+                                            <label class="form-label small fw-semibold">Audio Quality</label>
+                                            <select id="new-feed-quality" class="form-select form-select-sm">
+                                                <option value="high" selected>High</option>
+                                                <option value="low">Low</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4 add-advanced-field d-none">
+                                            <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
+                                            <input type="number" id="new-feed-pagesize" class="form-control form-control-sm" min="1" max="500" value="50">
+                                            <div class="form-text small">Number of recent episodes to query from channel.</div>
+                                        </div>
+                                        <div class="col-sm-8">
+                                            <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
+                                            <div class="input-group input-group-sm mb-1">
+                                                <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
+                                            </div>
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 1h')">1h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 6h')">6h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 12h')">12h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('@every 24h')">24h</button>
+                                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 small" onclick="setAddPresetCron('0 4 * * *')">Daily 04:00</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="add-advanced-field d-none">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Playlist Sorting</label>
+                                            <select id="new-feed-playlist-sort" class="form-select form-select-sm">
+                                                <option value="" selected>Default (Source order)</option>
+                                                <option value="asc">Ascending (Oldest first)</option>
+                                                <option value="desc">Descending (Newest first)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Preferred Audio Language</label>
+                                            <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
+                                            <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
+                                            <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="new-feed-cookies-hint">Global cookies: data/cookies.txt</span>
+                                        </div>
+                                        <div class="input-group input-group-sm mb-1">
+                                            <input type="text" id="new-feed-ytdl-args" class="form-control form-control-sm font-monospace" placeholder="e.g. --js-runtimes deno:/root/.deno/bin/deno --geo-bypass">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="insertGlobalCookiesToArgs('new-feed')" title="Append/Update global --cookies in arguments">
+                                                <i aria-hidden="true" class="bi bi-cookie me-1"></i>+ Cookies
+                                            </button>
+                                        </div>
+                                        <div class="form-text small">Arguments passed directly to yt-dlp (e.g. <code>--js-runtimes deno:...</code>). Global cookies/proxy from Downloader settings are applied automatically.</div>
+                                    </div>
+                                    <div class="border rounded p-2 bg-body-tertiary">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="new-feed-opml" checked>
+                                            <label class="form-check-label small fw-semibold" for="new-feed-opml">Include in OPML export</label>
+                                            <div class="form-text small">Allows podcast apps to import this feed via the OPML button.</div>
+                                        </div>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="new-feed-private-feed">
+                                            <label class="form-check-label small fw-semibold" for="new-feed-private-feed">Private podcast (Block aggregators)</label>
+                                            <div class="form-text small">Requests exclusion from podcast directories. RSS and media remain accessible to anyone with the link.</div>
+                                        </div>
+                                    </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Retention & Cleanup -->
+                                <div class="tab-pane fade" id="af-tab-cleanup">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
+                                        <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="50" placeholder="0 = unlimited (keep all episodes)">
+                                        <div class="form-text small mt-1">
+                                            <i aria-hidden="true" class="bi bi-info-circle me-1"></i>Automatically synced with Page Size by default. Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Filters -->
+                                <div class="tab-pane fade" id="af-tab-filters">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Title Include Match (Regex)</label>
+                                            <input type="text" id="new-feed-filter-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)podcast|interview">
+                                            <div class="form-text small">Only download episodes matching this regex.</div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Title Exclude Match (Regex)</label>
+                                            <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)short|teaser|live">
+                                            <div class="form-text small">Skip episodes matching this regex.</div>
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Description Include (Regex)</label>
+                                            <input type="text" id="new-feed-filter-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Description Exclude (Regex)</label>
+                                            <input type="text" id="new-feed-filter-notdesc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Min Duration (Seconds)</label>
+                                            <input type="number" id="new-feed-min-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 600 (10 min)">
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Max Duration (Seconds)</label>
+                                            <input type="number" id="new-feed-max-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 7200 (2 hours)">
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="form-label small fw-semibold">Max Age (Days)</label>
+                                            <input type="number" id="new-feed-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 4. Custom RSS Overrides -->
+                                <div class="tab-pane fade" id="af-tab-custom">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Custom Title</label>
+                                            <input type="text" id="new-feed-custom-title" class="form-control form-control-sm" placeholder="Overrides source channel title">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-semibold">Custom Author</label>
+                                            <input type="text" id="new-feed-custom-author" class="form-control form-control-sm" placeholder="Overrides source channel author">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Custom Description</label>
+                                        <textarea id="new-feed-custom-desc" class="form-control form-control-sm" rows="2" placeholder="Custom podcast description for RSS feed"></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
+                                        <input type="url" id="new-feed-custom-cover" class="form-control form-control-sm" placeholder="https://example.com/cover.jpg">
+                                        <div class="form-text small">Overrides the channel avatar with a custom podcast cover image.</div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-8">
+                                            <label class="form-label small fw-semibold">Category (iTunes)</label>
+                                            <input type="text" id="new-feed-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
+                                        </div>
+                                        <div class="col-sm-4 d-flex align-items-end pb-1">
+                                            <div class="form-check form-switch mb-1">
+                                                <input class="form-check-input" type="checkbox" id="new-feed-custom-explicit">
+                                                <label class="form-check-label small fw-semibold" for="new-feed-custom-explicit">Explicit content</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 5. Advanced -->
+                                <div class="tab-pane fade" id="af-tab-advanced">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold">Filename Template</label>
+                                        <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
+                                        <div class="form-text small">Supported tokens: <code>{{id}}</code>, <code>{{title}}</code>, <code>{{pub_date}}</code>, <code>{{feed_id}}</code>. Leave empty for default.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer border-top px-3 py-2">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                            <button type="submit" id="add-feed-btn" class="btn btn-brand btn-sm">
+                                <span id="add-feed-spinner" class="spinner-border spinner-border-sm d-none me-1"></span>
+                                <i aria-hidden="true" class="bi bi-plus-circle me-1"></i>Create &amp; Start
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: QR Code -->
+    <div class="modal fade" id="qrModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content text-center p-4">
+                <h5 class="fw-bold mb-1" id="qr-feed-title">Podcast</h5>
+                <p class="text-muted small mb-3">Scan with your smartphone camera to open in podcast app</p>
+                <div class="d-flex justify-content-center mb-3">
+                    <canvas id="qr-canvas"></canvas>
+                </div>
+                <div class="rss-box text-break small mb-3" id="qr-feed-url"></div>
+                <button type="button" class="btn btn-light btn-sm w-100" onclick="closeModal(this.closest('.modal'))">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Feed Error Log Viewer -->
+    <div class="modal fade" id="feedErrorsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom">
+                    <div>
+                        <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2" id="feed-errors-title">
+                            <i aria-hidden="true" class="bi bi-exclamation-triangle-fill"></i> Error Log
+                        </h5>
+                        <p class="text-muted small mb-0" id="feed-errors-subtitle">Loading error details...</p>
+                    </div>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                </div>
+                <div class="modal-body p-3" id="feed-errors-body">
+                    <!-- Loaded dynamically -->
+                </div>
+                <div class="modal-footer border-top d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-open-server-logs">
+                        <i aria-hidden="true" class="bi bi-terminal me-1"></i> Open Server Logs Tab
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="btn-retry-all-errors" style="display: none;">
+                            <i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i> Retry All
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" onclick="closeModal(this.closest('.modal'))">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1673,9 +1623,9 @@
             <div class="modal-content">
                 <div class="modal-header border-bottom">
                     <h5 class="modal-title fw-bold mb-0" id="securitySettingsTitle">
-                        <i class="bi bi-shield-lock text-primary me-2"></i>Security &amp; Rate Limit Settings
+                        <i aria-hidden="true" class="bi bi-shield-lock text-primary me-2"></i>Security &amp; Rate Limit Settings
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
                 </div>
                 <form id="securitySettingsForm" onsubmit="submitSecuritySettings(event)">
                     <div class="modal-body p-4">
@@ -1715,9 +1665,9 @@
                         </div>
                     </div>
                     <div class="modal-footer border-top bg-body-tertiary">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
                         <button type="submit" id="sec-settings-save-btn" class="btn btn-brand btn-sm">
-                            <i class="bi bi-check-lg me-1"></i>Save Settings
+                            <i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings
                         </button>
                     </div>
                 </form>
@@ -1730,8 +1680,8 @@
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content shadow">
                 <div class="modal-header">
-                    <h6 class="modal-title fw-bold" id="changePasswordTitle"><i class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h6 class="modal-title fw-bold" id="changePasswordTitle"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
                 </div>
                 <form id="changePasswordForm" onsubmit="submitChangePassword(event)">
                     <div class="modal-body">
@@ -1751,8 +1701,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" id="btn-save-pw" class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Update Password</button>
+                        <button type="button" class="btn btn-light btn-sm" onclick="closeModal(this.closest('.modal'))">Cancel</button>
+                        <button type="submit" id="btn-save-pw" class="btn btn-primary btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Update Password</button>
                     </div>
                 </form>
             </div>
@@ -1775,6 +1725,6 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=6"></script>
+    <script src="./admin.js?v=7"></script>
 </body>
 </html>

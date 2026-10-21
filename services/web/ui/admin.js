@@ -40,7 +40,15 @@
             const arg3 = target.dataset.uiArg3 || '';
             switch (target.dataset.uiAction) {
                 case 'copy': copyToClipboard(arg1); break;
-                case 'qr': showQRCode(arg1, arg2); break;
+                case 'qr': {
+                    const subscription = document.getElementById('subscribeModal');
+                    if (subscription?.classList.contains('show')) {
+                        subscription.addEventListener('hidden.bs.modal', () => showQRCode(arg1, arg2), {once:true});
+                        closeModal(subscription);
+                    } else showQRCode(arg1, arg2);
+                    break;
+                }
+                case 'subscribe': showSubscription(arg1); break;
                 case 'episodes': showEpisodes(arg1); break;
                 case 'settings': openFeedSettings(arg1); break;
                 case 'update': triggerUpdate(arg1); break;
@@ -89,27 +97,28 @@
             const el = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
             if (!el) return;
             try {
-                const inst = bootstrap.Modal.getOrCreateInstance(el);
-                if (inst) inst.hide();
-            } catch (e) {
-                console.warn('Modal hide failed:', e);
+                const modal = bootstrap.Modal.getOrCreateInstance(el);
+                const existingBackdrops = new Set(document.querySelectorAll('.modal-backdrop'));
+                // Bootstrap ignores hide() during its opening transition. Retry once shown.
+                const hideAfterOpening = () => modal.hide();
+                el.addEventListener('shown.bs.modal', hideAfterOpening, {once: true});
+                el.addEventListener('hidden.bs.modal', () => {
+                    el.removeEventListener('shown.bs.modal', hideAfterOpening);
+                }, {once: true});
+                modal.hide();
+                setTimeout(() => {
+                    el.removeEventListener('shown.bs.modal', hideAfterOpening);
+                    // Clean up an orphaned backdrop only when no other dialog is open.
+                    if (!document.querySelector('.modal.show') && Array.from(document.querySelectorAll('.modal-backdrop')).every(backdrop => existingBackdrops.has(backdrop))) {
+                        document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('overflow');
+                        document.body.style.removeProperty('padding-right');
+                    }
+                }, 700);
+            } catch (err) {
+                console.warn('Modal hide failed:', err);
             }
-            // Fallback: cleanup DOM classes and backdrop in case Bootstrap animation is interrupted
-            setTimeout(() => {
-                if (el.classList.contains('show')) {
-                    el.classList.remove('show');
-                    el.setAttribute('aria-hidden', 'true');
-                    el.removeAttribute('aria-modal');
-                    el.style.display = 'none';
-                }
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                if (backdrops.length > 0) {
-                    backdrops.forEach(b => b.remove());
-                }
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('overflow');
-                document.body.style.removeProperty('padding-right');
-            }, 100);
         }
 
         // Auth
@@ -122,7 +131,7 @@
                     document.body.innerHTML = `
                         <div class="min-vh-100 d-flex align-items-center justify-content-center p-3 text-center">
                             <div>
-                                <i class="bi bi-lock-fill text-muted display-1"></i>
+                                <i aria-hidden="true" class="bi bi-lock-fill text-muted display-1"></i>
                                 <h3 class="fw-bold mt-3">Admin Console is Disabled</h3>
                                 <p class="text-muted">Enable [server.admin] enabled = true in config.toml</p>
                             </div>
@@ -230,7 +239,7 @@
                 errAlert.classList.remove('d-none');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Password';
+                submitBtn.innerHTML = '<i aria-hidden="true" class="bi bi-check-lg me-1"></i>Update Password';
             }
         }
 
@@ -275,7 +284,7 @@
             } finally {
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Settings';
+                    submitBtn.innerHTML = '<i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings';
                 }
             }
         }
@@ -352,12 +361,10 @@
         }
 
         // Dashboard Data
-        function loadDashboard() {
-            loadFeeds();
-            loadTokens();
-            loadSystem();
-            loadMCPConfig();
-            loadAuthSecurity();
+        async function loadDashboard() {
+            restoreLibraryPreferences();
+            await loadFeeds();
+            restoreRoute();
         }
 
         // Feeds
@@ -385,7 +392,7 @@
                     btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...`;
                 } else {
                     btn.disabled = false;
-                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                    btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i> Update`;
                 }
             }
         }
@@ -396,8 +403,16 @@
                 const res = await fetch("/api/v1/feeds");
                 if (seq !== feedsFetchSeq) return;
                 if (!res.ok) throw new Error(await res.text());
-                allFeeds = await res.json();
+                const feeds = await res.json();
                 if (seq !== feedsFetchSeq) return;
+                allFeeds = feeds;
+                hideConnectionWarning();
+                updateLibraryCounts();
+                if (currentTab === 'feed-detail') {
+                    const feed = allFeeds.find(f => f.id === document.getElementById('episodesModal').dataset.feedId);
+                    if (feed && episodeView?.feedId === feed.id) episodeView.title = feed.title || feed.id;
+                    renderDetailHeader(feed);
+                }
 
                 const activeIds = new Set(allFeeds.filter(f => f.updating).map(f => f.id));
                 updatingFeeds.clear();
@@ -421,6 +436,8 @@
                     }
                 }
             } catch (err) {
+                if (seq !== feedsFetchSeq) return;
+                showConnectionWarning('Could not refresh your library. Showing the last available data.');
                 const container = document.getElementById("feeds-container");
                 if (container && (!allFeeds || allFeeds.length === 0)) {
                     container.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to load feeds: ${escapeHtml(err.message)}</div>`;
@@ -441,45 +458,6 @@
             const placeholder = img.parentElement ? img.parentElement.querySelector(".feed-cover-placeholder") : null;
             if (placeholder) {
                 placeholder.classList.remove("d-none");
-            }
-        }
-
-        // Fetch cover image directly from generated podcast XML (<image><url>)
-        async function loadCoverFromXML(feedUrl, feedId) {
-            if (!feedUrl) return;
-            try {
-                const res = await fetch(feedUrl);
-                if (!res.ok) return;
-                const text = await res.text();
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, "text/xml");
-                const imgUrl = xmlDoc.querySelector("channel > image > url")?.textContent?.trim() ||
-                               xmlDoc.querySelector("channel > itunes\\:image, channel > image")?.getAttribute("href")?.trim();
-                if (imgUrl) {
-                    const resolved = new URL(imgUrl, window.location.href);
-                    if (!["http:", "https:"].includes(resolved.protocol)) return;
-                    const card = Array.from(document.querySelectorAll("[data-feed-id]"))
-                        .find(el => el.getAttribute("data-feed-id") === feedId);
-                    if (card) {
-                        let img = card.querySelector("img.feed-cover");
-                        const placeholder = card.querySelector(".feed-cover-placeholder");
-                        if (!img && placeholder && placeholder.parentElement && document.createElement) {
-                            img = document.createElement("img");
-                            img.className = "feed-cover";
-                            img.alt = "Cover";
-                            img.loading = "lazy";
-                            img.onerror = () => handleCoverError(img);
-                            placeholder.parentElement.prepend(img);
-                        }
-                        if (img) {
-                            img.src = resolved.href;
-                            img.style.display = "block";
-                            if (placeholder) placeholder.classList.add("d-none");
-                        }
-                    }
-                }
-            } catch (e) {
-                // fallback to styled letter placeholder
             }
         }
 
@@ -519,10 +497,12 @@
                     setFeedButtonUpdating(id, false);
                 });
 
+                if (currentTab === 'tab-feeds') filterFeeds();
+                else tabDirty['tab-feeds'] = true;
                 if (completedFeeds.length > 0) {
                     await loadFeeds();
                     const epModal = document.getElementById("episodesModal");
-                    if (epModal && epModal.classList.contains("show")) {
+                    if (epModal && currentTab === 'feed-detail' && detailSection === 'episodes') {
                         const feedId = epModal.dataset.feedId;
                         if (feedId && completedFeeds.includes(feedId)) {
                             await showEpisodes(feedId, false);
@@ -538,7 +518,7 @@
                     const allBtn = document.getElementById("btn-update-all-feeds");
                     if (allBtn) {
                         allBtn.disabled = false;
-                        allBtn.innerHTML = "<i class=\"bi bi-arrow-repeat me-1\"></i> Update all";
+                        allBtn.innerHTML = "<i aria-hidden=\"true\" class=\"bi bi-arrow-repeat me-1\"></i> Update all";
                     }
                 }
             } catch (err) {
@@ -552,236 +532,71 @@
         }
 
         function startUpdatePolling() {
-            if (updatePollTimer) return;
+            if (updatePollTimer || document.hidden) return;
             updatePollTimer = setInterval(pollFeedStatuses, 2000);
         }
 
         function renderFeedCardHTML(feed) {
-            const providerClass = "provider-" + String(feed.provider || "unknown").replace(/[^a-z0-9_-]/gi, "");
+            const title = feed.title || feed.id || 'Untitled podcast';
             const isUpdating = updatingFeeds.has(feed.id);
-            const letter = (feed.title || feed.id || "P").trim()[0].toUpperCase();
-            const cover = `
-                <div class="flex-shrink-0" style="width: 80px; height: 80px; position: relative;">
-                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="Cover" loading="lazy" onerror="handleCoverError(this)">` : ""}
-                    <div class="feed-cover-placeholder ${feed.cover_art ? "d-none" : ""}">${escapeHtml(letter)}</div>
-                </div>`;
-
-            return `
-            <div class="card feed-card p-3 h-100">
-                <div class="d-flex gap-3">
-                    ${cover}
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
-                            <h6 class="fw-bold mb-0 text-truncate" title="${escapeHtml(feed.title || feed.id)}">
-                                ${escapeHtml(feed.title || feed.id)}
-                            </h6>
-                            <span class="badge badge-provider ${providerClass}">${escapeHtml((feed.provider || "").toUpperCase())}</span>
-                        </div>
-                        <div class="text-muted small text-truncate mb-2" id="feed-meta-${escapeHtml(feed.id)}">
-                            ${isValidAuthor(feed.author) ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>
-                        </div>
-
-                        <!-- RSS URL Box with Copy and QR -->
-                        <div class="d-flex align-items-center gap-1 mb-2">
-                            <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
-                            <button class="btn btn-light btn-sm border flex-shrink-0" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
-                                <i class="bi bi-clipboard"></i>
-                            </button>
-                            <button class="btn btn-light btn-sm border flex-shrink-0" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
-                                <i class="bi bi-qr-code"></i>
-                            </button>
-                        </div>
-
-                        <!-- Deep Links for Podcast Apps -->
-                        <div class="d-flex flex-wrap gap-1 mb-2">
-                            <a href="${safeUrl(feed.apple_url, ["podcast:"])}" class="deep-link-btn border">
-                                <i class="bi bi-apple"></i> Apple
-                            </a>
-                            <a href="${safeUrl(feed.pocketcasts_url, ["pktc:"])}" class="deep-link-btn border">
-                                <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
-                            </a>
-                            <a href="${safeUrl(feed.overcast_url, ["overcast:"])}" class="deep-link-btn border">
-                                <i class="bi bi-soundwave text-warning"></i> Overcast
-                            </a>
-                            <a href="${safeUrl(feed.feed_url, ["http:", "https:"])}" target="_blank" rel="noopener noreferrer" class="deep-link-btn border">
-                                <i class="bi bi-box-arrow-up-right"></i> XML
-                            </a>
-                        </div>
-
-                        <div id="feed-lasterr-${escapeHtml(feed.id)}" class="mb-2">
-                            ${feed.last_error ? `
-                            <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
-                                <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
-                                    <i class="bi bi-exclamation-octagon-fill me-1"></i>
-                                    <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
-                                </div>
-                                <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" ${actionAttrs("logs", feed.id)}>
-                                    View Logs
-                                </button>
-                            </div>` : ""}
-                        </div>
-
-                        <!-- Stats and Action Buttons -->
-                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="stat-badge" id="feed-ep-${escapeHtml(feed.id)}" title="${feed.downloaded_count ?? 0} downloaded on disk${(feed.episode_count ?? 0) > (feed.downloaded_count ?? 0) ? ` (${feed.episode_count} total in feed)` : ""}"><i class="bi bi-file-earmark-music"></i> ${feed.downloaded_count ?? 0} ep.</span>
-                                <span class="stat-badge" id="feed-size-${escapeHtml(feed.id)}"><i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}</span>
-                                <span id="feed-err-${escapeHtml(feed.id)}">${feed.error_count > 0 ? `<span class="stat-badge text-danger" role="button" tabindex="0" title="Click to view error log" ${actionAttrs("errors", feed.id)}><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : ""}</span>
-                            </div>
-                            <div class="d-flex flex-wrap gap-1">
-                                <button class="btn btn-light btn-sm border" title="View episodes" ${actionAttrs("episodes", feed.id)}>
-                                    <i class="bi bi-list-ul"></i> Episodes
-                                </button>
-                                <button class="btn btn-light btn-sm border" title="Podcast Settings" ${actionAttrs("settings", feed.id)}>
-                                    <i class="bi bi-gear"></i> Settings
-                                </button>
-                                <button class="btn btn-light btn-sm border" id="btn-update-${escapeHtml(feed.id)}" title="Update feed now" ${actionAttrs("update", feed.id)} ${isUpdating ? "disabled" : ""}>
-                                    ${isUpdating ? `<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...` : `<i class="bi bi-arrow-repeat me-1"></i> Update`}
-                                </button>
-                                <button class="btn btn-light btn-sm border text-danger" title="Delete podcast" ${actionAttrs("delete-feed", feed.id)}>
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            const hasError = feed.error_count > 0 || !!feed.last_error;
+            const state = isUpdating
+                ? '<span class="feed-state running"><i aria-hidden="true" class="bi bi-arrow-repeat"></i>Updating</span>'
+                : hasError
+                    ? `<button class="feed-state error" role="button" title="Click to view error log" ${actionAttrs('errors', feed.id)}><i aria-hidden="true" class="bi bi-exclamation-circle"></i>${feed.error_count > 0 ? feed.error_count + ' errors' : 'Update failed'}</button>`
+                    : `<span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>${feed.downloaded_count > 0 ? 'Ready' : 'No downloads yet'}</span>`;
+            return `<article class="card feed-card h-100">
+                <div class="feed-card-top">
+                    <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}">${escapeHtml(title.trim()[0] || 'P')}</div></div>
+                    <div class="flex-grow-1 min-w-0"><a class="feed-card-title" href="#feed/${encodeURIComponent(feed.id)}/episodes" title="${escapeHtml(title)}">${escapeHtml(title)}</a><div class="feed-card-author text-truncate">${escapeHtml(isValidAuthor(feed.author) ? feed.author : feed.provider || 'Podcast')}</div></div>
+                    <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" id="btn-update-${escapeHtml(feed.id)}" ${actionAttrs('update', feed.id)} ${isUpdating ? 'disabled' : ''}>${isUpdating ? 'Updating…' : 'Update now'}</button></li>
+                        <li><button class="dropdown-item" ${actionAttrs('settings', feed.id)}>Settings</button></li>
+                        <li><button class="dropdown-item" ${actionAttrs('logs', feed.id)}>View activity</button></li>
+                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('delete-feed', feed.id)}>Delete podcast</button></li>
+                    </ul></div>
                 </div>
-            </div>`;
+                <div class="feed-card-meta"><span><i aria-hidden="true" class="bi bi-headphones me-1"></i>${feed.downloaded_count ?? 0} episodes</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
+                <div class="feed-card-bottom">${state}<button class="btn btn-light" ${actionAttrs('episodes', feed.id)}>Open</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
+            </article>`;
         }
 
         function renderFeeds(feeds) {
-            const container = document.getElementById("feeds-container");
+            const container = document.getElementById('feeds-container');
             if (!container) return;
-
-            if (feeds.length === 0) {
-                const query = (document.getElementById("feed-search")?.value || "").trim();
-                const typeFilter = document.getElementById("feed-type-filter")?.value || "all";
-                const hasFilter = query !== "" || typeFilter !== "all";
-
-                if (hasFilter && allFeeds && allFeeds.length > 0) {
-                    container.innerHTML = `
-                        <div class="col-12 text-center py-5">
-                            <i class="bi bi-search text-muted display-4"></i>
-                            <h5 class="fw-bold mt-3">No matching podcasts</h5>
-                            <p class="text-muted small">No podcasts match your search query or filter criteria.</p>
-                            <button class="btn btn-outline-secondary btn-sm" ${actionAttrs("reset-filters")}><i class="bi bi-x-circle me-1"></i> Reset filters</button>
-                        </div>`;
-                } else {
-                    container.innerHTML = `
-                        <div class="col-12 text-center py-5">
-                            <i class="bi bi-inbox text-muted display-4"></i>
-                            <h5 class="fw-bold mt-3">No configured podcasts</h5>
-                            <p class="text-muted small">Click "Add podcast" to configure a VK Video, YouTube, or Vimeo feed</p>
-                            <button class="btn btn-brand btn-sm mt-2" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i class="bi bi-plus-lg me-1"></i> Add podcast</button>
-                        </div>`;
-                }
+            updateLibraryCounts();
+            if (!feeds.length) {
+                const filtered = allFeeds.length > 0;
+                container.innerHTML = `<div class="library-empty"><i aria-hidden="true" class="bi ${filtered ? 'bi-search' : 'bi-collection-play'} fs-1 text-muted"></i><h2 class="h5 mt-3">${filtered ? 'No matching podcasts' : 'No configured podcasts'}</h2><p class="text-muted">${filtered ? 'Try another search or reset your filters.' : 'Add a channel or playlist to start your library.'}</p>${filtered ? `<button class="btn btn-light" ${actionAttrs('reset-filters')}>Reset filters</button>` : '<button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addFeedModal">Add podcast</button>'}</div>`;
                 return;
             }
-
-            const existingCards = Array.from(container.querySelectorAll("[data-feed-id]"));
-            if (existingCards.length === 0 && !container.firstElementChild) {
-                container.innerHTML = feeds.map(feed => `
-                <div class="col-12 col-xl-6" data-feed-id="${escapeHtml(feed.id)}" data-cover-art="${escapeHtml(feed.cover_art || "")}">
-                    ${renderFeedCardHTML(feed)}
-                </div>`).join("");
-            } else {
-                const placeholder = container.querySelector(".text-center.py-5");
-                if (placeholder) placeholder.remove();
-
-                const feedMap = new Map(feeds.map(f => [f.id, f]));
-                const existingMap = new Map();
-                existingCards.forEach(card => {
-                    const id = card.getAttribute("data-feed-id");
-                    if (!feedMap.has(id)) {
-                        card.remove();
-                    } else {
-                        existingMap.set(id, card);
-                    }
-                });
-
-                feeds.forEach(feed => {
-                    const card = existingMap.get(feed.id);
-                    if (card) {
-                        const epEl = document.getElementById(`feed-ep-${feed.id}`);
-                        const dlCount = feed.downloaded_count ?? 0;
-                        const totalCount = feed.episode_count ?? 0;
-                        if (epEl) {
-                            epEl.innerHTML = `<i class="bi bi-file-earmark-music"></i> ${dlCount} ep.`;
-                            epEl.title = `${dlCount} downloaded on disk${totalCount > dlCount ? ` (${totalCount} total in feed)` : ""}`;
-                        }
-
-                        const sizeEl = document.getElementById(`feed-size-${feed.id}`);
-                        if (sizeEl) sizeEl.innerHTML = `<i class="bi bi-hdd"></i> ${formatBytes(feed.total_size)}`;
-
-                        const metaEl = document.getElementById(`feed-meta-${feed.id}`);
-                        if (metaEl) {
-                            metaEl.innerHTML = `${isValidAuthor(feed.author) ? `<span>${escapeHtml(feed.author)} • </span>` : ""}ID: <code>${escapeHtml(feed.id)}</code>`;
-                        }
-
-                        const errEl = document.getElementById(`feed-err-${feed.id}`);
-                        if (errEl) {
-                            errEl.innerHTML = feed.error_count > 0 ?
-                                `<span class="stat-badge text-danger" role="button" tabindex="0" title="Click to view error log" ${actionAttrs("errors", feed.id)}><i class="bi bi-exclamation-triangle-fill"></i> ${feed.error_count} errors</span>` : "";
-                        }
-
-                        const lastErrEl = document.getElementById(`feed-lasterr-${feed.id}`);
-                        if (lastErrEl) {
-                            lastErrEl.innerHTML = feed.last_error ? `
-                                <div class="p-2 rounded-2 bg-danger-subtle text-danger border border-danger-subtle small d-flex align-items-center justify-content-between">
-                                    <div class="text-truncate me-2" title="${escapeHtml(feed.last_error)}">
-                                        <i class="bi bi-exclamation-octagon-fill me-1"></i>
-                                        <strong>Update Error:</strong> ${escapeHtml(feed.last_error)}
-                                    </div>
-                                    <button class="btn btn-sm btn-outline-danger py-0 px-2 flex-shrink-0" ${actionAttrs("logs", feed.id)}>
-                                        View Logs
-                                    </button>
-                                </div>` : "";
-                        }
-
-                        setFeedButtonUpdating(feed.id, updatingFeeds.has(feed.id));
-
-                        const oldCover = card.getAttribute("data-cover-art") || "";
-                        const newCover = feed.cover_art || "";
-                        if (oldCover !== newCover) {
-                            card.setAttribute("data-cover-art", newCover);
-                            let img = card.querySelector("img.feed-cover");
-                            const ph = card.querySelector(".feed-cover-placeholder");
-                            if (newCover) {
-                                if (!img && ph && ph.parentElement && document.createElement) {
-                                    img = document.createElement("img");
-                                    img.className = "feed-cover";
-                                    img.alt = "Cover";
-                                    img.loading = "lazy";
-                                    img.onerror = () => handleCoverError(img);
-                                    ph.parentElement.prepend(img);
-                                }
-                                if (img) {
-                                    img.src = safeUrl(newCover);
-                                    img.style.display = "block";
-                                    if (ph) ph.classList.add("d-none");
-                                }
-                            } else {
-                                if (img) img.style.display = "none";
-                                if (ph) ph.classList.remove("d-none");
-                            }
-                        }
-
-                        container.appendChild(card);
-                    } else if (document.createElement) {
-                        const col = document.createElement("div");
-                        col.className = "col-12 col-xl-6";
-                        col.setAttribute("data-feed-id", feed.id);
-                        col.setAttribute("data-cover-art", feed.cover_art || "");
-                        col.innerHTML = renderFeedCardHTML(feed);
-                        container.appendChild(col);
-                    }
-                });
+            const existing = new Map(Array.from(container.querySelectorAll('[data-feed-id]')).map(el => [el.getAttribute('data-feed-id'), el]));
+            if (!existing.size) {
+                container.innerHTML = feeds.map(feed => `<div data-feed-id="${escapeHtml(feed.id)}" data-render-key="${escapeHtml(feedRenderKey(feed))}">${renderFeedCardHTML(feed)}</div>`).join('');
+                return;
             }
-
-            feeds.forEach(f => {
-                if (!f.cover_art && f.feed_url) {
-                    loadCoverFromXML(f.feed_url, f.id);
+            const ids = new Set(feeds.map(f => f.id));
+            existing.forEach((el, id) => { if (!ids.has(id)) el.remove(); });
+            let previous = null;
+            for (const feed of feeds) {
+                let el = existing.get(feed.id);
+                const key = feedRenderKey(feed);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.setAttribute('data-feed-id', feed.id);
                 }
-            });
+                if (el.getAttribute('data-render-key') !== key) {
+                    el.innerHTML = renderFeedCardHTML(feed);
+                    el.setAttribute('data-render-key', key);
+                }
+                const expected = previous ? previous.nextElementSibling : container.firstElementChild;
+                if (expected !== el) container.insertBefore(el, expected);
+                previous = el;
+            }
+        }
+
+        function feedRenderKey(feed) {
+            return JSON.stringify([feed.id, feed.title, feed.author, feed.provider, feed.cover_art, feed.downloaded_count, feed.total_size, feed.error_count, feed.last_error, updatingFeeds.has(feed.id)]);
         }
 
         function getFilteredFeeds() {
@@ -796,11 +611,18 @@
                     (f.provider && f.provider.toLowerCase().includes(query))
                 );
                 if (!matchesQuery) return false;
+                if (feedStatusFilter === 'updating' && !updatingFeeds.has(f.id)) return false;
+                if (feedStatusFilter === 'errors' && !(f.error_count > 0 || f.last_error)) return false;
 
                 const isAudiobook = (f.provider === "audiobook") || (f.url && f.url.startsWith("audiobook://"));
                 if (typeFilter === "channels") return !isAudiobook;
                 if (typeFilter === "audiobooks") return isAudiobook;
                 return true;
+            }).sort((a, b) => {
+                const sort = document.getElementById('feed-sort')?.value || 'title';
+                if (sort === 'size') return (b.total_size || 0) - (a.total_size || 0) || a.id.localeCompare(b.id);
+                if (sort === 'updated') return (Date.parse(b.last_update) || 0) - (Date.parse(a.last_update) || 0) || a.id.localeCompare(b.id);
+                return (a.title || a.id).localeCompare(b.title || b.id, undefined, {numeric: true}) || a.id.localeCompare(b.id);
             });
         }
 
@@ -815,7 +637,8 @@
 
             const query = (document.getElementById("feed-search")?.value || "").trim();
             const typeFilter = document.getElementById("feed-type-filter")?.value || "all";
-            const isFiltered = query !== "" || typeFilter !== "all";
+            const isFiltered = query !== "" || typeFilter !== "all" || feedStatusFilter !== 'all';
+            saveLibraryPreferences();
             const filterInfoEl = document.getElementById("feeds-filter-info");
             if (filterInfoEl) {
                 if (isFiltered && allFeeds && allFeeds.length > 0) {
@@ -839,7 +662,7 @@
             const typeFilter = document.getElementById("feed-type-filter");
             if (searchInput) searchInput.value = "";
             if (typeFilter) typeFilter.value = "all";
-            filterFeeds();
+            setFeedStatus('all');
         }
 
         function copyFeedUrl(url) {
@@ -919,7 +742,7 @@
                     updatingFeeds.delete(feedId);
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                        btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i> Update`;
                     }
                 }
             } catch (err) {
@@ -927,7 +750,7 @@
                 updatingFeeds.delete(feedId);
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update`;
+                    btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i> Update`;
                 }
             }
         }
@@ -962,14 +785,14 @@
                     showToast(`Failed to trigger update all: ${await res.text()}`);
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
+                        btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i> Update all`;
                     }
                 }
             } catch (err) {
                 showToast(`Network error: ${err.message}`);
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Update all`;
+                    btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i> Update all`;
                 }
             }
         }
@@ -1012,30 +835,45 @@
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = `<i class="bi bi-arrow-counterclockwise me-1"></i> Retry all`;
+                    btn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-counterclockwise me-1"></i> Retry all`;
                 }
             }
         }
 
 
         // Feed Settings Management
-        async function openFeedSettings(feedId) {
+        let settingsRequestId = 0;
+        async function openFeedSettings(feedId, activate = true) {
+            const requestId = ++settingsRequestId;
+            if (activate) {
+                openFeedScreen(feedId);
+                showFeedSection('settings', false);
+            }
+            const form = document.getElementById('feed-settings-form');
+            const status = document.getElementById('settings-load-status');
+            form.inert = true;
+            document.getElementById('fs-feed-id').value = '';
+            status.textContent = 'Loading settings…';
+            status.classList.remove('d-none');
             let feed = allFeeds.find(f => f.id === feedId);
             if (!feed || !feed.config) {
                 try {
                     const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        feed = data.feed;
-                    }
+                    if (!res.ok) throw new Error(await res.text());
+                    const data = await res.json();
+                    feed = data.feed;
                 } catch (e) {
+                    feed = null;
                     console.error('Failed to fetch feed details', e);
                 }
             }
-            if (!feed) {
-                alert('Could not load feed configuration');
+            if (requestId !== settingsRequestId || document.getElementById('episodesModal').dataset.feedId !== feedId) return;
+            if (!feed || !feed.config) {
+                status.textContent = 'Could not load settings. Select Settings to retry.';
                 return;
             }
+            status.classList.add('d-none');
+            form.inert = false;
 
             const cfg = feed.config || {};
             const filters = cfg.filters || {};
@@ -1136,10 +974,10 @@
             const cronHelp = document.getElementById('fs-cron-help');
 
             if (isAudiobook) {
-                if (titleEl) titleEl.innerHTML = '<i class="bi bi-book text-primary me-2"></i>Audiobook Settings';
+                if (titleEl) titleEl.innerHTML = '<i aria-hidden="true" class="bi bi-book text-primary me-2"></i>Audiobook Settings';
                 if (urlLabelEl) urlLabelEl.textContent = 'Audiobook Folder Path';
-                if (btnCustom) btnCustom.innerHTML = '<i class="bi bi-book me-1"></i>Book Metadata';
-                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>General &amp; Access';
+                if (btnCustom) btnCustom.innerHTML = '<i aria-hidden="true" class="bi bi-book me-1"></i>Book Metadata';
+                if (btnGeneral) btnGeneral.innerHTML = '<i aria-hidden="true" class="bi bi-clock me-1"></i>General &amp; Access';
                 document.getElementById('fs-cron-schedule').value = '';
 
                 if (navCleanup) navCleanup.classList.add('d-none');
@@ -1157,10 +995,10 @@
                     bootstrap.Tab.getOrCreateInstance(btnCustom).show();
                 }
             } else {
-                if (titleEl) titleEl.innerHTML = '<i class="bi bi-sliders text-primary me-2"></i>Podcast Settings';
+                if (titleEl) titleEl.innerHTML = '<i aria-hidden="true" class="bi bi-sliders text-primary me-2"></i>Podcast Settings';
                 if (urlLabelEl) urlLabelEl.textContent = 'Source URL';
-                if (btnCustom) btnCustom.innerHTML = '<i class="bi bi-card-text me-1"></i>RSS Overrides';
-                if (btnGeneral) btnGeneral.innerHTML = '<i class="bi bi-clock me-1"></i>General &amp; Schedule';
+                if (btnCustom) btnCustom.innerHTML = '<i aria-hidden="true" class="bi bi-card-text me-1"></i>RSS Overrides';
+                if (btnGeneral) btnGeneral.innerHTML = '<i aria-hidden="true" class="bi bi-clock me-1"></i>General &amp; Schedule';
                 if (cronHelp) cronHelp.textContent = 'Schedule to periodically check for new media files.';
 
                 if (navCleanup) navCleanup.classList.remove('d-none');
@@ -1179,9 +1017,7 @@
                 }
             }
 
-            const modalEl = document.getElementById('feedSettingsModal');
-            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            modal.show();
+            renderDetailHeader(feed);
         }
 
         function toggleMaxHeight() {
@@ -1267,7 +1103,7 @@
                 });
 
                 if (res.ok) {
-                    closeModal('feedSettingsModal');
+
                     showToast(`Settings for ${feedId} saved successfully`);
                     await loadFeeds();
                     renderAudiobookFeeds();
@@ -1291,7 +1127,7 @@
             } finally {
                 if (saveBtn) {
                     saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save Settings';
+                    saveBtn.innerHTML = '<i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save Settings';
                 }
             }
         }
@@ -1494,23 +1330,28 @@
         }
         let episodesRequestId = 0;
         let episodeView = null;
+        let episodePage = 0;
+        const episodePageSize = 40;
+        function resetEpisodePage() { episodePage = 0; renderEpisodeList(); }
+        function changeEpisodePage(delta) { episodePage = Math.max(0, episodePage + delta); renderEpisodeList(); }
 
         async function showEpisodes(feedId, openModal = true) {
             const requestId = ++episodesRequestId;
             const modalEl = document.getElementById('episodesModal');
             modalEl.dataset.feedId = feedId;
-            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
             const listEl = document.getElementById('episodes-list');
 
             const f = (allFeeds || []).find(x => x.id === feedId);
             const isAudiobook = f && ((f.provider === 'audiobook') || (f.url && f.url.startsWith('audiobook://')));
             document.getElementById('episodes-feed-title').innerText = isAudiobook ? `Audiobook Chapters: ${f?.title || feedId}` : `Podcast: ${f?.title || feedId}`;
             if (openModal) {
+                episodePage = 0;
+                openFeedScreen(feedId);
+                showFeedSection('episodes', false);
                 document.getElementById('episodes-search').value = '';
                 document.getElementById('episodes-status-filter').value = 'all';
                 document.getElementById('episodes-feed-subtitle').innerText = isAudiobook ? 'Loading chapters...' : 'Loading episodes...';
                 listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
-                modal.show();
             }
 
             try {
@@ -1518,6 +1359,7 @@
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
                 if (requestId !== episodesRequestId || modalEl.dataset.feedId !== feedId) return;
+                renderDetailHeader(data.feed || f);
                 episodeView = {
                     feedId,
                     title: data.feed?.title || f?.title || feedId,
@@ -1546,7 +1388,14 @@
             for (const [value, label] of [['new', 'Pending'], ['error', 'Errors'], ['cleaned', 'Cleaned']]) {
                 if (count(value)) parts.push(`${label}: ${count(value)}`);
             }
-            parts.push(`Shown: ${visible.length} / ${episodes.length}`);
+            parts.push(`Matching: ${visible.length} / ${episodes.length}`);
+            const pages = Math.max(1, Math.ceil(visible.length / episodePageSize));
+            episodePage = Math.min(episodePage, pages - 1);
+            const pageEpisodes = visible.slice(episodePage * episodePageSize, (episodePage + 1) * episodePageSize);
+            document.getElementById('episodes-page-label').innerText = `Page ${episodePage + 1} of ${pages}`;
+            document.getElementById('episodes-prev').disabled = episodePage === 0;
+            document.getElementById('episodes-next').disabled = episodePage >= pages - 1;
+            document.getElementById('episode-pagination').classList[pages > 1 ? 'remove' : 'add']('d-none');
             document.getElementById('episodes-feed-subtitle').innerText = parts.join(' • ');
             document.getElementById('episodes-feed-title').innerText =
                 `${isAudiobook ? 'Audiobook Chapters' : 'Podcast'}: ${title}`;
@@ -1557,20 +1406,20 @@
                         <div><button class="btn btn-outline-primary btn-sm mt-2" ${actionAttrs("update", feedId)}>Scan / Update Feed Now</button></div></div>`;
                 return;
             }
-            listEl.innerHTML = visible.map(ep => {
+            listEl.innerHTML = pageEpisodes.map(ep => {
                 let badge = '<span class="badge bg-secondary">Unknown</span>';
                 let size = formatBytes(ep.size);
                 let actions = '';
                 if (ep.status === 'downloaded') {
                     badge = `<span class="badge bg-success">${isAudiobook ? 'Available' : 'Downloaded'}</span>`;
-                    if (ep.media_url) actions += `<a href="${safeUrl(ep.media_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm" title="Play downloaded media"><i class="bi bi-play-fill"></i> Play</a>`;
+                    if (ep.media_url) actions += `<a href="${safeUrl(ep.media_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm" title="Play downloaded media"><i aria-hidden="true" class="bi bi-play-fill"></i> Play</a>`;
                 } else if (ep.status === 'new') {
                     badge = '<span class="badge bg-primary">Pending</span>';
                     size = 'Not downloaded';
                 } else if (ep.status === 'error') {
                     badge = '<span class="badge bg-danger">Error</span>';
                     size = 'Not downloaded';
-                    actions += `<button class="btn btn-outline-danger btn-sm" ${actionAttrs("retry", feedId, ep.id)}><i class="bi bi-arrow-clockwise"></i> Retry</button>`;
+                    actions += `<button class="btn btn-outline-danger btn-sm" ${actionAttrs("retry", feedId, ep.id)}><i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry</button>`;
                 } else if (ep.status === 'cleaned') {
                     badge = '<span class="badge bg-secondary">Cleaned</span>';
                     size = 'Deleted from disk';
@@ -1580,13 +1429,13 @@
                 }
                 const error = ep.status === 'error' && ep.error
                     ? `<div class="mt-2 p-2 rounded episode-error small text-break">${escapeHtml(ep.error)}</div>` : '';
-                const date = isAudiobook ? '' : `<span><i class="bi bi-calendar"></i> ${escapeHtml(formatDate(ep.pub_date))}</span>`;
+                const date = isAudiobook ? '' : `<span><i aria-hidden="true" class="bi bi-calendar"></i> ${escapeHtml(formatDate(ep.pub_date))}</span>`;
                 return `<div class="list-group-item p-3">
                     <div class="d-flex flex-column flex-sm-row align-items-start justify-content-between gap-3">
                         <div class="min-w-0 flex-grow-1">
                             <h6 class="fw-semibold mb-1 text-break">${isAudiobook && ep.order ? escapeHtml(ep.order) + '. ' : ''}${escapeHtml(ep.title || ep.id)}</h6>
                             <div class="text-muted small d-flex flex-wrap gap-3">
-                                <span><i class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
+                                <span><i aria-hidden="true" class="bi bi-clock"></i> ${formatDuration(ep.duration)}</span>
                                 <span>${size}</span>${date}
                             </div>${error}
                         </div>
@@ -1603,7 +1452,7 @@
                 const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}/episodes/${encodeURIComponent(episodeId)}/retry`, { method: 'POST' });
                 if (res.ok) {
                     showToast("Status reset, episode will be retried on next update");
-                    showEpisodes(feedId);
+                    showEpisodes(feedId, false);
                 } else {
                     alert("Retry failed: " + await res.text());
                 }
@@ -1646,7 +1495,7 @@
                     if (count === 1) {
                         tokensBadge = `<span class="badge bg-success ms-2 font-monospace">${escapeHtml(tokenList[0])}</span>`;
                     } else if (count > 1) {
-                        tokensBadge = `<span class="badge bg-primary-subtle text-primary border ms-2"><i class="bi bi-arrow-repeat me-1"></i>${count} keys (Rotation)</span>`;
+                        tokensBadge = `<span class="badge bg-primary-subtle text-primary border ms-2"><i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>${count} keys (Rotation)</span>`;
                     }
 
                     return `
@@ -1667,7 +1516,7 @@
                                     <input type="text" class="form-control form-control-sm font-monospace text-body-secondary" value="${escapeHtml(tok)}" readonly>
                                     ${!item.from_env ? `
                                         <button class="btn btn-outline-danger btn-sm" ${actionAttrs("delete-token", item.provider, idx, tok)} title="Delete token #${idx + 1} (${escapeHtml(tok)})">
-                                            <i class="bi bi-x-lg"></i>
+                                            <i aria-hidden="true" class="bi bi-x-lg"></i>
                                         </button>
                                     ` : ''}
                                 </div>
@@ -1677,23 +1526,23 @@
                         ${!item.from_env ? `
                         <div class="d-flex gap-2">
                             <div class="input-group input-group-sm">
-                                <span class="input-group-text bg-body-secondary"><i class="bi bi-key"></i></span>
+                                <span class="input-group-text bg-body-secondary"><i aria-hidden="true" class="bi bi-key"></i></span>
                                 <input type="text" id="token-input-${escapeHtml(item.provider)}" class="form-control form-control-sm font-monospace" placeholder="${count > 0 ? 'Add another key to rotation...' : (item.provider === 'vkvideo' ? 'Paste full URL from address bar or token...' : 'Enter API key(s) separated by space...')}" data-ui-token-provider="${escapeHtml(item.provider)}">
                                 <button class="btn btn-primary btn-sm" ${actionAttrs("add-token", item.provider)}>
-                                    <i class="bi bi-plus-lg me-1"></i>Add
+                                    <i aria-hidden="true" class="bi bi-plus-lg me-1"></i>Add
                                 </button>
                             </div>
                             ${count > 0 ? `
                                 <button class="btn btn-outline-danger btn-sm text-nowrap" ${actionAttrs("clear-tokens", item.provider)} title="Delete all tokens for ${escapeHtml(item.provider)}">
-                                    <i class="bi bi-trash3 me-1"></i>Clear All
+                                    <i aria-hidden="true" class="bi bi-trash3 me-1"></i>Clear All
                                 </button>
                             ` : ''}
                         </div>
                         <div class="form-text small text-muted mt-1">
-                            <i class="bi bi-info-circle me-1"></i>Add single key or multiple space-separated keys for automatic round-robin rotation.
+                            <i aria-hidden="true" class="bi bi-info-circle me-1"></i>Add single key or multiple space-separated keys for automatic round-robin rotation.
                         </div>` : `
                         <div class="text-muted small">
-                            <i class="bi bi-lock me-1"></i>Tokens are configured via environment variable (${escapeHtml(item.provider.toUpperCase())}_API_KEY) and cannot be edited via web UI.
+                            <i aria-hidden="true" class="bi bi-lock me-1"></i>Tokens are configured via environment variable (${escapeHtml(item.provider.toUpperCase())}_API_KEY) and cannot be edited via web UI.
                         </div>`}
                     </div>
                 `;
@@ -2109,7 +1958,7 @@
                 if (data.success) {
                     resultContainer.className = 'alert alert-success mt-3 small shadow-sm';
                     resultContainer.innerHTML = `
-                        <div class="fw-bold mb-1"><i class="bi bi-check-circle-fill me-1"></i> Success! yt-dlp extracted video metadata:</div>
+                        <div class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-check-circle-fill me-1"></i> Success! yt-dlp extracted video metadata:</div>
                         <div><strong>Title:</strong> ${escapeHtml(data.title || 'Unknown')}</div>
                         <div><strong>Channel:</strong> ${escapeHtml(data.channel || 'Unknown')}</div>
                         <div class="text-muted mt-1 small">Cookies &amp; proxy verified. YouTube bot protection bypassed successfully!</div>
@@ -2117,7 +1966,7 @@
                 } else {
                     resultContainer.className = 'alert alert-danger mt-3 small shadow-sm';
                     resultContainer.innerHTML = `
-                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> yt-dlp reported an error:</div>
+                        <div class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-exclamation-triangle-fill me-1"></i> yt-dlp reported an error:</div>
                         <pre class="p-2 my-1 font-monospace small" style="max-height: 200px; overflow-y: auto;">${escapeHtml(data.error || 'Unknown error')}</pre>
                         <div class="mt-1 small">Tip: Ensure your <code>cookies.txt</code> is fresh and exported while logged into YouTube.</div>
                     `;
@@ -2295,10 +2144,10 @@
             if (!input) return;
             if (input.type === 'password') {
                 input.type = 'text';
-                btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+                btn.innerHTML = '<i aria-hidden="true" class="bi bi-eye-slash"></i>';
             } else {
                 input.type = 'password';
-                btn.innerHTML = '<i class="bi bi-eye"></i>';
+                btn.innerHTML = '<i aria-hidden="true" class="bi bi-eye"></i>';
             }
         }
 
@@ -2320,7 +2169,7 @@
 
         function showCopyFeedback(btn) {
             const origHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-check2 text-success"></i> Copied!';
+            btn.innerHTML = '<i aria-hidden="true" class="bi bi-check2 text-success"></i> Copied!';
             setTimeout(() => {
                 btn.innerHTML = origHTML;
             }, 1500);
@@ -2333,8 +2182,12 @@
         let currentLogsLevel = 'all';
         let currentLogsFeed = '';
         let lastLoadedLogEntries = [];
+        let logsRequestId = 0;
+        let logsBusy = false;
+        let renderedLogsKey = '';
+        let renderedLogRows = [];
 
-        function setLogsLevel(lvl) {
+        function setLogsLevel(lvl, reload = true) {
             currentLogsLevel = lvl;
             const group = document.getElementById('logs-level-group');
             if (group) {
@@ -2344,7 +2197,7 @@
                 const activeBtn = group.querySelector(`button[onclick*="'${lvl}'"]`);
                 if (activeBtn) activeBtn.classList.add('active');
             }
-            loadLogs(true);
+            if (reload) loadLogs(true);
         }
 
         function onLogsFeedChange() {
@@ -2372,7 +2225,7 @@
             }
             const dot = document.getElementById('logs-live-dot');
             const ms = parseInt(intervalMs, 10);
-            if (ms > 0) {
+            if (ms > 0 && !document.hidden && currentTab === 'tab-logs') {
                 if (dot) dot.classList.remove('d-none');
                 logsAutoRefreshTimer = setInterval(() => {
                     const logsTab = document.getElementById('tab-logs');
@@ -2386,6 +2239,9 @@
         }
 
         async function loadLogs(manual = false) {
+            if (logsBusy && !manual) return;
+            logsBusy = true;
+            const requestId = ++logsRequestId;
             const terminal = document.getElementById('logs-terminal');
             const countBadge = document.getElementById('logs-count-badge');
             const statusText = document.getElementById('logs-status-text');
@@ -2428,6 +2284,7 @@
                 const res = await fetch(`/api/v1/system/logs${query}`);
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
+                if (requestId !== logsRequestId) return;
 
                 const entries = data.entries || [];
                 lastLoadedLogEntries = entries;
@@ -2460,10 +2317,17 @@
                     }
                 }
 
+                const newLogsKey = JSON.stringify(entries);
+                if (newLogsKey === renderedLogsKey) {
+                    if (statusText) statusText.innerText = 'Last checked: ' + new Date().toLocaleTimeString();
+                    return;
+                }
+                renderedLogsKey = newLogsKey;
                 if (entries.length === 0) {
+                    renderedLogRows = [];
                     terminal.innerHTML = `
                         <div class="text-muted text-center py-5">
-                            <i class="bi bi-journal-x fs-1 mb-2 d-block opacity-50"></i>
+                            <i aria-hidden="true" class="bi bi-journal-x fs-1 mb-2 d-block opacity-50"></i>
                             <div>No log entries found matching criteria.</div>
                             <div class="small mt-1">Try changing level, clearing search filter, or re-triggering podcast update.</div>
                         </div>`;
@@ -2496,7 +2360,18 @@
                         `;
                     }).join('');
 
-                    terminal.innerHTML = linesHtml;
+                    const newRows = entries.map(e => JSON.stringify(e));
+                    const canAppend = renderedLogRows.length > 0 && newRows.length >= renderedLogRows.length && renderedLogRows.every((row, i) => row === newRows[i]);
+                    if (canAppend) {
+                        const fragment = document.createElement('div');
+                        fragment.innerHTML = linesHtml;
+                        Array.from(fragment.children).slice(renderedLogRows.length).forEach(el => terminal.appendChild(el));
+                    } else {
+                        const scrollTop = terminal.scrollTop;
+                        terminal.innerHTML = linesHtml;
+                        terminal.scrollTop = scrollTop;
+                    }
+                    renderedLogRows = newRows;
 
                     const autoscroll = document.getElementById('logs-autoscroll');
                     if (autoscroll && autoscroll.checked) {
@@ -2507,10 +2382,13 @@
                 if (statusText) statusText.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
 
             } catch (err) {
+                if (requestId !== logsRequestId) return;
                 if (statusText) statusText.innerText = 'Error: ' + err.message;
                 if (manual) {
                     showToast('Failed to load logs: ' + err.message);
                 }
+            } finally {
+                if (requestId === logsRequestId) logsBusy = false;
             }
         }
 
@@ -2542,16 +2420,13 @@
         }
 
         function showLogsForFeed(feedId, level = 'all') {
-            const triggerEl = document.querySelector('button[data-bs-target="#tab-logs"]');
-            if (triggerEl) {
-                bootstrap.Tab.getOrCreateInstance(triggerEl).show();
-            }
             currentLogsFeed = feedId;
             const feedSelect = document.getElementById('logs-feed-select');
-            if (feedSelect) {
-                feedSelect.value = feedId;
-            }
-            setLogsLevel(level || 'all');
+            if (feedSelect) feedSelect.value = feedId;
+            setLogsLevel(level || 'all', false);
+            const triggerEl = document.querySelector('button[data-bs-target="#tab-logs"]');
+            if (currentTab === 'tab-logs') loadLogs(true);
+            else if (triggerEl) bootstrap.Tab.getOrCreateInstance(triggerEl).show();
         }
 
         async function showFeedErrors(feedId) {
@@ -2568,7 +2443,7 @@
             const feedTitle = feed ? (feed.title || feed.id) : feedId;
 
             if (titleEl) {
-                titleEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> Error Log &mdash; ${escapeHtml(feedTitle)}`;
+                titleEl.innerHTML = `<i aria-hidden="true" class="bi bi-exclamation-triangle-fill me-1"></i> Error Log &mdash; ${escapeHtml(feedTitle)}`;
             }
             if (subEl) {
                 subEl.innerHTML = `Podcast ID: <code>${escapeHtml(feedId)}</code>`;
@@ -2623,7 +2498,7 @@
                 if (!hasLastError && !hasEpisodeErrors && !hasLogs) {
                     bodyEl.innerHTML = `
                         <div class="text-center py-4 text-muted">
-                            <i class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
+                            <i aria-hidden="true" class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
                             <h6 class="fw-bold text-dark">No active errors</h6>
                             <p class="small mb-0">All episodes downloaded successfully and no error logs were recorded for this podcast.</p>
                         </div>`;
@@ -2638,10 +2513,10 @@
                         <div class="alert alert-danger mb-3 p-3">
                             <div class="d-flex align-items-center justify-content-between mb-1">
                                 <strong class="d-flex align-items-center gap-1">
-                                    <i class="bi bi-exclamation-octagon-fill"></i> Last Feed Update Error
+                                    <i aria-hidden="true" class="bi bi-exclamation-octagon-fill"></i> Last Feed Update Error
                                 </strong>
                                 <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="copyToClipboard('${escapeHtml(feed.last_error)}')">
-                                    <i class="bi bi-clipboard me-1"></i> Copy
+                                    <i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy
                                 </button>
                             </div>
                             <div class="small font-monospace text-break mb-0">${escapeHtml(feed.last_error)}</div>
@@ -2658,7 +2533,7 @@
                     html += `
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <h6 class="fw-bold mb-0 text-danger d-flex align-items-center gap-1">
-                                <i class="bi bi-file-earmark-x-fill"></i> Failed Episodes (${errorItems.length})
+                                <i aria-hidden="true" class="bi bi-file-earmark-x-fill"></i> Failed Episodes (${errorItems.length})
                             </h6>
                             <span class="text-muted small">Click Retry to attempt re-download</span>
                         </div>
@@ -2674,17 +2549,17 @@
                                         <div class="text-muted small d-flex flex-wrap align-items-center gap-2 mt-1">
                                             <span>ID: <code>${escapeHtml(item.episode_id)}</code></span>
                                             ${errDate ? `<span>&bull; ${escapeHtml(errDate)}</span>` : ''}
-                                            ${item.video_url ? `<span>&bull; <a href="${escapeHtml(item.video_url)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Source <i class="bi bi-box-arrow-up-right"></i></a></span>` : ''}
+                                            ${item.video_url ? `<span>&bull; <a href="${escapeHtml(item.video_url)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Source <i aria-hidden="true" class="bi bi-box-arrow-up-right"></i></a></span>` : ''}
                                         </div>
                                     </div>
                                     <button class="btn btn-sm btn-outline-danger py-1 px-2 flex-shrink-0" ${actionAttrs('retry-error', feedId, item.episode_id)}>
-                                        <i class="bi bi-arrow-clockwise me-1"></i> Retry
+                                        <i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i> Retry
                                     </button>
                                 </div>
                                 <pre class="bg-dark text-danger-subtle p-2 rounded small text-break mt-2 mb-1 user-select-all font-monospace" style="max-height: 140px; overflow-y: auto;"><code>${escapeHtml(item.error || 'Unknown download error')}</code></pre>
                                 ${item.recommendation ? `
                                     <div class="text-muted small mt-1 d-flex align-items-start gap-1">
-                                        <i class="bi bi-lightbulb text-warning flex-shrink-0 mt-1"></i>
+                                        <i aria-hidden="true" class="bi bi-lightbulb text-warning flex-shrink-0 mt-1"></i>
                                         <span>${escapeHtml(item.recommendation)}</span>
                                     </div>` : ''}
                             </div>`;
@@ -2697,7 +2572,7 @@
                 html += `
                     <div class="d-flex align-items-center justify-content-between mb-2 pt-2 border-top">
                         <h6 class="fw-bold mb-0 text-secondary d-flex align-items-center gap-1">
-                            <i class="bi bi-terminal-fill"></i> Server Error Logs (${logEntries.length})
+                            <i aria-hidden="true" class="bi bi-terminal-fill"></i> Server Error Logs (${logEntries.length})
                         </h6>
                     </div>`;
 
@@ -2728,7 +2603,7 @@
                 if (bodyEl) {
                     bodyEl.innerHTML = `
                         <div class="alert alert-danger mb-0">
-                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <i aria-hidden="true" class="bi bi-exclamation-triangle me-1"></i>
                             Failed to load error log: ${escapeHtml(err.message)}
                         </div>`;
                 }
@@ -2772,7 +2647,7 @@
             } finally {
                 if (retryBtn) {
                     retryBtn.disabled = false;
-                    retryBtn.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i> Retry All`;
+                    retryBtn.innerHTML = `<i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i> Retry All`;
                 }
             }
         }
@@ -2860,7 +2735,7 @@
                 renderAudiobookDirsTable(cachedAudiobookDirs);
             } catch (err) {
                 if (tbody) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle me-2"></i>Failed to read audiobooks: ${escapeHtml(err.message)}</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4"><i aria-hidden="true" class="bi bi-exclamation-triangle me-2"></i>Failed to read audiobooks: ${escapeHtml(err.message)}</td></tr>`;
                 }
             }
         }
@@ -2873,14 +2748,14 @@
             if (!tbody) return;
 
             if (dirs.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-inbox me-2"></i>No audiobook directories found in storage. Click "Upload audiobook" to add your first book!</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4"><i aria-hidden="true" class="bi bi-inbox me-2"></i>No audiobook directories found in storage. Click "Upload audiobook" to add your first book!</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = dirs.map(d => {
                 const sizeMB = (d.total_size / (1024 * 1024)).toFixed(1);
                 const coverBadge = d.has_cover 
-                    ? `<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-image me-1"></i>Found</span>` 
+                    ? `<span class="badge bg-success-subtle text-success border border-success-subtle"><i aria-hidden="true" class="bi bi-image me-1"></i>Found</span>`
                     : `<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">None (or ID3)</span>`;
                 
                 let statusBadge = '';
@@ -2889,25 +2764,25 @@
                 const escapedTitle = escapeHtml(d.suggested_title || d.name);
                 const escapedAuthor = escapeHtml(d.suggested_author || '');
                 if (d.linked) {
-                    statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="bi bi-link-45deg me-1"></i>Linked: ${escapeHtml(d.feed_id)}</span>`;
+                    statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i aria-hidden="true" class="bi bi-link-45deg me-1"></i>Linked: ${escapeHtml(d.feed_id)}</span>`;
                     actionBtn = `
                         <div class="d-inline-flex gap-1">
-                            <button class="btn btn-sm btn-outline-secondary" ${actionAttrs("episodes", d.feed_id)}><i class="bi bi-eye me-1"></i>Chapters</button>
-                            <button class="btn btn-sm btn-outline-danger" ${actionAttrs("delete-book", d.name, d.feed_id)} title="Delete folder and linked feed from disk"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" ${actionAttrs("episodes", d.feed_id)}><i aria-hidden="true" class="bi bi-eye me-1"></i>Chapters</button>
+                            <button class="btn btn-sm btn-outline-danger" ${actionAttrs("delete-book", d.name, d.feed_id)} title="Delete folder and linked feed from disk"><i aria-hidden="true" class="bi bi-trash"></i></button>
                         </div>`;
                 } else {
-                    statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i class="bi bi-clock me-1"></i>Unlinked</span>`;
+                    statusBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle"><i aria-hidden="true" class="bi bi-clock me-1"></i>Unlinked</span>`;
                     actionBtn = `
                         <div class="d-inline-flex gap-1">
-                            <button class="btn btn-sm btn-brand" ${actionAttrs("import-book", d.name, d.suggested_title || d.name, d.suggested_author || '')}><i class="bi bi-plus-circle me-1"></i>Import</button>
-                            <button class="btn btn-sm btn-outline-danger" ${actionAttrs("delete-book", d.name, '')} title="Delete folder from disk"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-brand" ${actionAttrs("import-book", d.name, d.suggested_title || d.name, d.suggested_author || '')}><i aria-hidden="true" class="bi bi-plus-circle me-1"></i>Import</button>
+                            <button class="btn btn-sm btn-outline-danger" ${actionAttrs("delete-book", d.name, '')} title="Delete folder from disk"><i aria-hidden="true" class="bi bi-trash"></i></button>
                         </div>`;
                 }
 
                 return `
                     <tr>
                         <td class="fw-semibold">
-                            <i class="bi bi-folder-fill text-warning me-2"></i>${escapeHtml(d.name)}
+                            <i aria-hidden="true" class="bi bi-folder-fill text-warning me-2"></i>${escapeHtml(d.name)}
                             ${d.suggested_title && d.suggested_author ? `<div class="text-muted small fw-normal ms-4">${escapeHtml(d.suggested_author)} — ${escapeHtml(d.suggested_title)}</div>` : ''}
                         </td>
                         <td><span class="badge bg-body-secondary text-body">${d.file_count} chapters</span></td>
@@ -2956,7 +2831,7 @@
             if (audioFeeds.length === 0) {
                 container.innerHTML = `
                     <div class="col-12 text-center text-muted py-4">
-                        <i class="bi bi-book me-2"></i>No audiobook podcast feeds configured yet. Import a local directory above!
+                        <i aria-hidden="true" class="bi bi-book me-2"></i>No audiobook podcast feeds configured yet. Import a local directory above!
                     </div>
                 `;
                 return;
@@ -2969,7 +2844,7 @@
                         <div class="card h-100 p-3 shadow-sm">
                             <div class="d-flex gap-3 align-items-center mb-3">
                                 <div role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters" class="flex-shrink-0" style="cursor: pointer;">
-                                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i class="bi bi-book fs-3"></i></div>`}
+                                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i aria-hidden="true" class="bi bi-book fs-3"></i></div>`}
                                 </div>
                                 <div class="min-w-0 flex-grow-1">
                                     <h6 class="fw-bold mb-1 text-truncate" role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters (Click to open)" style="cursor: pointer;">${escapeHtml(feed.title || feed.id)}</h6>
@@ -2981,39 +2856,39 @@
                             <div class="d-flex align-items-center gap-1 mb-2">
                                 <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
                                 <button class="btn btn-light btn-sm border flex-shrink-0" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
-                                    <i class="bi bi-clipboard"></i>
+                                    <i aria-hidden="true" class="bi bi-clipboard"></i>
                                 </button>
                                 <button class="btn btn-light btn-sm border flex-shrink-0" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
-                                    <i class="bi bi-qr-code"></i>
+                                    <i aria-hidden="true" class="bi bi-qr-code"></i>
                                 </button>
                             </div>
 
                             <!-- Deep Links for Podcast Apps -->
                             <div class="d-flex flex-wrap gap-1 mb-3">
                                 <a href="${safeUrl(feed.apple_url, ['podcast:'])}" class="deep-link-btn border">
-                                    <i class="bi bi-apple"></i> Apple
+                                    <i aria-hidden="true" class="bi bi-apple"></i> Apple
                                 </a>
                                 <a href="${safeUrl(feed.pocketcasts_url, ['pktc:'])}" class="deep-link-btn border">
-                                    <i class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
+                                    <i aria-hidden="true" class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
                                 </a>
                                 <a href="${safeUrl(feed.overcast_url, ['overcast:'])}" class="deep-link-btn border">
-                                    <i class="bi bi-soundwave text-warning"></i> Overcast
+                                    <i aria-hidden="true" class="bi bi-soundwave text-warning"></i> Overcast
                                 </a>
                                 <a href="${safeUrl(feed.feed_url, ['http:', 'https:'])}" target="_blank" rel="noopener noreferrer" class="deep-link-btn border">
-                                    <i class="bi bi-box-arrow-up-right"></i> XML
+                                    <i aria-hidden="true" class="bi bi-box-arrow-up-right"></i> XML
                                 </a>
                             </div>
 
                             <!-- Stats and Action Buttons -->
                             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
                                 <div class="d-flex align-items-center gap-2">
-                                    <span role="button" ${actionAttrs("episodes", feed.id)} class="stat-badge text-primary" style="cursor: pointer;" title="View Chapters"><i class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
-                                    <span class="stat-badge"><i class="bi bi-hdd me-1"></i>${totalMB} MB</span>
+                                    <span role="button" ${actionAttrs("episodes", feed.id)} class="stat-badge text-primary" style="cursor: pointer;" title="View Chapters"><i aria-hidden="true" class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
+                                    <span class="stat-badge"><i aria-hidden="true" class="bi bi-hdd me-1"></i>${totalMB} MB</span>
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i class="bi bi-list-ol me-1"></i>Chapters</button>
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i class="bi bi-gear me-1"></i>Settings</button>
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i class="bi bi-arrow-repeat me-1"></i>Update</button>
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i aria-hidden="true" class="bi bi-list-ol me-1"></i>Chapters</button>
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
+                                    <button class="btn btn-light btn-sm border" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update</button>
                                 </div>
                             </div>
                         </div>
@@ -3069,7 +2944,7 @@
                 alert('Import error: ' + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Create Feed`;
+                btn.innerHTML = `<i aria-hidden="true" class="bi bi-check-lg me-1"></i> Create Feed`;
             }
         }
 
@@ -3147,57 +3022,237 @@
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                if (updatePollTimer) {
-                    clearInterval(updatePollTimer);
-                    updatePollTimer = null;
-                }
-                if (typeof logsAutoRefreshTimer !== 'undefined' && logsAutoRefreshTimer) {
-                    clearInterval(logsAutoRefreshTimer);
-                    logsAutoRefreshTimer = null;
-                }
+                if (updatePollTimer) { clearInterval(updatePollTimer); updatePollTimer = null; }
+                if (logsAutoRefreshTimer) { clearInterval(logsAutoRefreshTimer); logsAutoRefreshTimer = null; }
             } else {
-                if (updatingFeeds.size > 0) {
-                    pollFeedStatuses();
-                    startUpdatePolling();
-                }
-                const logsAutoCheckbox = document.getElementById('logs-auto-refresh');
-                if (logsAutoCheckbox && logsAutoCheckbox.checked && currentTab === 'tab-logs') {
-                    if (typeof startLogsAutoRefresh === 'function') startLogsAutoRefresh();
+                if (updatingFeeds.size > 0) { pollFeedStatuses(); startUpdatePolling(); }
+                else loadFeeds();
+                if (currentTab === 'tab-logs') {
+                    loadLogs();
+                    setLogsAutoRefresh(document.getElementById('logs-autorefresh-select').value);
                 }
             }
         });
 
         document.getElementById('mainTabs')?.addEventListener('shown.bs.tab', (e) => {
             const target = e.target.getAttribute('data-bs-target')?.replace('#', '');
-            if (target) {
-                currentTab = target;
-                if (target === 'tab-feeds') {
-                    if (tabDirty['tab-feeds']) {
-                        tabDirty['tab-feeds'] = false;
-                        filterFeeds();
-                    }
-                } else if (target === 'tab-audiobooks') {
-                    currentTab = 'tab-audiobooks';
-                    tabDirty['tab-audiobooks'] = false;
-                    renderAudiobookFeeds();
-                    if (typeof loadAudiobookDirs === 'function') loadAudiobookDirs();
-                } else if (target === 'tab-downloader') {
-                    if (typeof loadDownloaderConfig === 'function') loadDownloaderConfig();
-                } else if (target === 'tab-mcp') {
-                    if (typeof loadMCPConfig === 'function') loadMCPConfig();
-                } else if (target === 'tab-logs') {
-                    if (typeof loadLogs === 'function') loadLogs();
-                } else if (target === 'tab-system') {
-                    loadSystem();
-                    loadAuthSecurity();
-                }
+            if (!target) return;
+            currentTab = target;
+            document.getElementById('episodesModal').classList.remove('show', 'active');
+            closeNavigation();
+            setRoute('#' + target.replace('tab-', ''));
+            if (logsAutoRefreshTimer) { clearInterval(logsAutoRefreshTimer); logsAutoRefreshTimer = null; }
+            if (target === 'tab-feeds') {
+                tabDirty[target] = false;
+                filterFeeds();
+                window.scrollTo?.(0, libraryScroll);
+            } else if (target === 'tab-audiobooks') {
+                loadAudiobooksTab();
+                window.scrollTo?.(0, libraryScroll);
+            } else if (target === 'tab-tokens') {
+                loadTokens();
+            } else if (target === 'tab-downloader') {
+                loadDownloaderConfig();
+            } else if (target === 'tab-mcp') {
+                loadMCPConfig();
+            } else if (target === 'tab-logs') {
+                loadLogs(true);
+                setLogsAutoRefresh(document.getElementById('logs-autorefresh-select').value);
+            } else if (target === 'tab-system') {
+                loadSystem(); loadAuthSecurity();
             }
         });
-
-
 
         document.getElementById('securitySettingsModal')?.addEventListener('show.bs.modal', () => {
             loadAuthSecurity();
             const errAlert = document.getElementById('sec-settings-error');
             if (errAlert) errAlert.classList.add('d-none');
         });
+
+        // Library navigation and view preferences are independent of server configuration.
+        let feedStatusFilter = 'all';
+        let libraryView = 'grid';
+        let libraryScroll = 0;
+        let libraryOrigin = 'tab-feeds';
+        let detailSection = 'episodes';
+        let restoringRoute = false;
+        let feedHistoryRequestId = 0;
+
+        function updateLibraryCounts() {
+            const counts = {all: allFeeds.length, updating: allFeeds.filter(f => updatingFeeds.has(f.id)).length, errors: allFeeds.filter(f => f.error_count > 0 || f.last_error).length};
+            for (const [name, count] of Object.entries(counts)) {
+                const el = document.getElementById('count-' + name);
+                if (el) el.textContent = count;
+            }
+        }
+
+        function setFeedStatus(status) {
+            feedStatusFilter = ['all', 'updating', 'errors'].includes(status) ? status : 'all';
+            document.querySelectorAll('[data-status]').forEach(el => {
+                const active = el.dataset.status === feedStatusFilter;
+                el.classList[active ? 'add' : 'remove']('active');
+                el.setAttribute('aria-pressed', String(active));
+            });
+            filterFeeds();
+        }
+
+        function setLibraryView(view) {
+            libraryView = view === 'list' ? 'list' : 'grid';
+            document.getElementById('feeds-container')?.setAttribute('data-view', libraryView);
+            for (const name of ['grid', 'list']) {
+                const button = document.getElementById('view-' + name);
+                if (!button) continue;
+                button.classList[name === libraryView ? 'add' : 'remove']('active');
+                button.setAttribute('aria-pressed', String(name === libraryView));
+            }
+            saveLibraryPreferences();
+        }
+
+        function saveLibraryPreferences() {
+            try {
+                localStorage.setItem('podsync-library', JSON.stringify({
+                    view: libraryView, status: feedStatusFilter,
+                    search: document.getElementById('feed-search')?.value || '',
+                    type: document.getElementById('feed-type-filter')?.value || 'all',
+                    sort: document.getElementById('feed-sort')?.value || 'title'
+                }));
+            } catch (_) { /* Browsers may disable storage; the current view still works. */ }
+        }
+
+        function restoreLibraryPreferences() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('podsync-library') || '{}');
+                document.getElementById('feed-search').value = typeof saved.search === 'string' ? saved.search : '';
+                document.getElementById('feed-type-filter').value = ['all', 'channels', 'audiobooks'].includes(saved.type) ? saved.type : 'all';
+                document.getElementById('feed-sort').value = ['title', 'updated', 'size'].includes(saved.sort) ? saved.sort : 'title';
+                setLibraryView(saved.view);
+                setFeedStatus(saved.status);
+            } catch (_) { setLibraryView('grid'); }
+        }
+
+        function toggleNavigation() {
+            const layout = document.querySelector('.app-layout');
+            const open = !layout.classList.contains('navigation-open');
+            layout.classList[open ? 'add' : 'remove']('navigation-open');
+            document.querySelector('.mobile-menu-toggle').setAttribute('aria-expanded', String(open));
+        }
+
+        function closeNavigation() {
+            document.querySelector('.app-layout')?.classList.remove('navigation-open');
+            document.querySelector('.mobile-menu-toggle')?.setAttribute('aria-expanded', 'false');
+        }
+
+        function setRoute(hash) {
+            if (!restoringRoute && window.location.hash !== hash) window.history?.pushState(null, '', hash);
+        }
+
+        function openFeedScreen(feedId) {
+            if (currentTab !== 'feed-detail') {
+                libraryScroll = window.scrollY || 0;
+                libraryOrigin = currentTab === 'tab-audiobooks' ? currentTab : 'tab-feeds';
+            }
+            currentTab = 'feed-detail';
+            if (logsAutoRefreshTimer) { clearInterval(logsAutoRefreshTimer); logsAutoRefreshTimer = null; }
+            document.querySelectorAll('#main-content > .tab-pane').forEach(el => el.classList.remove('show', 'active'));
+            document.querySelectorAll('#mainTabs .nav-link').forEach(el => {
+                el.classList.remove('active'); el.setAttribute('aria-selected', 'false');
+            });
+            const screen = document.getElementById('episodesModal');
+            screen.dataset.feedId = feedId;
+            screen.classList.add('show', 'active');
+            renderDetailHeader(allFeeds.find(f => f.id === feedId) || {id: feedId, title: feedId});
+            closeNavigation();
+            window.scrollTo?.(0, 0);
+        }
+
+        function renderDetailHeader(feed) {
+            if (!feed) return;
+            document.getElementById('episodes-feed-title').innerText = feed.title || feed.id;
+            document.getElementById('detail-provider').innerText = feed.provider || 'Podcast';
+            if (detailSection !== 'episodes') document.getElementById('episodes-feed-subtitle').innerText = [isValidAuthor(feed.author) ? feed.author : '', feed.downloaded_count != null ? `${feed.downloaded_count} episodes` : '', feed.total_size ? formatBytes(feed.total_size) : ''].filter(Boolean).join(' · ');
+            const cover = document.getElementById('detail-cover');
+            if (cover) cover.innerHTML = feed.cover_art && safeUrl(feed.cover_art)
+                ? `<img src="${safeUrl(feed.cover_art)}" alt="" onerror="this.style.display='none'">`
+                : `<i aria-hidden="true" class="bi ${feed.provider === 'audiobook' ? 'bi-book' : 'bi-broadcast'}"></i>`;
+        }
+
+        function showFeedSection(section, load = true) {
+            detailSection = ['episodes', 'settings', 'history'].includes(section) ? section : 'episodes';
+            const feedId = document.getElementById('episodesModal').dataset.feedId;
+            for (const name of ['episodes', 'settings', 'history']) {
+                document.getElementById('detail-' + name)?.classList[name === detailSection ? 'remove' : 'add']('d-none');
+            }
+            document.querySelectorAll('[data-section]').forEach(button => {
+                const active = button.dataset.section === detailSection;
+                button.classList[active ? 'add' : 'remove']('active');
+                if (active) button.setAttribute('aria-current', 'page');
+                else button.removeAttribute('aria-current');
+            });
+            setRoute('#feed/' + encodeURIComponent(feedId) + '/' + detailSection);
+            if (!load) return;
+            if (detailSection === 'settings') openFeedSettings(feedId, false);
+            else if (detailSection === 'history') loadFeedHistory();
+            else if (!episodeView || episodeView.feedId !== feedId) showEpisodes(feedId, false);
+            else renderEpisodeList();
+        }
+
+        function returnToLibrary() {
+            const button = document.querySelector(`#mainTabs [data-bs-target="#${libraryOrigin}"]`);
+            if (button) bootstrap.Tab.getOrCreateInstance(button).show();
+        }
+
+        function restoreRoute() {
+            const hash = window.location.hash || '#feeds';
+            restoringRoute = true;
+            try {
+                if (hash.startsWith('#feed/')) {
+                    const [id, section] = hash.slice(6).split('/');
+                    const feedId = decodeURIComponent(id || '');
+                    if (!feedId) return;
+                    if (section === 'settings') openFeedSettings(feedId);
+                    else if (section === 'history') { openFeedScreen(feedId); showFeedSection('history'); }
+                    else if (currentTab === 'feed-detail' && episodeView?.feedId === feedId) showFeedSection('episodes');
+                    else showEpisodes(feedId);
+                } else {
+                    const allowed = ['feeds', 'audiobooks', 'tokens', 'system', 'downloader', 'mcp', 'logs'];
+                    const tab = allowed.includes(hash.slice(1)) ? hash.slice(1) : 'feeds';
+                    const button = document.querySelector(`#mainTabs [data-bs-target="#tab-${tab}"]`);
+                    if (button) bootstrap.Tab.getOrCreateInstance(button).show();
+                }
+            } catch (_) { returnToLibrary(); }
+            finally { restoringRoute = false; }
+        }
+        window.addEventListener?.('hashchange', restoreRoute);
+
+        async function loadFeedHistory() {
+            const feedId = document.getElementById('episodesModal').dataset.feedId;
+            const requestId = ++feedHistoryRequestId;
+            const list = document.getElementById('feed-history-list');
+            list.innerHTML = '<p class="text-muted">Loading activity…</p>';
+            try {
+                const res = await fetch(`/api/v1/system/logs?feed_id=${encodeURIComponent(feedId)}&limit=100`);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                if (requestId !== feedHistoryRequestId || document.getElementById('episodesModal').dataset.feedId !== feedId) return;
+                list.innerHTML = (data.entries || []).map(entry => `<div class="history-entry"><div class="small text-muted mb-1">${escapeHtml(formatDate(entry.timestamp))} · ${escapeHtml(entry.level)}</div><div>${escapeHtml(entry.message)}</div></div>`).join('') || '<p class="text-muted mb-0">No recent activity for this podcast.</p>';
+            } catch (err) {
+                if (requestId === feedHistoryRequestId && document.getElementById('episodesModal').dataset.feedId === feedId) list.textContent = 'Could not load activity: ' + err.message;
+            }
+        }
+
+        function showSubscription(feedId) {
+            const feed = allFeeds.find(f => f.id === feedId);
+            if (!feed) { showToast('This podcast is no longer in the library. Refresh the list.'); return; }
+            document.getElementById('subscribe-title').innerText = 'Subscribe to ' + (feed.title || feed.id);
+            const links = [[feed.apple_url, ['podcast:'], 'bi-apple', 'Apple Podcasts'], [feed.pocketcasts_url, ['pktc:'], 'bi-play-circle', 'Pocket Casts'], [feed.overcast_url, ['overcast:'], 'bi-soundwave', 'Overcast'], [feed.feed_url, ['http:', 'https:'], 'bi-rss', 'Open RSS feed']];
+            document.getElementById('subscribe-body').innerHTML = `<p class="text-muted small">Copy the feed link into your podcast app, or choose an app below.</p><div class="subscription-url"><input class="form-control" aria-label="RSS feed URL" readonly value="${escapeHtml(feed.feed_url || '')}"><button class="btn btn-brand" ${actionAttrs('copy', feed.feed_url)}>Copy</button><button class="btn btn-light" aria-label="Show QR code" ${actionAttrs('qr', feed.title || feed.id, feed.feed_url)}><i aria-hidden="true" class="bi bi-qr-code"></i></button></div><div class="subscription-links">${links.filter(([url, schemes]) => url && safeUrl(url, schemes)).map(([url, schemes, icon, label]) => `<a href="${safeUrl(url, schemes)}"><i aria-hidden="true" class="bi ${icon} me-2"></i>${label}<i aria-hidden="true" class="bi bi-arrow-up-right float-end"></i></a>`).join('')}</div>`;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('subscribeModal')).show();
+        }
+
+        function toggleAddAdvanced(button) {
+            const expanded = button.getAttribute('aria-expanded') !== 'true';
+            button.setAttribute('aria-expanded', String(expanded));
+            document.getElementById('addFeedTabs').classList[expanded ? 'remove' : 'add']('d-none');
+            document.querySelectorAll('.add-advanced-field').forEach(el => el.classList[expanded ? 'remove' : 'add']('d-none'));
+            if (!expanded) bootstrap.Tab.getOrCreateInstance(document.querySelector('[data-bs-target="#af-tab-general"]')).show();
+        }

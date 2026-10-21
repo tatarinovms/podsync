@@ -11,7 +11,7 @@ function el(id) {
     return elements.get(id);
 }
 const context = {
-    document: {getElementById:el, documentElement:{setAttribute(){}},addEventListener(){},querySelectorAll(){return [];}},
+    document: {getElementById:el, documentElement:{setAttribute(){}},querySelector(){return null;},addEventListener(){},querySelectorAll(){return [];}},
     window:{location:{href:'http://localhost/admin/'}},
     bootstrap:{Toast:class {},Modal:{getOrCreateInstance(){return {show(){}};}}},
     URL, console, setInterval(){}, clearInterval(){}, setTimeout(){}, navigator:{},

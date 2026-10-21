@@ -112,3 +112,31 @@ assert.equal(typeof context.retryFeedError, "function", "retryFeedError must be 
 assert.equal(typeof context.retryAllErrorsForFeed, "function", "retryAllErrorsForFeed must be a function");
 
 console.log('UI search, filter, and rendering tests passed!');
+
+// Status filters include feed-level failures even when no episode has failed yet.
+feedTypeFilter.value = 'all';
+feedSearch.value = '';
+vm.runInContext(`allFeeds = [
+    {id:'alpha',title:'Alpha',total_size:10,last_update:'2026-01-01'},
+    {id:'beta',title:'Beta',total_size:30,last_update:'2026-02-01',last_error:'API unavailable'},
+    {id:'gamma',title:'Gamma',total_size:20,error_count:2}
+]; updatingFeeds.add('alpha'); feedStatusFilter = 'errors';`, context);
+assert.deepEqual(Array.from(vm.runInContext('getFilteredFeeds().map(f => f.id)', context)), ['beta','gamma']);
+vm.runInContext("feedStatusFilter = 'updating'", context);
+assert.deepEqual(Array.from(vm.runInContext('getFilteredFeeds().map(f => f.id)', context)), ['alpha']);
+vm.runInContext("feedStatusFilter = 'all'", context);
+
+// A response whose JSON arrives late must never overwrite a newer library snapshot.
+async function testFeedResponseOrdering() {
+    let resolveOldJSON;
+    context.fetch = async () => ({ok:true, json:() => new Promise(resolve => {resolveOldJSON=resolve;})});
+    const oldRequest = context.loadFeeds();
+    await new Promise(setImmediate);
+    context.fetch = async () => ({ok:true, json:async () => [{id:'latest',title:'Latest'}]});
+    await context.loadFeeds();
+    resolveOldJSON([{id:'stale',title:'Stale'}]);
+    await oldRequest;
+    assert.equal(vm.runInContext('allFeeds[0].id',context),'latest');
+    console.log('Library status filters and response ordering tests passed');
+}
+testFeedResponseOrdering().catch(err=>{console.error(err);process.exitCode=1;});

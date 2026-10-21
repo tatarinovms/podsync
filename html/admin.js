@@ -1288,6 +1288,14 @@
                         formatSelect.value = 'audio';
                         toggleAddMaxHeight();
                     }
+
+                    // Synchronize scope with current checked radio or default to 25
+                    const checkedScope = document.querySelector('input[name="rss-scope"]:checked');
+                    if (checkedScope) {
+                        setRssScope(checkedScope.value);
+                    } else {
+                        setRssScope(25);
+                    }
                 } else {
                     previewCard.classList.add('d-none');
                 }
@@ -1303,10 +1311,12 @@
                 if (pageSizeEl) pageSizeEl.value = '0';
                 if (keepLastEl) keepLastEl.value = '0';
             } else {
-                const count = parseInt(scope, 10) || 10;
+                const count = parseInt(scope, 10) || 25;
                 if (pageSizeEl) pageSizeEl.value = count;
                 if (keepLastEl) keepLastEl.value = count;
             }
+            const radio = document.getElementById(`rss-scope-${scope}`);
+            if (radio) radio.checked = true;
         }
 
         function suggestFeedId(url) {

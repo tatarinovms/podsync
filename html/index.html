@@ -7,7 +7,7 @@
     <title>Podsync Management Console</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=4">
+    <link rel="stylesheet" href="./admin.css?v=5">
 </head>
 <body>
 
@@ -1384,13 +1384,13 @@
                                     </div>
                                 </div>
                                 <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                    <span class="small text-muted">Download Scope:</span>
-                                    <div class="btn-group btn-group-sm" role="group">
+                                    <span class="small text-muted fw-semibold"><i class="bi bi-cloud-arrow-down me-1"></i>Download Scope:</span>
+                                    <div class="btn-group btn-group-sm" role="group" id="rss-scope-group">
                                         <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-all" value="all" onchange="setRssScope('all')">
                                         <label class="btn btn-outline-secondary btn-xs" for="rss-scope-all">All episodes</label>
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-10" value="10" onchange="setRssScope(10)" checked>
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-10" value="10" onchange="setRssScope(10)">
                                         <label class="btn btn-outline-secondary btn-xs" for="rss-scope-10">Last 10</label>
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-25" value="25" onchange="setRssScope(25)">
+                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-25" value="25" onchange="setRssScope(25)" checked>
                                         <label class="btn btn-outline-secondary btn-xs" for="rss-scope-25">Last 25</label>
                                         <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-50" value="50" onchange="setRssScope(50)">
                                         <label class="btn btn-outline-secondary btn-xs" for="rss-scope-50">Last 50</label>

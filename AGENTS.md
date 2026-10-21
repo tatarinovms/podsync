@@ -10,12 +10,14 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ### Core Technologies
 - **Language**: Go 1.25+ (`go.mod`)
-- **Storage/DB**: BadgerDB v3 (embedded key-value database for feed/episode metadata and state)
+- **Storage/DB**: BadgerDB (embedded key-value database for feed/episode metadata and state)
+- **Job Queue & Concurrency**: Persistent disk-backed job queue (`pkg/jobqueue/`) with crash recovery, state persistence, and worker concurrency limits
 - **Filesystem**: Local filesystem storage or AWS S3 (`pkg/fs/`), with dynamic Virtual Mounter (`fs.Mounter`) for zero-copy audiobook serving
-- **Downloader**: `yt-dlp` (native preference with fallback to `youtube-dl`), using `ffmpeg` for audio conversion and metadata extraction
+- **Downloader**: `yt-dlp` (native preference with fallback to `youtube-dl`), using `ffmpeg` for audio conversion, duration probing, and metadata extraction
 - **Scheduling**: `robfig/cron/v3` supporting standard 5-field cron expressions and `@every` duration intervals
 - **Configuration**: TOML via `pelletier/go-toml`
-- **Web UI**: Embedded single-page application (`services/web/ui/index.html`) styled with strict Catppuccin Mocha (dark) & Latte (light) themes
+- **Security & Rate Limiting**: In-memory sliding-window IP rate limiter (`services/web/rate_limiter.go`) with brute-force lockout, session cookie authentication, and HTTP Basic Auth
+- **Web UI**: Embedded modular single-page application (`services/web/ui/` with `index.html`, `admin.css`, `admin.js`, `theme.js`, mirrored to root `html/`) styled with strict Catppuccin Mocha (dark) & Latte (light) themes
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
 
 ---
@@ -31,6 +33,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── feed_manager.go       # Implementation of AppFeedManager for Web UI and MCP
 │   ├── feed_manager_test.go  # Tests for feed management, private feeds, audiobook deletion
 │   └── disk_unix.go / windows.go # Platform-specific disk space calculations
+├── html/                     # Mirrored Web UI static assets (admin.css, admin.js, index.html, theme.js)
 ├── pkg/
 │   ├── builder/              # Platform builders fetching metadata from source APIs
 │   │   ├── audiobook.go      # Local audiobook builder (ID3/APIC tags, natural sorting, serial format)
@@ -47,6 +50,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── xml.go            # RSS/iTunes XML builder (serial/episodic, itunes:block, covers)
 │   │   └── xml_test.go       # RSS XML generation tests
 │   ├── fs/                   # Storage abstraction (Local file system, S3, and Virtual Mounter)
+│   ├── jobqueue/             # Persistent disk-backed job queue with crash recovery and concurrency control
+│   ├── logbuffer/            # Thread-safe in-memory circular ring buffer for real-time logs
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
 │   │   ├── server.go         # 21 MCP tools, resources (podsync://*), and diagnostic prompts
 │   │   └── proxy.go          # HTTP client proxy implementing web.AdminManager over REST
@@ -56,7 +61,11 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
 │   │   ├── admin_types.go    # FeedSummary, FeedConfigUpdate, AudiobookDirInfo structs
 │   │   ├── api.go            # REST API endpoints (/api/v1/*)
-│   │   └── ui/index.html     # Embedded SPA Web UI (Catppuccin theme)
+│   │   ├── auth.go           # Session cookie auth, password verification, login handlers
+│   │   ├── feed_patch.go     # Atomic partial feed configuration updates
+│   │   ├── rate_limiter.go   # In-memory sliding-window IP brute-force protection
+│   │   ├── server.go         # HTTP router, middleware, static asset embedding
+│   │   └── ui/               # Embedded SPA assets (admin.css, admin.js, index.html, theme.js)
 │   ├── update/               # Feed update orchestrator and regex episode matcher
 │   └── migrate/              # Tooling for media filename migration
 ├── docs/                     # Guides, token setup instructions, and MCP specs
@@ -97,11 +106,25 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 4. Web Admin Console & REST API (`services/web/`)
 
-- Accessible at `/admin` (SPA embedded via `//go:embed ui/*` from `services/web/ui/index.html`).
+- Accessible at `/admin` (SPA modularized across `index.html`, `admin.css`, `admin.js`, and `theme.js`, embedded via `//go:embed ui/*`).
+- **UI Architecture**:
+  - **Sidebar Navigation (`.sidebar`)**: Live podcast count badges, quick filters (All, Active, Errors, Audiobooks), and real-time disk storage gauge.
+  - **Dual Library Views**: Compact card grid (`#view-mode-cards`) and structured tabular list (`#view-mode-list`) with persistent view selection.
+  - **Dedicated Podcast View (`.feed-detail`)**:
+    - **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.
+    - **Episodes Tab**: Real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), duration filtering (&lt; 15 min, 15–60 min, &gt; 60 min), flexible multi-criteria sorting (date newest/oldest, duration longest/shortest, title A–Z), in-browser audio player, file download links, and individual retry buttons.
+    - **Settings Tab**: Inline feed parameters adjustment (cron schedule, format, quality presets 480p/720p/1080p, retention limits, language, custom cover art URL & file upload with live preview) directly on the show page.
+    - **History Tab**: Dedicated chronological timeline of synchronization events, download activity, and errors for the feed.
+- **Button Standards & Layout Metrics**:
+  - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).
+  - **Mobile Touch Targets**: Under mobile viewports (`max-width: 575px`), action buttons automatically expand to `min-height: 44px` with `padding: 8px 16px` for touch accessibility.
+  - **Secondary Actions**: Use `.btn-secondary.btn-sm` (Neutral surface).
+  - **Primary Actions**: Use `.btn-brand.btn-sm` (Mauve accent `#cba6f7` / `#8839ef`).
+  - **Presets**: Compact badges and cron interval buttons use `.btn-xs` (`font-size: 0.78rem`, `padding: 2px 8px`, `border-radius: 6px`).
 - **Brand Colors (Catppuccin Mocha & Latte)**:
   - All UI elements must strictly use project CSS variables (`--ctp-*`).
   - Never allow raw Bootstrap defaults (`#0d6efd`, slate `#2b3035`) to leak into backgrounds or buttons.
-  - Save buttons must use `.btn-primary` or `.btn-brand` (Mauve).
+  - Primary buttons must use `.btn-brand` (Mauve).
 - **Modal Lifecycle Reliability**:
   - Never use `bootstrap.Modal.getInstance(el).hide()` directly as it can return `null`.
   - Always use `closeModal(modalId)` which leverages `bootstrap.Modal.getOrCreateInstance(el)` and ensures DOM backdrop/class cleanup.
@@ -110,14 +133,25 @@ This file provides comprehensive architecture guidance, development workflows, a
 ### REST API Endpoints (`/api/v1`)
 | Method | Endpoint | Description |
 |---|---|---|
+| `GET` | `/api/v1/health` | Service health check |
+| `POST` | `/api/v1/auth/login` | Authenticate admin session and issue cookie |
+| `POST` | `/api/v1/auth/logout` | Invalidate current admin session |
+| `GET` | `/api/v1/auth/security` | Inspect login rate-limiter & lockout settings |
+| `POST` | `/api/v1/auth/security` | Update lockout thresholds & reset rate limiter |
+| `POST` | `/api/v1/auth/password` | Change admin password |
 | `GET` | `/api/v1/feeds` | List all active feeds (channels and audiobooks) |
 | `POST` | `/api/v1/feeds` | Create new podcast feed |
+| `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
+| `GET` | `/api/v1/feeds/errors` | Failed download errors across all feeds |
 | `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list |
 | `PUT` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
 | `DELETE` | `/api/v1/feeds/{id}` | Delete feed (optional `?delete_files=true`) |
 | `POST` | `/api/v1/feeds/{id}/update` | Trigger manual update for a feed |
 | `POST` | `/api/v1/feeds/update-all` | Trigger update for all feeds |
+| `GET` | `/api/v1/feeds/{id}/errors` | Failed download errors for a specific feed |
 | `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode state |
+| `POST` | `/api/v1/covers/upload` | Upload custom cover image file (JPEG, PNG, WebP) |
+| `POST` | `/api/v1/feeds/{id}/cover` | Attach uploaded cover to a specific feed |
 | `GET` | `/api/v1/tokens` | List masked API tokens and ENV sources |
 | `POST` | `/api/v1/tokens` | Update / append API tokens for rotation |
 | `DELETE` | `/api/v1/tokens` | Delete token by `?provider=...&index=...` |
@@ -160,8 +194,8 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
 5. **Private Feeds Guarantee**: Generates `<itunes:block>yes</itunes:block>` in RSS XML when `feed.PrivateFeed || cfg.PrivateFeed`. Both in-memory `Config`, BadgerDB `Feed`, and `config.toml` must be kept in sync.
 6. **Path Traversal Protection**: Any file or directory operations (`AudiobookDir`, `DeleteAudiobookDir`, uploads) must strictly validate with `filepath.Clean` and verify `filepath.Rel` stays inside the configured parent directory.
 7. **Strict Brand & Theme Compliance (Catppuccin Mocha & Latte)**:
-   - When modifying `services/web/ui/index.html`, strictly adhere to Catppuccin color tokens. Never let default Bootstrap blue or slate-gray leak through.
-   - Synchronize changes between `services/web/ui/index.html` and `html/index.html`.
+   - When modifying Web UI, strictly adhere to Catppuccin color tokens. Never let default Bootstrap blue or slate-gray leak through.
+   - Synchronize all Web UI files (`index.html`, `admin.css`, `admin.js`, `theme.js`) byte-for-byte between `services/web/ui/` and root `html/`.
 8. **Proper Agent Skill Formatting (`SKILL.md`)**:
    - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`).
    - Keep `.agents/skills/podsync/SKILL.md` and user config skill directories synchronized.
@@ -174,3 +208,6 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
      5. Update `AGENTS.md` (tool count and list in Section 5).
      6. Update `SKILL.md` (and propagate to all 4 skill locations: `.agents/skills/podsync/`, `.gemini/skills/podsync/`, `~/.gemini/config/skills/podsync/`, `~/.gemini/antigravity-cli/skills/podsync/`).
      7. Run `go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...` to automatically verify that all registered tools match the UI table and documentation.
+10. **Button Metrics & Interaction Consistency**:
+    - Preserve unified action pair button metrics: standard `btn-sm`, `min-width: 105px`, 35px desktop height, and >= 44px mobile touch target.
+    - Cancel / Close buttons must always precede Save / Update / Confirm buttons, with secondary styling on the left and Mauve `.btn-brand` primary styling on the right.

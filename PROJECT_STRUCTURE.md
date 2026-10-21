@@ -9,11 +9,13 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 ```
 .
 ├── cmd/podsync/              # CLI entry point, configuration, and Feed Manager
+├── html/                     # Mirrored Web UI static assets (admin.css, admin.js, index.html, theme.js)
 ├── pkg/
 │   ├── builder/              # Platform builders (YouTube, VK, Rutube, Audiobooks, etc.)
 │   ├── db/                   # BadgerDB key-value metadata store
 │   ├── feed/                 # RSS XML, OPML generation, API key rotation
 │   ├── fs/                   # Filesystem abstraction (Local, S3, Virtual Mounter)
+│   ├── jobqueue/             # Persistent disk-backed job queue with crash recovery
 │   ├── logbuffer/            # In-memory circular log buffer
 │   ├── mcp/                  # Model Context Protocol server (Stdio, SSE, Proxy)
 │   ├── model/                # Core domain types (Feed, Episode, Provider constants)
@@ -22,6 +24,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 │   ├── migrate/              # Media filename migration tool
 │   ├── update/               # Feed update orchestrator and episode matcher
 │   └── web/                  # REST API server and Catppuccin Web Admin Console
+│       └── ui/               # Embedded SPA assets (admin.css, admin.js, index.html, theme.js)
 ├── docs/                     # Guides, deployment documentation, and manuals
 ├── .agents/skills/podsync/   # Agent skill definition for MCP assistants
 ├── Dockerfile                # Multi-stage Docker container build
@@ -65,17 +68,26 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`s3.go`**: AWS S3 storage backend.
 - **`mounter.go`**: `fs.Mounter` interface enabling zero-copy virtual folder mounting for local audiobook feeds.
 
-### 2.6 `pkg/mcp/` (Model Context Protocol)
+### 2.6 `pkg/jobqueue/` (Persistent Job Queue)
+- **`queue.go`**: Disk-backed persistent job queue with crash recovery and worker concurrency controls for managing asynchronous feed updates.
+
+### 2.7 `pkg/logbuffer/` (In-Memory Log Streamer)
+- **`buffer.go`**: Thread-safe circular ring buffer capturing system log entries for live querying and real-time frontend streaming.
+
+### 2.8 `pkg/mcp/` (Model Context Protocol)
 - **`server.go`**: Implements the MCP protocol server exposing 21 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
 - **`proxy.go`**: `HTTPClientManager` that forwards MCP commands to a running Podsync instance via HTTP REST.
 - **`sse.go`**: SSE transport implementation for MCP clients.
 
-### 2.7 `services/web/` (HTTP Server & Web UI)
-- **`server.go`**: HTTP server initialization, route registration, Basic Auth middleware, and static asset handling.
-- **`api.go`**: REST API handlers (`/api/v1/*`).
+### 2.9 `services/web/` (HTTP Server & Web UI)
+- **`server.go`**: HTTP server initialization, route registration, rate limiting middleware, Basic Auth & session auth, and static asset embedding.
+- **`api.go`**: REST API handlers (`/api/v1/*`) including feed operations, cover art upload, log querying, and system stats.
+- **`auth.go`**: Session cookie authentication, login rate-limiting checks, and admin credential verification.
+- **`feed_patch.go`**: Atomic partial feed configuration update handler.
+- **`rate_limiter.go`**: In-memory sliding-window IP rate limiter preventing brute-force login attempts.
 - **`admin_types.go`**: Data transfer objects (`FeedSummary`, `FeedConfigUpdate`, `AudiobookDirInfo`, `SystemStats`).
-- **`ui/index.html`**: Embedded Single Page Application styled with Catppuccin Mocha & Latte.
+- **`ui/`**: Modular Single Page Application (`index.html`, `admin.css`, `admin.js`, `theme.js`) embedded via `//go:embed ui/*`.
 
-### 2.8 `services/update/` (Updater Pipeline)
+### 2.10 `services/update/` (Updater Pipeline)
 - **`updater.go`**: Manages the feed synchronization lifecycle: queries builders, checks episode statuses, downloads new media, runs hooks, cleans old files, and generates RSS XML.
 - **`matcher.go`**: Regex and filter matching logic for episodes (title, description, duration, age).

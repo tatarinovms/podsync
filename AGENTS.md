@@ -134,24 +134,30 @@ This file provides comprehensive architecture guidance, development workflows, a
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/v1/health` | Service health check |
+| `GET` | `/api/v1/auth/status` | Get current authentication status |
 | `POST` | `/api/v1/auth/login` | Authenticate admin session and issue cookie |
 | `POST` | `/api/v1/auth/logout` | Invalidate current admin session |
-| `GET` | `/api/v1/auth/security` | Inspect login rate-limiter & lockout settings |
-| `POST` | `/api/v1/auth/security` | Update lockout thresholds & reset rate limiter |
-| `POST` | `/api/v1/auth/password` | Change admin password |
+| `POST` | `/api/v1/auth/password` | Change admin password (requires current password) |
+| `GET`, `POST` | `/api/v1/auth/security` | Get or update login rate-limiter & lockout settings |
+| `GET` | `/api/v1/system/errors` | List download errors with diagnostic causes and recommendations (`?feed_id=...&limit=...`) |
+| `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes (`?feed_id=...&limit=...`) |
+| `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
+| `GET` | `/api/v1/system` | Get system metrics, disk usage, and dependencies |
+| `GET` | `/api/v1/system/logs` | Query in-memory server logs (level/search/feed_id filter) |
+| `GET` | `/api/v1/system/logs/download` | Download complete server log file as text |
+| `DELETE` | `/api/v1/system/logs` | Clear in-memory system log buffer |
+| `GET`, `POST` | `/api/v1/system/logs/level` | Get or change server logging level on the fly |
 | `GET` | `/api/v1/feeds` | List all active feeds (channels and audiobooks) |
 | `POST` | `/api/v1/feeds` | Create new podcast feed |
 | `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
-| `GET` | `/api/v1/feeds/errors` | Failed download errors across all feeds |
+| `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
 | `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list |
 | `PUT` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
 | `DELETE` | `/api/v1/feeds/{id}` | Delete feed (optional `?delete_files=true`) |
 | `POST` | `/api/v1/feeds/{id}/update` | Trigger manual update for a feed |
-| `POST` | `/api/v1/feeds/update-all` | Trigger update for all feeds |
-| `GET` | `/api/v1/feeds/{id}/errors` | Failed download errors for a specific feed |
+| `POST` | `/api/v1/feeds/{id}/cover` | Attach uploaded cover directly to a specific feed |
 | `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode state |
-| `POST` | `/api/v1/covers/upload` | Upload custom cover image file (JPEG, PNG, WebP) |
-| `POST` | `/api/v1/feeds/{id}/cover` | Attach uploaded cover to a specific feed |
+| `POST` | `/api/v1/covers/upload` | Upload custom cover image file (JPEG, PNG, WebP) with live preview |
 | `GET` | `/api/v1/tokens` | List masked API tokens and ENV sources |
 | `POST` | `/api/v1/tokens` | Update / append API tokens for rotation |
 | `DELETE` | `/api/v1/tokens` | Delete token by `?provider=...&index=...` |
@@ -164,9 +170,6 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/downloader` | Update downloader timeout, proxy, language, browser cookies |
 | `GET`/`POST`/`DELETE` | `/api/v1/downloader/cookies` | Manage Netscape `cookies.txt` content |
 | `POST` | `/api/v1/downloader/test` | Test yt-dlp metadata extraction against URL |
-| `GET` | `/api/v1/system/logs` | Query in-memory server logs (level/search/feed filter) |
-| `GET` | `/api/v1/system/logs/download` | Download `.log` file |
-| `DELETE` | `/api/v1/system/logs` | Clear in-memory log buffer |
 | `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
 
 ---

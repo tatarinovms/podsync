@@ -545,19 +545,22 @@
                 : hasError
                     ? `<button class="feed-state error" role="button" title="Click to view error log" ${actionAttrs('errors', feed.id)}><i aria-hidden="true" class="bi bi-exclamation-circle"></i>${feed.error_count > 0 ? feed.error_count + ' errors' : 'Update failed'}</button>`
                     : `<span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>${feed.downloaded_count > 0 ? 'Ready' : 'No downloads yet'}</span>`;
+            const isBook = feed.provider === 'audiobook';
+            const countLabel = isBook ? 'chapters' : 'episodes';
+            const countIcon = isBook ? 'bi-file-earmark-music' : 'bi-headphones';
             return `<article class="card feed-card h-100">
                 <div class="feed-card-top">
                     <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}">${escapeHtml(title.trim()[0] || 'P')}</div></div>
                     <div class="flex-grow-1 min-w-0"><a class="feed-card-title" href="#feed/${encodeURIComponent(feed.id)}/episodes" title="${escapeHtml(title)}">${escapeHtml(title)}</a><div class="feed-card-author text-truncate">${escapeHtml(isValidAuthor(feed.author) ? feed.author : feed.provider || 'Podcast')}</div></div>
                     <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
-                        <li><button class="dropdown-item" id="btn-update-${escapeHtml(feed.id)}" ${actionAttrs('update', feed.id)} ${isUpdating ? 'disabled' : ''}>${isUpdating ? 'Updating…' : 'Update now'}</button></li>
+                        <li><button class="dropdown-item" id="btn-update-${escapeHtml(feed.id)}" ${actionAttrs('update', feed.id)} ${isUpdating ? 'disabled' : ''}>${isUpdating ? 'Updating…' : (isBook ? 'Scan chapters' : 'Update now')}</button></li>
                         <li><button class="dropdown-item" ${actionAttrs('settings', feed.id)}>Settings</button></li>
                         <li><button class="dropdown-item" ${actionAttrs('logs', feed.id)}>View activity</button></li>
-                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('delete-feed', feed.id)}>Delete podcast</button></li>
+                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('delete-feed', feed.id)}>${isBook ? 'Remove audiobook' : 'Delete podcast'}</button></li>
                     </ul></div>
                 </div>
-                <div class="feed-card-meta"><span><i aria-hidden="true" class="bi bi-headphones me-1"></i>${feed.downloaded_count ?? 0} episodes</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
-                <div class="feed-card-bottom">${state}<button class="btn btn-light" ${actionAttrs('episodes', feed.id)}>Open</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
+                <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.downloaded_count ?? 0} ${countLabel}</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
+                <div class="feed-card-bottom">${state}<button class="btn btn-light" ${actionAttrs('episodes', feed.id)}>${isBook ? 'Chapters' : 'Open'}</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
             </article>`;
         }
 
@@ -1213,6 +1216,9 @@
                 const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}?delete_files=${deleteFiles}`, { method: 'DELETE' });
                 if (res.ok) {
                     showToast(`Podcast ${feedId} deleted`);
+                    if (currentTab === 'feed-detail') {
+                        returnToLibrary();
+                    }
                     loadFeeds();
                 } else {
                     alert(`Failed to delete: ${await res.text()}`);
@@ -3051,59 +3057,10 @@
             }
 
             container.innerHTML = audioFeeds.map(feed => {
-                const totalMB = (feed.total_size / (1024 * 1024)).toFixed(1);
                 return `
                     <div class="col-12 col-md-6 col-xl-4">
-                        <div class="card h-100 p-3 shadow-sm">
-                            <div class="d-flex gap-3 align-items-center mb-3">
-                                <div role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters" class="flex-shrink-0" style="cursor: pointer;">
-                                    ${feed.cover_art ? `<img src="${safeUrl(feed.cover_art)}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;" onerror="handleCoverError(this)">` : `<div class="rounded d-flex align-items-center justify-content-center bg-body-secondary text-muted" style="width: 64px; height: 64px;"><i aria-hidden="true" class="bi bi-book fs-3"></i></div>`}
-                                </div>
-                                <div class="min-w-0 flex-grow-1">
-                                    <h6 class="fw-bold mb-1 text-truncate" role="button" ${actionAttrs("episodes", feed.id)} title="View Chapters (Click to open)" style="cursor: pointer;">${escapeHtml(feed.title || feed.id)}</h6>
-                                    <div class="text-muted small text-truncate">${(feed.author && feed.author !== "<notfound>") ? escapeHtml(feed.author) : 'Audiobook'} • ID: <code>${escapeHtml(feed.id)}</code></div>
-                                </div>
-                            </div>
-
-                            <!-- RSS URL Box with Copy and QR -->
-                            <div class="d-flex align-items-center gap-1 mb-2">
-                                <div class="rss-box flex-grow-1 text-truncate">${escapeHtml(feed.feed_url)}</div>
-                                <button class="btn btn-light btn-sm border flex-shrink-0" title="Copy link" ${actionAttrs("copy", feed.feed_url)}>
-                                    <i aria-hidden="true" class="bi bi-clipboard"></i>
-                                </button>
-                                <button class="btn btn-light btn-sm border flex-shrink-0" title="Show QR code" ${actionAttrs("qr", feed.title || feed.id, feed.feed_url)}>
-                                    <i aria-hidden="true" class="bi bi-qr-code"></i>
-                                </button>
-                            </div>
-
-                            <!-- Deep Links for Podcast Apps -->
-                            <div class="d-flex flex-wrap gap-1 mb-3">
-                                <a href="${safeUrl(feed.apple_url, ['podcast:'])}" class="deep-link-btn border">
-                                    <i aria-hidden="true" class="bi bi-apple"></i> Apple
-                                </a>
-                                <a href="${safeUrl(feed.pocketcasts_url, ['pktc:'])}" class="deep-link-btn border">
-                                    <i aria-hidden="true" class="bi bi-play-circle-fill text-danger"></i> Pocket Casts
-                                </a>
-                                <a href="${safeUrl(feed.overcast_url, ['overcast:'])}" class="deep-link-btn border">
-                                    <i aria-hidden="true" class="bi bi-soundwave text-warning"></i> Overcast
-                                </a>
-                                <a href="${safeUrl(feed.feed_url, ['http:', 'https:'])}" target="_blank" rel="noopener noreferrer" class="deep-link-btn border">
-                                    <i aria-hidden="true" class="bi bi-box-arrow-up-right"></i> XML
-                                </a>
-                            </div>
-
-                            <!-- Stats and Action Buttons -->
-                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-2 border-top">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span role="button" ${actionAttrs("episodes", feed.id)} class="stat-badge text-primary" style="cursor: pointer;" title="View Chapters"><i aria-hidden="true" class="bi bi-file-earmark-music me-1"></i>${Number(feed.downloaded_count || feed.episode_count || 0)} chapters</span>
-                                    <span class="stat-badge"><i aria-hidden="true" class="bi bi-hdd me-1"></i>${totalMB} MB</span>
-                                </div>
-                                <div class="d-flex flex-wrap gap-1">
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("episodes", feed.id)} title="View Chapters"><i aria-hidden="true" class="bi bi-list-ol me-1"></i>Chapters</button>
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("settings", feed.id)} title="Audiobook Settings"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
-                                    <button class="btn btn-light btn-sm border" ${actionAttrs("update", feed.id)} title="Refresh Metadata"><i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update</button>
-                                </div>
-                            </div>
+                        <div data-feed-id="${escapeHtml(feed.id)}" data-render-key="${escapeHtml(feedRenderKey(feed))}">
+                            ${renderFeedCardHTML(feed)}
                         </div>
                     </div>
                 `;

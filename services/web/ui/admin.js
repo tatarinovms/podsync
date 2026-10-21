@@ -1338,7 +1338,7 @@
                         slug = parsed.hostname.split('.')[0];
                     }
                 }
-                slug = slug.replace(/[@\-.]/g, '_').toUpperCase();
+                slug = slug.replace(/^@+/, '').replace(/[@\-.]/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
                 if (slug) {
                     idInput.value = slug;
                 }

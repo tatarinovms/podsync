@@ -600,6 +600,31 @@
             color: var(--ctp-text) !important;
             box-shadow: 0 0 0 0.2rem rgba(var(--ctp-mauve-rgb), 0.25) !important;
         }
+        .form-control.is-invalid, .was-validated .form-control:invalid {
+            border-color: var(--ctp-red) !important;
+            box-shadow: 0 0 0 1px var(--ctp-red) !important;
+        }
+        .form-control.is-invalid:focus, .was-validated .form-control:invalid:focus {
+            border-color: var(--ctp-red) !important;
+            box-shadow: 0 0 0 0.2rem rgba(var(--ctp-red-rgb), 0.25) !important;
+        }
+        .form-control.is-valid {
+            border-color: var(--ctp-green) !important;
+        }
+        .form-control.is-valid:focus {
+            border-color: var(--ctp-green) !important;
+            box-shadow: 0 0 0 0.2rem rgba(var(--ctp-green-rgb), 0.25) !important;
+        }
+        .invalid-feedback {
+            color: var(--ctp-red) !important;
+            font-size: 0.775rem !important;
+            margin-top: 0.25rem;
+            display: none;
+        }
+        .is-invalid ~ .invalid-feedback,
+        .was-validated :invalid ~ .invalid-feedback {
+            display: block !important;
+        }
         .form-control::placeholder {
             color: var(--ctp-subtext0) !important;
             opacity: 0.7;

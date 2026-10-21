@@ -677,6 +677,36 @@ func TestImportAudiobookRejectsEmptyAndOutsideFolders(t *testing.T) {
 	assert.Empty(t, mgr.updates)
 }
 
+func TestGenerateAudiobookSlugAndValidation(t *testing.T) {
+	assert.Equal(t, "voyna-i-mir", generateAudiobookSlug("Война и мир"))
+	assert.Equal(t, "dtkd-dlya-tekh-kto-doma", generateAudiobookSlug("ДТКД (Для тех, кто дома)"))
+	assert.Equal(t, "kiyivskiy-shchodennik", generateAudiobookSlug("Київський щоденник"))
+	assert.Equal(t, "clanbeaver", generateAudiobookSlug("@clanbeaver"))
+
+	root := t.TempDir()
+	bookDir := filepath.Join(root, "my_book")
+	require.NoError(t, os.Mkdir(bookDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(bookDir, "01.mp3"), []byte("mp3data"), 0644))
+
+	mgr := &AppFeedManager{cfg: &Config{Audiobooks: AudiobooksConfig{Dir: root}},
+		feeds: make(map[string]*feed.Config), updates: make(chan *feed.Config, 2)}
+
+	// Reject non-English / invalid characters in manual ID
+	_, err := mgr.ImportAudiobook(context.Background(), &web.ImportAudiobookRequest{
+		DirName: "my_book",
+		ID:      "русский_id",
+	})
+	require.Error(t, err)
+
+	// Auto-generate slug from Cyrillic title
+	cfg, err := mgr.ImportAudiobook(context.Background(), &web.ImportAudiobookRequest{
+		DirName: "my_book",
+		Title:   "Война и мир",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "voyna-i-mir", cfg.ID)
+}
+
 func TestAudiobookUploadRetryAcceptsIdenticalFiles(t *testing.T) {
 	mgr := &AppFeedManager{cfg: &Config{Audiobooks: AudiobooksConfig{Dir: t.TempDir()}}}
 	require.NoError(t, mgr.SaveAudiobookFile("book", "01.mp3", strings.NewReader("audio")))

@@ -112,6 +112,15 @@ async function run() {
     await context.showEpisodes('book');
     assert(el('episodes-list').innerHTML.includes('1. Chapter'));
     assert(!el('episodes-list').innerHTML.includes('2020'));
+    // Test Cyrillic transliteration and Feed ID slug generation
+    assert.equal(context.toValidFeedSlug("клан_бобров", true, "_"), "KLAN_BOBROV");
+    assert.equal(context.toValidFeedSlug("ДТКД (Для тех, кто дома)", true, "_"), "DTKD_DLYA_TEKH_KTO_DOMA");
+    assert.equal(context.toValidFeedSlug("Война и мир", false, "-"), "voyna-i-mir");
+    assert.equal(context.toValidFeedSlug("Київський щоденник", false, "-"), "kiyivskiy-shchodennik");
+    assert.equal(context.toValidFeedSlug("Uncut - Завтракаст #392", true, "_"), "UNCUT_ZAVTRAKAST_392");
+    assert.equal(context.toValidFeedSlug("@clanbeaver", true, "_"), "CLANBEAVER");
+
     console.log('Episode rendering, filtering, sorting, media links, and request ordering tests passed');
+    console.log('Cyrillic transliteration and Feed ID slug tests passed');
 }
 run().catch(err=>{console.error(err);process.exitCode=1;});

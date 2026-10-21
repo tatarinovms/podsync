@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
 )
+
+var validFeedIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 type LoginRequest struct {
 	Username string `json:"username"`
@@ -419,6 +422,10 @@ func (s *Server) handleFeeds(w http.ResponseWriter, r *http.Request) {
 		}
 		if feedID == "" {
 			s.writeError(w, http.StatusBadRequest, "could not generate feed id, please specify one")
+			return
+		}
+		if !validFeedIDRegex.MatchString(feedID) {
+			s.writeError(w, http.StatusBadRequest, "feed id must contain only English letters (a-z, A-Z), numbers, dashes, and underscores")
 			return
 		}
 
@@ -1067,6 +1074,10 @@ func (s *Server) handleAudiobookImport(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	if req.ID != "" && !validFeedIDRegex.MatchString(strings.TrimSpace(req.ID)) {
+		s.writeError(w, http.StatusBadRequest, "feed id must contain only English letters (a-z, A-Z), numbers, dashes, and underscores")
+		return
+	}
 	feedCfg, err := s.adminMgr.ImportAudiobook(r.Context(), &req)
 	if err != nil {
 		s.writeError(w, http.StatusBadRequest, err.Error())
@@ -1153,6 +1164,13 @@ func (s *Server) handleAudiobookUpload(w http.ResponseWriter, r *http.Request) {
 	var createdFeed *feed.Config
 	if autoImport {
 		id := strings.TrimSpace(r.FormValue("id"))
+		if id != "" && !validFeedIDRegex.MatchString(id) {
+			s.writeJSON(w, http.StatusBadRequest, map[string]interface{}{
+				"error":    "feed id must contain only English letters (a-z, A-Z), numbers, dashes, and underscores",
+				"uploaded": savedCount, "book_dir": bookDir, "imported": false,
+			})
+			return
+		}
 		title := strings.TrimSpace(r.FormValue("title"))
 		author := strings.TrimSpace(r.FormValue("author"))
 		desc := strings.TrimSpace(r.FormValue("description"))

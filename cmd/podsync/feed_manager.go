@@ -2258,7 +2258,28 @@ func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.Audiobook
 	return results, nil
 }
 
+var cyrillicToLatinMap = map[rune]string{
+	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "yo", 'ж': "zh",
+	'з': "z", 'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o",
+	'п': "p", 'р': "r", 'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "kh", 'ц': "ts",
+	'ч': "ch", 'ш': "sh", 'щ': "shch", 'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu",
+	'я': "ya", 'є': "ye", 'і': "i", 'ї': "yi", 'ґ': "g", 'ў': "u",
+}
+
+func transliterateCyrillic(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if lat, ok := cyrillicToLatinMap[r]; ok {
+			b.WriteString(lat)
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func generateAudiobookSlug(s string) string {
+	s = transliterateCyrillic(s)
 	s = strings.ToLower(strings.TrimSpace(s))
 	reg := regexp.MustCompile(`[^a-z0-9_-]+`)
 	slug := reg.ReplaceAllString(s, "-")
@@ -2295,6 +2316,9 @@ func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAud
 
 	if id == "" {
 		return nil, errors.New("could not generate valid feed ID")
+	}
+	if !regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(id) {
+		return nil, errors.New("feed id must contain only English letters (a-z, A-Z), numbers, dashes, and underscores")
 	}
 
 	m.mu.RLock()

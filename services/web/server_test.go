@@ -1016,3 +1016,54 @@ func TestFeedPreviewEndpoint(t *testing.T) {
 	assert.Equal(t, 1, resp.TotalEpisodes)
 	assert.Equal(t, int64(1000000), resp.TotalBytes)
 }
+
+func TestFeedIDValidation(t *testing.T) {
+	mgr := &mockDownloaderAdminMgr{}
+	srv := New(Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "pass",
+		},
+	}, &mockFileSystem{}, nil)
+	srv.SetAdminManager(mgr)
+
+	// 1. Invalid Cyrillic / non-English Feed ID
+	body := `{"url":"https://vkvideo.ru/@clanbeaver","id":"мой_подкаст"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "English letters")
+
+	// 2. Invalid Feed ID with spaces
+	body = `{"url":"https://vkvideo.ru/@clanbeaver","id":"CLAN BEAVER"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+	w = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 3. Valid Feed ID
+	body = `{"url":"https://vkvideo.ru/@clanbeaver","id":"CLAN_BEAVER-123"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/feeds", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+	w = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	// 4. Invalid Audiobook Import ID
+	body = `{"dir_name":"my_book","id":"книга_1"}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/audiobooks/import", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+	w = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "English letters")
+}

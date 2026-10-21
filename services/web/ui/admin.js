@@ -4,6 +4,111 @@
             const str = String(author).trim().toLowerCase();
             return str !== "" && str !== "<notfound>" && str !== "notfound" && !str.includes("notfound");
         }
+
+        // Cyrillic & Slug Transliteration for Feed IDs
+        const CYRILLIC_TO_LATIN = {
+            "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo", "ж": "zh",
+            "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
+            "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts",
+            "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu",
+            "я": "ya",
+            "є": "ye", "і": "i", "ї": "yi", "ґ": "g", "ў": "u"
+        };
+
+        function transliterateText(str) {
+            if (!str) return "";
+            return String(str).split("").map(char => {
+                const lower = char.toLowerCase();
+                if (CYRILLIC_TO_LATIN[lower] !== undefined) {
+                    const mapped = CYRILLIC_TO_LATIN[lower];
+                    return char === lower ? mapped : (mapped.length > 1 ? mapped.charAt(0).toUpperCase() + mapped.slice(1) : mapped.toUpperCase());
+                }
+                return char;
+            }).join("").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        }
+
+        function toValidFeedSlug(str, uppercase = true, sep = "_") {
+            if (!str) return "";
+            let s = transliterateText(str);
+            s = s.replace(/[^a-zA-Z0-9_-]+/g, sep);
+            s = s.replace(/[_-]+/g, sep);
+            s = s.replace(/^[_-]+|[_-]+$/g, "");
+            return uppercase ? s.toUpperCase() : s.toLowerCase();
+        }
+
+        function setupFeedIdValidation(inputEl, previewEl, options = {}) {
+            if (!inputEl) return;
+            const uppercase = options.uppercase !== false;
+            const sep = options.separator || "_";
+
+            function updateState() {
+                const raw = inputEl.value;
+                const val = raw.trim();
+                const hasDisallowed = !/^[a-zA-Z0-9_-]*$/.test(raw);
+                const isEmpty = val.length === 0;
+
+                if (hasDisallowed || (inputEl.dataset.touched === "true" && isEmpty)) {
+                    inputEl.classList.add("is-invalid");
+                    inputEl.classList.remove("is-valid");
+                } else if (!isEmpty) {
+                    inputEl.classList.remove("is-invalid");
+                    inputEl.classList.add("is-valid");
+                } else {
+                    inputEl.classList.remove("is-invalid");
+                    inputEl.classList.remove("is-valid");
+                }
+
+                if (previewEl) {
+                    previewEl.textContent = val || (uppercase ? "CLANBEAVER" : "feed-slug");
+                }
+            }
+
+            inputEl.addEventListener("input", () => {
+                inputEl.dataset.manual = "true";
+                inputEl.dataset.touched = "true";
+
+                // Real-time Cyrillic transliteration
+                if (/[а-яА-ЯёЁіІїЇєЄґҐўЎ]/.test(inputEl.value)) {
+                    const start = inputEl.selectionStart;
+                    const original = inputEl.value;
+                    let trans = transliterateText(original);
+                    if (uppercase) trans = trans.toUpperCase();
+                    inputEl.value = trans;
+                    const diff = trans.length - original.length;
+                    const newPos = Math.max(0, (start || 0) + diff);
+                    try { inputEl.setSelectionRange(newPos, newPos); } catch (e) {}
+                }
+                updateState();
+            });
+
+            inputEl.addEventListener("paste", (e) => {
+                inputEl.dataset.manual = "true";
+                inputEl.dataset.touched = "true";
+                const clipboard = (e.clipboardData || window.clipboardData)?.getData("text");
+                if (clipboard && (/[а-яА-ЯёЁіІїЇєЄґҐўЎ\s@/\\#]/.test(clipboard) || !/^[a-zA-Z0-9_-]+$/.test(clipboard))) {
+                    e.preventDefault();
+                    const cleanSlug = toValidFeedSlug(clipboard, uppercase, sep);
+                    const start = inputEl.selectionStart || 0;
+                    const end = inputEl.selectionEnd || 0;
+                    const curr = inputEl.value;
+                    let next = (start === 0 && end === curr.length) ? cleanSlug : (curr.slice(0, start) + cleanSlug + curr.slice(end));
+                    if (uppercase) next = next.toUpperCase();
+                    inputEl.value = next;
+                    updateState();
+                }
+            });
+
+            inputEl.addEventListener("blur", () => {
+                inputEl.dataset.touched = "true";
+                let val = inputEl.value.trim();
+                if (val) {
+                    val = val.replace(/^[_-]+|[_-]+$/g, "");
+                    if (uppercase) val = val.toUpperCase();
+                    inputEl.value = val;
+                }
+                updateState();
+            });
+        }
         // State
         let allFeeds = [];
         let qrInstance = null;
@@ -1286,6 +1391,16 @@
                         toggleAddMaxHeight();
                     }
 
+                    // Auto-suggest feed ID from podcast title if not manually entered
+                    const idInputPreview = document.getElementById('new-feed-id');
+                    if (idInputPreview && idInputPreview.dataset.manual !== 'true' && (!idInputPreview.value || idInputPreview.value === 'CLANBEAVER')) {
+                        const titleSlug = toValidFeedSlug(data.title, true, '_');
+                        if (titleSlug) {
+                            idInputPreview.value = titleSlug;
+                            idInputPreview.dispatchEvent(new Event('input'));
+                        }
+                    }
+
                     // Synchronize scope with current checked radio or default to 25
                     const checkedScope = document.querySelector('input[name="rss-scope"]:checked');
                     if (checkedScope) {
@@ -1335,9 +1450,10 @@
                         slug = parsed.hostname.split('.')[0];
                     }
                 }
-                slug = slug.replace(/^@+/, '').replace(/[@\-.]/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+                slug = toValidFeedSlug(slug, true, '_');
                 if (slug) {
                     idInput.value = slug;
+                    idInput.dispatchEvent(new Event('input'));
                 }
             } catch (e) {}
         }
@@ -1358,9 +1474,17 @@
             document.getElementById('new-feed-cron-schedule').value = val;
         }
 
-        document.getElementById('new-feed-id').addEventListener('input', () => {
-            document.getElementById('new-feed-id').dataset.manual = 'true';
-        });
+        const newFeedIdEl = document.getElementById('new-feed-id');
+        const newFeedSlugPrev = document.getElementById('new-feed-slug-preview');
+        if (newFeedIdEl) {
+            setupFeedIdValidation(newFeedIdEl, newFeedSlugPrev, { uppercase: true, separator: '_' });
+        }
+
+        const importFeedIdEl = document.getElementById('import-feed-id');
+        const importFeedSlugPrev = document.getElementById('import-feed-slug-preview');
+        if (importFeedIdEl) {
+            setupFeedIdValidation(importFeedIdEl, importFeedSlugPrev, { uppercase: false, separator: '-' });
+        }
 
         let keepLastManual = false;
         const newFeedPageSizeEl = document.getElementById('new-feed-pagesize');
@@ -1393,7 +1517,13 @@
                 }
                 toggleAddMaxHeight();
                 const idInput = document.getElementById('new-feed-id');
-                if (idInput) idInput.dataset.manual = 'false';
+                if (idInput) {
+                    idInput.dataset.manual = 'false';
+                    idInput.dataset.touched = 'false';
+                    idInput.classList.remove('is-invalid', 'is-valid');
+                }
+                const slugPrev = document.getElementById('new-feed-slug-preview');
+                if (slugPrev) slugPrev.textContent = 'CLANBEAVER';
             });
         }
 
@@ -1406,12 +1536,30 @@
                         newFeedKeepLastEl.value = newFeedPageSizeEl.value || '50';
                     }
                     toggleAddMaxHeight();
+                    const idInput = document.getElementById('new-feed-id');
+                    if (idInput) {
+                        idInput.dataset.manual = 'false';
+                        idInput.dataset.touched = 'false';
+                        idInput.classList.remove('is-invalid', 'is-valid');
+                    }
+                    const slugPrev = document.getElementById('new-feed-slug-preview');
+                    if (slugPrev) slugPrev.textContent = 'CLANBEAVER';
                 }, 0);
             });
         }
 
         document.getElementById('add-feed-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const feedIdInput = document.getElementById('new-feed-id');
+            const feedIdVal = feedIdInput ? feedIdInput.value.trim() : '';
+            if (!feedIdVal || !/^[a-zA-Z0-9_-]+$/.test(feedIdVal)) {
+                if (feedIdInput) {
+                    feedIdInput.classList.add('is-invalid');
+                    feedIdInput.focus();
+                }
+                showToast('Please provide a valid Feed ID using only English letters, numbers, dashes, and underscores.', 'warning');
+                return;
+            }
             const btn = document.getElementById('add-feed-btn');
             const spinner = document.getElementById('add-feed-spinner');
             const errBox = document.getElementById('add-feed-error');
@@ -3087,8 +3235,13 @@
             document.getElementById('import-dir-name').value = dirName;
             document.getElementById('import-feed-title').value = title || '';
             document.getElementById('import-feed-author').value = author || '';
-            const slug = (title || dirName).toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-            document.getElementById('import-feed-id').value = slug;
+            const slug = toValidFeedSlug(title || dirName, false, '-').slice(0, 40);
+            const impIdEl = document.getElementById('import-feed-id');
+            if (impIdEl) {
+                impIdEl.value = slug;
+                impIdEl.dataset.touched = 'false';
+                impIdEl.dispatchEvent(new Event('input'));
+            }
             document.getElementById('import-feed-desc').value = '';
             const importPriv = document.getElementById('import-feed-private');
             if (importPriv) importPriv.checked = false;
@@ -3097,6 +3250,16 @@
         }
 
         async function submitImportAudiobook() {
+            const impIdEl = document.getElementById('import-feed-id');
+            const impIdVal = impIdEl ? impIdEl.value.trim() : '';
+            if (!impIdVal || !/^[a-zA-Z0-9_-]+$/.test(impIdVal)) {
+                if (impIdEl) {
+                    impIdEl.classList.add('is-invalid');
+                    impIdEl.focus();
+                }
+                showToast('Please provide a valid Feed ID using only English letters, numbers, dashes, and underscores.', 'warning');
+                return;
+            }
             const btn = document.getElementById('btn-submit-import-audiobook');
             btn.disabled = true;
             btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Creating...`;

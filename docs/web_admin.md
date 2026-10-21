@@ -88,29 +88,50 @@ Log in using the configured username and password.
 
 ## Features & Functionality
 
-### 1. Podcast Feeds & One-Click Subscribing
-- **Channel Cards**: View all active channels with high-resolution artwork, provider badges (VK Video, YouTube, Vimeo, SoundCloud, Twitch), episode counts, and total disk space used.
-- **Copy RSS Link**: Copy the direct feed URL (`http://<host>:<port>/<feed_id>.xml`) into your clipboard with a single click.
-- **QR Code Generator**: Click the QR icon on any feed card to display an on-screen QR code. Scan it with your phone's camera to instantly open and subscribe in your podcast app.
-- **Player Deep-Links**: Direct links to subscribe in popular podcast players:
-  - **Apple Podcasts** (`podcast://...`)
-  - **Pocket Casts** (`pktc://subscribe/...`)
-  - **Overcast** (`overcast://...`)
+### 1. Sidebar Navigation & Library Organization
+- **Structured Sidebar (`.app-sidebar`)**:
+  - **LIBRARY**: Direct access to **Podcasts** (with total count badge), **Audiobooks**, and **Activity** (with live error badge).
+  - **SETTINGS**: Centralized access to **API Keys**, **Downloader**, **System & Storage**, and **MCP Server**.
+- **Dual View Modes (Grid & List)**:
+  - Toggle between rich **Card Grid** view and high-density **List View** with view preference persisted in `localStorage`.
+- **Live Search, Type Filters & Sorting**:
+  - Instant search across podcast titles, authors, and show metadata with preserved focus.
+  - Filter by feed type (**All types**, **Channels**, **Audiobooks**).
+  - Sort by **Title A–Z**, **Recently updated**, or **Largest first** (storage footprint).
+- **Status Quick-Filters**:
+  - Interactive chips for **All**, **Updating**, and **Needs attention** with real-time numeric badges.
+- **Mobile Responsive Layout**:
+  - Collapsible offcanvas navigation via the top-bar burger menu with touch-friendly 44px interactive targets and `prefers-reduced-motion` compliance.
 
-### 2. Feed Management
-- **Add Feed**: Click **+ Add Feed** to register a new channel, user, or playlist (VK Video, YouTube, Vimeo, etc.).
-  - Auto-detection of Feed ID from URL.
-  - Configuration of format (`video`, `audio`), quality (`high`, `low`), update frequency, and title filters.
-  - **Instant synchronization**: Newly created feeds are immediately written to `config.toml`, scheduled in cron, and added to the download queue.
-- **Delete Feed**: Remove a feed from memory and `config.toml`, with an optional checkbox to remove all downloaded media files from disk.
-- **Manual Update ("Update Now")**: Trigger an immediate update check without waiting for the next cron cycle.
+### 2. Unified Subscription Window (RSS, Apps & QR)
+- Clicking **Subscribe** on any card or detail page opens a unified dialog:
+  - **Direct RSS Feed URL**: Read-only URL box with a one-click **Copy** button.
+  - **QR Code Generator**: Instant on-screen QR code for camera scanning with phones and tablets.
+  - **Podcast Player Deep-Links**: Direct one-tap subscription for:
+    - **Apple Podcasts** (`podcast://...`)
+    - **Pocket Casts** (`pktc://subscribe/...`)
+    - **Overcast** (`overcast://...`)
 
-### 3. Episode Inspection & Retry
-- Click **Episodes** on any feed to view all discovered media items.
-- See status badges: `Downloaded` (with file size and date), `New`, or `Error`.
-- **Retry Failed Downloads**: If an episode failed to download (e.g., temporary network error or rate limit), click **Retry** to reset its status and re-enqueue it.
+### 3. Dedicated Podcast Page (Episodes, Settings & History)
+Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`) instead of a modal popup:
+- **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.
+- **Sub-navigation Tabs**:
+  - **Episodes**: Full media library with real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), in-browser audio playback, file download links, and individual retry buttons.
+  - **Settings**: Adjust feed parameters (update schedule, video/audio format, quality presets 480p/720p/1080p, retention limits, language) directly on the show page.
+  - **History**: Dedicated timeline of synchronization events, download activity, and errors for this specific feed.
+- **Back to Library**: Seamless one-click return to the main library preserving active filters and scroll position.
 
-### 4. API Keys Management
+### 4. Feed Management & Bulk Actions
+- **Add Podcast**: Modal to subscribe to channels, playlists, or users (YouTube, Rutube, VK Video, Vimeo, SoundCloud).
+  - Auto-detection of Feed ID from source URL.
+  - Preset video qualities (**480p**, **720p**, **1080p**) and automatic synchronization of **Page Size &rarr; Keep Last**.
+  - Immediate persistence to `config.toml`, cron scheduler, and download queue.
+- **Library Actions Menu**:
+  - **Update All**: Trigger concurrent updates across all configured feeds.
+  - **Retry Failed Episodes**: One-click batch retry across all failing episodes in the entire library.
+  - **Refresh List**: Reload library metadata on demand.
+
+### 5. API Keys Management
 - The **API Keys** tab displays current tokens for all providers:
   - **VK Video** (`PODSYNC_VKVIDEO_API_KEY` / `PODSYNC_VK_API_KEY`)
   - **YouTube** (`PODSYNC_YOUTUBE_API_KEY`)
@@ -121,7 +142,7 @@ Log in using the configured username and password.
 - Existing keys are masked (`••••••••`) for security.
 - Add or update keys directly from the web interface — changes are automatically saved to `config.toml`.
 
-### 5. System Health & Observability
+### 6. System Health & Observability
 - **Security & Rate Limiting**:
   - Brute-force protection tracking failed login attempts per client IP and username.
   - Dynamically configurable via Web UI modal or API (`max_attempts`, `window`, `lockout`).
@@ -133,7 +154,7 @@ Log in using the configured username and password.
   - **Server Uptime**: How long the Podsync daemon has been running.
   - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
 
-### 6. Downloader & Cookies Configuration (yt-dlp)
+### 7. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
   - **Bypassing Bot Verification**: Overcomes the `Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication` error.
   - **Netscape Cookies (`cookies.txt`)**: Paste or upload exported browser cookies directly into the web UI. Stored automatically in `data/cookies.txt`.

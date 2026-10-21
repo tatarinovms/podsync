@@ -18,10 +18,12 @@ Podcast applications provide superior content delivery: automatic download of ne
 
 This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 
-- **Local Audiobooks & Directory Auto-Discovery**: Convert local folders of audiobooks (`.mp3`, `.m4b`, `.m4a`, `.aac`, `.ogg`) into Podcast 2.0 serial RSS feeds (`<itunes:type>serial</itunes:type>`, `<itunes:episode>N</itunes:episode>`). Features natural numeric track sorting (`01`, `02`, ..., `10`), automatic ID3/APIC cover art and metadata extraction, 1-click folder auto-discovery import, and direct file uploads in the Web UI.
+- **Podcast RSS Mirroring & Live Preview**: Mirror any existing third-party podcast RSS feed (`http://`, `https://`, `*.xml`) with direct HTTP media streaming straight to disk without intermediate `/tmp` buffer or RAM spikes. Features a live metadata preview card (artwork, episode count, size) and segmented **Download Scope** (`All episodes`, `Last 10`, `Last 25`, `Last 50`) that automatically syncs with `page_size` and `keep_last`, clamping episode ingestion so huge podcast archives won't exhaust your storage.
+- **Local Audiobooks & Directory Auto-Discovery**: Convert local folders of audiobooks (`.mp3`, `.m4b`, `.m4a`, `.aac`, `.ogg`) into Podcast 2.0 serial RSS feeds (`<itunes:type>serial</itunes:type>`, `<itunes:episode>N</itunes:episode>`). Features natural numeric track sorting (`01`, `02`, ..., `10`), automatic ID3/APIC cover art and metadata extraction, 1-click folder auto-discovery import, and direct file uploads in the Web UI. Active Audiobook Podcast Feeds render in the exact same clean `.feed-grid` / `.feed-card` design as regular podcasts.
 - **Rutube Support**: Native support for Rutube channels, playlists, user profiles, and individual videos (`rutube.ru/channel/...`, `rutube.ru/plst/...`, `rutube.ru/u/...`, `rutube.ru/video/...`) powered by `yt-dlp` with zero API keys required.
 - **VK Video Support**: Convert VK Video channels, public communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
-- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with authentication, ready-to-use RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, deep-links for Apple Podcasts / Pocket Casts / Overcast, feed management (add/delete channels, trigger updates, retry failed episodes), and API key management. See [Web Admin Guide](./docs/web_admin.md).
+- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with sidebar navigation (Podcasts, Audiobooks, Activity, API keys, Downloader, System & storage, MCP server), list and grid views, dedicated podcast detail page with chapters/episodes, search, sorting, status badges, audio playback link, episode retry, and direct **Delete podcast** button in the header. Features custom cover art upload with live preview, ready-to-use RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, and deep-links for Apple Podcasts / Pocket Casts / Overcast. See [Web Admin Guide](./docs/web_admin.md).
+- **Brute-Force Protection & Security Settings**: Sliding-window rate limiter protecting web login and HTTP Basic Auth from brute-force attacks, configurable via Web UI, environment variables, or `config.toml` (max failed attempts, observation window, lockout duration).
 - **Real-Time In-Memory System Logs**: Built-in log console in the web admin with live auto-refresh (2s polling), search/filter by keyword, level filtering (DEBUG, INFO, WARN, ERROR), dynamic on-the-fly log level switching, and 1-click log download.
 - **Downloader & Dependency Diagnostics**: Live status and version detection for both `yt-dlp` and `ffmpeg`, Netscape `cookies.txt` management (upload/view/clear, extract from browser) to bypass YouTube bot checks, HTTP/SOCKS5 proxy configuration, and live URL extraction test.
 - **Smart Token Extraction**: Paste the entire OAuth redirect URL when adding VK API tokens — Podsync automatically parses out the access token.
@@ -30,21 +32,23 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Model Context Protocol (MCP) Server**: Built-in MCP server with 22 tools for AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
-- **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, tokens, downloaders, and audiobooks.
+- **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, security, tokens, downloaders, and audiobooks.
 
 ## Features
 
-- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch, and local Audiobooks.
-- Supports feeds configuration: video/audio, high/low quality, max video height, etc.
+- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch, local Audiobooks, and third-party Podcast RSS mirrors.
+- Supports feeds configuration: video/audio, quality profile, max video height ceiling, and download scope limits.
 - mp3 encoding with ffmpeg.
+- Direct-to-disk streaming downloads avoiding `/tmp` storage exhaustion.
 - Podcast 2.0 Serial feed specifications for audiobooks with chapter tracking and embedded/external artwork.
 - Update scheduler supports cron expressions.
 - Episode filtering (match by title regex, duration min/max, max age).
-- Feed customizations (custom artwork, category, language, etc.).
+- Feed customizations (custom artwork upload with live preview, category, language, etc.).
 - OPML export.
 - Automatic episode cleanup (keep last X episodes).
 - Configurable hooks for custom integrations and post-download workflows.
 - In-memory real-time log viewer with dynamic log levels.
+- Built-in brute-force protection and login rate limiting.
 - Runs on Windows, macOS, Linux, and Docker.
 - Supports ARM (arm64, armv7) and x86_64 architectures.
 - Supports API keys rotation for quota management.
@@ -150,6 +154,10 @@ All key settings can be configured via environment variables:
 | `PODSYNC_ADMIN_ENABLED` | Enable web admin console (`true` or `false`) | `true` |
 | `PODSYNC_ADMIN_USERNAME` | Admin web console username | `admin` |
 | `PODSYNC_ADMIN_PASSWORD` | Admin web console password | `secretpassword` |
+| `PODSYNC_ADMIN_MAX_ATTEMPTS` | Maximum failed login attempts before lockout | `5` |
+| `PODSYNC_ADMIN_WINDOW` | Observation window for failed attempts | `5m` |
+| `PODSYNC_ADMIN_LOCKOUT` | Lockout duration after exceeding max attempts | `15m` |
+| `PODSYNC_JOBS_WORKERS` | Concurrent job queue download workers | `2` |
 | `PODSYNC_AUDIOBOOKS_DIR` | Root directory for local audiobook folders | `/app/data/audiobooks` |
 | `PODSYNC_VKVIDEO_API_KEY` | VK Video token(s), space-separated for rotation (alias: `PODSYNC_VK_API_KEY`) | `vk_token1 vk_token2` |
 | `PODSYNC_YOUTUBE_API_KEY` | YouTube API key(s), space-separated for rotation | `key1 key2 key3` |
@@ -178,12 +186,19 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `POST` | `/api/v1/auth/password` | Change admin password |
 | `GET`, `POST` | `/api/v1/auth/security` | View or update brute-force rate limiting settings |
 | `GET` | `/api/v1/feeds` | List all podcast feeds with active episode counts and disk usage |
-| `POST` | `/api/v1/feeds` | Add new channel/playlist feed with auto-sync to `config.toml` |
+| `POST` | `/api/v1/feeds` | Add new channel/playlist/RSS mirror feed with auto-sync to `config.toml` |
+| `POST` | `/api/v1/feeds/preview` | Live preview for feeds/RSS mirrors (title, author, cover, episodes, size) |
+| `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
+| `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
 | `GET` | `/api/v1/feeds/{id}` | Detailed feed info and episode status |
+| `PUT`, `PATCH` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
 | `DELETE` | `/api/v1/feeds/{id}` | Delete feed (`?delete_files=true` to purge downloaded media) |
 | `POST` | `/api/v1/feeds/{id}/update` | Trigger immediate feed update and download cycle |
+| `POST` | `/api/v1/feeds/{id}/cover` | Attach uploaded cover directly to a specific feed |
+| `POST` | `/api/v1/covers/upload` | Upload custom cover image file (JPEG, PNG, WebP) with live preview |
 | `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode status for retry |
 | `GET` | `/api/v1/audiobooks/dirs` | Auto-discover subdirectories in audiobooks path with file count & cover status |
+| `DELETE` | `/api/v1/audiobooks/dirs` | Delete local audiobook folder and audio files from disk (`?name=...`) |
 | `POST` | `/api/v1/audiobooks/import` | Create a new podcast feed from a discovered local audiobook folder |
 | `POST` | `/api/v1/audiobooks/upload` | Upload audio files and cover art directly to create an audiobook feed |
 | `GET` | `/api/v1/audiobooks/config` | Get audiobook configuration and root path status |
@@ -198,12 +213,14 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/system` | System metrics (RAM, uptime, disk space, yt-dlp & ffmpeg versions) |
 | `GET` | `/api/v1/tokens` | Get masked API tokens for all providers |
 | `POST` | `/api/v1/tokens` | Update API tokens (supports key rotation and URL parsing) |
+| `DELETE` | `/api/v1/tokens` | Delete token by `?provider=...&index=...` |
 | `GET` | `/api/v1/downloader` | Get yt-dlp/ffmpeg downloader settings, cookie status, and proxy |
 | `POST` | `/api/v1/downloader` | Update downloader settings (timeout, proxy, browser, self-update) |
 | `GET` | `/api/v1/downloader/cookies` | Get Netscape cookies.txt content |
 | `POST` | `/api/v1/downloader/cookies` | Save or upload new Netscape cookies.txt content |
 | `DELETE` | `/api/v1/downloader/cookies` | Clear and delete installed cookies.txt file |
 | `POST` | `/api/v1/downloader/test` | Test URL extraction with yt-dlp and configured cookies/proxy |
+| `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
 
 ## Model Context Protocol (MCP) Server
 

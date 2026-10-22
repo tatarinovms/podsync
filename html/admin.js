@@ -3641,11 +3641,57 @@
             return data;
         }
         function personalJSON(method, body) { return {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}; }
-        function personalError(error, id = 'personal-error') { document.getElementById(id).textContent = error ? error.message : ''; }
-        function personalButton(action, id, label) { return `<button type="button" class="btn btn-secondary btn-sm" data-personal-action="${action}" data-personal-id="${escapeHtml(id)}">${label}</button>`; }
+        function personalError(error, id = 'personal-error') {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (error) {
+                el.textContent = error.message || String(error);
+                el.classList.remove('d-none');
+            } else {
+                el.textContent = '';
+                el.classList.add('d-none');
+            }
+        }
         function personalRenderCards() {
             const list = document.getElementById('personal-list');
-            list.innerHTML = personalFeeds.length ? personalFeeds.map(f => `<article class="personal-card">${f.cover_art && safeUrl(f.cover_art) ? `<img class="personal-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">` : '<div class="personal-cover personal-placeholder"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>'}<h2 class="h5">${escapeHtml(f.title)}</h2><p class="text-muted small">${escapeHtml(f.id)}.xml · ${f.format === 'video' ? 'Video' : 'Audio'} · ${f.episode_count} eps</p><p class="personal-card-description">${escapeHtml(f.description || '')}</p><div class="personal-actions">${personalButton('open',f.id,'Open')}<a class="btn btn-brand btn-sm" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener">RSS</a></div></article>`).join('') : '<p class="text-muted">No personal feeds yet. Click \"Create Feed\" to add your first one.</p>';
+            if (!list) return;
+            if (!personalFeeds.length) {
+                list.innerHTML = `<div class="library-empty text-center py-5 text-muted col-12" style="grid-column: 1 / -1;">
+                    <i aria-hidden="true" class="bi bi-bookmark-heart display-4 text-muted mb-3 d-block"></i>
+                    <h5 class="fw-semibold">No personal feeds yet</h5>
+                    <p class="small text-muted mb-3">Click \"Create feed\" to add your first curated feed.</p>
+                    <button class="btn btn-brand btn-sm" type="button" onclick="personalEdit()">
+                        <i aria-hidden="true" class="bi bi-plus-lg me-1"></i>Create feed
+                    </button>
+                </div>`;
+                return;
+            }
+            list.innerHTML = personalFeeds.map(f => {
+                const coverArt = f.cover_art && safeUrl(f.cover_art)
+                    ? `<img class="feed-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">`
+                    : `<div class="feed-cover-placeholder d-flex align-items-center justify-content-center"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>`;
+                const isVideo = f.format === 'video';
+                return `<article class="card feed-card h-100">
+                    <div class="feed-card-top">
+                        <div class="feed-art">${coverArt}</div>
+                        <div class="flex-grow-1 min-w-0">
+                            <a class="feed-card-title" href="javascript:void(0)" onclick="personalOpen('${escapeHtml(f.id)}')">${escapeHtml(f.title)}</a>
+                            <div class="feed-card-author text-truncate">${escapeHtml(f.id)}.xml</div>
+                        </div>
+                    </div>
+                    ${f.description ? `<p class="text-muted small mb-0 feed-card-description" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(f.description)}</p>` : ''}
+                    <div class="feed-card-meta">
+                        <span><i aria-hidden="true" class="bi bi-collection-play me-1"></i>${f.episode_count || 0} episodes</span>
+                        <span><i aria-hidden="true" class="bi ${isVideo ? 'bi-camera-video' : 'bi-music-note-beamed'} me-1"></i>${isVideo ? 'Video' : 'Audio'}</span>
+                        <span class="feed-provider">Personal</span>
+                    </div>
+                    <div class="feed-card-bottom">
+                        <button class="btn btn-light" type="button" onclick="personalOpen('${escapeHtml(f.id)}')">Open</button>
+                        <a class="btn btn-light" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</a>
+                        <button class="btn btn-light" type="button" onclick="personalEdit('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
+                    </div>
+                </article>`;
+            }).join('');
         }
         async function loadPersonalFeeds() {
             try {
@@ -3658,8 +3704,8 @@
         }
         function personalBack() {
             personalCurrentID = ''; personalRequestID++;
-            document.getElementById('personal-detail').classList.add('d-none');
-            document.getElementById('personal-list').classList.remove('d-none');
+            document.getElementById('personal-detail')?.classList.add('d-none');
+            document.getElementById('personal-main-view')?.classList.remove('d-none');
         }
         async function personalOpen(id, reset = true) {
             personalCurrentID = id;
@@ -3667,20 +3713,72 @@
             try {
                 const data = await personalAPI('/' + encodeURIComponent(id));
                 if (request !== personalRequestID || personalCurrentID !== id) return;
-                document.getElementById('personal-list').classList.add('d-none');
-                document.getElementById('personal-detail').classList.remove('d-none');
+                document.getElementById('personal-main-view')?.classList.add('d-none');
+                document.getElementById('personal-detail')?.classList.remove('d-none');
                 document.getElementById('personal-title').textContent = data.feed.title;
-                document.getElementById('personal-description').textContent = data.feed.description;
-                const rss = document.getElementById('personal-rss'); rss.href = safeUrl(data.feed.feed_url); rss.textContent = data.feed.feed_url;
+                document.getElementById('personal-description').textContent = data.feed.description || '';
+                const cover = document.getElementById('personal-detail-cover');
+                if (cover) {
+                    cover.innerHTML = data.feed.cover_art && safeUrl(data.feed.cover_art)
+                        ? `<img src="${safeUrl(data.feed.cover_art)}" alt="" onerror="this.style.display='none'">`
+                        : `<i aria-hidden="true" class="bi bi-bookmark-heart"></i>`;
+                }
+                const rss = document.getElementById('personal-rss');
+                if (rss) {
+                    rss.href = safeUrl(data.feed.feed_url);
+                }
+                const countBadge = document.getElementById('personal-episodes-count');
+                if (countBadge) countBadge.textContent = `${(data.episodes || []).length} episodes`;
+
                 const snapshot = JSON.stringify(data.episodes);
                 if (reset || snapshot !== personalEpisodeSnapshot) {
                     personalEpisodeSnapshot = snapshot;
-                    const labels = {new:'Queued',downloaded:'Ready',error:'Error',cleaned:'Cleaned'};
-                    document.getElementById('personal-episodes').innerHTML = data.episodes.length ? data.episodes.map(ep => {
-                        const url = safeUrl(ep.media_url || '');
-                        const player = ep.status === 'downloaded' && url ? (ep.media_type === 'video/mp4' ? `<video controls preload="none" src="${url}"></video>` : `<audio controls preload="none" src="${url}"></audio>`) : '';
-                        return `<article class="personal-episode"><h4 class="h6">${escapeHtml(ep.title)}</h4><p class="text-muted small">${labels[ep.status] || escapeHtml(ep.status)} · ${escapeHtml(new Date(ep.pub_date).toLocaleString())}</p>${ep.error ? `<p class="text-danger small">${escapeHtml(ep.error)}</p>` : ''}${player}<div class="personal-actions mt-2">${personalButton('move',ep.id,'Move')}${personalButton('copy',ep.id,'Copy')}${ep.status === 'error' ? personalButton('retry',ep.id,'Retry') : ''}${personalButton('delete',ep.id,'Delete')}</div></article>`;
-                    }).join('') : '<p class="text-muted">Add a link or upload a file — episodes of this feed will appear here.</p>';
+                    const labels = {
+                        new: '<span class="badge bg-primary">Queued</span>',
+                        downloaded: '<span class="badge bg-success">Ready</span>',
+                        error: '<span class="badge bg-danger">Error</span>',
+                        cleaned: '<span class="badge bg-secondary">Cleaned</span>'
+                    };
+                    const container = document.getElementById('personal-episodes');
+                    if (container) {
+                        container.innerHTML = data.episodes.length ? data.episodes.map(ep => {
+                            const url = safeUrl(ep.media_url || '');
+                            const player = ep.status === 'downloaded' && url
+                                ? (ep.media_type === 'video/mp4'
+                                    ? `<video controls preload="none" class="w-100 rounded mt-2" style="max-height: 240px; background: var(--ctp-crust);" src="${url}"></video>`
+                                    : `<audio controls preload="none" class="w-100 mt-2" src="${url}"></audio>`)
+                                : '';
+                            let actions = `<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="move" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrows-move me-1"></i>Move</button>
+<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="copy" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-copy me-1"></i>Copy</button>`;
+                            if (ep.status === 'error') {
+                                actions += ` <button type="button" class="btn btn-outline-danger btn-sm" data-personal-action="retry" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i>Retry</button>`;
+                            }
+                            actions += ` <button type="button" class="btn btn-outline-danger btn-sm" data-personal-action="delete" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button>`;
+
+                            const dateStr = ep.pub_date ? new Date(ep.pub_date).toLocaleString() : '';
+                            const errorHtml = ep.error ? `<div class="mt-2 p-2 rounded episode-error small text-danger text-break">${escapeHtml(ep.error)}</div>` : '';
+
+                            return `<div class="list-group-item p-3">
+                                <div class="d-flex flex-column flex-sm-row align-items-start justify-content-between gap-3">
+                                    <div class="min-w-0 flex-grow-1">
+                                        <h6 class="fw-semibold mb-1 text-break">${escapeHtml(ep.title || ep.id)}</h6>
+                                        <div class="text-muted small d-flex flex-wrap gap-3">
+                                            ${dateStr ? `<span><i aria-hidden="true" class="bi bi-calendar me-1"></i>${escapeHtml(dateStr)}</span>` : ''}
+                                        </div>
+                                        ${errorHtml}
+                                        ${player}
+                                    </div>
+                                    <div class="flex-shrink-0 text-sm-end">
+                                        ${labels[ep.status] || `<span class="badge bg-secondary">${escapeHtml(ep.status)}</span>`}
+                                        <div class="d-flex flex-wrap gap-1 mt-2 justify-content-sm-end">${actions}</div>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }).join('') : `<div class="p-4 text-center text-muted">
+                            <i aria-hidden="true" class="bi bi-inbox display-6 text-muted mb-2 d-block"></i>
+                            <div>Add a link or upload a file above to add episodes to this feed.</div>
+                        </div>`;
+                    }
                 }
                 personalError(null);
             } catch (error) { if (request === personalRequestID) personalError(error); }
@@ -3725,13 +3823,26 @@
         }
         async function personalUpload(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
-            document.getElementById('personal-progress').textContent = 'Uploading file…';
+            const prog = document.getElementById('personal-progress');
+            if (prog) {
+                prog.textContent = 'Uploading file…';
+                prog.className = 'alert alert-info py-2 px-3 small mb-3';
+            }
             try {
                 const data = new FormData(); data.append('file', document.getElementById('personal-file').files[0]);
                 await personalAPI('/'+encodeURIComponent(id)+'/upload',{method:'POST',body:data});
-                event.target.reset(); document.getElementById('personal-progress').textContent = 'File uploaded. Processing episode…';
-                if (personalCurrentID === id) await personalOpen(id); await loadPersonalFeeds();
-            } catch (error) { personalError(error); document.getElementById('personal-progress').textContent = ''; }
+                event.target.reset();
+                if (prog) {
+                    prog.textContent = 'File uploaded. Processing episode…';
+                    prog.className = 'alert alert-success py-2 px-3 small mb-3';
+                    setTimeout(() => { prog.className = 'alert alert-info py-2 px-3 small d-none mb-3'; }, 4000);
+                }
+                if (personalCurrentID === id) await personalOpen(id);
+                await loadPersonalFeeds();
+            } catch (error) {
+                personalError(error);
+                if (prog) prog.className = 'alert alert-info py-2 px-3 small d-none mb-3';
+            }
             finally { if (button) button.disabled = false; }
         }
         function personalDeleteFeed() { personalConfirmDelete(''); }

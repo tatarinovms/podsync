@@ -459,6 +459,16 @@ Moves an episode from one personal feed to another.
 Resets a failed episode in the queue to retry downloading.
 - **Response**: `202 Accepted`.
 
+#### `PATCH /api/v1/personal-feeds/{id}/episodes/{episode_id}`
+Renames an episode in the personal feed. Also accepts `POST /api/v1/personal-feeds/{id}/episodes/{episode_id}/rename` and `PUT`.
+- **Request Body**:
+```json
+{
+  "title": "New Episode Title"
+}
+```
+- **Response**: `200 OK` with the updated `Episode` object. Rebuilds the feed's RSS XML immediately.
+
 #### `DELETE /api/v1/personal-feeds/{id}/episodes/{episode_id}?confirm=true&delete_files={bool}`
 Removes an episode from the personal feed.
 - **Query Parameters**:

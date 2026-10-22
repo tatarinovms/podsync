@@ -91,6 +91,7 @@ AI assistants (**Claude Desktop**, **OpenCode**, **Cursor**, **Cline**, **Antigr
 | **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
 | **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt)* | Add an episode from a URL or local server file path. |
 | **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
+| **`rename_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `title` *(req)* | Rename an episode in a personal podcast feed. |
 
 ---
 

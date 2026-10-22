@@ -91,7 +91,7 @@ This file provides comprehensive architecture guidance, development workflows, a
   - Automatic `ffmpeg` conversion to MP3 for audio and MP4 for video, preserving duration, metadata, and artwork.
 - Dedicated transactional BadgerDB namespace (`podsync/personal/v1/`) for feed configs, episode memberships, and shared media references.
 - Copying an episode creates a new stable GUID referencing shared media; moving an episode retains the original GUID. Media files are only deleted when their reference count drops to zero and file deletion was explicitly requested.
-- Managed by 5 specialized MCP tools: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`.
+- Managed by 6 specialized MCP tools: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`.
 
 ### Local Audiobooks (`audiobook://<folder_name>`)
 - **Protocol**: `audiobook://<folder>` or `audiobook://relative/path`
@@ -207,9 +207,9 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes 27 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
+Podsync exposes 28 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
 - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
-- `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`
+- `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`
 - `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
 - `get_download_errors`, `get_recent_downloads`, `get_sync_status`
 - `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`

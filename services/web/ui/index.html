@@ -945,6 +945,11 @@
                                         <td>Remove an episode from a personal podcast feed</td>
                                         <td><code>feed_id</code>, <code>episode_id</code>, <code>delete_files</code> <em>(optional)</em></td>
                                     </tr>
+                                    <tr>
+                                        <td><code>rename_personal_episode</code></td>
+                                        <td>Rename an episode in a personal podcast feed</td>
+                                        <td><code>feed_id</code>, <code>episode_id</code>, <code>title</code></td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1923,6 +1928,9 @@
     </form></div></div>
     <div class="modal fade" id="personalDeleteModal" tabindex="-1" aria-labelledby="personal-delete-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalDeleteSave(event)">
         <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-delete-heading">Confirm Deletion</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalDeleteModal')"></button></div><div class="modal-body"><div id="personal-delete-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><p id="personal-delete-text" class="mb-3"></p><div class="form-check"><input class="form-check-input" type="checkbox" id="personal-delete-files" checked><label class="form-check-label small" for="personal-delete-files">Delete unreferenced media files from storage as well</label></div><div class="text-muted small mt-2">Files used by other feeds will be preserved in any case.</div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalDeleteModal')">Cancel</button><button type="submit" class="btn btn-danger btn-sm"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button></div>
+    </form></div></div>
+    <div class="modal fade" id="personalRenameModal" tabindex="-1" aria-labelledby="personal-rename-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalRenameSave(event)">
+        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-rename-heading">Rename Episode</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalRenameModal')"></button></div><div class="modal-body"><div id="personal-rename-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><div class="mb-3"><label class="form-label small text-muted" for="personal-rename-title">Title *</label><input class="form-control" id="personal-rename-title" required placeholder="Episode title"></div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalRenameModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save</button></div>
     </form></div></div>
 
 

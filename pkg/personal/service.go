@@ -558,6 +558,65 @@ func (s *Service) DeleteEpisode(ctx context.Context, id, episodeID string, delet
 	}
 	return s.collectLocked(ctx)
 }
+func (s *Service) RenameEpisode(ctx context.Context, id, episodeID, newTitle string) (*model.Episode, error) {
+	newTitle = strings.TrimSpace(newTitle)
+	if newTitle == "" {
+		return nil, invalid("title cannot be empty")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var ep *model.Episode
+	err := s.store.PersonalUpdate(func(tx db.PersonalTx) error {
+		var f Feed
+		if err := tx.Get("feed/"+id, &f); err != nil {
+			return err
+		}
+		var member Membership
+		if err := tx.Get(memberKey(id, episodeID), &member); err != nil {
+			return err
+		}
+		var media Media
+		if err := tx.Get("media/"+member.MediaID, &media); err != nil {
+			return err
+		}
+		media.Title = newTitle
+		if err := tx.Put("media/"+media.ID, media); err != nil {
+			return err
+		}
+		mime := "audio/mpeg"
+		if media.Format == model.FormatVideo || strings.HasSuffix(media.Path, ".mp4") {
+			mime = "video/mp4"
+		}
+		ep = &model.Episode{
+			ID:          member.ID,
+			MediaID:     media.ID,
+			Title:       media.Title,
+			Description: media.Description,
+			Thumbnail:   media.Thumbnail,
+			Duration:    media.Duration,
+			Size:        media.Size,
+			VideoURL:    media.SourceURL,
+			PubDate:     member.AddedAt,
+			Status:      media.Status,
+			Error:       media.Error,
+			MediaType:   mime,
+		}
+		if media.Status == model.EpisodeDownloaded {
+			ep.MediaURL = s.host + "/" + media.Path
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.rebuildLocked(ctx, id); err != nil {
+		return nil, err
+	}
+	return ep, nil
+}
 func (s *Service) Delete(ctx context.Context, id string, deleteFiles bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

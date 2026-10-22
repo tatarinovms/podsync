@@ -660,6 +660,28 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "rename_personal_episode",
+			Description: "Rename an episode in a personal podcast feed",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Personal feed ID",
+					},
+					"episode_id": {
+						Type:        "string",
+						Description: "Episode ID to rename",
+					},
+					"title": {
+						Type:        "string",
+						Description: "New title for the episode",
+					},
+				},
+				Required: []string{"feed_id", "episode_id", "title"},
+			},
+		},
+		{
 			Name:        "import_audiobook",
 			Description: "Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format)",
 			InputSchema: InputSchema{
@@ -821,6 +843,31 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Episode %s removed from feed %s", epID, feedID)}},
+		}, nil
+
+	case "rename_personal_episode":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		feedID, ok := args["feed_id"].(string)
+		if !ok || strings.TrimSpace(feedID) == "" {
+			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
+		}
+		epID, ok := args["episode_id"].(string)
+		if !ok || strings.TrimSpace(epID) == "" {
+			return CallToolResult{}, fmt.Errorf("episode_id parameter is required")
+		}
+		title, ok := args["title"].(string)
+		if !ok || strings.TrimSpace(title) == "" {
+			return CallToolResult{}, fmt.Errorf("title parameter is required")
+		}
+		ep, err := s.personal.RenameEpisode(ctx, strings.TrimSpace(feedID), strings.TrimSpace(epID), strings.TrimSpace(title))
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.Marshal(ep)
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil
 
 	case "delete_audiobook_dir":

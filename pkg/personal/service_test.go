@@ -271,3 +271,38 @@ func TestMediaPathsStayInsideSharedStorage(t *testing.T) {
 	}
 	require.NoError(t, validateMediaPath("_personal/abc/media.mp3"))
 }
+
+func TestRenameEpisode(t *testing.T) {
+	ctx := context.Background()
+	s, _, files := testService(t, nil)
+
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/audio.mp3", "Original Title", "")
+	require.NoError(t, err)
+	require.NoError(t, s.Update(ctx, "personal"))
+
+	// Empty title rejected
+	_, err = s.RenameEpisode(ctx, "personal", ep.ID, "   ")
+	require.Error(t, err)
+
+	// Non-existent feed or episode rejected
+	_, err = s.RenameEpisode(ctx, "nonexistent", ep.ID, "New Title")
+	require.ErrorIs(t, err, model.ErrNotFound)
+	_, err = s.RenameEpisode(ctx, "personal", "nonexistent", "New Title")
+	require.ErrorIs(t, err, model.ErrNotFound)
+
+	// Successful rename
+	updated, err := s.RenameEpisode(ctx, "personal", ep.ID, "Brand New Title")
+	require.NoError(t, err)
+	require.Equal(t, "Brand New Title", updated.Title)
+
+	// Verify in Get()
+	detail, err := s.Get("personal")
+	require.NoError(t, err)
+	require.Len(t, detail.Episodes, 1)
+	require.Equal(t, "Brand New Title", detail.Episodes[0].Title)
+
+	// Verify XML contains new title
+	xmlData := readFile(t, files, "personal.xml")
+	require.Contains(t, xmlData, "Brand New Title")
+	require.NotContains(t, xmlData, "Original Title")
+}

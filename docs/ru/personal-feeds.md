@@ -92,6 +92,7 @@
 | **`create_personal_feed`** | `title` *(обяз)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Создать новую персональную ленту. |
 | **`add_personal_episode`** | `feed_id` *(обяз)*, `url` *(опц)*, `file_path` *(опц)*, `title` *(опц)*, `format` *(опц)* | Добавить эпизод по ссылке или локальному пути к файлу. |
 | **`delete_personal_episode`** | `feed_id` *(обяз)*, `episode_id` *(обяз)* | Удалить эпизод из ленты и очистить занятое дисковое пространство. |
+| **`rename_personal_episode`** | `feed_id` *(обяз)*, `episode_id` *(обяз)*, `title` *(обяз)* | Переименовать эпизод в персональной ленте. |
 
 ---
 

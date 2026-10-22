@@ -163,16 +163,27 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 		result, err = s.personal.Upload(r.Context(), parts[0], name, file, format)
 		status = http.StatusAccepted
 	} else if len(parts) == 3 && parts[1] == "episodes" {
-		if r.Method != http.MethodDelete {
+		if r.Method == http.MethodDelete {
+			if r.URL.Query().Get("confirm") != "true" {
+				s.writeError(w, 400, "deletion requires confirm=true")
+				return
+			}
+			err = s.personal.DeleteEpisode(r.Context(), parts[0], parts[2], r.URL.Query().Get("delete_files") == "true")
+			status = http.StatusNoContent
+		} else if r.Method == http.MethodPatch || r.Method == http.MethodPut {
+			var req struct {
+				Title string `json:"title"`
+			}
+			if e := decodePersonal(w, r, &req); e != nil {
+				badBody(e)
+				return
+			}
+			result, err = s.personal.RenameEpisode(r.Context(), parts[0], parts[2], req.Title)
+			status = http.StatusOK
+		} else {
 			s.writeError(w, 405, "method not allowed")
 			return
 		}
-		if r.URL.Query().Get("confirm") != "true" {
-			s.writeError(w, 400, "deletion requires confirm=true")
-			return
-		}
-		err = s.personal.DeleteEpisode(r.Context(), parts[0], parts[2], r.URL.Query().Get("delete_files") == "true")
-		status = http.StatusNoContent
 	} else if len(parts) == 4 && parts[1] == "episodes" {
 		if r.Method != http.MethodPost {
 			s.writeError(w, 405, "method not allowed")
@@ -192,6 +203,16 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			err = s.personal.Retry(r.Context(), parts[0], parts[2])
 			result = map[string]bool{"queued": true}
 			status = http.StatusAccepted
+		case "rename":
+			var req struct {
+				Title string `json:"title"`
+			}
+			if e := decodePersonal(w, r, &req); e != nil {
+				badBody(e)
+				return
+			}
+			result, err = s.personal.RenameEpisode(r.Context(), parts[0], parts[2], req.Title)
+			status = http.StatusOK
 		default:
 			s.writeError(w, 404, "unknown episode action")
 			return

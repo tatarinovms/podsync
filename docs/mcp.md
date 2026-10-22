@@ -39,7 +39,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 27 specialized tools:
+The MCP server provides 28 specialized tools:
 
 ### Monitoring & Status
 | Tool Name | Arguments | Description |
@@ -80,6 +80,7 @@ The MCP server provides 27 specialized tools:
 | **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
 | **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt: audio/video)* | Add an episode to a personal feed from a URL (YouTube, VK, Rutube, direct audio/video link) or a local file path. |
 | **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
+| **`rename_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `title` *(req)* | Rename an episode in a personal podcast feed. |
 
 ### Audiobooks Management
 | Tool Name | Arguments | Description |

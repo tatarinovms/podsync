@@ -50,7 +50,7 @@ await page.waitForSelector('.feed-card');
 
 assert.deepEqual(requests.filter(p=>!p.endsWith('/status') || p.includes('/auth/')), ['/api/v1/auth/status', '/api/v1/feeds']);
 assert.equal(await page.locator('.feed-card').count(), 6);
-assert.deepEqual(await page.locator('#main-content > .tab-pane').evaluateAll(es=>es.map(e=>e.id)), ['tab-feeds','tab-audiobooks','tab-tokens','tab-system','tab-downloader','tab-mcp','tab-logs','episodesModal']);
+assert.deepEqual(await page.locator('#main-content > .tab-pane').evaluateAll(es=>es.map(e=>e.id)), ['tab-feeds','tab-personal','tab-audiobooks','tab-tokens','tab-system','tab-downloader','tab-mcp','tab-logs','episodesModal']);
 await screenshot('mocha-desktop.png', true);
 await page.getByRole('button',{name:'List view',exact:true}).click();
 assert.equal(await page.locator('#feeds-container').getAttribute('data-view'),'list');

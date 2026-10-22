@@ -55,6 +55,8 @@ type UpdateTokensRequest struct {
 }
 
 func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
+	mux.Handle("/api/v1/personal-feeds", s.authMiddleware(http.HandlerFunc(s.handlePersonalFeeds)))
+	mux.Handle("/api/v1/personal-feeds/", s.authMiddleware(http.HandlerFunc(s.handlePersonalFeeds)))
 	mux.HandleFunc("/api/v1/auth/status", s.handleAuthStatus)
 	mux.HandleFunc("/api/v1/auth/login", s.handleAuthLogin)
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)

@@ -6,12 +6,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/mxpv/podsync/pkg/feed"
+	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/personal"
 	"github.com/mxpv/podsync/services/migrate"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
@@ -220,8 +223,37 @@ func main() {
 		log.WithError(err).Fatal("failed to create updater")
 	}
 
+	reservedIDs := make(map[string]bool)
+	for id := range cfg.Feeds {
+		reservedIDs[id] = true
+	}
+	if err := database.WalkFeeds(ctx, func(f *model.Feed) error { reservedIDs[f.ID] = true; return nil }); err != nil {
+		log.WithError(err).Fatal("failed to read existing feed IDs")
+	}
+	// The same persistent queue is consumed by the worker pool below.
+	personalQueue := jobqueue.NewJobQueue(database, cfg.Jobs.MaxAttempts)
+	if period, err := time.ParseDuration(cfg.Jobs.PollPeriod); err == nil && period > 0 {
+		personalQueue.SetPollPeriod(period)
+	}
+	personalFeeds, err := personal.New(ctx, database, storage, &personal.MediaProcessor{Downloader: downloader, Files: storage}, cfg.Server.PublicURL(), reservedIDs, func(ctx context.Context, id string) error {
+		_, _, err := personalQueue.EnqueueManualUpdate(ctx, id)
+		return err
+	})
+	if err != nil {
+		log.WithError(err).Fatal("failed to initialize personal feeds")
+	}
+
 	// In Headless mode, do one round of feed updates and quit
 	if opts.Headless {
+		feeds, err := personalFeeds.List()
+		if err != nil {
+			log.WithError(err).Fatal("failed to list personal feeds")
+		}
+		for _, f := range feeds {
+			if err := personalFeeds.Update(ctx, f.ID); err != nil {
+				log.WithError(err).Error("personal feed update failed")
+			}
+		}
 		for _, _feed := range cfg.Feeds {
 			if err := manager.Update(ctx, _feed); err != nil {
 				log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
@@ -255,6 +287,8 @@ func main() {
 		date,
 		logBuffer,
 	)
+
+	feedManager.queue = personalQueue
 
 	group, ctx := errgroup.WithContext(ctx)
 	defer func() {
@@ -311,6 +345,11 @@ func main() {
 					currentClaimToken = job.ClaimToken
 					_feed = feedManager.GetFeedConfig(job.FeedID)
 					if _feed == nil {
+						if detail, err := personalFeeds.Get(job.FeedID); err == nil {
+							_feed = detail.Feed.Config()
+						}
+					}
+					if _feed == nil {
 						log.WithField("feed_id", job.FeedID).Warn("job feed not found in configuration, marking failed")
 						_, _ = feedManager.JobQueue().MarkFailed(ctx, job.ID, fmt.Errorf("feed %q not found in configuration", job.FeedID), currentClaimToken)
 						continue
@@ -333,7 +372,12 @@ func main() {
 				}
 				log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
 				updateCtx, updateCancel := context.WithTimeout(ctx, 2*time.Hour)
-				err := manager.Update(updateCtx, _feed)
+				var err error
+				if strings.HasPrefix(_feed.URL, "personal://") {
+					err = personalFeeds.Update(updateCtx, _feed.ID)
+				} else {
+					err = manager.Update(updateCtx, _feed)
+				}
 				updateCancel()
 				if err != nil {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
@@ -466,6 +510,7 @@ func main() {
 	cfg.Server.Admin.ConfigPath = opts.ConfigPath
 	srv := web.New(cfg.Server, storage, database)
 	srv.SetAdminManager(feedManager)
+	srv.SetPersonalFeeds(personalFeeds)
 
 	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)
 	mcpServer := mcp.NewServer(feedManager)

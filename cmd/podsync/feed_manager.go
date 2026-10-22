@@ -458,6 +458,9 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 		return errors.New("feed ID must contain only Latin letters, digits, underscores, or hyphens")
 	}
 
+	if newFeed.ID == "personal" || strings.HasPrefix(newFeed.ID, "personal-") || newFeed.ID == "_personal" {
+		return errors.New("this feed ID is reserved for personal feeds")
+	}
 	if _, exists := m.feeds[newFeed.ID]; exists {
 		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
 	}

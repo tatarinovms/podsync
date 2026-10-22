@@ -23,6 +23,7 @@ const (
 	ProviderVkVideo    = Provider("vkvideo")
 	ProviderRutube     = Provider("rutube")
 	ProviderAudiobook  = Provider("audiobook")
+	ProviderPersonal   = Provider("personal")
 	ProviderRSS        = Provider("rss")
 )
 

@@ -148,3 +148,13 @@ type s3logger struct{}
 func (s s3logger) Log(args ...interface{}) {
 	log.Debug(args...)
 }
+
+// Read retrieves a stored object for processing without exposing an HTTP file server.
+func (s *S3) Read(ctx context.Context, name string) (io.ReadCloser, error) {
+	key := s.buildKey(name)
+	result, err := s.api.GetObjectWithContext(ctx, &s3.GetObjectInput{Bucket: &s.bucket, Key: &key})
+	if err != nil {
+		return nil, err
+	}
+	return result.Body, nil
+}

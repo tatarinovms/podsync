@@ -21,6 +21,7 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Podcast RSS Mirroring & Live Preview**: Mirror any existing third-party podcast RSS feed (`http://`, `https://`, `*.xml`) with direct HTTP media streaming straight to disk without intermediate `/tmp` buffer or RAM spikes. Features a live metadata preview card (artwork, episode count, size) and segmented **Download Scope** (`All episodes`, `Last 10`, `Last 25`, `Last 50`) that automatically syncs with `page_size` and `keep_last`, clamping episode ingestion so huge podcast archives won't exhaust your storage.
 - **Smart Feed ID Transliteration & Validation**: Automatic real-time transliteration of Cyrillic (Russian, Ukrainian, Belarusian) and diacritic text into clean Latin slugs on typing and pasting (`Клан Бобров` → `KLAN_BOBROV`, `ДТКД` → `DTKD`, `Война и мир` → `voyna-i-mir`). Features instant visual validation with Catppuccin Red highlight (`is-invalid`), dynamic live RSS URL preview (`/CLANBEAVER.xml`), and strict server-side regex enforcement (`^[a-zA-Z0-9_-]+$`).
 - **Responsive Mobile Navigation Drawer**: Optimized mobile layout for smartphones (`<= 767px`) with a sliding overlay navigation drawer, auto-closing on route navigation, backdrop tap, or Escape key, with cleanly isolated toggle controls.
+- **Personal Feeds (Персональные ленты)**: Create custom, manually curated RSS podcast feeds directly in the Web Admin under **LIBRARY → Персональные ленты**. Add individual videos from YouTube, VK Video, Rutube, direct HTTP/HTTPS media URLs, or upload local media files (up to 4 GiB) with automatic `ffmpeg` transcoding (Audio to MP3, Video to MP4). Supports episode reordering, copying between feeds with shared media reference counting, moving episodes (preserving GUID), and safe confirmed deletion. See [Personal Feeds Guide](./docs/personal-feeds.md).
 - **Local Audiobooks & Directory Auto-Discovery**: Convert local folders of audiobooks (`.mp3`, `.m4b`, `.m4a`, `.aac`, `.ogg`) into Podcast 2.0 serial RSS feeds (`<itunes:type>serial</itunes:type>`, `<itunes:episode>N</itunes:episode>`). Features natural numeric track sorting (`01`, `02`, ..., `10`), automatic ID3/APIC cover art and metadata extraction, 1-click folder auto-discovery import, and direct file uploads in the Web UI. Active Audiobook Podcast Feeds render in the exact same clean `.feed-grid` / `.feed-card` design as regular podcasts.
 - **Rutube Support**: Native support for Rutube channels, playlists, user profiles, and individual videos (`rutube.ru/channel/...`, `rutube.ru/plst/...`, `rutube.ru/u/...`, `rutube.ru/video/...`) powered by `yt-dlp` with zero API keys required.
 - **VK Video Support**: Convert VK Video channels, public communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
@@ -199,6 +200,18 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `POST` | `/api/v1/feeds/{id}/cover` | Attach uploaded cover directly to a specific feed |
 | `POST` | `/api/v1/covers/upload` | Upload custom cover image file (JPEG, PNG, WebP) with live preview |
 | `POST` | `/api/v1/feeds/{id}/episodes/{ep_id}/retry` | Reset failed episode status for retry |
+| `GET` | `/api/v1/personal-feeds` | List all personal curated podcast feeds |
+| `POST` | `/api/v1/personal-feeds` | Create new personal feed (`title`, `format`, optional `cover_art`, etc.) |
+| `GET` | `/api/v1/personal-feeds/{id}` | Detailed personal feed metadata and episode list |
+| `PATCH` | `/api/v1/personal-feeds/{id}` | Update personal feed configuration (title, description, cover, sort) |
+| `DELETE` | `/api/v1/personal-feeds/{id}` | Delete personal feed (`?confirm=true&delete_files=true`) |
+| `GET` | `/api/v1/personal-feeds/{id}/episodes` | List episodes of a personal feed |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode by single video URL (YouTube, VK, Rutube, direct media) |
+| `POST` | `/api/v1/personal-feeds/{id}/upload` | Upload local audio/video file up to 4 GiB with auto-transcoding |
+| `DELETE` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | Remove episode from feed (`?confirm=true&delete_files=true`) |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | Copy episode to another feed (shared media, new stable GUID) |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | Move episode to another feed (preserves existing GUID) |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Retry failed personal episode download |
 | `GET` | `/api/v1/audiobooks/dirs` | Auto-discover subdirectories in audiobooks path with file count & cover status |
 | `DELETE` | `/api/v1/audiobooks/dirs` | Delete local audiobook folder and audio files from disk (`?name=...`) |
 | `POST` | `/api/v1/audiobooks/import` | Create a new podcast feed from a discovered local audiobook folder |

@@ -1082,3 +1082,22 @@ button.feed-state { border: 0; background: transparent; padding: 0; text-align: 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Personal feeds have their own library and use the shared Catppuccin theme. */
+.personal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+.personal-card, .personal-episode { padding: 20px; border: 1px solid var(--ctp-surface1); border-radius: 16px; background: var(--ctp-mantle); color: var(--ctp-text); }
+.personal-cover { width: 88px; height: 88px; object-fit: cover; border-radius: 12px; margin-bottom: 16px; }
+.personal-placeholder { display: grid; place-items: center; font-size: 2rem; background: var(--ctp-surface0); color: var(--ctp-mauve); }
+.personal-card-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.personal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.personal-actions .btn-sm { min-width: 105px; padding: 6px 16px; font-size: .875rem; line-height: 1.5; }
+.personal-detail-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.personal-detail-heading a { overflow-wrap: anywhere; }
+.personal-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.personal-episode { margin-bottom: 12px; }
+.personal-episode audio, .personal-episode video { display: block; width: 100%; max-width: 640px; }
+.personal-episode video { max-height: 360px; }
+@media (max-width: 575px) {
+    .personal-inputs { grid-template-columns: 1fr; }
+    .personal-actions .btn-sm, #tab-personal .btn-sm { min-height: 44px; padding: 8px 16px; }
+}

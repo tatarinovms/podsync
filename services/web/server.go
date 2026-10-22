@@ -2,17 +2,18 @@ package web
 
 import (
 	"encoding/json"
-	"sync"
 	"expvar"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/personal"
 )
 
 type Server struct {
@@ -22,6 +23,7 @@ type Server struct {
 	cfg           Config
 	sessions      *SessionManager
 	adminMgr      AdminManager
+	personal      *personal.Service
 	adminUpdateMu sync.Mutex
 	mcpHandler    http.Handler
 	rateLimiter   *LoginRateLimiter

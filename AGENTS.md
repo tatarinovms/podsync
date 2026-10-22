@@ -79,6 +79,15 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 3. Platform Implementations & Specifics
 
+### Personal feeds (`pkg/personal/`)
+- Independent **Персональные ленты** section in **LIBRARY**, separate from Podcasts and Audiobooks.
+- Unlimited manually curated feeds, with immutable generated IDs and one-time default `personal` (Моя лента).
+- Settings, membership GUIDs, shared media records, reference counts and initialization marker use a separate transactional Badger namespace. See `docs/personal-feeds.md`.
+- REST routes under `/api/v1/personal-feeds/{id}` include episodes, upload, copy, move, retry and confirmed deletion.
+- Personal media uses the existing persistent worker queue, yt-dlp, ffmpeg and `fs.Storage`; no cron or retention cleanup.
+- Copy creates a new membership GUID without copying files; move retains the GUID. Delete media only after its last membership is removed and file deletion was explicitly requested.
+- Preserve the initialization marker when deleting the default feed. Keep media format immutable so cross-format copies retain correct enclosure MIME types.
+
 ### Local Audiobooks (`audiobook://<folder_name>`)
 - **Protocol**: `audiobook://<folder>` or `audiobook://relative/path`
 - **Podcast 2.0 Serial Standard**: Generated RSS feed contains `<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>` to ensure podcast apps play chapters in strict chronological order (Chapter 1 -> Chapter 2).

@@ -204,6 +204,13 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			}
 		}
 
+		if feed.Provider == model.ProviderPersonal {
+			downloadURL = episode.MediaURL
+			enclosureType = itunes.MP3
+			if episode.MediaType == "video/mp4" {
+				enclosureType = itunes.MP4
+			}
+		}
 		item.AddEnclosure(downloadURL, enclosureType, episode.Size)
 
 		// p.AddItem requires description to be not empty, use workaround

@@ -19,6 +19,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 │   ├── logbuffer/            # In-memory circular log buffer
 │   ├── mcp/                  # Model Context Protocol server (Stdio, SSE, Proxy)
 │   ├── model/                # Core domain types (Feed, Episode, Provider constants)
+│   ├── personal/             # Personal curated feeds service (storage, reference counting, media links)
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── migrate/              # Media filename migration tool
@@ -62,24 +63,29 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`keys.go`**: Thread-safe multi-key Round-Robin rotator for API keys.
 - **`opml.go`**: Generates OPML subscriptions export file.
 
-### 2.5 `pkg/fs/` (Storage & Mounter)
+### 2.5 `pkg/personal/` (Personal Feeds Service)
+- **`service.go`**: Core service orchestrating user-curated custom podcast feeds. Coordinates transactional feed configurations, membership records, shared media reference counting, and XML generation.
+- **Copying & Moving**: Supports copying episodes (allocating a new stable GUID referencing shared media) and moving episodes (preserving the existing GUID).
+- **Media Ingestion**: Handles single-item URL downloads (YouTube, VK Video, Rutube, direct URLs) and direct local file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
+
+### 2.6 `pkg/fs/` (Storage & Mounter)
 - **`storage.go`**: `Storage` interface for saving and retrieving media and XML files.
 - **`local.go`**: Local filesystem storage implementation.
 - **`s3.go`**: AWS S3 storage backend.
 - **`mounter.go`**: `fs.Mounter` interface enabling zero-copy virtual folder mounting for local audiobook feeds.
 
-### 2.6 `pkg/jobqueue/` (Persistent Job Queue)
+### 2.7 `pkg/jobqueue/` (Persistent Job Queue)
 - **`queue.go`**: Disk-backed persistent job queue with crash recovery and worker concurrency controls for managing asynchronous feed updates.
 
-### 2.7 `pkg/logbuffer/` (In-Memory Log Streamer)
+### 2.8 `pkg/logbuffer/` (In-Memory Log Streamer)
 - **`buffer.go`**: Thread-safe circular ring buffer capturing system log entries for live querying and real-time frontend streaming.
 
-### 2.8 `pkg/mcp/` (Model Context Protocol)
+### 2.9 `pkg/mcp/` (Model Context Protocol)
 - **`server.go`**: Implements the MCP protocol server exposing 21 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
 - **`proxy.go`**: `HTTPClientManager` that forwards MCP commands to a running Podsync instance via HTTP REST.
 - **`sse.go`**: SSE transport implementation for MCP clients.
 
-### 2.9 `services/web/` (HTTP Server & Web UI)
+### 2.10 `services/web/` (HTTP Server & Web UI)
 - **`server.go`**: HTTP server initialization, route registration, rate limiting middleware, Basic Auth & session auth, and static asset embedding.
 - **`api.go`**: REST API handlers (`/api/v1/*`) including feed operations, cover art upload, log querying, and system stats.
 - **`auth.go`**: Session cookie authentication, login rate-limiting checks, and admin credential verification.
@@ -88,6 +94,6 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`admin_types.go`**: Data transfer objects (`FeedSummary`, `FeedConfigUpdate`, `AudiobookDirInfo`, `SystemStats`).
 - **`ui/`**: Modular Single Page Application (`index.html`, `admin.css`, `admin.js`, `theme.js`) embedded via `//go:embed ui/*`.
 
-### 2.10 `services/update/` (Updater Pipeline)
+### 2.11 `services/update/` (Updater Pipeline)
 - **`updater.go`**: Manages the feed synchronization lifecycle: queries builders, checks episode statuses, downloads new media, runs hooks, cleans old files, and generates RSS XML.
 - **`matcher.go`**: Regex and filter matching logic for episodes (title, description, duration, age).

@@ -83,6 +83,7 @@
                 <ul class="nav nav-tabs" id="mainTabs" role="tablist" aria-orientation="vertical">
                     <li class="nav-section" role="presentation">LIBRARY</li>
                     <li class="nav-item"><button class="nav-link active" role="tab" aria-selected="true" data-bs-toggle="tab" data-bs-target="#tab-feeds"><i aria-hidden="true" class="bi bi-collection-play"></i> Podcasts <span class="nav-count" id="feeds-count">0</span></button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-personal"><i aria-hidden="true" class="bi bi-bookmark-heart"></i> Персональные ленты</button></li>
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-audiobooks"><i aria-hidden="true" class="bi bi-book"></i> Audiobooks</button></li>
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-logs"><i aria-hidden="true" class="bi bi-activity"></i> Activity <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button></li>
                     <li class="nav-section" role="presentation">SETTINGS</li>
@@ -130,6 +131,25 @@
                 </div>
 
                 <!-- Audiobooks Tab -->
+                <section class="tab-pane fade" id="tab-personal" aria-label="Персональные ленты">
+                    <header class="library-heading">
+                        <div><div class="eyebrow">LIBRARY</div><h1>Персональные ленты</h1><p class="text-muted mb-0">Собирайте видео и аудио в собственные подкасты.</p></div>
+                        <button class="btn btn-brand btn-sm" type="button" onclick="personalEdit()"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Создать ленту</button>
+                    </header>
+                    <p id="personal-error" class="text-danger" role="alert"></p>
+                    <div id="personal-list" class="personal-grid" aria-live="polite"></div>
+                    <section id="personal-detail" class="d-none" aria-label="Содержимое персональной ленты">
+                        <button class="btn btn-secondary btn-sm mb-3" type="button" onclick="personalBack()">← Все персональные ленты</button>
+                        <div class="personal-detail-heading"><div><h2 id="personal-title"></h2><p id="personal-description" class="text-muted"></p><a id="personal-rss" target="_blank" rel="noopener">RSS</a></div><div class="personal-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="personalEdit(personalCurrentID)">Настройки</button><button class="btn btn-secondary btn-sm" type="button" onclick="personalDeleteFeed()">Удалить ленту</button></div></div>
+                        <div class="personal-inputs mt-4 mb-4">
+                            <form id="personal-url-form" onsubmit="personalAddURL(event)"><label for="personal-url" class="form-label">Добавить по ссылке</label><input id="personal-url" type="url" required class="form-control mb-2" placeholder="YouTube, VK Video, Rutube или медиафайл"><input id="personal-url-title" class="form-control mb-2" placeholder="Название (необязательно)" aria-label="Название эпизода"><button class="btn btn-brand btn-sm" type="submit">Добавить URL</button></form>
+                            <form id="personal-upload-form" onsubmit="personalUpload(event)"><label for="personal-file" class="form-label">Загрузить файл</label><input id="personal-file" type="file" required accept="audio/*,video/*,.m4b,.mkv,.flac,.opus" class="form-control mb-2"><p class="text-muted small">До 4 ГиБ. Файл будет преобразован в формат ленты.</p><button class="btn btn-brand btn-sm" type="submit">Загрузить</button></form>
+                        </div>
+                        <p id="personal-progress" role="status" class="text-muted"></p>
+                        <h3 class="h5">Эпизоды</h3><div id="personal-episodes" aria-live="polite"></div>
+                    </section>
+                </section>
+
                 <div class="tab-pane fade" id="tab-audiobooks">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                         <div>
@@ -1793,11 +1813,33 @@
     </div>
 
     <!-- Bootstrap Bundle with Popper -->
+    <div class="modal fade" id="personalEditModal" tabindex="-1" aria-labelledby="personal-edit-heading" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" onsubmit="personalSave(event)">
+        <div class="modal-header"><h2 class="modal-title h5" id="personal-edit-heading">Создать ленту</h2><button type="button" class="btn-close" aria-label="Закрыть" onclick="closeModal('personalEditModal')"></button></div>
+        <div class="modal-body">
+            <p id="personal-edit-error" class="text-danger" role="alert"></p>
+            <label for="personal-edit-title" class="form-label">Название *</label><input class="form-control mb-3" id="personal-edit-title" required>
+            <label for="personal-edit-description" class="form-label">Описание</label><textarea class="form-control mb-3" id="personal-edit-description" rows="3"></textarea>
+            <label for="personal-edit-cover" class="form-label">URL обложки</label><input class="form-control mb-2" id="personal-edit-cover" type="url">
+            <label for="personal-edit-cover-file" class="form-label">Или загрузите обложку</label><input class="form-control mb-3" id="personal-edit-cover-file" type="file" accept="image/jpeg,image/png,image/webp">
+            <label for="personal-edit-format" class="form-label">Формат *</label><select class="form-select mb-2" id="personal-edit-format"><option value="audio">Audio</option><option value="video">Video</option></select><p class="text-muted small">Формат применяется к новым эпизодам. При копировании сохраняется исходный файл.</p>
+            <label for="personal-edit-sort" class="form-label">Порядок эпизодов</label><select class="form-select mb-3" id="personal-edit-sort"><option value="desc">Сначала новые</option><option value="asc">Сначала старые</option></select>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="personal-edit-private"><label class="form-check-label" for="personal-edit-private">Не индексировать в каталогах подкастов</label></div>
+        </div><div class="modal-footer personal-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalEditModal')">Отмена</button><button type="submit" class="btn btn-brand btn-sm">Сохранить</button></div>
+    </form></div></div>
+    <div class="modal fade" id="personalTransferModal" tabindex="-1" aria-labelledby="personal-transfer-heading" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" onsubmit="personalTransferSave(event)">
+        <div class="modal-header"><h2 class="modal-title h5" id="personal-transfer-heading">Переместить эпизод</h2></div><div class="modal-body"><p id="personal-transfer-error" class="text-danger" role="alert"></p><label class="form-label" for="personal-target">В какую ленту?</label><select class="form-select" id="personal-target" required></select><p class="text-muted small mt-3">Будет использован тот же медиафайл, без повторной загрузки.</p></div><div class="modal-footer personal-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalTransferModal')">Отмена</button><button type="submit" class="btn btn-brand btn-sm">Подтвердить</button></div>
+    </form></div></div>
+    <div class="modal fade" id="personalDeleteModal" tabindex="-1" aria-labelledby="personal-delete-heading" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" onsubmit="personalDeleteSave(event)">
+        <div class="modal-header"><h2 class="modal-title h5" id="personal-delete-heading">Подтверждение удаления</h2></div><div class="modal-body"><p id="personal-delete-error" class="text-danger" role="alert"></p><p id="personal-delete-text"></p><div class="form-check"><input class="form-check-input" type="checkbox" id="personal-delete-files" checked><label class="form-check-label" for="personal-delete-files">Удалить также медиафайлы, которые больше нигде не используются</label></div><p class="text-muted small mt-2">Файлы, используемые другими лентами, сохранятся в любом случае.</p></div><div class="modal-footer personal-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalDeleteModal')">Отмена</button><button type="submit" class="btn btn-brand btn-sm">Удалить</button></div>
+    </form></div></div>
+
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=10"></script>
+    <script src="./admin.js?v=11"></script>
+
 </body>
 </html>

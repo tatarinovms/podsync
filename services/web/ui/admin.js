@@ -3395,6 +3395,8 @@
                 tabDirty[target] = false;
                 filterFeeds();
                 window.scrollTo?.(0, libraryScroll);
+            } else if (target === 'tab-personal') {
+                loadPersonalFeeds();
             } else if (target === 'tab-audiobooks') {
                 loadAudiobooksTab();
                 window.scrollTo?.(0, libraryScroll);
@@ -3579,7 +3581,7 @@
                     else if (currentTab === 'feed-detail' && episodeView?.feedId === feedId) showFeedSection('episodes');
                     else showEpisodes(feedId);
                 } else {
-                    const allowed = ['feeds', 'audiobooks', 'tokens', 'system', 'downloader', 'mcp', 'logs'];
+                    const allowed = ['feeds', 'personal', 'audiobooks', 'tokens', 'system', 'downloader', 'mcp', 'logs'];
                     const tab = allowed.includes(hash.slice(1)) ? hash.slice(1) : 'feeds';
                     const button = document.querySelector(`#mainTabs [data-bs-target="#tab-${tab}"]`);
                     if (button) bootstrap.Tab.getOrCreateInstance(button).show();
@@ -3621,3 +3623,165 @@
             document.querySelectorAll('.add-advanced-field').forEach(el => el.classList[expanded ? 'remove' : 'add']('d-none'));
             if (!expanded) bootstrap.Tab.getOrCreateInstance(document.querySelector('[data-bs-target="#af-tab-general"]')).show();
         }
+
+        // Personal feeds are a separate library, with feed-scoped membership actions.
+        let personalFeeds = [];
+        let personalCurrentID = '';
+        let personalEditingID = '';
+        let personalTransferAction = null;
+        let personalDeleteAction = null;
+        let personalRequestID = 0;
+        let personalEpisodeSnapshot = '';
+
+        async function personalAPI(path = '', options = {}) {
+            const response = await fetch('/api/v1/personal-feeds' + path, options);
+            if (response.status === 204) return null;
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Не удалось выполнить запрос');
+            return data;
+        }
+        function personalJSON(method, body) { return {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}; }
+        function personalError(error, id = 'personal-error') { document.getElementById(id).textContent = error ? error.message : ''; }
+        function personalButton(action, id, label) { return `<button type="button" class="btn btn-secondary btn-sm" data-personal-action="${action}" data-personal-id="${escapeHtml(id)}">${label}</button>`; }
+        function personalRenderCards() {
+            const list = document.getElementById('personal-list');
+            list.innerHTML = personalFeeds.length ? personalFeeds.map(f => `<article class="personal-card">${f.cover_art && safeUrl(f.cover_art) ? `<img class="personal-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">` : '<div class="personal-cover personal-placeholder"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>'}<h2 class="h5">${escapeHtml(f.title)}</h2><p class="text-muted small">${escapeHtml(f.id)}.xml · ${f.format === 'video' ? 'Video' : 'Audio'} · ${f.episode_count} эп.</p><p class="personal-card-description">${escapeHtml(f.description || '')}</p><div class="personal-actions">${personalButton('open',f.id,'Открыть')}<a class="btn btn-brand btn-sm" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener">RSS</a></div></article>`).join('') : '<p class="text-muted">Лент пока нет. Нажмите «Создать ленту», чтобы добавить первую.</p>';
+        }
+        async function loadPersonalFeeds() {
+            try {
+                personalFeeds = await personalAPI();
+                personalRenderCards();
+                if (personalCurrentID && !personalFeeds.some(f => f.id === personalCurrentID)) personalBack();
+                if (personalCurrentID) await personalOpen(personalCurrentID, false);
+                personalError(null);
+            } catch (error) { personalError(error); }
+        }
+        function personalBack() {
+            personalCurrentID = ''; personalRequestID++;
+            document.getElementById('personal-detail').classList.add('d-none');
+            document.getElementById('personal-list').classList.remove('d-none');
+        }
+        async function personalOpen(id, reset = true) {
+            personalCurrentID = id;
+            const request = ++personalRequestID;
+            try {
+                const data = await personalAPI('/' + encodeURIComponent(id));
+                if (request !== personalRequestID || personalCurrentID !== id) return;
+                document.getElementById('personal-list').classList.add('d-none');
+                document.getElementById('personal-detail').classList.remove('d-none');
+                document.getElementById('personal-title').textContent = data.feed.title;
+                document.getElementById('personal-description').textContent = data.feed.description;
+                const rss = document.getElementById('personal-rss'); rss.href = safeUrl(data.feed.feed_url); rss.textContent = data.feed.feed_url;
+                const snapshot = JSON.stringify(data.episodes);
+                if (reset || snapshot !== personalEpisodeSnapshot) {
+                    personalEpisodeSnapshot = snapshot;
+                    const labels = {new:'Ожидает загрузки',downloaded:'Готов',error:'Ошибка',cleaned:'Удалён'};
+                    document.getElementById('personal-episodes').innerHTML = data.episodes.length ? data.episodes.map(ep => {
+                        const url = safeUrl(ep.media_url || '');
+                        const player = ep.status === 'downloaded' && url ? (ep.media_type === 'video/mp4' ? `<video controls preload="none" src="${url}"></video>` : `<audio controls preload="none" src="${url}"></audio>`) : '';
+                        return `<article class="personal-episode"><h4 class="h6">${escapeHtml(ep.title)}</h4><p class="text-muted small">${labels[ep.status] || escapeHtml(ep.status)} · ${escapeHtml(new Date(ep.pub_date).toLocaleString())}</p>${ep.error ? `<p class="text-danger small">${escapeHtml(ep.error)}</p>` : ''}${player}<div class="personal-actions mt-2">${personalButton('move',ep.id,'Переместить')}${personalButton('copy',ep.id,'Копировать')}${ep.status === 'error' ? personalButton('retry',ep.id,'Повторить') : ''}${personalButton('delete',ep.id,'Удалить')}</div></article>`;
+                    }).join('') : '<p class="text-muted">Добавьте ссылку или загрузите файл — здесь появятся эпизоды этой ленты.</p>';
+                }
+                personalError(null);
+            } catch (error) { if (request === personalRequestID) personalError(error); }
+        }
+        function personalEdit(id = '') {
+            personalEditingID = id;
+            const f = personalFeeds.find(f => f.id === id) || {};
+            document.getElementById('personal-edit-heading').textContent = id ? 'Настройки ленты' : 'Создать ленту';
+            document.getElementById('personal-edit-title').value = f.title || '';
+            document.getElementById('personal-edit-description').value = f.description || '';
+            document.getElementById('personal-edit-cover').value = f.cover_art || '';
+            document.getElementById('personal-edit-cover-file').value = '';
+            document.getElementById('personal-edit-format').value = f.format || 'audio';
+            document.getElementById('personal-edit-sort').value = f.playlist_sort || 'desc';
+            document.getElementById('personal-edit-private').checked = !!f.private_feed;
+            personalError(null, 'personal-edit-error');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('personalEditModal')).show();
+        }
+        async function personalSave(event) {
+            event.preventDefault(); const button = event.submitter; if (button) button.disabled = true;
+            try {
+                let cover = document.getElementById('personal-edit-cover').value;
+                const file = document.getElementById('personal-edit-cover-file').files[0];
+                if (file) {
+                    const form = new FormData(); form.append('file',file);
+                    const response = await fetch('/api/v1/covers/upload',{method:'POST',body:form});
+                    const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки обложки'); cover = data.url;
+                }
+                const payload = {title:document.getElementById('personal-edit-title').value,description:document.getElementById('personal-edit-description').value,cover_art:cover,format:document.getElementById('personal-edit-format').value,playlist_sort:document.getElementById('personal-edit-sort').value,private_feed:document.getElementById('personal-edit-private').checked};
+                const f = await personalAPI(personalEditingID ? '/' + encodeURIComponent(personalEditingID) : '',personalJSON(personalEditingID ? 'PATCH' : 'POST',payload));
+                closeModal('personalEditModal'); await loadPersonalFeeds(); await personalOpen(f.id);
+            } catch (error) { personalError(error, 'personal-edit-error'); }
+            finally { if (button) button.disabled = false; }
+        }
+        async function personalAddURL(event) {
+            event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
+            try {
+                await personalAPI('/'+encodeURIComponent(id)+'/episodes',personalJSON('POST',{url:document.getElementById('personal-url').value,title:document.getElementById('personal-url-title').value}));
+                event.target.reset(); if (personalCurrentID === id) await personalOpen(id);
+                await loadPersonalFeeds();
+            } catch (error) { personalError(error); } finally { if (button) button.disabled = false; }
+        }
+        async function personalUpload(event) {
+            event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
+            document.getElementById('personal-progress').textContent = 'Загрузка файла…';
+            try {
+                const data = new FormData(); data.append('file', document.getElementById('personal-file').files[0]);
+                await personalAPI('/'+encodeURIComponent(id)+'/upload',{method:'POST',body:data});
+                event.target.reset(); document.getElementById('personal-progress').textContent = 'Файл принят. Подготовка эпизода…';
+                if (personalCurrentID === id) await personalOpen(id); await loadPersonalFeeds();
+            } catch (error) { personalError(error); document.getElementById('personal-progress').textContent = ''; }
+            finally { if (button) button.disabled = false; }
+        }
+        function personalDeleteFeed() { personalConfirmDelete(''); }
+        function personalConfirmDelete(episodeID) {
+            personalDeleteAction = {feedID:personalCurrentID,episodeID};
+            document.getElementById('personal-delete-text').textContent = episodeID ? 'Удалить эпизод из этой ленты?' : 'Удалить ленту и все её эпизоды? Подписка на её RSS перестанет работать.';
+            document.getElementById('personal-delete-files').checked = true;
+            personalError(null, 'personal-delete-error');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('personalDeleteModal')).show();
+        }
+        async function personalDeleteSave(event) {
+            event.preventDefault(); const action = personalDeleteAction; if (!action) return;
+            const button = event.submitter; if (button) button.disabled = true;
+            try {
+                await personalAPI('/'+encodeURIComponent(action.feedID)+(action.episodeID ? '/episodes/'+encodeURIComponent(action.episodeID) : '')+'?confirm=true&delete_files='+document.getElementById('personal-delete-files').checked,{method:'DELETE'});
+                closeModal('personalDeleteModal'); if (!action.episodeID) personalBack(); await loadPersonalFeeds();
+            } catch (error) { personalError(error, 'personal-delete-error'); } finally { if (button) button.disabled = false; }
+        }
+        function personalTransfer(episodeID, mode) {
+            const targets = personalFeeds.filter(f => f.id !== personalCurrentID);
+            if (!targets.length) { personalError(new Error('Сначала создайте ещё одну персональную ленту.')); return; }
+            personalTransferAction = {feedID:personalCurrentID,episodeID,mode};
+            document.getElementById('personal-transfer-heading').textContent = mode === 'move' ? 'Переместить эпизод' : 'Копировать эпизод';
+            document.getElementById('personal-target').innerHTML = targets.map(f=>`<option value="${escapeHtml(f.id)}">${escapeHtml(f.title)}</option>`).join('');
+            personalError(null,'personal-transfer-error'); bootstrap.Modal.getOrCreateInstance(document.getElementById('personalTransferModal')).show();
+        }
+        async function personalTransferSave(event) {
+            event.preventDefault(); const action = personalTransferAction; if (!action) return;
+            const button = event.submitter; if (button) button.disabled = true;
+            try {
+                await personalAPI('/'+encodeURIComponent(action.feedID)+'/episodes/'+encodeURIComponent(action.episodeID)+'/'+action.mode,personalJSON('POST',{target_feed_id:document.getElementById('personal-target').value}));
+                closeModal('personalTransferModal'); await loadPersonalFeeds();
+            } catch (error) { personalError(error,'personal-transfer-error'); } finally { if (button) button.disabled = false; }
+        }
+        document.getElementById('tab-personal')?.addEventListener('click', async event => {
+            const button = event.target.closest('[data-personal-action]'); if (!button) return;
+            const {personalAction:action, personalId:id} = button.dataset;
+            if (action === 'open') return personalOpen(id);
+            if (action === 'copy' || action === 'move') return personalTransfer(id,action);
+            if (action === 'delete') return personalConfirmDelete(id);
+            if (action === 'retry') {
+                button.disabled = true;
+                try { await personalAPI('/'+encodeURIComponent(personalCurrentID)+'/episodes/'+encodeURIComponent(id)+'/retry',{method:'POST'}); await personalOpen(personalCurrentID); }
+                catch (error) { personalError(error); } finally { button.disabled = false; }
+            }
+        });
+        setInterval(() => {
+            if (currentTab === 'tab-personal' && !document.hidden) {
+                // Preserve a playing media element while polling download status.
+                const playing = Array.from(document.querySelectorAll('#personal-episodes audio, #personal-episodes video')).some(el => !el.paused);
+                if (!playing) loadPersonalFeeds();
+            }
+        }, 5000);

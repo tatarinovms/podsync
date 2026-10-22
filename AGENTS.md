@@ -138,6 +138,11 @@ This file provides comprehensive architecture guidance, development workflows, a
   - Never use `bootstrap.Modal.getInstance(el).hide()` directly as it can return `null`.
   - Always use `closeModal(modalId)` which leverages `bootstrap.Modal.getOrCreateInstance(el)` and ensures DOM backdrop/class cleanup.
 - **Instant Feed Rebuild**: Saving feed settings (`UpdateFeed`) immediately triggers `m.updates <- f` so changes (`private_feed`, `title`, `author`, `custom cover`) appear in `{feed_id}.xml` right away.
+- **Strict English-Only Interface**:
+  - The Web Admin Console is strictly English-only.
+  - All navigation labels, headings, subtitles, button labels, forms, placeholders, badges, status indicators, empty states, modals, and notifications must be written in English.
+  - Never hardcode Russian or other non-English text in HTML templates, JavaScript code, or backend default values (e.g. default personal feed title is `My Feed`, not `Моя лента`).
+  - User-provided Cyrillic titles used as slugs/IDs must be safely transliterated to ASCII/Latin slugs automatically (`transliterateCyrillic`) with visual validation.
 
 ### REST API Endpoints (`/api/v1`)
 | Method | Endpoint | Description |
@@ -223,3 +228,8 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
 10. **Button Metrics & Interaction Consistency**:
     - Preserve unified action pair button metrics: standard `btn-sm`, `min-width: 105px`, 35px desktop height, and >= 44px mobile touch target.
     - Cancel / Close buttons must always precede Save / Update / Confirm buttons, with secondary styling on the left and Mauve `.btn-brand` primary styling on the right.
+11. **Strict English-Only Web UI (Internationalization Standard)**:
+    - The Web Admin Console interface must be 100% in English.
+    - All tab titles, navigation items, page headings, subtitles, button labels, form placeholders, badges, status indicators, empty states, modal text, and notifications must strictly be written in English.
+    - Never introduce Russian, Cyrillic, or any non-English text into HTML templates, JavaScript code, or backend default strings (e.g. default personal feed name is `My Feed`, never `Моя лента`).
+    - User input containing Cyrillic or non-ASCII characters (e.g., feed titles used as URL slugs/IDs) must be safely handled (e.g. automatic transliteration to ASCII/Latin slugs via `transliterateCyrillic` and red outline/validation for invalid characters).

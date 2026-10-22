@@ -434,6 +434,8 @@ Directly uploads a media file (up to 4 GiB) via multipart form data.
   - `file` *(file, required)*: Audio or video file (`.mp3`, `.ogg`, `.opus`, `.m4a`, `.wav`, `.flac`, `.mp4`, `.mkv`, `.webm`, `.mov`).
   - `title` *(string, optional)*: Custom episode title.
   - `format` *(string, optional)*: Preferred media format (`"audio"` or `"video"`).
+  - `quality` *(string, optional)*: Audio quality (`"high"` ~192kbps or `"low"` ~96kbps) or video preset (`"high"` / `"low"`).
+  - `max_height` *(integer, optional)*: Maximum video height (`480`, `720`, `1080`, `1440`, `2160`). Defaults to `0` (original resolution).
 - **Processing**:
   - Audio files are converted to compatible MP3 with duration and metadata extraction via `ffmpeg`.
   - Video files are remuxed to MP4 (H.264 / AAC) with duration and thumbnail extraction.

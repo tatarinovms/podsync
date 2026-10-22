@@ -73,7 +73,7 @@
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query-параметры | Удаление ленты и RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | Нет | Список эпизодов ленты. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Добавление эпизода по ссылке или пути к файлу с выбором качества. |
-| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`) | Загрузка медиафайла (до 4 ГиБ). |
+| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`, `quality`, `max_height`) | Загрузка медиафайла (до 4 ГиБ) с выбором качества. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Копирование эпизода в другую ленту. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Перемещение эпизода в другую ленту. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Нет | Повтор неудачной загрузки серии. |

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mxpv/podsync/pkg/model"
@@ -127,7 +128,7 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if req.FilePath != "" {
-				result, err = s.personal.AddPath(r.Context(), parts[0], req.FilePath, req.Title, req.Format)
+				result, err = s.personal.AddPath(r.Context(), parts[0], req.FilePath, req.Title, req.Format, req.Quality, req.MaxHeight)
 			} else {
 				result, err = s.personal.AddURL(r.Context(), parts[0], req.URL, req.Title, req.Format, req.Quality, req.MaxHeight)
 			}
@@ -162,7 +163,9 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			name = strings.TrimSpace(title) + strings.ToLower(filepath.Ext(header.Filename))
 		}
 		format := r.FormValue("format")
-		result, err = s.personal.Upload(r.Context(), parts[0], name, file, format)
+		quality := r.FormValue("quality")
+		maxHeight, _ := strconv.Atoi(r.FormValue("max_height"))
+		result, err = s.personal.Upload(r.Context(), parts[0], name, file, format, quality, maxHeight)
 		status = http.StatusAccepted
 	} else if len(parts) == 3 && parts[1] == "episodes" {
 		if r.Method == http.MethodDelete {

@@ -828,7 +828,7 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		var ep *model.Episode
 		var err error
 		if filePath != "" {
-			ep, err = s.personal.AddPath(ctx, strings.TrimSpace(feedID), filePath, title, format)
+			ep, err = s.personal.AddPath(ctx, strings.TrimSpace(feedID), filePath, title, format, quality, maxHeight)
 		} else {
 			ep, err = s.personal.AddURL(ctx, strings.TrimSpace(feedID), urlStr, title, format, quality, maxHeight)
 		}

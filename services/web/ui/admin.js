@@ -3915,6 +3915,25 @@
                 await loadPersonalFeeds();
             } catch (error) { personalError(error); } finally { if (button) button.disabled = false; }
         }
+        function togglePersonalUploadQuality() {
+            const fmt = document.getElementById('personal-upload-format')?.value;
+            const vCol = document.getElementById('personal-upload-video-quality-col');
+            const aCol = document.getElementById('personal-upload-audio-quality-col');
+            if (vCol) vCol.style.display = (fmt === 'video') ? 'block' : 'none';
+            if (aCol) aCol.style.display = (fmt === 'audio' || fmt === 'auto') ? 'block' : 'none';
+        }
+        function autoDetectUploadFormat(input) {
+            if (!input || !input.files || !input.files[0]) return;
+            const name = input.files[0].name.toLowerCase();
+            const fmtSelect = document.getElementById('personal-upload-format');
+            if (!fmtSelect) return;
+            if (name.endsWith('.mp4') || name.endsWith('.mkv') || name.endsWith('.mov') || name.endsWith('.webm') || name.endsWith('.m4v')) {
+                fmtSelect.value = 'video';
+            } else {
+                fmtSelect.value = 'audio';
+            }
+            togglePersonalUploadQuality();
+        }
         async function personalUpload(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
             const prog = document.getElementById('personal-progress');
@@ -3926,16 +3945,23 @@
                 const data = new FormData();
                 const fileInput = document.getElementById('personal-file');
                 if (fileInput && fileInput.files[0]) data.append('file', fileInput.files[0]);
-                const titleVal = document.getElementById('personal-file-title')?.value;
+                const titleVal = document.getElementById('personal-upload-title')?.value || document.getElementById('personal-file-title')?.value;
                 if (titleVal) data.append('title', titleVal);
-                const formatVal = document.getElementById('personal-file-format')?.value;
+                const formatVal = document.getElementById('personal-upload-format')?.value || document.getElementById('personal-file-format')?.value;
                 if (formatVal) data.append('format', formatVal);
+                const qualityVal = document.getElementById('personal-upload-quality')?.value;
+                if (qualityVal) data.append('quality', qualityVal);
+                const maxHeightVal = document.getElementById('personal-upload-max-height')?.value;
+                if (maxHeightVal !== undefined && maxHeightVal !== '') {
+                    data.append('max_height', maxHeightVal);
+                }
                 await personalAPI('/'+encodeURIComponent(id)+'/upload',{method:'POST',body:data});
                 event.target.reset();
+                togglePersonalUploadQuality();
                 if (prog) {
                     prog.textContent = 'File uploaded. Processing episode…';
                     prog.className = 'alert alert-success py-2 px-3 small mb-3';
-                    setTimeout(() => { prog.className = 'alert alert-info py-2 px-3 small d-none mb-3'; }, 4000);
+                    setTimeout(() => { if (prog) prog.className = 'alert alert-info py-2 px-3 small d-none mb-3'; }, 4000);
                 }
                 if (personalCurrentID === id) await personalOpen(id);
                 await loadPersonalFeeds();

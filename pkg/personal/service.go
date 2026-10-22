@@ -391,7 +391,7 @@ func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*mode
 }
 
 // Upload uses only generated storage paths; filenames are never used as paths.
-func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader, format string) (*model.Episode, error) {
+func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader, format string, quality string, maxHeight int) (*model.Episode, error) {
 	if filename != filepath.Base(filename) || strings.ContainsAny(filename, "/\\") || filename == "." || filename == ".." {
 		return nil, invalid("invalid filename")
 	}
@@ -420,11 +420,20 @@ func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	mediaFormat := detectFormat("", filename, format)
+	q := model.QualityHigh
+	if strings.ToLower(strings.TrimSpace(quality)) == string(model.QualityLow) {
+		q = model.QualityLow
+	}
+	if maxHeight < 0 {
+		maxHeight = 0
+	}
 	ep, err := s.addLocked(ctx, id, &Media{
 		ID:         mediaID,
 		SourcePath: source,
 		Title:      strings.TrimSuffix(filename, ext),
 		Format:     mediaFormat,
+		Quality:    q,
+		MaxHeight:  maxHeight,
 	})
 	if err != nil {
 		// Queue failure must not delete a source already referenced by a persisted job.
@@ -438,7 +447,7 @@ func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader, 
 }
 
 // AddPath allows importing a media file from a local server file path.
-func (s *Service) AddPath(ctx context.Context, id, filePath, title, format string) (*model.Episode, error) {
+func (s *Service) AddPath(ctx context.Context, id, filePath, title, format string, quality string, maxHeight int) (*model.Episode, error) {
 	filePath = filepath.Clean(strings.TrimSpace(filePath))
 	if filePath == "" || filePath == "." || filePath == "/" {
 		return nil, invalid("file_path is required")
@@ -465,7 +474,7 @@ func (s *Service) AddPath(ctx context.Context, id, filePath, title, format strin
 	if strings.TrimSpace(title) != "" {
 		name = strings.TrimSpace(title) + ext
 	}
-	return s.Upload(ctx, id, name, f, format)
+	return s.Upload(ctx, id, name, f, format, quality, maxHeight)
 }
 
 func (s *Service) Transfer(ctx context.Context, source, episodeID, target string, move bool) (*Membership, error) {

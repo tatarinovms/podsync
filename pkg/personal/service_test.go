@@ -124,7 +124,7 @@ func TestCopyMoveAndReferenceSafeDeletion(t *testing.T) {
 func TestRetainFilesAndPatchRebuild(t *testing.T) {
 	ctx := context.Background()
 	s, _, files := testService(t, nil)
-	ep, err := s.Upload(ctx, "personal", "chapter.mp3", strings.NewReader("source"), "")
+	ep, err := s.Upload(ctx, "personal", "chapter.mp3", strings.NewReader("source"), "", "", 0)
 	require.NoError(t, err)
 	require.NoError(t, s.Update(ctx, "personal"))
 	before, err := s.Get("personal")
@@ -221,7 +221,7 @@ func TestRetryAndValidation(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalid)
 	}
 	for _, name := range []string{"../../evil.mp3", "..\\evil.mp3", "file.html"} {
-		_, err := s.Upload(ctx, "personal", name, strings.NewReader("x"), "")
+		_, err := s.Upload(ctx, "personal", name, strings.NewReader("x"), "", "", 0)
 		require.ErrorIs(t, err, ErrInvalid)
 	}
 	_, err := s.Create(ctx, Patch{Title: str("   ")}, nil)
@@ -321,5 +321,22 @@ func TestAddURLQualityAndMaxHeight(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, model.QualityLow, media.Quality)
 	require.Equal(t, 720, media.MaxHeight)
+	require.Equal(t, model.FormatVideo, media.Format)
+}
+
+func TestUploadQualityAndMaxHeight(t *testing.T) {
+	ctx := context.Background()
+	s, database, _ := testService(t, nil)
+
+	ep, err := s.Upload(ctx, "personal", "video.mp4", strings.NewReader("testvideo"), "video", "low", 480)
+	require.NoError(t, err)
+
+	var media Media
+	err = database.PersonalView(func(tx db.PersonalTx) error {
+		return tx.Get("media/"+ep.MediaID, &media)
+	})
+	require.NoError(t, err)
+	require.Equal(t, model.QualityLow, media.Quality)
+	require.Equal(t, 480, media.MaxHeight)
 	require.Equal(t, model.FormatVideo, media.Format)
 }

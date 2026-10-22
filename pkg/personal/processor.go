@@ -270,7 +270,6 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 }
 
 func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input string) (io.ReadCloser, error) {
-	output := filepath.Join(dir, "output.media")
 	targetFormat := m.Format
 	if targetFormat == "" {
 		if probeHasVideo(ctx, input) {
@@ -281,13 +280,42 @@ func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input s
 		m.Format = targetFormat
 	}
 
+	outExt := ".mp3"
+	if targetFormat == model.FormatVideo {
+		outExt = ".mp4"
+		m.Path = "_personal/" + m.ID + "/media.mp4"
+	} else {
+		m.Path = "_personal/" + m.ID + "/media.mp3"
+	}
+	output := filepath.Join(dir, "output"+outExt)
+
+	quality := m.Quality
+	if quality == "" {
+		quality = model.QualityHigh
+	}
+
 	var cmd *exec.Cmd
 	if targetFormat == model.FormatVideo {
 		// Output MP4 (H.264 / AAC)
-		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-c:v", "libx264", "-c:a", "aac", "-movflags", "+faststart", output)
+		args := []string{"-y", "-i", input, "-c:v", "libx264"}
+		if m.MaxHeight > 0 {
+			scaleFilter := fmt.Sprintf("scale=-2:'min(ih,%d)'", m.MaxHeight)
+			args = append(args, "-vf", scaleFilter)
+		}
+		if quality == model.QualityLow {
+			args = append(args, "-crf", "28", "-preset", "fast", "-c:a", "aac", "-b:a", "64k")
+		} else {
+			args = append(args, "-crf", "23", "-preset", "medium", "-c:a", "aac", "-b:a", "128k")
+		}
+		args = append(args, "-movflags", "+faststart", "-f", "mp4", output)
+		cmd = exec.CommandContext(ctx, "ffmpeg", args...)
 	} else {
 		// Output MP3
-		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", output)
+		bitrate := "192k"
+		if quality == model.QualityLow {
+			bitrate = "96k"
+		}
+		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-vn", "-c:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", output)
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("media conversion failed (%w): %s", err, string(out))

@@ -72,7 +72,7 @@ All endpoints require administrator authentication (Basic Auth or session cookie
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query params | Deletes feed and unmounts RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | None | Returns list of episode objects. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Adds episode from URL or local file path with quality selection. |
-| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`) | Uploads media file (up to 4 GiB). |
+| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`, `quality`, `max_height`) | Uploads media file (up to 4 GiB) with quality selection. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Copies episode to another feed (shared file). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Moves episode to another feed (retains GUID). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | None | Resets failed episode to retry download. |

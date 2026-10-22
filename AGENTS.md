@@ -199,7 +199,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `DELETE` | `/api/v1/personal-feeds/{id}` | Delete personal feed (optional `?delete_files=true`) |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | List all episodes in a personal feed |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode via `url`, `file_path`, `title`, `format`, `quality`, `max_height` |
-| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart file upload with `file`, `title`, `format` |
+| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart file upload with `file`, `title`, `format`, `quality`, `max_height` |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | Copy episode to another personal feed (`target_feed_id`) |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | Move episode to another personal feed (`target_feed_id`) |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Retry failed personal feed episode download |

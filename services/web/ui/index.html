@@ -206,18 +206,38 @@
                                     <form id="personal-upload-form" onsubmit="personalUpload(event)">
                                         <div class="mb-3">
                                             <label for="personal-file" class="form-label small text-muted">Choose audio or video file *</label>
-                                            <input id="personal-file" type="file" required accept="audio/*,video/*,.mp3,.ogg,.opus,.m4a,.m4b,.flac,.wav,.aac,.mp4,.mkv,.mov,.webm" class="form-control">
+                                            <input id="personal-file" type="file" required accept="audio/*,video/*,.mp3,.ogg,.opus,.m4a,.m4b,.flac,.wav,.aac,.mp4,.mkv,.mov,.webm" class="form-control" onchange="autoDetectUploadFormat(this)">
                                             <div class="text-muted small mt-1">Supports MP3, OGG, OPUS, M4A, FLAC, WAV, MP4, MKV, WebM up to 4 GiB.</div>
                                         </div>
+                                        <div class="mb-3">
+                                            <label for="personal-upload-title" class="form-label small text-muted">Episode Title (optional)</label>
+                                            <input id="personal-upload-title" class="form-control" placeholder="Title (optional, filename used if empty)" aria-label="Episode title">
+                                        </div>
                                         <div class="row g-2 mb-3">
-                                            <div class="col-7">
-                                                <input id="personal-upload-title" class="form-control" placeholder="Title (optional)" aria-label="Episode title">
-                                            </div>
-                                            <div class="col-5">
-                                                <select id="personal-upload-format" class="form-select" aria-label="Format">
-                                                    <option value="auto">Auto-detect</option>
-                                                    <option value="audio">Audio (MP3)</option>
+                                            <div class="col-sm-6">
+                                                <label for="personal-upload-format" class="form-label small text-muted">Format</label>
+                                                <select id="personal-upload-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUploadQuality()">
+                                                    <option value="audio" selected>Audio (MP3)</option>
                                                     <option value="video">Video (MP4)</option>
+                                                    <option value="auto">Auto-detect</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6" id="personal-upload-audio-quality-col">
+                                                <label for="personal-upload-quality" class="form-label small text-muted">Audio Quality</label>
+                                                <select id="personal-upload-quality" class="form-select form-select-sm">
+                                                    <option value="high" selected>High</option>
+                                                    <option value="low">Low</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6" id="personal-upload-video-quality-col" style="display: none;">
+                                                <label for="personal-upload-max-height" class="form-label small text-muted">Video Quality</label>
+                                                <select id="personal-upload-max-height" class="form-select form-select-sm">
+                                                    <option value="480">480p</option>
+                                                    <option value="720" selected>720p (HD)</option>
+                                                    <option value="1080">1080p (Full HD)</option>
+                                                    <option value="1440">1440p (2K)</option>
+                                                    <option value="2160">2160p (4K)</option>
+                                                    <option value="0">Default (Original)</option>
                                                 </select>
                                             </div>
                                         </div>

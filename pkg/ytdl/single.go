@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // SingleMetadata resolves an individual URL without importing a playlist.
@@ -11,7 +12,14 @@ func (dl *YoutubeDl) SingleMetadata(ctx context.Context, source string) (title, 
 	args := dl.appendCommonArgs([]string{"--dump-single-json", "--no-playlist", "--skip-download", "--no-warnings"})
 	output, err := dl.exec(ctx, append(args, "--", source)...)
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("metadata: %s", CleanErrorMessage(output))
+		cleanMsg := CleanErrorMessage(output)
+		if strings.Contains(output, "Sign in to confirm you") || strings.Contains(output, "confirm you’re not a bot") {
+			return "", "", "", 0, ErrBotDetection
+		}
+		if strings.Contains(output, "HTTP Error 429") {
+			return "", "", "", 0, ErrTooManyRequests
+		}
+		return "", "", "", 0, fmt.Errorf("metadata: %s", cleanMsg)
 	}
 	var info struct {
 		Type        string  `json:"_type"`

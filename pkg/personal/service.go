@@ -741,6 +741,7 @@ func (s *Service) process(ctx context.Context, id string) error {
 		latest.Description = media.Description
 		latest.Thumbnail = media.Thumbnail
 		latest.Duration = media.Duration
+		latest.Path = media.Path
 		if processErr != nil {
 			latest.Status = model.EpisodeError
 			latest.Error = processErr.Error()

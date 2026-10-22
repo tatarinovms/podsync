@@ -38,6 +38,43 @@ func (f *convertedFile) Close() error {
 	return returnError
 }
 
+func isPlatformURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	domains := []string{
+		"youtube.com", "youtu.be",
+		"vk.com", "vkvideo.ru", "vk.ru",
+		"rutube.ru",
+		"vimeo.com",
+		"soundcloud.com",
+		"twitch.tv",
+		"tiktok.com",
+		"dzen.ru",
+		"bilibili.com",
+		"twitter.com", "x.com",
+		"instagram.com",
+		"facebook.com",
+	}
+	for _, d := range domains {
+		if host == d || strings.HasSuffix(host, "."+d) {
+			return true
+		}
+	}
+	return false
+}
+
+func probeHasVideo(ctx context.Context, input string) bool {
+	cmd := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_type", "-of", "csv=p=0", input)
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) == "video"
+}
+
 func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, error) {
 	if m.SourcePath == "" {
 		isDirectMedia := false
@@ -47,6 +84,29 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 			case ".mp3", ".m4a", ".m4b", ".wav", ".ogg", ".opus", ".flac", ".aac", ".mp4", ".m4v", ".mov", ".webm", ".mkv":
 				isDirectMedia = true
 			}
+		}
+
+		isPlatform := isPlatformURL(m.SourceURL)
+
+		if isPlatform {
+			if p.Downloader == nil {
+				return nil, fmt.Errorf("downloader is not configured for platform URLs")
+			}
+			title, description, thumbnail, duration, err := p.Downloader.SingleMetadata(ctx, m.SourceURL)
+			if err != nil {
+				return nil, fmt.Errorf("metadata extraction failed: %w", err)
+			}
+			if m.Title == "" || m.Title == m.SourceURL {
+				m.Title = title
+			}
+			m.Description = description
+			m.Thumbnail = thumbnail
+			m.Duration = duration
+			cfg := &feed.Config{ID: m.ID, Format: m.Format, Quality: model.QualityHigh, YouTubeDLArgs: []string{"--no-playlist"}}
+			if m.Format == model.FormatVideo {
+				cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
+			}
+			return p.Downloader.Download(ctx, cfg, &model.Episode{ID: m.ID, VideoURL: m.SourceURL, Title: m.Title})
 		}
 
 		if !isDirectMedia && p.Downloader != nil {
@@ -66,7 +126,7 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 			}
 		}
 
-		// Direct HTTP download fallback
+		// Direct HTTP download fallback for direct audio/video files
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.SourceURL, nil)
 		if err != nil {
 			return nil, fmt.Errorf("invalid URL: %w", err)
@@ -78,6 +138,14 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 		defer resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			return nil, fmt.Errorf("download failed with HTTP %d", resp.StatusCode)
+		}
+
+		ct := strings.ToLower(resp.Header.Get("Content-Type"))
+		if idx := strings.Index(ct, ";"); idx != -1 {
+			ct = strings.TrimSpace(ct[:idx])
+		}
+		if strings.HasPrefix(ct, "text/") || ct == "application/json" || ct == "application/xml" || ct == "application/xhtml+xml" {
+			return nil, fmt.Errorf("URL returned web content (%s) instead of media stream; ensure URL points directly to an audio/video file", ct)
 		}
 
 		dir, err := os.MkdirTemp("", "podsync-personal-")
@@ -100,6 +168,21 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 		if err != nil {
 			return nil, err
 		}
+
+		headerBuf := make([]byte, 512)
+		n, _ := io.ReadFull(resp.Body, headerBuf)
+		if n > 0 {
+			sniffed := http.DetectContentType(headerBuf[:n])
+			if strings.HasPrefix(sniffed, "text/") {
+				_ = out.Close()
+				return nil, fmt.Errorf("downloaded content is %s, not a valid media file", sniffed)
+			}
+			if _, err := out.Write(headerBuf[:n]); err != nil {
+				_ = out.Close()
+				return nil, err
+			}
+		}
+
 		_, copyErr := io.Copy(out, resp.Body)
 		closeErr := out.Close()
 		if copyErr != nil {
@@ -166,14 +249,23 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 }
 
 func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input string) (io.ReadCloser, error) {
+	hasVideo := probeHasVideo(ctx, input)
 	extension := "mp3"
 	args := []string{"-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-i", input}
-	if m.Format == model.FormatAudio {
-		args = append(args, "-vn", "-c:a", "libmp3lame", "-q:a", "2")
-	} else {
+
+	if hasVideo && m.Format != model.FormatAudio {
 		extension = "mp4"
+		if strings.HasSuffix(m.Path, ".mp3") {
+			m.Path = strings.TrimSuffix(m.Path, ".mp3") + ".mp4"
+		}
 		args = append(args, "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart")
+	} else {
+		if strings.HasSuffix(m.Path, ".mp4") {
+			m.Path = strings.TrimSuffix(m.Path, ".mp4") + ".mp3"
+		}
+		args = append(args, "-vn", "-c:a", "libmp3lame", "-q:a", "2")
 	}
+
 	output := filepath.Join(dir, "media."+extension)
 	result, err := exec.CommandContext(ctx, "ffmpeg", append(args, output)...).CombinedOutput()
 	if err != nil {

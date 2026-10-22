@@ -395,6 +395,16 @@ func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
 		}
 	}
 
+	if !hasArg(args, "--js-runtimes") {
+		if denoPath, err := exec.LookPath("deno"); err == nil {
+			args = append(args, "--js-runtimes", fmt.Sprintf("deno:%s", denoPath))
+		} else if _, err := os.Stat("/root/.deno/bin/deno"); err == nil {
+			args = append(args, "--js-runtimes", "deno:/root/.deno/bin/deno")
+		} else if nodePath, err := exec.LookPath("node"); err == nil {
+			args = append(args, "--js-runtimes", fmt.Sprintf("node:%s", nodePath))
+		}
+	}
+
 	return args
 }
 
@@ -463,7 +473,7 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 	// Insert additional per-feed youtube-dl arguments
 	args = append(args, feedConfig.YouTubeDLArgs...)
 
-	// Insert global downloader options (cookies, proxy)
+	// Insert global downloader options (cookies, proxy, js-runtimes)
 	if dl != nil {
 		args = dl.appendCommonArgs(args)
 	}

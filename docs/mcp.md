@@ -39,7 +39,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 22 specialized tools:
+The MCP server provides 27 specialized tools:
 
 ### Monitoring & Status
 | Tool Name | Arguments | Description |
@@ -71,6 +71,15 @@ The MCP server provides 22 specialized tools:
 | **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Rutube, Vimeo, SoundCloud, and Twitch. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |
 | **`delete_tokens`** | `provider` *(req)*, `index` *(opt)* | Delete a specific API token by index, or clear all configured tokens for a provider from `config.toml`. |
+
+### Personal Feeds Management
+| Tool Name | Arguments | Description |
+|---|---|---|
+| **`list_personal_feeds`** | `{}` | List all curated personal podcast feeds, episode counts, total sizes, and feed URLs. |
+| **`get_personal_feed`** | `feed_id` *(req)* | Get metadata and all episodes (with status, source URL/file, and media URL) for a personal feed. |
+| **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
+| **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt: audio/video)* | Add an episode to a personal feed from a URL (YouTube, VK, Rutube, direct audio/video link) or a local file path. |
+| **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
 
 ### Audiobooks Management
 | Tool Name | Arguments | Description |

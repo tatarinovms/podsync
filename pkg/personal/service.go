@@ -189,11 +189,11 @@ func apply(f *Feed, p Patch) error {
 			}
 		}
 	}
-	if p.Format != nil {
+	if p.Format != nil && *p.Format != "" {
 		f.Format = *p.Format
 	}
-	if f.Format != model.FormatAudio && f.Format != model.FormatVideo {
-		return invalid("format must be audio or video")
+	if f.Format == "" {
+		f.Format = "universal"
 	}
 	if p.PlaylistSort != nil {
 		f.PlaylistSort = *p.PlaylistSort
@@ -217,10 +217,7 @@ func validateURL(raw string) error {
 func (s *Service) Create(ctx context.Context, p Patch, reserved map[string]bool) (*Feed, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	f := &Feed{Type: "personal", PlaylistSort: model.SortingDesc, CreatedAt: time.Now().UTC()}
-	if p.Format == nil {
-		return nil, invalid("format is required")
-	}
+	f := &Feed{Type: "personal", Format: "universal", PlaylistSort: model.SortingDesc, CreatedAt: time.Now().UTC()}
 	if err := apply(f, p); err != nil {
 		return nil, err
 	}
@@ -292,14 +289,42 @@ func (s *Service) enqueueLocked(ctx context.Context, id string) error {
 	}
 	return s.enqueue(ctx, id)
 }
-func (s *Service) AddURL(ctx context.Context, id, source, title string) (*model.Episode, error) {
+func detectFormat(sourceURL, sourcePath, requestedFormat string) model.Format {
+	req := strings.ToLower(strings.TrimSpace(requestedFormat))
+	if req == "audio" {
+		return model.FormatAudio
+	}
+	if req == "video" {
+		return model.FormatVideo
+	}
+	target := sourcePath
+	if target == "" {
+		target = sourceURL
+	}
+	if u, err := url.Parse(target); err == nil && u.Path != "" {
+		target = u.Path
+	}
+	ext := strings.ToLower(filepath.Ext(target))
+	switch ext {
+	case ".mp4", ".m4v", ".mov", ".webm", ".mkv":
+		return model.FormatVideo
+	default:
+		return model.FormatAudio
+	}
+}
+
+func (s *Service) AddURL(ctx context.Context, id, source, title, format string) (*model.Episode, error) {
 	source = strings.TrimSpace(source)
 	if err := validateURL(source); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.addLocked(ctx, id, &Media{SourceURL: source, Title: strings.TrimSpace(title)})
+	return s.addLocked(ctx, id, &Media{
+		SourceURL: source,
+		Title:     strings.TrimSpace(title),
+		Format:    detectFormat(source, "", format),
+	})
 }
 func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*model.Episode, error) {
 	mediaID, err := newID()
@@ -313,13 +338,15 @@ func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*mode
 	if media.ID == "" {
 		media.ID = mediaID
 	}
+	if media.Format == "" {
+		media.Format = detectFormat(media.SourceURL, media.SourcePath, "")
+	}
 	member := Membership{ID: memberID, MediaID: media.ID, AddedAt: time.Now().UTC()}
 	err = s.store.PersonalUpdate(func(tx db.PersonalTx) error {
 		var f Feed
 		if err := tx.Get("feed/"+id, &f); err != nil {
 			return err
 		}
-		media.Format = f.Format
 		media.References = 1
 		media.Status = model.EpisodeNew
 		ext := "mp3"
@@ -349,7 +376,7 @@ func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*mode
 }
 
 // Upload uses only generated storage paths; filenames are never used as paths.
-func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader) (*model.Episode, error) {
+func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader, format string) (*model.Episode, error) {
 	if filename != filepath.Base(filename) || strings.ContainsAny(filename, "/\\") || filename == "." || filename == ".." {
 		return nil, invalid("invalid filename")
 	}
@@ -377,7 +404,13 @@ func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader) 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ep, err := s.addLocked(ctx, id, &Media{ID: mediaID, SourcePath: source, Title: strings.TrimSuffix(filename, ext)})
+	mediaFormat := detectFormat("", filename, format)
+	ep, err := s.addLocked(ctx, id, &Media{
+		ID:         mediaID,
+		SourcePath: source,
+		Title:      strings.TrimSuffix(filename, ext),
+		Format:     mediaFormat,
+	})
 	if err != nil {
 		// Queue failure must not delete a source already referenced by a persisted job.
 		var m Media
@@ -387,6 +420,37 @@ func (s *Service) Upload(ctx context.Context, id, filename string, r io.Reader) 
 		}
 	}
 	return ep, err
+}
+
+// AddPath allows importing a media file from a local server file path.
+func (s *Service) AddPath(ctx context.Context, id, filePath, title, format string) (*model.Episode, error) {
+	filePath = filepath.Clean(strings.TrimSpace(filePath))
+	if filePath == "" || filePath == "." || filePath == "/" {
+		return nil, invalid("file_path is required")
+	}
+	fi, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("file not found: %w", err)
+	}
+	if !fi.Mode().IsRegular() {
+		return nil, invalid("target is not a regular file")
+	}
+	ext := strings.ToLower(filepath.Ext(filePath))
+	switch ext {
+	case ".mp3", ".m4a", ".m4b", ".mp4", ".m4v", ".mov", ".webm", ".mkv", ".wav", ".ogg", ".opus", ".flac", ".aac":
+	default:
+		return nil, invalid("unsupported media file format: " + ext)
+	}
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	name := filepath.Base(filePath)
+	if strings.TrimSpace(title) != "" {
+		name = strings.TrimSpace(title) + ext
+	}
+	return s.Upload(ctx, id, name, f, format)
 }
 
 func (s *Service) Transfer(ctx context.Context, source, episodeID, target string, move bool) (*Membership, error) {

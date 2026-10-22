@@ -212,6 +212,9 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			}
 		}
 		item.AddEnclosure(downloadURL, enclosureType, episode.Size)
+		if feed.Provider == model.ProviderPersonal && episode.MediaType != "" && item.Enclosure != nil {
+			item.Enclosure.TypeFormatted = episode.MediaType
+		}
 
 		// p.AddItem requires description to be not empty, use workaround
 		if item.Description == "" {

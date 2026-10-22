@@ -89,7 +89,7 @@ func TestCopyMoveAndReferenceSafeDeletion(t *testing.T) {
 	ctx := context.Background()
 	s, database, files := testService(t, nil)
 	target := newFeed(t, s, "IT и разработка")
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/video", "Тест")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/video", "Тест", "")
 	require.NoError(t, err)
 	require.NoError(t, s.Update(ctx, "personal"))
 	d, err := s.Get("personal")
@@ -124,7 +124,7 @@ func TestCopyMoveAndReferenceSafeDeletion(t *testing.T) {
 func TestRetainFilesAndPatchRebuild(t *testing.T) {
 	ctx := context.Background()
 	s, _, files := testService(t, nil)
-	ep, err := s.Upload(ctx, "personal", "chapter.mp3", strings.NewReader("source"))
+	ep, err := s.Upload(ctx, "personal", "chapter.mp3", strings.NewReader("source"), "")
 	require.NoError(t, err)
 	require.NoError(t, s.Update(ctx, "personal"))
 	before, err := s.Get("personal")
@@ -144,7 +144,7 @@ func TestRetainFilesAndPatchRebuild(t *testing.T) {
 func TestFormatChangesDoNotRelabelSharedMedia(t *testing.T) {
 	ctx := context.Background()
 	s, _, files := testService(t, nil)
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio", "")
 	require.NoError(t, err)
 	require.NoError(t, s.Update(ctx, "personal"))
 	target, err := s.Create(ctx, Patch{Title: str("Video"), Format: format(model.FormatVideo)}, nil)
@@ -158,7 +158,7 @@ func TestFormatChangesDoNotRelabelSharedMedia(t *testing.T) {
 func TestConcurrentCopiesAndDeletion(t *testing.T) {
 	ctx := context.Background()
 	s, database, _ := testService(t, nil)
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio", "")
 	require.NoError(t, err)
 	target := newFeed(t, s, "Target")
 	var wg sync.WaitGroup
@@ -193,7 +193,7 @@ func TestDeleteWhileDownloadRunning(t *testing.T) {
 	})
 	ctx := context.Background()
 	s, database, files := testService(t, processor)
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio", "")
 	require.NoError(t, err)
 	done := make(chan error, 1)
 	go func() { done <- s.Update(ctx, "personal") }()
@@ -217,18 +217,18 @@ func TestRetryAndValidation(t *testing.T) {
 	ctx := context.Background()
 	s, _, _ := testService(t, processor)
 	for _, source := range []string{"file:///etc/passwd", "ftp://example.org/a", "http://user:pass@example.org/a", "--exec=x"} {
-		_, err := s.AddURL(ctx, "personal", source, "")
+		_, err := s.AddURL(ctx, "personal", source, "", "")
 		require.ErrorIs(t, err, ErrInvalid)
 	}
 	for _, name := range []string{"../../evil.mp3", "..\\evil.mp3", "file.html"} {
-		_, err := s.Upload(ctx, "personal", name, strings.NewReader("x"))
+		_, err := s.Upload(ctx, "personal", name, strings.NewReader("x"), "")
 		require.ErrorIs(t, err, ErrInvalid)
 	}
-	_, err := s.Create(ctx, Patch{Title: str("Title")}, nil)
+	_, err := s.Create(ctx, Patch{Title: str("   ")}, nil)
 	require.ErrorIs(t, err, ErrInvalid)
 	_, err = s.Patch(ctx, "personal", Patch{Title: str("  ")})
 	require.ErrorIs(t, err, ErrInvalid)
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio", "")
 	require.NoError(t, err)
 	require.Error(t, s.Update(ctx, "personal"))
 	d, err := s.Get("personal")
@@ -244,7 +244,7 @@ func TestRetryAndValidation(t *testing.T) {
 func TestAtomicTransferRollback(t *testing.T) {
 	ctx := context.Background()
 	s, database, _ := testService(t, nil)
-	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio")
+	ep, err := s.AddURL(ctx, "personal", "https://example.org/a", "Audio", "")
 	require.NoError(t, err)
 	_, err = s.Transfer(ctx, "personal", ep.ID, "missing", true)
 	require.ErrorIs(t, err, model.ErrNotFound)

@@ -67,7 +67,11 @@ type Detail struct {
 }
 
 func (f *Feed) Config() *feed.Config {
-	return &feed.Config{ID: f.ID, URL: "personal://" + f.ID, Format: f.Format,
+	fmt := f.Format
+	if fmt == "" || fmt == "universal" {
+		fmt = model.FormatCustom
+	}
+	return &feed.Config{ID: f.ID, URL: "personal://" + f.ID, Format: fmt,
 		Quality: model.QualityHigh, PlaylistSort: f.PlaylistSort, PrivateFeed: f.PrivateFeed,
 		Custom: feed.Custom{Title: f.Title, Description: f.Description, CoverArt: f.CoverArt}}
 }

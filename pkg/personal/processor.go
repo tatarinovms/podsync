@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,22 +40,82 @@ func (f *convertedFile) Close() error {
 
 func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, error) {
 	if m.SourcePath == "" {
-		title, description, thumbnail, duration, err := p.Downloader.SingleMetadata(ctx, m.SourceURL)
+		isDirectMedia := false
+		if u, err := url.Parse(m.SourceURL); err == nil {
+			ext := strings.ToLower(filepath.Ext(u.Path))
+			switch ext {
+			case ".mp3", ".m4a", ".m4b", ".wav", ".ogg", ".opus", ".flac", ".aac", ".mp4", ".m4v", ".mov", ".webm", ".mkv":
+				isDirectMedia = true
+			}
+		}
+
+		if !isDirectMedia && p.Downloader != nil {
+			title, description, thumbnail, duration, err := p.Downloader.SingleMetadata(ctx, m.SourceURL)
+			if err == nil {
+				if m.Title == "" || m.Title == m.SourceURL {
+					m.Title = title
+				}
+				m.Description = description
+				m.Thumbnail = thumbnail
+				m.Duration = duration
+				cfg := &feed.Config{ID: m.ID, Format: m.Format, Quality: model.QualityHigh, YouTubeDLArgs: []string{"--no-playlist"}}
+				if m.Format == model.FormatVideo {
+					cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
+				}
+				return p.Downloader.Download(ctx, cfg, &model.Episode{ID: m.ID, VideoURL: m.SourceURL, Title: m.Title})
+			}
+		}
+
+		// Direct HTTP download fallback
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.SourceURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("invalid URL: %w", err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("download from URL failed: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("download failed with HTTP %d", resp.StatusCode)
+		}
+
+		dir, err := os.MkdirTemp("", "podsync-personal-")
 		if err != nil {
 			return nil, err
 		}
-		if m.Title == "" || m.Title == m.SourceURL {
-			m.Title = title
+		success := false
+		defer func() {
+			if !success {
+				_ = os.RemoveAll(dir)
+			}
+		}()
+
+		ext := filepath.Ext(m.SourceURL)
+		if ext == "" || len(ext) > 5 {
+			ext = ".media"
 		}
-		m.Description = description
-		m.Thumbnail = thumbnail
-		m.Duration = duration
-		cfg := &feed.Config{ID: m.ID, Format: m.Format, Quality: model.QualityHigh, YouTubeDLArgs: []string{"--no-playlist"}}
-		if m.Format == model.FormatVideo {
-			cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
+		input := filepath.Join(dir, "input"+ext)
+		out, err := os.Create(input)
+		if err != nil {
+			return nil, err
 		}
-		return p.Downloader.Download(ctx, cfg, &model.Episode{ID: m.ID, VideoURL: m.SourceURL, Title: m.Title})
+		_, copyErr := io.Copy(out, resp.Body)
+		closeErr := out.Close()
+		if copyErr != nil {
+			return nil, copyErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+
+		rc, err := p.convertFile(ctx, m, dir, input)
+		if err == nil {
+			success = true
+		}
+		return rc, err
 	}
+
 	if err := validateMediaPath(m.SourcePath); err != nil {
 		return nil, err
 	}
@@ -70,6 +132,7 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 		return nil, err
 	}
 	defer source.Close()
+
 	dir, err := os.MkdirTemp("", "podsync-personal-")
 	if err != nil {
 		return nil, err
@@ -80,6 +143,7 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 			_ = os.RemoveAll(dir)
 		}
 	}()
+
 	input := filepath.Join(dir, "input"+filepath.Ext(m.SourcePath))
 	out, err := os.Create(input)
 	if err != nil {
@@ -93,6 +157,15 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 	if closeErr != nil {
 		return nil, closeErr
 	}
+
+	rc, err := p.convertFile(ctx, m, dir, input)
+	if err == nil {
+		success = true
+	}
+	return rc, err
+}
+
+func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input string) (io.ReadCloser, error) {
 	extension := "mp3"
 	args := []string{"-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-i", input}
 	if m.Format == model.FormatAudio {
@@ -122,6 +195,5 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 	if err != nil {
 		return nil, err
 	}
-	success = true
 	return &convertedFile{f, dir}, nil
 }

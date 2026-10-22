@@ -161,12 +161,20 @@
                                     <h6 class="fw-bold mb-3"><i aria-hidden="true" class="bi bi-link-45deg me-2 text-primary"></i>Add from link</h6>
                                     <form id="personal-url-form" onsubmit="personalAddURL(event)">
                                         <div class="mb-3">
-                                            <label for="personal-url" class="form-label small text-muted">Media URL *</label>
-                                            <input id="personal-url" type="url" required class="form-control" placeholder="YouTube, VK Video, Rutube, or direct media URL">
+                                            <label for="personal-url" class="form-label small text-muted">Direct media link or video platform URL *</label>
+                                            <input id="personal-url" type="url" required class="form-control" placeholder="MP3, OGG, MP4 direct URL, or YouTube / VK / Rutube">
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="personal-url-title" class="form-label small text-muted">Title (optional)</label>
-                                            <input id="personal-url-title" class="form-control" placeholder="Episode title" aria-label="Episode title">
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-7">
+                                                <input id="personal-url-title" class="form-control" placeholder="Title (optional)" aria-label="Episode title">
+                                            </div>
+                                            <div class="col-5">
+                                                <select id="personal-url-format" class="form-select" aria-label="Format">
+                                                    <option value="auto">Auto-detect</option>
+                                                    <option value="audio">Audio (MP3)</option>
+                                                    <option value="video">Video (MP4)</option>
+                                                </select>
+                                            </div>
                                         </div>
                                         <button class="btn btn-brand btn-sm" type="submit"><i aria-hidden="true" class="bi bi-plus-lg me-1"></i>Add URL</button>
                                     </form>
@@ -178,10 +186,22 @@
                                     <form id="personal-upload-form" onsubmit="personalUpload(event)">
                                         <div class="mb-3">
                                             <label for="personal-file" class="form-label small text-muted">Choose audio or video file *</label>
-                                            <input id="personal-file" type="file" required accept="audio/*,video/*,.m4b,.mkv,.flac,.opus" class="form-control">
-                                            <div class="text-muted small mt-1">Up to 4 GiB. File will be converted to the feed format.</div>
+                                            <input id="personal-file" type="file" required accept="audio/*,video/*,.mp3,.ogg,.opus,.m4a,.m4b,.flac,.wav,.aac,.mp4,.mkv,.mov,.webm" class="form-control">
+                                            <div class="text-muted small mt-1">Supports MP3, OGG, OPUS, M4A, FLAC, WAV, MP4, MKV, WebM up to 4 GiB.</div>
                                         </div>
-                                        <button class="btn btn-brand btn-sm" type="submit"><i aria-hidden="true" class="bi bi-upload me-1"></i>Upload</button>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-7">
+                                                <input id="personal-upload-title" class="form-control" placeholder="Title (optional)" aria-label="Episode title">
+                                            </div>
+                                            <div class="col-5">
+                                                <select id="personal-upload-format" class="form-select" aria-label="Format">
+                                                    <option value="auto">Auto-detect</option>
+                                                    <option value="audio">Audio (MP3)</option>
+                                                    <option value="video">Video (MP4)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-brand btn-sm" type="submit"><i aria-hidden="true" class="bi bi-upload me-1"></i>Upload file</button>
                                     </form>
                                 </div>
                             </div>
@@ -899,6 +919,31 @@
                                         <td><code>delete_audiobook_dir</code></td>
                                         <td>Delete an audiobook folder from audiobooks storage on disk and remove any linked podcast feed</td>
                                         <td><code>dir_name</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>list_personal_feeds</code></td>
+                                        <td>List all personal curated podcast feeds (title, ID, episode count, format, and RSS URL)</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_personal_feed</code></td>
+                                        <td>Get details and episode list of a specific personal podcast feed</td>
+                                        <td><code>feed_id</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>create_personal_feed</code></td>
+                                        <td>Create a new universal personal podcast feed that can host both audio and video episodes</td>
+                                        <td><code>title</code>, <code>description</code>, <code>cover_art</code>, <code>private_feed</code> <em>(optional)</em></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>add_personal_episode</code></td>
+                                        <td>Add an episode to a personal podcast feed from a direct media URL (MP3, OGG, MP4...), supported video platform (YouTube, VK...), or local server file path</td>
+                                        <td><code>feed_id</code>, <code>url</code> / <code>file_path</code>, <code>title</code>, <code>format</code> <em>(optional)</em></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>delete_personal_episode</code></td>
+                                        <td>Remove an episode from a personal podcast feed</td>
+                                        <td><code>feed_id</code>, <code>episode_id</code>, <code>delete_files</code> <em>(optional)</em></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1868,7 +1913,7 @@
             <div class="mb-3"><label for="personal-edit-description" class="form-label small text-muted">Description</label><textarea class="form-control" id="personal-edit-description" rows="3" placeholder="Feed description..."></textarea></div>
             <div class="mb-3"><label for="personal-edit-cover" class="form-label small text-muted">Cover image URL</label><input class="form-control mb-2" id="personal-edit-cover" type="url" placeholder="https://example.com/cover.jpg"></div>
             <div class="mb-3"><label for="personal-edit-cover-file" class="form-label small text-muted">Or upload cover image</label><input class="form-control" id="personal-edit-cover-file" type="file" accept="image/jpeg,image/png,image/webp"></div>
-            <div class="mb-3"><label for="personal-edit-format" class="form-label small text-muted">Feed format *</label><select class="form-select mb-1" id="personal-edit-format"><option value="audio">Audio</option><option value="video">Video</option></select><div class="text-muted small">Format applies to new episodes. Cross-format copies preserve the original file.</div></div>
+
             <div class="mb-3"><label for="personal-edit-sort" class="form-label small text-muted">Episode order</label><select class="form-select" id="personal-edit-sort"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></div>
             <div class="form-check"><input class="form-check-input" type="checkbox" id="personal-edit-private"><label class="form-check-label small" for="personal-edit-private">Do not index in podcast catalogs</label></div>
         </div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalEditModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save</button></div>

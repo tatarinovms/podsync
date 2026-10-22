@@ -30,13 +30,13 @@ func TestPersonalFeedAPI(t *testing.T) {
 		return w
 	}
 	require.Equal(t, 200, call("GET", "", "").Code)
-	require.Equal(t, 400, call("POST", "", `{"title":"No format"}`).Code)
+	require.Equal(t, 400, call("POST", "", `{"title":"   "}`).Code)
 	w := call("POST", "", `{"title":"IT","format":"audio"}`)
 	require.Equal(t, 201, w.Code, w.Body.String())
 	var f personal.Feed
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &f))
 	require.Equal(t, 400, call("PATCH", "/"+f.ID, `{"id":"renamed"}`).Code)
-	require.Equal(t, 400, call("PATCH", "/"+f.ID, `{"format":"custom"}`).Code)
+	require.Equal(t, 400, call("PATCH", "/"+f.ID, `{"title":""}`).Code)
 	require.Equal(t, 200, call("PATCH", "/"+f.ID, `{"description":"Updated"}`).Code)
 	w = call("POST", "/personal/episodes", `{"url":"https://example.org/video"}`)
 	require.Equal(t, 202, w.Code, w.Body.String())

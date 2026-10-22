@@ -9,12 +9,14 @@ import (
 
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/personal"
 	"github.com/mxpv/podsync/services/web"
 )
 
 // Server implements the Model Context Protocol (MCP) server
 type Server struct {
-	mgr web.AdminManager
+	mgr      web.AdminManager
+	personal *personal.Service
 }
 
 // NewServer creates a new MCP server backed by web.AdminManager
@@ -22,6 +24,11 @@ func NewServer(mgr web.AdminManager) *Server {
 	return &Server{
 		mgr: mgr,
 	}
+}
+
+// SetPersonalFeeds attaches personal feeds service to MCP server
+func (s *Server) SetPersonalFeeds(service *personal.Service) {
+	s.personal = service
 }
 
 // HandleMessage parses a JSON-RPC 2.0 message and returns the response bytes
@@ -552,6 +559,107 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "list_personal_feeds",
+			Description: "List all personal curated podcast feeds (title, ID, episode count, and RSS URL)",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "get_personal_feed",
+			Description: "Get details and episode list of a specific personal podcast feed",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Unique ID of the personal feed (e.g. personal-xyz)",
+					},
+				},
+				Required: []string{"feed_id"},
+			},
+		},
+		{
+			Name:        "create_personal_feed",
+			Description: "Create a new universal personal podcast feed that can host both audio and video episodes",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"title": {
+						Type:        "string",
+						Description: "Title for the personal feed",
+					},
+					"description": {
+						Type:        "string",
+						Description: "Description for the feed",
+					},
+					"cover_art": {
+						Type:        "string",
+						Description: "Optional HTTP/HTTPS URL of cover art",
+					},
+					"private_feed": {
+						Type:        "boolean",
+						Description: "Block search engines and public directories (adds <itunes:block>yes</itunes:block>)",
+					},
+				},
+				Required: []string{"title"},
+			},
+		},
+		{
+			Name:        "add_personal_episode",
+			Description: "Add an episode to a personal podcast feed from a direct media URL (MP3, OGG, MP4...), supported video platform (YouTube, VK...), or local server file path",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Personal feed ID (e.g. personal-xyz)",
+					},
+					"url": {
+						Type:        "string",
+						Description: "HTTP/HTTPS URL to media file (MP3, OGG, MP4, FLAC...) or supported video platform (YouTube, VK, Rutube...)",
+					},
+					"file_path": {
+						Type:        "string",
+						Description: "Absolute path to a local audio or video file on the server (e.g. /path/to/audio.mp3, /path/to/media.ogg, /path/to/video.mp4)",
+					},
+					"title": {
+						Type:        "string",
+						Description: "Optional custom title for the episode",
+					},
+					"format": {
+						Type:        "string",
+						Description: "Media format: 'auto' (default, detects audio vs video), 'audio', or 'video'",
+						Enum:        []string{"auto", "audio", "video"},
+					},
+				},
+				Required: []string{"feed_id"},
+			},
+		},
+		{
+			Name:        "delete_personal_episode",
+			Description: "Remove an episode from a personal podcast feed",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"feed_id": {
+						Type:        "string",
+						Description: "Personal feed ID",
+					},
+					"episode_id": {
+						Type:        "string",
+						Description: "Episode ID to remove",
+					},
+					"delete_files": {
+						Type:        "boolean",
+						Description: "Whether to delete the media file from disk if unreferenced by other feeds (default: false)",
+					},
+				},
+				Required: []string{"feed_id", "episode_id"},
+			},
+		},
+		{
 			Name:        "import_audiobook",
 			Description: "Import a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts serial format)",
 			InputSchema: InputSchema{
@@ -594,6 +702,127 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 	}
 
 	switch name {
+	case "list_personal_feeds":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		feeds, err := s.personal.List()
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(feeds, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "get_personal_feed":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		feedID, ok := args["feed_id"].(string)
+		if !ok || strings.TrimSpace(feedID) == "" {
+			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
+		}
+		detail, err := s.personal.Get(strings.TrimSpace(feedID))
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(detail, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "create_personal_feed":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		title, ok := args["title"].(string)
+		if !ok || strings.TrimSpace(title) == "" {
+			return CallToolResult{}, fmt.Errorf("title parameter is required")
+		}
+		patch := personal.Patch{Title: &title}
+		if desc, ok := args["description"].(string); ok && desc != "" {
+			patch.Description = &desc
+		}
+		if cover, ok := args["cover_art"].(string); ok && cover != "" {
+			patch.CoverArt = &cover
+		}
+		if priv, ok := args["private_feed"].(bool); ok {
+			patch.PrivateFeed = &priv
+		}
+		reserved := map[string]bool{}
+		if s.mgr != nil {
+			if existingFeeds, err := s.mgr.ListFeeds(ctx); err == nil {
+				for _, f := range existingFeeds {
+					reserved[f.ID] = true
+				}
+			}
+		}
+		created, err := s.personal.Create(ctx, patch, reserved)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(created, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "add_personal_episode":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		feedID, ok := args["feed_id"].(string)
+		if !ok || strings.TrimSpace(feedID) == "" {
+			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
+		}
+		title, _ := args["title"].(string)
+		format, _ := args["format"].(string)
+		urlStr, _ := args["url"].(string)
+		filePath, _ := args["file_path"].(string)
+
+		urlStr = strings.TrimSpace(urlStr)
+		filePath = strings.TrimSpace(filePath)
+
+		if urlStr == "" && filePath == "" {
+			return CallToolResult{}, fmt.Errorf("either 'url' or 'file_path' parameter is required")
+		}
+
+		var ep *model.Episode
+		var err error
+		if filePath != "" {
+			ep, err = s.personal.AddPath(ctx, strings.TrimSpace(feedID), filePath, title, format)
+		} else {
+			ep, err = s.personal.AddURL(ctx, strings.TrimSpace(feedID), urlStr, title, format)
+		}
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(ep, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "delete_personal_episode":
+		if s.personal == nil {
+			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")
+		}
+		feedID, ok := args["feed_id"].(string)
+		if !ok || strings.TrimSpace(feedID) == "" {
+			return CallToolResult{}, fmt.Errorf("feed_id parameter is required")
+		}
+		epID, ok := args["episode_id"].(string)
+		if !ok || strings.TrimSpace(epID) == "" {
+			return CallToolResult{}, fmt.Errorf("episode_id parameter is required")
+		}
+		delFiles, _ := args["delete_files"].(bool)
+		err := s.personal.DeleteEpisode(ctx, strings.TrimSpace(feedID), strings.TrimSpace(epID), delFiles)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: fmt.Sprintf("Episode %s removed from feed %s", epID, feedID)}},
+		}, nil
+
 	case "delete_audiobook_dir":
 		dirName, ok := args["dir_name"].(string)
 		if !ok || strings.TrimSpace(dirName) == "" {

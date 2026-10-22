@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/mxpv/podsync/pkg/model"
@@ -114,14 +115,20 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			}
 		case http.MethodPost:
 			var req struct {
-				URL   string `json:"url"`
-				Title string `json:"title"`
+				URL      string `json:"url"`
+				FilePath string `json:"file_path"`
+				Title    string `json:"title"`
+				Format   string `json:"format"`
 			}
 			if e := decodePersonal(w, r, &req); e != nil {
 				badBody(e)
 				return
 			}
-			result, err = s.personal.AddURL(r.Context(), parts[0], req.URL, req.Title)
+			if req.FilePath != "" {
+				result, err = s.personal.AddPath(r.Context(), parts[0], req.FilePath, req.Title, req.Format)
+			} else {
+				result, err = s.personal.AddURL(r.Context(), parts[0], req.URL, req.Title, req.Format)
+			}
 			status = http.StatusAccepted
 		default:
 			s.writeError(w, 405, "method not allowed")
@@ -147,7 +154,13 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer file.Close()
-		result, err = s.personal.Upload(r.Context(), parts[0], header.Filename, file)
+		name := header.Filename
+		title := r.FormValue("title")
+		if strings.TrimSpace(title) != "" {
+			name = strings.TrimSpace(title) + strings.ToLower(filepath.Ext(header.Filename))
+		}
+		format := r.FormValue("format")
+		result, err = s.personal.Upload(r.Context(), parts[0], name, file, format)
 		status = http.StatusAccepted
 	} else if len(parts) == 3 && parts[1] == "episodes" {
 		if r.Method != http.MethodDelete {

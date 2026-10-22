@@ -514,6 +514,7 @@ func main() {
 
 	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)
 	mcpServer := mcp.NewServer(feedManager)
+	mcpServer.SetPersonalFeeds(personalFeeds)
 	srv.SetMCPHandler(mcp.NewHTTPHandler(mcpServer))
 
 	if opts.MCP {

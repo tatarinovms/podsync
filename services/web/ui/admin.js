@@ -3670,7 +3670,6 @@
                 const coverArt = f.cover_art && safeUrl(f.cover_art)
                     ? `<img class="feed-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">`
                     : `<div class="feed-cover-placeholder d-flex align-items-center justify-content-center"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>`;
-                const isVideo = f.format === 'video';
                 return `<article class="card feed-card h-100">
                     <div class="feed-card-top">
                         <div class="feed-art">${coverArt}</div>
@@ -3682,7 +3681,7 @@
                     ${f.description ? `<p class="text-muted small mb-0 feed-card-description" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(f.description)}</p>` : ''}
                     <div class="feed-card-meta">
                         <span><i aria-hidden="true" class="bi bi-collection-play me-1"></i>${f.episode_count || 0} episodes</span>
-                        <span><i aria-hidden="true" class="bi ${isVideo ? 'bi-camera-video' : 'bi-music-note-beamed'} me-1"></i>${isVideo ? 'Video' : 'Audio'}</span>
+                        <span><i aria-hidden="true" class="bi bi-stars me-1"></i>Universal</span>
                         <span class="feed-provider">Personal</span>
                     </div>
                     <div class="feed-card-bottom">
@@ -3743,8 +3742,9 @@
                     if (container) {
                         container.innerHTML = data.episodes.length ? data.episodes.map(ep => {
                             const url = safeUrl(ep.media_url || '');
+                            const isVid = (ep.media_type && ep.media_type.startsWith('video/')) || ep.format === 'video';
                             const player = ep.status === 'downloaded' && url
-                                ? (ep.media_type === 'video/mp4'
+                                ? (isVid
                                     ? `<video controls preload="none" class="w-100 rounded mt-2" style="max-height: 240px; background: var(--ctp-crust);" src="${url}"></video>`
                                     : `<audio controls preload="none" class="w-100 mt-2" src="${url}"></audio>`)
                                 : '';
@@ -3791,7 +3791,6 @@
             document.getElementById('personal-edit-description').value = f.description || '';
             document.getElementById('personal-edit-cover').value = f.cover_art || '';
             document.getElementById('personal-edit-cover-file').value = '';
-            document.getElementById('personal-edit-format').value = f.format || 'audio';
             document.getElementById('personal-edit-sort').value = f.playlist_sort || 'desc';
             document.getElementById('personal-edit-private').checked = !!f.private_feed;
             personalError(null, 'personal-edit-error');
@@ -3807,7 +3806,7 @@
                     const response = await fetch('/api/v1/covers/upload',{method:'POST',body:form});
                     const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Failed to upload cover art'); cover = data.url;
                 }
-                const payload = {title:document.getElementById('personal-edit-title').value,description:document.getElementById('personal-edit-description').value,cover_art:cover,format:document.getElementById('personal-edit-format').value,playlist_sort:document.getElementById('personal-edit-sort').value,private_feed:document.getElementById('personal-edit-private').checked};
+                const payload = {title:document.getElementById('personal-edit-title').value,description:document.getElementById('personal-edit-description').value,cover_art:cover,playlist_sort:document.getElementById('personal-edit-sort').value,private_feed:document.getElementById('personal-edit-private').checked};
                 const f = await personalAPI(personalEditingID ? '/' + encodeURIComponent(personalEditingID) : '',personalJSON(personalEditingID ? 'PATCH' : 'POST',payload));
                 closeModal('personalEditModal'); await loadPersonalFeeds(); await personalOpen(f.id);
             } catch (error) { personalError(error, 'personal-edit-error'); }
@@ -3816,7 +3815,13 @@
         async function personalAddURL(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
             try {
-                await personalAPI('/'+encodeURIComponent(id)+'/episodes',personalJSON('POST',{url:document.getElementById('personal-url').value,title:document.getElementById('personal-url-title').value}));
+                const body = {
+                    url: document.getElementById('personal-url').value,
+                    title: document.getElementById('personal-url-title')?.value || ''
+                };
+                const formatVal = document.getElementById('personal-url-format')?.value;
+                if (formatVal) body.format = formatVal;
+                await personalAPI('/'+encodeURIComponent(id)+'/episodes',personalJSON('POST',body));
                 event.target.reset(); if (personalCurrentID === id) await personalOpen(id);
                 await loadPersonalFeeds();
             } catch (error) { personalError(error); } finally { if (button) button.disabled = false; }
@@ -3829,7 +3834,13 @@
                 prog.className = 'alert alert-info py-2 px-3 small mb-3';
             }
             try {
-                const data = new FormData(); data.append('file', document.getElementById('personal-file').files[0]);
+                const data = new FormData();
+                const fileInput = document.getElementById('personal-file');
+                if (fileInput && fileInput.files[0]) data.append('file', fileInput.files[0]);
+                const titleVal = document.getElementById('personal-file-title')?.value;
+                if (titleVal) data.append('title', titleVal);
+                const formatVal = document.getElementById('personal-file-format')?.value;
+                if (formatVal) data.append('format', formatVal);
                 await personalAPI('/'+encodeURIComponent(id)+'/upload',{method:'POST',body:data});
                 event.target.reset();
                 if (prog) {

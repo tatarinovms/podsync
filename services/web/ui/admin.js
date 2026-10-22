@@ -3608,10 +3608,15 @@
         }
 
         function showSubscription(feedId) {
-            const feed = allFeeds.find(f => f.id === feedId);
+            const feed = allFeeds.find(f => f.id === feedId) || (typeof personalFeeds !== 'undefined' && personalFeeds.find(f => f.id === feedId));
             if (!feed) { showToast('This podcast is no longer in the library. Refresh the list.'); return; }
             document.getElementById('subscribe-title').innerText = 'Subscribe to ' + (feed.title || feed.id);
-            const links = [[feed.apple_url, ['podcast:'], 'bi-apple', 'Apple Podcasts'], [feed.pocketcasts_url, ['pktc:'], 'bi-play-circle', 'Pocket Casts'], [feed.overcast_url, ['overcast:'], 'bi-soundwave', 'Overcast'], [feed.feed_url, ['http:', 'https:'], 'bi-rss', 'Open RSS feed']];
+            const feedURL = feed.feed_url || '';
+            const cleanURL = feedURL.replace(/^https?:\/\//, '');
+            const appleURL = feed.apple_url || (cleanURL ? `podcast://${cleanURL}` : '');
+            const pocketcastsURL = feed.pocketcasts_url || (cleanURL ? `pktc://subscribe/${cleanURL}` : '');
+            const overcastURL = feed.overcast_url || (feedURL ? `overcast://x-callback-url/add?url=${encodeURIComponent(feedURL)}` : '');
+            const links = [[appleURL, ['podcast:'], 'bi-apple', 'Apple Podcasts'], [pocketcastsURL, ['pktc:'], 'bi-play-circle', 'Pocket Casts'], [overcastURL, ['overcast:'], 'bi-soundwave', 'Overcast'], [feedURL, ['http:', 'https:'], 'bi-rss', 'Open RSS feed']];
             document.getElementById('subscribe-body').innerHTML = `<p class="text-muted small">Copy the feed link into your podcast app, or choose an app below.</p><div class="subscription-url"><input class="form-control" aria-label="RSS feed URL" readonly value="${escapeHtml(feed.feed_url || '')}"><button class="btn btn-brand" ${actionAttrs('copy', feed.feed_url)}>Copy</button><button class="btn btn-light" aria-label="Show QR code" ${actionAttrs('qr', feed.title || feed.id, feed.feed_url)}><i aria-hidden="true" class="bi bi-qr-code"></i></button></div><div class="subscription-links">${links.filter(([url, schemes]) => url && safeUrl(url, schemes)).map(([url, schemes, icon, label]) => `<a href="${safeUrl(url, schemes)}"><i aria-hidden="true" class="bi ${icon} me-2"></i>${label}<i aria-hidden="true" class="bi bi-arrow-up-right float-end"></i></a>`).join('')}</div>`;
             bootstrap.Modal.getOrCreateInstance(document.getElementById('subscribeModal')).show();
         }
@@ -3686,7 +3691,7 @@
                     </div>
                     <div class="feed-card-bottom">
                         <button class="btn btn-light" type="button" onclick="personalOpen('${escapeHtml(f.id)}')">Open</button>
-                        <a class="btn btn-light" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</a>
+                        <button class="btn btn-light" type="button" onclick="showSubscription('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                         <button class="btn btn-light" type="button" onclick="personalEdit('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
                     </div>
                 </article>`;

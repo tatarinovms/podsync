@@ -78,7 +78,7 @@ The MCP server provides 28 specialized tools:
 | **`list_personal_feeds`** | `{}` | List all curated personal podcast feeds, episode counts, total sizes, and feed URLs. |
 | **`get_personal_feed`** | `feed_id` *(req)* | Get metadata and all episodes (with status, source URL/file, and media URL) for a personal feed. |
 | **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
-| **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt: audio/video)* | Add an episode to a personal feed from a URL (YouTube, VK, Rutube, direct audio/video link) or a local file path. |
+| **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt: audio/video/auto)*, `quality` *(opt: high/low)*, `max_height` *(opt: 480/720/1080)* | Add an episode to a personal feed from a URL (YouTube, VK, Rutube, direct audio/video link) or a local file path. |
 | **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
 | **`rename_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `title` *(req)* | Rename an episode in a personal podcast feed. |
 

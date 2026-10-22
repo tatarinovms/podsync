@@ -3821,7 +3821,8 @@
                                     ? `<video controls preload="none" class="w-100 rounded mt-2" style="max-height: 240px; background: var(--ctp-crust);" src="${url}"></video>`
                                     : `<audio controls preload="none" class="w-100 mt-2" src="${url}"></audio>`)
                                 : '';
-                            let actions = `<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="move" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrows-move me-1"></i>Move</button>
+                            let actions = `<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="rename" data-personal-id="${escapeHtml(ep.id)}" data-personal-title="${escapeHtml(ep.title || '')}"><i aria-hidden="true" class="bi bi-pencil me-1"></i>Rename</button>
+<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="move" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrows-move me-1"></i>Move</button>
 <button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="copy" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-copy me-1"></i>Copy</button>`;
                             if (ep.status === 'error') {
                                 actions += ` <button type="button" class="btn btn-outline-danger btn-sm" data-personal-action="retry" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrow-clockwise me-1"></i>Retry</button>`;
@@ -3885,6 +3886,13 @@
             } catch (error) { personalError(error, 'personal-edit-error'); }
             finally { if (button) button.disabled = false; }
         }
+        function togglePersonalUrlQuality() {
+            const fmt = document.getElementById('personal-url-format')?.value;
+            const vCol = document.getElementById('personal-url-video-quality-col');
+            const aCol = document.getElementById('personal-url-audio-quality-col');
+            if (vCol) vCol.style.display = (fmt === 'video') ? 'block' : 'none';
+            if (aCol) aCol.style.display = (fmt === 'audio' || fmt === 'auto') ? 'block' : 'none';
+        }
         async function personalAddURL(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
             try {
@@ -3894,8 +3902,16 @@
                 };
                 const formatVal = document.getElementById('personal-url-format')?.value;
                 if (formatVal) body.format = formatVal;
+                const qualityVal = document.getElementById('personal-url-quality')?.value;
+                if (qualityVal) body.quality = qualityVal;
+                const maxHeightVal = document.getElementById('personal-url-max-height')?.value;
+                if (maxHeightVal !== undefined && maxHeightVal !== '') {
+                    body.max_height = parseInt(maxHeightVal, 10) || 0;
+                }
                 await personalAPI('/'+encodeURIComponent(id)+'/episodes',personalJSON('POST',body));
-                event.target.reset(); if (personalCurrentID === id) await personalOpen(id);
+                event.target.reset();
+                togglePersonalUrlQuality();
+                if (personalCurrentID === id) await personalOpen(id);
                 await loadPersonalFeeds();
             } catch (error) { personalError(error); } finally { if (button) button.disabled = false; }
         }
@@ -3961,10 +3977,38 @@
                 closeModal('personalTransferModal'); await loadPersonalFeeds();
             } catch (error) { personalError(error,'personal-transfer-error'); } finally { if (button) button.disabled = false; }
         }
+        let personalRenameAction = null;
+        function personalRename(episodeID, currentTitle) {
+            personalRenameAction = { feedID: personalCurrentID, episodeID };
+            const input = document.getElementById('personal-rename-title');
+            if (input) input.value = currentTitle || '';
+            personalError(null, 'personal-rename-error');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('personalRenameModal')).show();
+        }
+        async function personalRenameSave(event) {
+            event.preventDefault();
+            const action = personalRenameAction;
+            if (!action) return;
+            const titleInput = document.getElementById('personal-rename-title');
+            const newTitle = titleInput ? titleInput.value.trim() : '';
+            if (!newTitle) return;
+            const button = event.submitter;
+            if (button) button.disabled = true;
+            try {
+                await personalAPI('/'+encodeURIComponent(action.feedID)+'/episodes/'+encodeURIComponent(action.episodeID), personalJSON('PATCH', { title: newTitle }));
+                closeModal('personalRenameModal');
+                await loadPersonalFeeds();
+            } catch (error) {
+                personalError(error, 'personal-rename-error');
+            } finally {
+                if (button) button.disabled = false;
+            }
+        }
         document.getElementById('tab-personal')?.addEventListener('click', async event => {
             const button = event.target.closest('[data-personal-action]'); if (!button) return;
             const {personalAction:action, personalId:id} = button.dataset;
             if (action === 'open') return personalOpen(id);
+            if (action === 'rename') return personalRename(id, button.dataset.personalTitle || '');
             if (action === 'copy' || action === 'move') return personalTransfer(id,action);
             if (action === 'delete') return personalConfirmDelete(id);
             if (action === 'retry') {

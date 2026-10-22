@@ -633,6 +633,15 @@ func (s *Server) getToolDefinitions() []Tool {
 						Description: "Media format: 'auto' (default, detects audio vs video), 'audio', or 'video'",
 						Enum:        []string{"auto", "audio", "video"},
 					},
+					"quality": {
+						Type:        "string",
+						Description: "Audio/media quality: 'high' (default) or 'low'",
+						Enum:        []string{"high", "low"},
+					},
+					"max_height": {
+						Type:        "integer",
+						Description: "Maximum video height in pixels for video downloads (e.g. 480, 720, 1080). 0 or omitted for default/unlimited",
+					},
 				},
 				Required: []string{"feed_id"},
 			},
@@ -799,6 +808,13 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		title, _ := args["title"].(string)
 		format, _ := args["format"].(string)
+		quality, _ := args["quality"].(string)
+		var maxHeight int
+		if mh, ok := args["max_height"].(float64); ok {
+			maxHeight = int(mh)
+		} else if mh, ok := args["max_height"].(int); ok {
+			maxHeight = mh
+		}
 		urlStr, _ := args["url"].(string)
 		filePath, _ := args["file_path"].(string)
 
@@ -814,7 +830,7 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		if filePath != "" {
 			ep, err = s.personal.AddPath(ctx, strings.TrimSpace(feedID), filePath, title, format)
 		} else {
-			ep, err = s.personal.AddURL(ctx, strings.TrimSpace(feedID), urlStr, title, format)
+			ep, err = s.personal.AddURL(ctx, strings.TrimSpace(feedID), urlStr, title, format, quality, maxHeight)
 		}
 		if err != nil {
 			return CallToolResult{}, err

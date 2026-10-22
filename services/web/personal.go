@@ -115,10 +115,12 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			}
 		case http.MethodPost:
 			var req struct {
-				URL      string `json:"url"`
-				FilePath string `json:"file_path"`
-				Title    string `json:"title"`
-				Format   string `json:"format"`
+				URL       string `json:"url"`
+				FilePath  string `json:"file_path"`
+				Title     string `json:"title"`
+				Format    string `json:"format"`
+				Quality   string `json:"quality"`
+				MaxHeight int    `json:"max_height"`
 			}
 			if e := decodePersonal(w, r, &req); e != nil {
 				badBody(e)
@@ -127,7 +129,7 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			if req.FilePath != "" {
 				result, err = s.personal.AddPath(r.Context(), parts[0], req.FilePath, req.Title, req.Format)
 			} else {
-				result, err = s.personal.AddURL(r.Context(), parts[0], req.URL, req.Title, req.Format)
+				result, err = s.personal.AddURL(r.Context(), parts[0], req.URL, req.Title, req.Format, req.Quality, req.MaxHeight)
 			}
 			status = http.StatusAccepted
 		default:

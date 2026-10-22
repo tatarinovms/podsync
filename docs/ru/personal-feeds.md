@@ -72,7 +72,7 @@
 | `PATCH` | `/api/v1/personal-feeds/{id}` | `{"title": "...", "description": "...", "cover_art": "...", "playlist_sort": "asc", "private_feed": true}` | Частичное обновление настроек. |
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query-параметры | Удаление ленты и RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | Нет | Список эпизодов ленты. |
-| `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio"}` | Добавление эпизода по ссылке или пути к файлу. |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Добавление эпизода по ссылке или пути к файлу с выбором качества. |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`) | Загрузка медиафайла (до 4 ГиБ). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Копирование эпизода в другую ленту. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Перемещение эпизода в другую ленту. |
@@ -90,7 +90,7 @@
 | **`list_personal_feeds`** | `{}` | Список всех персональных лент, количество эпизодов, общий вес и RSS URL. |
 | **`get_personal_feed`** | `feed_id` *(обяз)* | Метаданные ленты и список всех эпизодов (со статусом, источником и ссылкой). |
 | **`create_personal_feed`** | `title` *(обяз)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Создать новую персональную ленту. |
-| **`add_personal_episode`** | `feed_id` *(обяз)*, `url` *(опц)*, `file_path` *(опц)*, `title` *(опц)*, `format` *(опц)* | Добавить эпизод по ссылке или локальному пути к файлу. |
+| **`add_personal_episode`** | `feed_id` *(обяз)*, `url` *(опц)*, `file_path` *(опц)*, `title` *(опц)*, `format` *(опц)*, `quality` *(опц)*, `max_height` *(опц)* | Добавить эпизод по ссылке или локальному пути к файлу. |
 | **`delete_personal_episode`** | `feed_id` *(обяз)*, `episode_id` *(обяз)* | Удалить эпизод из ленты и очистить занятое дисковое пространство. |
 | **`rename_personal_episode`** | `feed_id` *(обяз)*, `episode_id` *(обяз)*, `title` *(обяз)* | Переименовать эпизод в персональной ленте. |
 

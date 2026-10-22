@@ -164,15 +164,35 @@
                                             <label for="personal-url" class="form-label small text-muted">Direct media link or video platform URL *</label>
                                             <input id="personal-url" type="url" required class="form-control" placeholder="MP3, OGG, MP4 direct URL, or YouTube / VK / Rutube">
                                         </div>
+                                        <div class="mb-3">
+                                            <label for="personal-url-title" class="form-label small text-muted">Episode Title (optional)</label>
+                                            <input id="personal-url-title" class="form-control" placeholder="Title (optional, auto-detected if empty)" aria-label="Episode title">
+                                        </div>
                                         <div class="row g-2 mb-3">
-                                            <div class="col-7">
-                                                <input id="personal-url-title" class="form-control" placeholder="Title (optional)" aria-label="Episode title">
-                                            </div>
-                                            <div class="col-5">
-                                                <select id="personal-url-format" class="form-select" aria-label="Format">
-                                                    <option value="auto">Auto-detect</option>
-                                                    <option value="audio">Audio (MP3)</option>
+                                            <div class="col-sm-6">
+                                                <label for="personal-url-format" class="form-label small text-muted">Format</label>
+                                                <select id="personal-url-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUrlQuality()">
+                                                    <option value="audio" selected>Audio (MP3)</option>
                                                     <option value="video">Video (MP4)</option>
+                                                    <option value="auto">Auto-detect</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6" id="personal-url-audio-quality-col">
+                                                <label for="personal-url-quality" class="form-label small text-muted">Audio Quality</label>
+                                                <select id="personal-url-quality" class="form-select form-select-sm">
+                                                    <option value="high" selected>High</option>
+                                                    <option value="low">Low</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-sm-6" id="personal-url-video-quality-col" style="display: none;">
+                                                <label for="personal-url-max-height" class="form-label small text-muted">Video Quality</label>
+                                                <select id="personal-url-max-height" class="form-select form-select-sm">
+                                                    <option value="480">480p</option>
+                                                    <option value="720" selected>720p (HD)</option>
+                                                    <option value="1080">1080p (Full HD)</option>
+                                                    <option value="1440">1440p (2K)</option>
+                                                    <option value="2160">2160p (4K)</option>
+                                                    <option value="0">Default (Original)</option>
                                                 </select>
                                             </div>
                                         </div>

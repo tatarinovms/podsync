@@ -3886,6 +3886,13 @@
             } catch (error) { personalError(error, 'personal-edit-error'); }
             finally { if (button) button.disabled = false; }
         }
+        function togglePersonalUrlQuality() {
+            const fmt = document.getElementById('personal-url-format')?.value;
+            const vCol = document.getElementById('personal-url-video-quality-col');
+            const aCol = document.getElementById('personal-url-audio-quality-col');
+            if (vCol) vCol.style.display = (fmt === 'video') ? 'block' : 'none';
+            if (aCol) aCol.style.display = (fmt === 'audio' || fmt === 'auto') ? 'block' : 'none';
+        }
         async function personalAddURL(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
             try {
@@ -3895,8 +3902,16 @@
                 };
                 const formatVal = document.getElementById('personal-url-format')?.value;
                 if (formatVal) body.format = formatVal;
+                const qualityVal = document.getElementById('personal-url-quality')?.value;
+                if (qualityVal) body.quality = qualityVal;
+                const maxHeightVal = document.getElementById('personal-url-max-height')?.value;
+                if (maxHeightVal !== undefined && maxHeightVal !== '') {
+                    body.max_height = parseInt(maxHeightVal, 10) || 0;
+                }
                 await personalAPI('/'+encodeURIComponent(id)+'/episodes',personalJSON('POST',body));
-                event.target.reset(); if (personalCurrentID === id) await personalOpen(id);
+                event.target.reset();
+                togglePersonalUrlQuality();
+                if (personalCurrentID === id) await personalOpen(id);
                 await loadPersonalFeeds();
             } catch (error) { personalError(error); } finally { if (button) button.disabled = false; }
         }

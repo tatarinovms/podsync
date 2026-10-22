@@ -44,6 +44,8 @@ type Media struct {
 	SourcePath    string              `json:"source_path,omitempty"`
 	Path          string              `json:"path"`
 	Format        model.Format        `json:"format"`
+	Quality       model.Quality       `json:"quality,omitempty"`
+	MaxHeight     int                 `json:"max_height,omitempty"`
 	Title         string              `json:"title"`
 	Description   string              `json:"description"`
 	Thumbnail     string              `json:"thumbnail"`

@@ -314,17 +314,28 @@ func detectFormat(sourceURL, sourcePath, requestedFormat string) model.Format {
 	}
 }
 
-func (s *Service) AddURL(ctx context.Context, id, source, title, format string) (*model.Episode, error) {
+func (s *Service) AddURL(ctx context.Context, id, source, title, format string, quality string, maxHeight int) (*model.Episode, error) {
 	source = strings.TrimSpace(source)
 	if err := validateURL(source); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	q := model.QualityHigh
+	if strings.ToLower(strings.TrimSpace(quality)) == string(model.QualityLow) {
+		q = model.QualityLow
+	}
+	if maxHeight < 0 {
+		maxHeight = 0
+	}
+
 	return s.addLocked(ctx, id, &Media{
 		SourceURL: source,
 		Title:     strings.TrimSpace(title),
 		Format:    detectFormat(source, "", format),
+		Quality:   q,
+		MaxHeight: maxHeight,
 	})
 }
 func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*model.Episode, error) {
@@ -341,6 +352,9 @@ func (s *Service) addLocked(ctx context.Context, id string, media *Media) (*mode
 	}
 	if media.Format == "" {
 		media.Format = detectFormat(media.SourceURL, media.SourcePath, "")
+	}
+	if media.Quality == "" {
+		media.Quality = model.QualityHigh
 	}
 	member := Membership{ID: memberID, MediaID: media.ID, AddedAt: time.Now().UTC()}
 	err = s.store.PersonalUpdate(func(tx db.PersonalTx) error {

@@ -102,7 +102,18 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 			m.Description = description
 			m.Thumbnail = thumbnail
 			m.Duration = duration
-			cfg := &feed.Config{ID: m.ID, Format: m.Format, Quality: model.QualityHigh, YouTubeDLArgs: []string{"--no-playlist"}}
+
+			quality := m.Quality
+			if quality == "" {
+				quality = model.QualityHigh
+			}
+			cfg := &feed.Config{
+				ID:            m.ID,
+				Format:        m.Format,
+				Quality:       quality,
+				MaxHeight:     m.MaxHeight,
+				YouTubeDLArgs: []string{"--no-playlist"},
+			}
 			if m.Format == model.FormatVideo {
 				cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
 			}
@@ -118,7 +129,18 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 				m.Description = description
 				m.Thumbnail = thumbnail
 				m.Duration = duration
-				cfg := &feed.Config{ID: m.ID, Format: m.Format, Quality: model.QualityHigh, YouTubeDLArgs: []string{"--no-playlist"}}
+
+				quality := m.Quality
+				if quality == "" {
+					quality = model.QualityHigh
+				}
+				cfg := &feed.Config{
+					ID:            m.ID,
+					Format:        m.Format,
+					Quality:       quality,
+					MaxHeight:     m.MaxHeight,
+					YouTubeDLArgs: []string{"--no-playlist"},
+				}
 				if m.Format == model.FormatVideo {
 					cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
 				}
@@ -232,13 +254,12 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 	if err != nil {
 		return nil, err
 	}
-	_, copyErr := io.Copy(out, source)
-	closeErr := out.Close()
-	if copyErr != nil {
-		return nil, copyErr
+	if _, err := io.Copy(out, source); err != nil {
+		_ = out.Close()
+		return nil, err
 	}
-	if closeErr != nil {
-		return nil, closeErr
+	if err := out.Close(); err != nil {
+		return nil, err
 	}
 
 	rc, err := p.convertFile(ctx, m, dir, input)
@@ -249,43 +270,92 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 }
 
 func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input string) (io.ReadCloser, error) {
-	hasVideo := probeHasVideo(ctx, input)
-	extension := "mp3"
-	args := []string{"-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-i", input}
-
-	if hasVideo && m.Format != model.FormatAudio {
-		extension = "mp4"
-		if strings.HasSuffix(m.Path, ".mp3") {
-			m.Path = strings.TrimSuffix(m.Path, ".mp3") + ".mp4"
+	output := filepath.Join(dir, "output.media")
+	targetFormat := m.Format
+	if targetFormat == "" {
+		if probeHasVideo(ctx, input) {
+			targetFormat = model.FormatVideo
+		} else {
+			targetFormat = model.FormatAudio
 		}
-		args = append(args, "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "fast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart")
+		m.Format = targetFormat
+	}
+
+	var cmd *exec.Cmd
+	if targetFormat == model.FormatVideo {
+		// Output MP4 (H.264 / AAC)
+		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-c:v", "libx264", "-c:a", "aac", "-movflags", "+faststart", output)
 	} else {
-		if strings.HasSuffix(m.Path, ".mp4") {
-			m.Path = strings.TrimSuffix(m.Path, ".mp4") + ".mp3"
-		}
-		args = append(args, "-vn", "-c:a", "libmp3lame", "-q:a", "2")
+		// Output MP3
+		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", output)
+	}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("media conversion failed (%w): %s", err, string(out))
 	}
 
-	output := filepath.Join(dir, "media."+extension)
-	result, err := exec.CommandContext(ctx, "ffmpeg", append(args, output)...).CombinedOutput()
+	// Extract duration via ffprobe
+	durCmd := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", output)
+	if durOut, err := durCmd.Output(); err == nil {
+		if durFloat, err := strconv.ParseFloat(strings.TrimSpace(string(durOut)), 64); err == nil {
+			m.Duration = int64(durFloat)
+		}
+	}
+
+	// Extract video thumbnail if format is video and no thumbnail exists yet
+	if targetFormat == model.FormatVideo && m.Thumbnail == "" {
+		thumbPath := filepath.Join(dir, "thumb.jpg")
+		thumbCmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-ss", "00:00:01", "-i", output, "-vframes", "1", "-q:v", "2", thumbPath)
+		if err := thumbCmd.Run(); err == nil {
+			if tf, err := os.Open(thumbPath); err == nil {
+				defer tf.Close()
+				thumbStoragePath := "_personal/" + m.ID + "/thumb.jpg"
+				if _, err := p.Files.Create(ctx, thumbStoragePath, tf); err == nil {
+					m.Thumbnail = "/" + thumbStoragePath
+				}
+			}
+		}
+	}
+
+	fi, err := os.Stat(output)
 	if err != nil {
-		return nil, fmt.Errorf("media conversion: %s: %w", strings.TrimSpace(string(result)), err)
+		return nil, err
 	}
-	probe, err := exec.CommandContext(ctx, "ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", output).Output()
-	if err == nil {
-		var data struct {
-			Format struct {
-				Duration string `json:"duration"`
-			} `json:"format"`
-		}
-		if json.Unmarshal(probe, &data) == nil {
-			v, _ := strconv.ParseFloat(data.Format.Duration, 64)
-			m.Duration = int64(v)
-		}
-	}
+	m.Size = fi.Size()
+
 	f, err := os.Open(output)
 	if err != nil {
 		return nil, err
 	}
-	return &convertedFile{f, dir}, nil
+	return &convertedFile{File: f, dir: dir}, nil
+}
+
+func probeMetadata(ctx context.Context, input string) (title, desc string, duration int64) {
+	cmd := exec.CommandContext(ctx, "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", input)
+	out, err := cmd.Output()
+	if err != nil {
+		return
+	}
+	var probe struct {
+		Format struct {
+			Duration string            `json:"duration"`
+			Tags     map[string]string `json:"tags"`
+		} `json:"format"`
+	}
+	if err := json.Unmarshal(out, &probe); err != nil {
+		return
+	}
+	if d, err := strconv.ParseFloat(probe.Format.Duration, 64); err == nil {
+		duration = int64(d)
+	}
+	for k, v := range probe.Format.Tags {
+		switch strings.ToLower(k) {
+		case "title":
+			title = v
+		case "description", "comment":
+			if desc == "" {
+				desc = v
+			}
+		}
+	}
+	return
 }

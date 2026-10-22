@@ -71,7 +71,7 @@ All endpoints require administrator authentication (Basic Auth or session cookie
 | `PATCH` | `/api/v1/personal-feeds/{id}` | `{"title": "...", "description": "...", "cover_art": "...", "playlist_sort": "asc", "private_feed": true}` | Partially updates feed settings. |
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query params | Deletes feed and unmounts RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | None | Returns list of episode objects. |
-| `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio"}` | Adds episode from URL or local file path. |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Adds episode from URL or local file path with quality selection. |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`) | Uploads media file (up to 4 GiB). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Copies episode to another feed (shared file). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Moves episode to another feed (retains GUID). |
@@ -89,7 +89,7 @@ AI assistants (**Claude Desktop**, **OpenCode**, **Cursor**, **Cline**, **Antigr
 | **`list_personal_feeds`** | `{}` | List all curated personal feeds, episode counts, total sizes, and feed URLs. |
 | **`get_personal_feed`** | `feed_id` *(req)* | Get metadata and all episodes (with status, source URL/file, and media URL). |
 | **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
-| **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt)* | Add an episode from a URL or local server file path. |
+| **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt)*, `quality` *(opt)*, `max_height` *(opt)* | Add an episode from a URL or local server file path. |
 | **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
 | **`rename_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `title` *(req)* | Rename an episode in a personal podcast feed. |
 

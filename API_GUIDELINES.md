@@ -414,7 +414,9 @@ Queues a new episode for downloading and ingestion into the personal feed from a
   "url": "https://www.youtube.com/watch?v=... or https://example.com/file.mp3",
   "file_path": "/var/media/audio.mp3",
   "title": "Custom Title Override",
-  "format": "audio"
+  "format": "audio",
+  "quality": "high",
+  "max_height": 720
 }
 ```
 - **Fields**:
@@ -422,6 +424,8 @@ Queues a new episode for downloading and ingestion into the personal feed from a
   - `file_path` *(string, optional)*: Absolute path to a media file located directly on the server filesystem.
   - `title` *(string, optional)*: Custom episode title override.
   - `format` *(string, optional)*: Target media format (`"audio"` or `"video"`). Auto-detected if omitted.
+  - `quality` *(string, optional)*: Media quality preference (`"high"` or `"low"`). Defaults to `"high"`.
+  - `max_height` *(integer, optional)*: Maximum video height (e.g. `480`, `720`, `1080`, `1440`, `2160`, or `0` for original). Defaults to `0` (unlimited).
 - **Response**: `202 Accepted` with episode status object.
 
 #### `POST /api/v1/personal-feeds/{id}/upload`

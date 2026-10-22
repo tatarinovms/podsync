@@ -137,16 +137,25 @@ func (l *Local) Open(name string) (http.File, error) {
 func (l *Local) Delete(_ctx context.Context, name string) error {
 	rootPath, relPath, err := l.resolveTarget(name)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
 		return err
 	}
 
 	root, err := os.OpenRoot(rootPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
 		return err
 	}
 	defer root.Close()
 
 	if err := root.Remove(relPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
 		return fmt.Errorf("failed to delete file %s: %w", name, err)
 	}
 	return nil

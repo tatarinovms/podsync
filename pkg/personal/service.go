@@ -20,6 +20,7 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
+	log "github.com/sirupsen/logrus"
 )
 
 type Processor interface {
@@ -613,8 +614,8 @@ func (s *Service) collectLocked(ctx context.Context) error {
 		return err
 	}
 	for _, id := range deleted {
-		if err := s.files.Delete(ctx, id+".xml"); err != nil && !os.IsNotExist(err) {
-			return err
+		if err := s.files.Delete(ctx, id+".xml"); err != nil && !errors.Is(err, os.ErrNotExist) && !os.IsNotExist(err) {
+			log.WithError(err).Warnf("failed to delete feed xml %s", id)
 		}
 		if err := s.store.PersonalUpdate(func(tx db.PersonalTx) error { return tx.Delete("deleted/" + id) }); err != nil {
 			return err
@@ -626,8 +627,8 @@ func (s *Service) collectLocked(ctx context.Context) error {
 				if err := validateMediaPath(path); err != nil {
 					return err
 				}
-				if err := s.files.Delete(ctx, path); err != nil && !os.IsNotExist(err) {
-					return err
+				if err := s.files.Delete(ctx, path); err != nil && !errors.Is(err, os.ErrNotExist) && !os.IsNotExist(err) {
+					log.WithError(err).Warnf("failed to delete media file %s", path)
 				}
 			}
 		}

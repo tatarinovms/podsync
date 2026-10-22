@@ -314,3 +314,153 @@ Updates brute-force rate limiter parameters on the fly in memory and persists th
   }
 }
 ```
+
+### 3.7 Personal Feeds Management
+
+Personal feeds allow users to curate custom hybrid podcast feeds containing both audio and video episodes. Media files are stored in a dedicated content-addressed directory with reference counting, allowing episodes to be shared across multiple feeds without duplicating large files.
+
+#### `GET /api/v1/personal-feeds`
+Returns a list of all personal feeds.
+- **Response**: Array of `personal.Feed` objects:
+```json
+[
+  {
+    "id": "personal",
+    "type": "personal",
+    "title": "My Feed",
+    "description": "My curated audio and video podcast",
+    "cover_art": "https://example.com/cover.jpg",
+    "playlist_sort": "desc",
+    "private_feed": false,
+    "feed_url": "http://localhost:8080/personal.xml",
+    "episode_count": 8,
+    "created_at": "2026-10-22T10:00:00Z",
+    "updated_at": "2026-10-22T12:00:00Z"
+  }
+]
+```
+
+#### `POST /api/v1/personal-feeds`
+Creates a new personal podcast feed.
+- **Request Body**:
+```json
+{
+  "title": "Tech & Talks",
+  "description": "Curated collection of conference talks and podcasts",
+  "cover_art": "https://example.com/cover.jpg",
+  "playlist_sort": "desc",
+  "private_feed": false
+}
+```
+- **Validation**:
+  - `title` *(required, non-empty)*
+  - `playlist_sort` *(optional)*: `"desc"` (newest first, default) or `"asc"` (oldest first).
+  - `private_feed` *(optional, bool)*: emits `<itunes:block>yes</itunes:block>` when true.
+- **Response**: `201 Created` returning the new `personal.Feed` object with an auto-generated unique ID (`personal-<32 hex characters>`).
+
+#### `GET /api/v1/personal-feeds/{id}`
+Returns details for a personal feed and its list of episodes.
+- **Response**:
+```json
+{
+  "feed": {
+    "id": "personal",
+    "title": "My Feed",
+    "feed_url": "http://localhost:8080/personal.xml",
+    "episode_count": 1
+  },
+  "episodes": [
+    {
+      "id": "ep-uuid-1",
+      "title": "Podcast Episode 1",
+      "status": "downloaded",
+      "media_type": "audio/mpeg",
+      "media_url": "http://localhost:8080/_personal/media-hash/file.mp3",
+      "duration": 3600,
+      "size": 52428800,
+      "pub_date": "2026-10-22T12:00:00Z"
+    }
+  ]
+}
+```
+
+#### `PATCH /api/v1/personal-feeds/{id}`
+Updates metadata for an existing personal feed. Omitted fields are preserved.
+- **Request Body**:
+```json
+{
+  "title": "Updated Title",
+  "description": "New description",
+  "cover_art": "https://example.com/new-cover.jpg",
+  "playlist_sort": "asc",
+  "private_feed": true
+}
+```
+
+#### `DELETE /api/v1/personal-feeds/{id}?confirm=true&delete_files={bool}`
+Deletes the personal feed and unmounts its RSS XML.
+- **Query Parameters**:
+  - `confirm`: required (`true`).
+  - `delete_files` *(optional, default: false)*: when `true`, media files associated exclusively with this feed are removed from disk. Shared files referenced by other feeds are preserved.
+
+#### `GET /api/v1/personal-feeds/{id}/episodes`
+Lists all episode objects for a personal feed.
+
+#### `POST /api/v1/personal-feeds/{id}/episodes`
+Queues a new episode for downloading and ingestion into the personal feed from a URL or local server file path.
+- **Request Body**:
+```json
+{
+  "url": "https://www.youtube.com/watch?v=... or https://example.com/file.mp3",
+  "file_path": "/var/media/audio.mp3",
+  "title": "Custom Title Override",
+  "format": "audio"
+}
+```
+- **Fields**:
+  - `url` *(string, optional)*: Web URL (YouTube, VK Video, Rutube, or direct HTTP/HTTPS link to MP3, OGG, MP4, etc.).
+  - `file_path` *(string, optional)*: Absolute path to a media file located directly on the server filesystem.
+  - `title` *(string, optional)*: Custom episode title override.
+  - `format` *(string, optional)*: Target media format (`"audio"` or `"video"`). Auto-detected if omitted.
+- **Response**: `202 Accepted` with episode status object.
+
+#### `POST /api/v1/personal-feeds/{id}/upload`
+Directly uploads a media file (up to 4 GiB) via multipart form data.
+- **Form Fields**:
+  - `file` *(file, required)*: Audio or video file (`.mp3`, `.ogg`, `.opus`, `.m4a`, `.wav`, `.flac`, `.mp4`, `.mkv`, `.webm`, `.mov`).
+  - `title` *(string, optional)*: Custom episode title.
+  - `format` *(string, optional)*: Preferred media format (`"audio"` or `"video"`).
+- **Processing**:
+  - Audio files are converted to compatible MP3 with duration and metadata extraction via `ffmpeg`.
+  - Video files are remuxed to MP4 (H.264 / AAC) with duration and thumbnail extraction.
+- **Response**: `202 Accepted`.
+
+#### `POST /api/v1/personal-feeds/{id}/episodes/{episode_id}/copy`
+Copies an episode into another personal feed without duplicating the underlying media file on disk.
+- **Request Body**:
+```json
+{
+  "target_feed_id": "personal-target-id"
+}
+```
+- **Behavior**: Generates a new unique episode membership and GUID in the target feed, incrementing the underlying media object reference count.
+
+#### `POST /api/v1/personal-feeds/{id}/episodes/{episode_id}/move`
+Moves an episode from one personal feed to another.
+- **Request Body**:
+```json
+{
+  "target_feed_id": "personal-target-id"
+}
+```
+- **Behavior**: Reassigns the episode membership while preserving the episode GUID and publication date.
+
+#### `POST /api/v1/personal-feeds/{id}/episodes/{episode_id}/retry`
+Resets a failed episode in the queue to retry downloading.
+- **Response**: `202 Accepted`.
+
+#### `DELETE /api/v1/personal-feeds/{id}/episodes/{episode_id}?confirm=true&delete_files={bool}`
+Removes an episode from the personal feed.
+- **Query Parameters**:
+  - `confirm`: required (`true`).
+  - `delete_files` *(optional, default: false)*: when `true`, decrements the media reference counter and deletes the file from disk if no other personal feeds reference it.

@@ -90,13 +90,13 @@ Log in using the configured username and password.
 
 ### 1. Sidebar Navigation & Library Organization
 - **Structured Sidebar (`.app-sidebar`)**:
-  - **LIBRARY**: Direct access to **Podcasts** (with total count badge), **Audiobooks**, and **Activity** (with live error badge).
+  - **LIBRARY**: Direct access to **Podcasts** (with total count badge), **Personal feeds**, **Audiobooks**, and **Activity** (with live error badge).
   - **SETTINGS**: Centralized access to **API Keys**, **Downloader**, **System & Storage**, and **MCP Server**.
 - **Dual View Modes (Grid & List)**:
   - Toggle between rich **Card Grid** view and high-density **List View** with view preference persisted in `localStorage`.
 - **Live Search, Type Filters & Sorting**:
   - Instant search across podcast titles, authors, and show metadata with preserved focus.
-  - Filter by feed type (**All types**, **Channels**, **Audiobooks**).
+  - Filter by feed type (**All types**, **Channels**, **Personal**, **Audiobooks**).
   - Sort by **Title A–Z**, **Recently updated**, or **Largest first** (storage footprint).
 - **Status Quick-Filters**:
   - Interactive chips for **All**, **Updating**, and **Needs attention** with real-time numeric badges.
@@ -131,7 +131,23 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Retry Failed Episodes**: One-click batch retry across all failing episodes in the entire library.
   - **Refresh List**: Reload library metadata on demand.
 
-### 5. API Keys Management
+### 5. Personal Feeds Management
+- **Universal Feeds (Audio + Video)**: Curate individual videos and audio files into custom podcast feeds. Both audio tracks and video clips can reside in the same feed, with dynamic `<enclosure>` MIME types.
+- **Unified Library & Dedicated Tab**:
+  - Directly manage feeds, upload files, and add URLs in the dedicated **Personal feeds** tab.
+  - Personal feeds are also surfaced on the main **Podcasts** tab with a **Personal** provider badge and quick action buttons.
+- **Multiple Ingestion Methods**:
+  - **URL Links**: Add episodes by URL from YouTube, VK Video, Rutube, or direct HTTP/HTTPS links to `.mp3`, `.ogg`, `.mp4` files.
+  - **Server Local Files**: Import media directly by local filesystem path (`file_path`).
+  - **File Uploads**: Drag-and-drop or upload local audio/video files (up to 4 GiB) with real-time progress and automatic `ffmpeg` transcoding.
+- **Episode Operations**:
+  - In-browser playback with integrated audio/video player.
+  - **Copy**: Clone an episode into another personal feed without duplicating physical storage.
+  - **Move**: Transfer an episode between feeds while preserving its GUID.
+  - **Retry**: Re-attempt failed downloads or transcoding.
+- **Unified Subscription**: One-click **Subscribe** modal with QR code, direct RSS copy, and deep links for Apple Podcasts, Pocket Casts, and Overcast.
+
+### 6. API Keys Management
 - The **API Keys** tab displays current tokens for all providers:
   - **VK Video** (`PODSYNC_VKVIDEO_API_KEY` / `PODSYNC_VK_API_KEY`)
   - **YouTube** (`PODSYNC_YOUTUBE_API_KEY`)
@@ -142,7 +158,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
 - Existing keys are masked (`••••••••`) for security.
 - Add or update keys directly from the web interface — changes are automatically saved to `config.toml`.
 
-### 6. System Health & Observability
+### 7. System Health & Observability
 - **Security & Rate Limiting**:
   - Brute-force protection tracking failed login attempts per client IP and username.
   - Dynamically configurable via Web UI modal or API (`max_attempts`, `window`, `lockout`).

@@ -69,7 +69,7 @@ Before committing changes, opening pull requests, or creating release tags, run 
 
 ## 6. MCP & Skill Synchronization
 
-- [ ] **Tool Count**: All 21 MCP tools in `pkg/mcp/server.go` have matching implementations in `pkg/mcp/proxy.go` and `cmd/podsync/feed_manager.go`.
+- [ ] **Tool Count**: All 27 MCP tools in `pkg/mcp/server.go` have matching implementations in `pkg/mcp/proxy.go` and `cmd/podsync/feed_manager.go`.
 - [ ] **Skill Parity**:
   - Updated `.agents/skills/podsync/SKILL.md`.
   - Copied to `/Users/tatarinovms/.gemini/config/skills/podsync/SKILL.md` and project skill directories.

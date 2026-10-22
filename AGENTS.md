@@ -80,13 +80,18 @@ This file provides comprehensive architecture guidance, development workflows, a
 ## 3. Platform Implementations & Specifics
 
 ### Personal feeds (`pkg/personal/`)
-- Independent **Персональные ленты** section in **LIBRARY**, separate from Podcasts and Audiobooks.
-- Unlimited manually curated feeds, with immutable generated IDs and one-time default `personal` (Моя лента).
-- Settings, membership GUIDs, shared media records, reference counts and initialization marker use a separate transactional Badger namespace. See `docs/personal-feeds.md`.
-- REST routes under `/api/v1/personal-feeds/{id}` include episodes, upload, copy, move, retry and confirmed deletion.
-- Personal media uses the existing persistent worker queue, yt-dlp, ffmpeg and `fs.Storage`; no cron or retention cleanup.
-- Copy creates a new membership GUID without copying files; move retains the GUID. Delete media only after its last membership is removed and file deletion was explicitly requested.
-- Preserve the initialization marker when deleting the default feed. Keep media format immutable so cross-format copies retain correct enclosure MIME types.
+- Universal curated feeds capable of hosting both audio and video episodes simultaneously in a single feed. Each episode generates dynamic `<enclosure>` MIME types matching its real format (`audio/mpeg`, `video/mp4`, etc.).
+- Dedicated **Personal feeds** tab in **LIBRARY**, plus unified card display on the main **Podcasts** tab with the `Personal` filter option.
+- Unlimited manually curated feeds with immutable generated IDs (`personal-<32hex>`) and an initial default `personal` (`My Feed`).
+- Media ingestion supports:
+  - Direct media URLs (HTTP/HTTPS links to `.mp3`, `.ogg`, `.wav`, `.mp4`, `.mkv`, etc.).
+  - Video and audio platform URLs (YouTube, VK Video, Rutube).
+  - Local server file paths (`file_path`) via API and MCP tools.
+  - Multipart file uploads up to 4 GiB via Web UI or REST API.
+  - Automatic `ffmpeg` conversion to MP3 for audio and MP4 for video, preserving duration, metadata, and artwork.
+- Dedicated transactional BadgerDB namespace (`podsync/personal/v1/`) for feed configs, episode memberships, and shared media references.
+- Copying an episode creates a new stable GUID referencing shared media; moving an episode retains the original GUID. Media files are only deleted when their reference count drops to zero and file deletion was explicitly requested.
+- Managed by 5 specialized MCP tools: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`.
 
 ### Local Audiobooks (`audiobook://<folder_name>`)
 - **Protocol**: `audiobook://<folder>` or `audiobook://relative/path`
@@ -185,6 +190,18 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `GET`/`POST`/`DELETE` | `/api/v1/downloader/cookies` | Manage Netscape `cookies.txt` content |
 | `POST` | `/api/v1/downloader/test` | Test yt-dlp metadata extraction against URL |
 | `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
+| `GET` | `/api/v1/personal-feeds` | List all personal podcast feeds |
+| `POST` | `/api/v1/personal-feeds` | Create new personal podcast feed |
+| `GET` | `/api/v1/personal-feeds/{id}` | Get personal feed details and episodes |
+| `PATCH` | `/api/v1/personal-feeds/{id}` | Update personal feed title, description, cover, or sort order |
+| `DELETE` | `/api/v1/personal-feeds/{id}` | Delete personal feed (optional `?delete_files=true`) |
+| `GET` | `/api/v1/personal-feeds/{id}/episodes` | List all episodes in a personal feed |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode via `url`, `file_path`, `title`, `format` |
+| `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart file upload with `file`, `title`, `format` |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | Copy episode to another personal feed (`target_feed_id`) |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | Move episode to another personal feed (`target_feed_id`) |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Retry failed personal feed episode download |
+| `DELETE` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | Delete episode from personal feed (optional `?delete_files=true`) |
 
 ---
 

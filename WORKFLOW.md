@@ -72,6 +72,12 @@ go test -v ./pkg/feed
 
 # Test Builders (VK, YouTube, Audiobooks, Rutube)
 go test -v ./pkg/builder
+
+# Test Personal Feeds Service
+go test -v ./pkg/personal
+
+# Test MCP Server & Documentation Synchronization
+go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...
 ```
 
 ---
@@ -81,9 +87,12 @@ go test -v ./pkg/builder
 The Web UI is an embedded Single Page Application located in `services/web/ui/index.html`.
 
 ### 3.1 Synchronizing Files
-Whenever `services/web/ui/index.html` is modified, you must copy it to `html/index.html`:
+Whenever Web UI assets in `services/web/ui/` are modified, keep `html/` byte-for-byte synchronized:
 ```bash
 cp services/web/ui/index.html html/index.html
+cp services/web/ui/admin.js html/admin.js
+cp services/web/ui/admin.css html/admin.css
+cp services/web/ui/theme.js html/theme.js
 ```
 
 ### 3.2 Modal Lifecycle Rules

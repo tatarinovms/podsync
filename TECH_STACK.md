@@ -89,5 +89,5 @@ Embedded directly within the Go binary (`//go:embed ui/*` from `services/web/ui/
 
 - **RSS 2.0 & iTunes Podcast Specifications**: Compliant XML schema with audio/video enclosures, artwork, categories, explicit tags, and `<itunes:block>yes</itunes:block>` for private feeds.
 - **Podcast 2.0**: Serial feed specification (`<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`) for episodic audiobook chapters.
-- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing JSON-RPC 2.0 tools and resources over Stdio and HTTP Server-Sent Events (SSE).
+- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing 27 JSON-RPC 2.0 tools and resources over Stdio and HTTP Server-Sent Events (SSE).
 - **Netscape Cookie Format**: Standard cookies header format used by `yt-dlp` to authenticate and bypass bot challenges.

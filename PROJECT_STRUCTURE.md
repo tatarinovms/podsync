@@ -64,9 +64,10 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`opml.go`**: Generates OPML subscriptions export file.
 
 ### 2.5 `pkg/personal/` (Personal Feeds Service)
-- **`service.go`**: Core service orchestrating user-curated custom podcast feeds. Coordinates transactional feed configurations, membership records, shared media reference counting, and XML generation.
+- **`service.go`**: Core service orchestrating user-curated, universal podcast feeds. Coordinates transactional feed configurations, membership records, shared media reference counting, and dynamic XML enclosure generation.
+- **`processor.go`**: Ingestion pipeline handling direct media URLs (MP3, OGG, OPUS, WAV, FLAC, MP4, MKV, WebM), platform URLs (YouTube, VK Video, Rutube), server local file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
 - **Copying & Moving**: Supports copying episodes (allocating a new stable GUID referencing shared media) and moving episodes (preserving the existing GUID).
-- **Media Ingestion**: Handles single-item URL downloads (YouTube, VK Video, Rutube, direct URLs) and direct local file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
+- **Library Integration**: Seamlessly integrated into the main Podcasts tab with a `Personal` filter, unified subscribe modal, and 5 dedicated MCP tools.
 
 ### 2.6 `pkg/fs/` (Storage & Mounter)
 - **`storage.go`**: `Storage` interface for saving and retrieving media and XML files.
@@ -81,7 +82,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`buffer.go`**: Thread-safe circular ring buffer capturing system log entries for live querying and real-time frontend streaming.
 
 ### 2.9 `pkg/mcp/` (Model Context Protocol)
-- **`server.go`**: Implements the MCP protocol server exposing 21 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
+- **`server.go`**: Implements the MCP protocol server exposing 27 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
 - **`proxy.go`**: `HTTPClientManager` that forwards MCP commands to a running Podsync instance via HTTP REST.
 - **`sse.go`**: SSE transport implementation for MCP clients.
 

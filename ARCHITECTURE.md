@@ -19,6 +19,7 @@ flowchart TD
     subgraph Service["Podsync Server (Go Runtime)"]
         WebServer["Web Server & REST API\n(:8080 /admin, /api/v1)"]
         MCPServer["MCP Server\n(Stdio & SSE /mcp)"]
+        PersonalService["Personal Feeds Service\n(pkg/personal)"]
         FeedMgr["AppFeedManager\n(In-Memory State & Coordination)"]
         CronSched["Cron Scheduler\n(robfig/cron/v3)"]
         UpdateQueue["Update Queue\n(Buffered Channel)"]
@@ -52,6 +53,12 @@ flowchart TD
 
     WebServer <--> FeedMgr
     MCPServer <--> FeedMgr
+    WebServer <--> PersonalService
+    MCPServer <--> PersonalService
+    PersonalService --> BadgerDB
+    PersonalService --> Storage
+    PersonalService --> YTDLP
+    PersonalService --> XMLGen
     CronSched -->|Trigger feed| UpdateQueue
     FeedMgr -->|Immediate update| UpdateQueue
     UpdateQueue --> UpdateMgr
@@ -100,6 +107,13 @@ Platform-specific metadata parsers implementing the `builder.Builder` interface:
 ### 2.5 Storage Layer & Virtual Mounter (`pkg/fs/`)
 - Standard storage abstraction (`fs.Storage`) supporting local disk and AWS S3.
 - **Virtual Mounter (`fs.Mounter`)**: For local audiobook feeds (`audiobook://`), mounts the source directory directly under the feed namespace without copying multi-gigabyte audio files into Podsync's data directory.
+
+### 2.6 Personal Feeds Service (`pkg/personal/`)
+Core service orchestrating manually curated, universal podcast feeds:
+- **Universal Format (Audio + Video)**: Supports mixing audio tracks (MP3, OGG, OPUS, WAV, FLAC) and video tracks (MP4, MKV, WebM) within the same feed, assigning dynamic `<enclosure>` MIME types per episode.
+- **Reference-Counted Media Pool**: Uploaded and downloaded files live in a shared directory (`_personal/{media_id}/`). Copying an episode to another feed creates a new membership GUID without duplicating the file on disk. Files are only deleted when the reference counter reaches zero and deletion was confirmed.
+- **Ingestion Pipeline**: Ingests direct media URLs, platform links (YouTube, VK Video, Rutube), local server file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
+- **State Isolation**: Operates inside an independent BadgerDB transactional namespace (`podsync/personal/v1/`), preventing collisions with `config.toml` channels.
 
 ---
 
@@ -151,3 +165,11 @@ Status values:
 - `EpisodeDownloaded` (1): Stored on disk and served via RSS enclosure.
 - `EpisodeError` (2): Failed to download (network, rate limit, ffmpeg error).
 - `EpisodeCleaned` (3): Pruned by retention policy (`keep_last`).
+
+### 4.1 Personal Feeds Namespace (`podsync/personal/v1/`)
+Personal feeds maintain transactional records segregated from standard feeds:
+- `feed/{feed_id}`: Serialized `personal.Feed` (title, description, cover art URL, sort order, private flag, episode count).
+- `episode/{feed_id}/{episode_id}`: Serialized `personal.Membership` (episode GUID, pointer to shared `media_id`, added timestamp).
+- `media/{media_id}`: Serialized `personal.Media` (source URL/path, stored path, format, duration, size, status, error, reference count).
+- `initialized`: Flag marking initial database seeding (`My Feed` / `personal`).
+- `deleted/{feed_id}` / `delete_pending`: Tombstones for async background cleanup.

@@ -154,6 +154,9 @@
                     break;
                 }
                 case 'subscribe': showSubscription(arg1); break;
+                case 'personal-open': personalOpenFromLibrary(arg1); break;
+                case 'personal-edit': personalEdit(arg1); break;
+                case 'personal-delete': personalConfirmDeleteFeed(arg1); break;
                 case 'episodes': showEpisodes(arg1); break;
                 case 'settings': openFeedSettings(arg1); break;
                 case 'update': triggerUpdate(arg1); break;
@@ -469,6 +472,9 @@
         async function loadDashboard() {
             restoreLibraryPreferences();
             await loadFeeds();
+            if (typeof loadPersonalFeeds === 'function') {
+                loadPersonalFeeds().catch(() => {});
+            }
             restoreRoute();
         }
 
@@ -502,6 +508,43 @@
             }
         }
 
+        
+        function syncPersonalIntoAllFeeds() {
+            if (!Array.isArray(allFeeds)) return;
+            const nonPersonal = allFeeds.filter(f => f.provider !== 'personal' && f.type !== 'personal');
+            const pFeeds = (typeof personalFeeds !== 'undefined' && Array.isArray(personalFeeds) ? personalFeeds : []).map(pf => ({
+                id: pf.id,
+                title: pf.title,
+                description: pf.description,
+                author: 'Personal',
+                provider: 'personal',
+                cover_art: pf.cover_art,
+                feed_url: pf.feed_url,
+                episode_count: pf.episode_count || 0,
+                downloaded_count: pf.episode_count || 0,
+                total_size: 0,
+                last_update: pf.updated_at || pf.created_at,
+                private_feed: pf.private_feed,
+                type: 'personal'
+            }));
+            allFeeds = [...nonPersonal, ...pFeeds];
+            updateLibraryCounts();
+            const countEl = document.getElementById("feeds-count");
+            if (countEl) countEl.innerText = allFeeds.length;
+            if (currentTab === "tab-feeds") filterFeeds();
+        }
+
+        function personalOpenFromLibrary(id) {
+            const tabBtn = document.querySelector('#mainTabs [data-bs-target="#tab-personal"]');
+            if (tabBtn) bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+            if (typeof personalOpen === 'function') personalOpen(id);
+        }
+
+        function personalConfirmDeleteFeed(id) {
+            personalCurrentID = id;
+            if (typeof personalDeleteFeed === 'function') personalDeleteFeed();
+        }
+
         async function loadFeeds() {
             const seq = ++feedsFetchSeq;
             try {
@@ -511,6 +554,7 @@
                 const feeds = await res.json();
                 if (seq !== feedsFetchSeq) return;
                 allFeeds = feeds;
+                syncPersonalIntoAllFeeds();
                 hideConnectionWarning();
                 updateLibraryCounts();
                 if (currentTab === 'feed-detail') {
@@ -649,10 +693,28 @@
                 ? '<span class="feed-state running"><i aria-hidden="true" class="bi bi-arrow-repeat"></i>Updating</span>'
                 : hasError
                     ? `<button class="feed-state error" role="button" title="Click to view error log" ${actionAttrs('errors', feed.id)}><i aria-hidden="true" class="bi bi-exclamation-circle"></i>${feed.error_count > 0 ? feed.error_count + ' errors' : 'Update failed'}</button>`
-                    : `<span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>${feed.downloaded_count > 0 ? 'Ready' : 'No downloads yet'}</span>`;
+                    : `<span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>${(feed.downloaded_count > 0 || feed.episode_count > 0) ? 'Ready' : 'No downloads yet'}</span>`;
             const isBook = feed.provider === 'audiobook';
+            const isPersonal = feed.provider === 'personal' || feed.type === 'personal';
             const countLabel = isBook ? 'chapters' : 'episodes';
-            const countIcon = isBook ? 'bi-file-earmark-music' : 'bi-headphones';
+            const countIcon = isBook ? 'bi-file-earmark-music' : (isPersonal ? 'bi-collection-play' : 'bi-headphones');
+
+            if (isPersonal) {
+                return `<article class="card feed-card h-100">
+                <div class="feed-card-top">
+                    <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div></div>
+                    <div class="flex-grow-1 min-w-0"><a class="feed-card-title" href="#personal/${encodeURIComponent(feed.id)}" ${actionAttrs('personal-open', feed.id)} title="${escapeHtml(title)}">${escapeHtml(title)}</a><div class="feed-card-author text-truncate">${escapeHtml(feed.id)}.xml</div></div>
+                    <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" ${actionAttrs('personal-open', feed.id)}>Open</button></li>
+                        <li><button class="dropdown-item" ${actionAttrs('personal-edit', feed.id)}>Settings</button></li>
+                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('personal-delete', feed.id)}>Delete feed</button></li>
+                    </ul></div>
+                </div>
+                <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.episode_count ?? feed.downloaded_count ?? 0} ${countLabel}</span><span class="badge bg-secondary-subtle text-secondary border">Universal</span><span class="feed-provider">Personal</span></div>
+                <div class="feed-card-bottom"><span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span><button class="btn btn-light" ${actionAttrs('personal-open', feed.id)}>Open</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
+            </article>`;
+            }
+
             return `<article class="card feed-card h-100">
                 <div class="feed-card-top">
                     <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}">${escapeHtml(title.trim()[0] || 'P')}</div></div>
@@ -704,7 +766,7 @@
         }
 
         function feedRenderKey(feed) {
-            return JSON.stringify([feed.id, feed.title, feed.author, feed.provider, feed.cover_art, feed.downloaded_count, feed.total_size, feed.error_count, feed.last_error, updatingFeeds.has(feed.id)]);
+            return JSON.stringify([feed.id, feed.title, feed.author, feed.provider, feed.cover_art, feed.downloaded_count, feed.episode_count, feed.total_size, feed.error_count, feed.last_error, updatingFeeds.has(feed.id)]);
         }
 
         function getFilteredFeeds() {
@@ -723,7 +785,9 @@
                 if (feedStatusFilter === 'errors' && !(f.error_count > 0 || f.last_error)) return false;
 
                 const isAudiobook = (f.provider === "audiobook") || (f.url && f.url.startsWith("audiobook://"));
-                if (typeFilter === "channels") return !isAudiobook;
+                const isPersonal = (f.provider === "personal") || (f.type === "personal");
+                if (typeFilter === "channels") return !isAudiobook && !isPersonal;
+                if (typeFilter === "personal") return isPersonal;
                 if (typeFilter === "audiobooks") return isAudiobook;
                 return true;
             }).sort((a, b) => {
@@ -3474,7 +3538,7 @@
             try {
                 const saved = JSON.parse(localStorage.getItem('podsync-library') || '{}');
                 document.getElementById('feed-search').value = typeof saved.search === 'string' ? saved.search : '';
-                document.getElementById('feed-type-filter').value = ['all', 'channels', 'audiobooks'].includes(saved.type) ? saved.type : 'all';
+                document.getElementById('feed-type-filter').value = ['all', 'channels', 'personal', 'audiobooks'].includes(saved.type) ? saved.type : 'all';
                 document.getElementById('feed-sort').value = ['title', 'updated', 'size'].includes(saved.sort) ? saved.sort : 'title';
                 setLibraryView(saved.view);
                 setFeedStatus(saved.status);
@@ -3572,7 +3636,10 @@
             const hash = window.location.hash || '#feeds';
             restoringRoute = true;
             try {
-                if (hash.startsWith('#feed/')) {
+                if (hash.startsWith('#personal/')) {
+                    const id = decodeURIComponent(hash.slice(10).split('/')[0] || '');
+                    if (id) personalOpenFromLibrary(id);
+                } else if (hash.startsWith('#feed/')) {
                     const [id, section] = hash.slice(6).split('/');
                     const feedId = decodeURIComponent(id || '');
                     if (!feedId) return;
@@ -3701,6 +3768,7 @@
             try {
                 personalFeeds = await personalAPI();
                 personalRenderCards();
+                syncPersonalIntoAllFeeds();
                 if (personalCurrentID && !personalFeeds.some(f => f.id === personalCurrentID)) personalBack();
                 if (personalCurrentID) await personalOpen(personalCurrentID, false);
                 personalError(null);

@@ -99,6 +99,21 @@ filtered = vm.runInContext('getFilteredFeeds()', context);
 assert.equal(filtered.length, 1);
 assert.equal(filtered[0].id, 'book1');
 
+assert.equal(filtered[0].id, 'book1');
+
+// Test 4b: Personal feeds filter matching and rendering
+vm.runInContext('allFeeds = [{id: "tech1", title: "Tech Podcast", provider: "youtube"}, {id: "mypod", title: "My Personal Feed", provider: "personal"}];', context);
+feedSearch.value = '';
+feedTypeFilter.value = 'personal';
+filtered = vm.runInContext('getFilteredFeeds()', context);
+assert.equal(filtered.length, 1);
+assert.equal(filtered[0].id, 'mypod');
+
+const personalCardHtml = vm.runInContext('renderFeedCardHTML({id: "mypod", title: "My Personal Feed", provider: "personal", episode_count: 5})', context);
+assert(personalCardHtml.includes('data-ui-action="personal-open"'), "Missing personal-open action on card");
+assert(personalCardHtml.includes('Universal'), "Missing Universal badge on personal card");
+assert(personalCardHtml.includes('Personal'), "Missing Personal provider on personal card");
+
 
 // Test 5: Error badge rendering and clickable actions
 const cardHtml = vm.runInContext('renderFeedCardHTML({id: "errpod", title: "Error Podcast", error_count: 3, total_size: 1024, downloaded_count: 5, episode_count: 8})', context);

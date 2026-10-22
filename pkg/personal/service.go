@@ -73,7 +73,7 @@ func New(ctx context.Context, store db.PersonalStorage, files fs.Storage, proces
 		var existing Feed
 		if err := tx.Get("feed/personal", &existing); errors.Is(err, model.ErrNotFound) {
 			now := time.Now().UTC()
-			f := &Feed{ID: "personal", Type: "personal", Title: "Моя лента", Format: model.FormatAudio, PlaylistSort: model.SortingDesc, CreatedAt: now, UpdatedAt: now}
+			f := &Feed{ID: "personal", Type: "personal", Title: "My Feed", Format: model.FormatAudio, PlaylistSort: model.SortingDesc, CreatedAt: now, UpdatedAt: now}
 			if err := tx.Put("feed/personal", f); err != nil {
 				return err
 			}

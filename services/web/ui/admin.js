@@ -3637,7 +3637,7 @@
             const response = await fetch('/api/v1/personal-feeds' + path, options);
             if (response.status === 204) return null;
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Не удалось выполнить запрос');
+            if (!response.ok) throw new Error(data.error || 'Request failed');
             return data;
         }
         function personalJSON(method, body) { return {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}; }
@@ -3645,7 +3645,7 @@
         function personalButton(action, id, label) { return `<button type="button" class="btn btn-secondary btn-sm" data-personal-action="${action}" data-personal-id="${escapeHtml(id)}">${label}</button>`; }
         function personalRenderCards() {
             const list = document.getElementById('personal-list');
-            list.innerHTML = personalFeeds.length ? personalFeeds.map(f => `<article class="personal-card">${f.cover_art && safeUrl(f.cover_art) ? `<img class="personal-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">` : '<div class="personal-cover personal-placeholder"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>'}<h2 class="h5">${escapeHtml(f.title)}</h2><p class="text-muted small">${escapeHtml(f.id)}.xml · ${f.format === 'video' ? 'Video' : 'Audio'} · ${f.episode_count} эп.</p><p class="personal-card-description">${escapeHtml(f.description || '')}</p><div class="personal-actions">${personalButton('open',f.id,'Открыть')}<a class="btn btn-brand btn-sm" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener">RSS</a></div></article>`).join('') : '<p class="text-muted">Лент пока нет. Нажмите «Создать ленту», чтобы добавить первую.</p>';
+            list.innerHTML = personalFeeds.length ? personalFeeds.map(f => `<article class="personal-card">${f.cover_art && safeUrl(f.cover_art) ? `<img class="personal-cover" src="${safeUrl(f.cover_art)}" alt="" loading="lazy">` : '<div class="personal-cover personal-placeholder"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>'}<h2 class="h5">${escapeHtml(f.title)}</h2><p class="text-muted small">${escapeHtml(f.id)}.xml · ${f.format === 'video' ? 'Video' : 'Audio'} · ${f.episode_count} eps</p><p class="personal-card-description">${escapeHtml(f.description || '')}</p><div class="personal-actions">${personalButton('open',f.id,'Open')}<a class="btn btn-brand btn-sm" href="${safeUrl(f.feed_url)}" target="_blank" rel="noopener">RSS</a></div></article>`).join('') : '<p class="text-muted">No personal feeds yet. Click \"Create Feed\" to add your first one.</p>';
         }
         async function loadPersonalFeeds() {
             try {
@@ -3675,12 +3675,12 @@
                 const snapshot = JSON.stringify(data.episodes);
                 if (reset || snapshot !== personalEpisodeSnapshot) {
                     personalEpisodeSnapshot = snapshot;
-                    const labels = {new:'Ожидает загрузки',downloaded:'Готов',error:'Ошибка',cleaned:'Удалён'};
+                    const labels = {new:'Queued',downloaded:'Ready',error:'Error',cleaned:'Cleaned'};
                     document.getElementById('personal-episodes').innerHTML = data.episodes.length ? data.episodes.map(ep => {
                         const url = safeUrl(ep.media_url || '');
                         const player = ep.status === 'downloaded' && url ? (ep.media_type === 'video/mp4' ? `<video controls preload="none" src="${url}"></video>` : `<audio controls preload="none" src="${url}"></audio>`) : '';
-                        return `<article class="personal-episode"><h4 class="h6">${escapeHtml(ep.title)}</h4><p class="text-muted small">${labels[ep.status] || escapeHtml(ep.status)} · ${escapeHtml(new Date(ep.pub_date).toLocaleString())}</p>${ep.error ? `<p class="text-danger small">${escapeHtml(ep.error)}</p>` : ''}${player}<div class="personal-actions mt-2">${personalButton('move',ep.id,'Переместить')}${personalButton('copy',ep.id,'Копировать')}${ep.status === 'error' ? personalButton('retry',ep.id,'Повторить') : ''}${personalButton('delete',ep.id,'Удалить')}</div></article>`;
-                    }).join('') : '<p class="text-muted">Добавьте ссылку или загрузите файл — здесь появятся эпизоды этой ленты.</p>';
+                        return `<article class="personal-episode"><h4 class="h6">${escapeHtml(ep.title)}</h4><p class="text-muted small">${labels[ep.status] || escapeHtml(ep.status)} · ${escapeHtml(new Date(ep.pub_date).toLocaleString())}</p>${ep.error ? `<p class="text-danger small">${escapeHtml(ep.error)}</p>` : ''}${player}<div class="personal-actions mt-2">${personalButton('move',ep.id,'Move')}${personalButton('copy',ep.id,'Copy')}${ep.status === 'error' ? personalButton('retry',ep.id,'Retry') : ''}${personalButton('delete',ep.id,'Delete')}</div></article>`;
+                    }).join('') : '<p class="text-muted">Add a link or upload a file — episodes of this feed will appear here.</p>';
                 }
                 personalError(null);
             } catch (error) { if (request === personalRequestID) personalError(error); }
@@ -3688,7 +3688,7 @@
         function personalEdit(id = '') {
             personalEditingID = id;
             const f = personalFeeds.find(f => f.id === id) || {};
-            document.getElementById('personal-edit-heading').textContent = id ? 'Настройки ленты' : 'Создать ленту';
+            document.getElementById('personal-edit-heading').textContent = id ? 'Feed Settings' : 'Create Feed';
             document.getElementById('personal-edit-title').value = f.title || '';
             document.getElementById('personal-edit-description').value = f.description || '';
             document.getElementById('personal-edit-cover').value = f.cover_art || '';
@@ -3707,7 +3707,7 @@
                 if (file) {
                     const form = new FormData(); form.append('file',file);
                     const response = await fetch('/api/v1/covers/upload',{method:'POST',body:form});
-                    const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Ошибка загрузки обложки'); cover = data.url;
+                    const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Failed to upload cover art'); cover = data.url;
                 }
                 const payload = {title:document.getElementById('personal-edit-title').value,description:document.getElementById('personal-edit-description').value,cover_art:cover,format:document.getElementById('personal-edit-format').value,playlist_sort:document.getElementById('personal-edit-sort').value,private_feed:document.getElementById('personal-edit-private').checked};
                 const f = await personalAPI(personalEditingID ? '/' + encodeURIComponent(personalEditingID) : '',personalJSON(personalEditingID ? 'PATCH' : 'POST',payload));
@@ -3725,11 +3725,11 @@
         }
         async function personalUpload(event) {
             event.preventDefault(); const id = personalCurrentID; const button = event.submitter; if (button) button.disabled = true;
-            document.getElementById('personal-progress').textContent = 'Загрузка файла…';
+            document.getElementById('personal-progress').textContent = 'Uploading file…';
             try {
                 const data = new FormData(); data.append('file', document.getElementById('personal-file').files[0]);
                 await personalAPI('/'+encodeURIComponent(id)+'/upload',{method:'POST',body:data});
-                event.target.reset(); document.getElementById('personal-progress').textContent = 'Файл принят. Подготовка эпизода…';
+                event.target.reset(); document.getElementById('personal-progress').textContent = 'File uploaded. Processing episode…';
                 if (personalCurrentID === id) await personalOpen(id); await loadPersonalFeeds();
             } catch (error) { personalError(error); document.getElementById('personal-progress').textContent = ''; }
             finally { if (button) button.disabled = false; }
@@ -3737,7 +3737,7 @@
         function personalDeleteFeed() { personalConfirmDelete(''); }
         function personalConfirmDelete(episodeID) {
             personalDeleteAction = {feedID:personalCurrentID,episodeID};
-            document.getElementById('personal-delete-text').textContent = episodeID ? 'Удалить эпизод из этой ленты?' : 'Удалить ленту и все её эпизоды? Подписка на её RSS перестанет работать.';
+            document.getElementById('personal-delete-text').textContent = episodeID ? 'Remove this episode from the feed?' : 'Delete feed and all its episodes? Its RSS subscription will stop working.';
             document.getElementById('personal-delete-files').checked = true;
             personalError(null, 'personal-delete-error');
             bootstrap.Modal.getOrCreateInstance(document.getElementById('personalDeleteModal')).show();
@@ -3752,9 +3752,9 @@
         }
         function personalTransfer(episodeID, mode) {
             const targets = personalFeeds.filter(f => f.id !== personalCurrentID);
-            if (!targets.length) { personalError(new Error('Сначала создайте ещё одну персональную ленту.')); return; }
+            if (!targets.length) { personalError(new Error('Create another personal feed first.')); return; }
             personalTransferAction = {feedID:personalCurrentID,episodeID,mode};
-            document.getElementById('personal-transfer-heading').textContent = mode === 'move' ? 'Переместить эпизод' : 'Копировать эпизод';
+            document.getElementById('personal-transfer-heading').textContent = mode === 'move' ? 'Move Episode' : 'Copy Episode';
             document.getElementById('personal-target').innerHTML = targets.map(f=>`<option value="${escapeHtml(f.id)}">${escapeHtml(f.title)}</option>`).join('');
             personalError(null,'personal-transfer-error'); bootstrap.Modal.getOrCreateInstance(document.getElementById('personalTransferModal')).show();
         }

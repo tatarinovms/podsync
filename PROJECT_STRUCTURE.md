@@ -64,10 +64,10 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`opml.go`**: Generates OPML subscriptions export file.
 
 ### 2.5 `pkg/personal/` (Personal Feeds Service)
-- **`service.go`**: Core service orchestrating user-curated, universal podcast feeds. Coordinates transactional feed configurations, membership records, shared media reference counting, and dynamic XML enclosure generation.
-- **`processor.go`**: Ingestion pipeline handling direct media URLs (MP3, OGG, OPUS, WAV, FLAC, MP4, MKV, WebM), platform URLs (YouTube, VK Video, Rutube), server local file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
-- **Copying & Moving**: Supports copying episodes (allocating a new stable GUID referencing shared media) and moving episodes (preserving the existing GUID).
-- **Library Integration**: Seamlessly integrated into the main Podcasts tab with a `Personal` filter, unified subscribe modal, and 5 dedicated MCP tools.
+- **`service.go`**: Core service orchestrating user-curated, universal podcast feeds. Coordinates transactional feed configurations, membership records, shared media reference counting, inline episode renaming, and dynamic XML enclosure generation.
+- **`processor.go`**: Ingestion pipeline handling direct media URLs (MP3, OGG, OPUS, WAV, FLAC, MP4, MKV, WebM), platform URLs (YouTube, VK Video, Rutube), server local file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding. Supports custom quality (`high`/`low`) and max video height (`480`, `720`, `1080`...) presets.
+- **Copying, Moving & Renaming**: Supports copying episodes (allocating a new stable GUID referencing shared media), moving episodes (preserving the existing GUID), and renaming episodes with immediate RSS XML rebuild.
+- **Library Integration**: Seamlessly integrated into the main Podcasts tab with a `Personal` filter, unified subscribe modal, and 6 dedicated MCP tools (`list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`).
 
 ### 2.6 `pkg/fs/` (Storage & Mounter)
 - **`storage.go`**: `Storage` interface for saving and retrieving media and XML files.

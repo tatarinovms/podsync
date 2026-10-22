@@ -89,6 +89,8 @@ This file provides comprehensive architecture guidance, development workflows, a
   - Local server file paths (`file_path`) via API and MCP tools.
   - Multipart file uploads up to 4 GiB via Web UI or REST API.
   - Automatic `ffmpeg` conversion to MP3 for audio and MP4 for video, preserving duration, metadata, and artwork.
+  - Quality and resolution control when adding from URL: audio quality (`high`/`low`) and video resolution (`480p`, `720p HD`, `1080p Full HD`, `1440p 2K`, `2160p 4K`, `Default Original`), matching feed mirroring options.
+  - Inline episode renaming with instant feed RSS XML rebuild (`PATCH /api/v1/personal-feeds/{id}/episodes/{ep_id}`).
 - Dedicated transactional BadgerDB namespace (`podsync/personal/v1/`) for feed configs, episode memberships, and shared media references.
 - Copying an episode creates a new stable GUID referencing shared media; moving an episode retains the original GUID. Media files are only deleted when their reference count drops to zero and file deletion was explicitly requested.
 - Managed by 6 specialized MCP tools: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`.
@@ -196,11 +198,12 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `PATCH` | `/api/v1/personal-feeds/{id}` | Update personal feed title, description, cover, or sort order |
 | `DELETE` | `/api/v1/personal-feeds/{id}` | Delete personal feed (optional `?delete_files=true`) |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | List all episodes in a personal feed |
-| `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode via `url`, `file_path`, `title`, `format` |
+| `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode via `url`, `file_path`, `title`, `format`, `quality`, `max_height` |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart file upload with `file`, `title`, `format` |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | Copy episode to another personal feed (`target_feed_id`) |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | Move episode to another personal feed (`target_feed_id`) |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Retry failed personal feed episode download |
+| `PATCH`, `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | Rename episode in personal feed (`{"title": "..."}`) and rebuild RSS XML |
 | `DELETE` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | Delete episode from personal feed (optional `?delete_files=true`) |
 
 ---

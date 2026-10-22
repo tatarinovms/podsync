@@ -77,6 +77,7 @@
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Копирование эпизода в другую ленту. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Перемещение эпизода в другую ленту. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | Нет | Повтор неудачной загрузки серии. |
+| `PATCH` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | `{"title": "..."}` | Переименование эпизода с пересборкой RSS. Также поддерживает `POST .../rename` и `PUT`. |
 | `DELETE` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}?confirm=true&delete_files=true` | Query-параметры | Удаление серии из ленты. |
 
 ---

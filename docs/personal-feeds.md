@@ -76,6 +76,7 @@ All endpoints require administrator authentication (Basic Auth or session cookie
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Copies episode to another feed (shared file). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | `{"target_feed_id": "personal-..."}` | Moves episode to another feed (retains GUID). |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/retry` | None | Resets failed episode to retry download. |
+| `PATCH` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}` | `{"title": "..."}` | Renames episode title and rebuilds feed RSS. Also accepts `POST .../rename` and `PUT`. |
 | `DELETE` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}?confirm=true&delete_files=true` | Query params | Deletes episode from personal feed. |
 
 ---

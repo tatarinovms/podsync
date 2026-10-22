@@ -109,13 +109,15 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **When to use**: When the user wants to create a new personal / custom podcast feed.
 
 ### 12. `add_personal_episode`
-- **Purpose**: Adds an episode to a personal feed from a URL (YouTube, VK, Rutube, direct media link like MP3, OGG, MP4) or a local file path on the server (`file_path`). Automatically detects format or accepts an explicit format override (`"audio"` or `"video"`).
+- **Purpose**: Adds an episode to a personal feed from a URL (YouTube, VK, Rutube, direct media link like MP3, OGG, MP4) or a local file path on the server (`file_path`). Automatically detects format or accepts an explicit format override (`"audio"`, `"video"`, or `"auto"`), with optional audio quality (`"high"`, `"low"`) and max video height (`480`, `720`, `1080`...).
 - **Arguments**:
   - `feed_id` *(string, required)*: Target personal feed identifier.
   - `url` *(string, optional)*: Source media or video URL (YouTube, Rutube, VK Video, direct MP3/OGG/MP4 link).
   - `file_path` *(string, optional)*: Local server file path to import directly into the feed.
   - `title` *(string, optional)*: Episode title override.
-  - `format` *(string, optional)*: Preferred episode media format (`"audio"` or `"video"`). Auto-detected if omitted.
+  - `format` *(string, optional)*: Preferred episode media format (`"audio"`, `"video"`, or `"auto"`). Auto-detected if omitted.
+  - `quality` *(string, optional)*: Media quality preference (`"high"` [default] or `"low"`).
+  - `max_height` *(integer, optional)*: Maximum video height (e.g. `480`, `720`, `1080`). Defaults to 0 (unlimited/original).
 - **When to use**: Adding media files or URLs to a personal feed via MCP.
 
 ### 13. `delete_personal_episode`
@@ -123,36 +125,45 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **Arguments**:
   - `feed_id` *(string, required)*: Feed identifier.
   - `episode_id` *(string, required)*: Episode identifier.
+  - `delete_files` *(boolean, optional, default: false)*: Whether to delete the media file from disk if unreferenced by other feeds.
 - **When to use**: Removing an episode from a personal feed.
 
-### 14. `get_system_stats`
+### 14. `rename_personal_episode`
+- **Purpose**: Renames an episode in a personal podcast feed and immediately rebuilds the feed's public RSS XML file.
+- **Arguments**:
+  - `feed_id` *(string, required)*: Personal feed identifier (e.g. `personal-xyz` or `personal`).
+  - `episode_id` *(string, required)*: Episode identifier to rename.
+  - `title` *(string, required)*: New title for the episode.
+- **When to use**: When the user requests renaming an episode in a personal feed.
+
+### 16. `get_system_stats`
 - **Purpose**: Returns memory usage, disk space (total, used, free on `data_dir`), uptime, and whether `ffmpeg` and `yt-dlp` are installed and functioning.
 - **Arguments**: None `{}`.
 - **When to use**: Health checks, checking remaining disk capacity, or troubleshooting download failures.
 
-### 15. `get_tokens`
+### 16. `get_tokens`
 - **Purpose**: Returns masked API keys for all providers (`youtube`, `vkvideo`, `vimeo`, `soundcloud`, `twitch`) and indicates if they are loaded from ENV or `config.toml`.
 - **Arguments**: None `{}`.
 
-### 16. `update_tokens`
+### 17. `update_tokens`
 - **Purpose**: Updates API keys for a provider in `config.toml`. Accepts multiple keys to enable automatic Round-Robin quota rotation (especially useful for YouTube API).
 - **Arguments**:
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
   - `tokens` *(array of strings, required)*: List of API keys.
 
-### 17. `delete_tokens`
+### 18. `delete_tokens`
 - **Purpose**: Deletes a specific API token by index, or clears all configured API tokens for a provider from `config.toml`.
 - **Arguments**:
   - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
   - `index` *(integer, optional)*: 0-based index of a specific token to delete. If omitted or negative, all tokens for the provider are removed.
 - **When to use**: Removing invalid, revoked, or unnecessary API keys (either a single key from rotation or the entire provider).
 
-### 18. `get_downloader_config`
+### 19. `get_downloader_config`
 - **Purpose**: Retrieves yt-dlp binary path, version, ffmpeg version, current timeout, proxy, and status of installed cookies file (`cookies.txt` line count, file size, last modified).
 - **Arguments**: None `{}`.
 - **When to use**: Diagnosing YouTube download failures such as bot verification blocks or rate limits.
 
-### 19. `update_downloader_config`
+### 20. `update_downloader_config`
 - **Purpose**: Updates yt-dlp downloader configuration (download timeout, proxy URL, preferred audio language, or browser cookie extraction).
 - **Arguments**:
   - `timeout` *(integer, optional)*: Timeout in minutes.
@@ -160,7 +171,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `cookies_from_browser` *(string, optional)*: Browser name to extract session cookies from (e.g. `chrome`, `firefox`).
   - `language` *(string, optional)*: Global preferred audio track language code (e.g. `"ru"`, `"en"`) for multi-audio videos and YouTube dubbing.
 
-### 20. `test_downloader`
+### 21. `test_downloader`
 - **Purpose**: Tests yt-dlp connectivity and cookie verification against a video URL without downloading the file.
 - **Arguments**:
   - `url` *(string, optional)*: Video URL to test (defaults to YouTube sample video).
@@ -168,26 +179,26 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 ---
 
 
-### 21. `get_download_errors`
+### 22. `get_download_errors`
 - **Purpose**: Returns a diagnostic list of all failed podcast episodes across all feeds or for a specific feed, with exact error causes (e.g. YouTube bot verification, private video, 429 rate limits, ffmpeg errors) and actionable recommendations.
 - **Arguments**:
   - `feed_id` *(string, optional)*: Filter errors by feed ID.
   - `limit` *(integer, optional, default: 20, max: 100)*: Maximum error records to return.
 - **When to use**: Answering *"Are there any download errors?"*, *"Why did download fail on channel X?"*, or before proposing retries.
 
-### 22. `get_recent_downloads`
+### 23. `get_recent_downloads`
 - **Purpose**: Returns the most recently downloaded podcast episodes across all channels or for a single feed, complete with file sizes, durations, publication dates, and playable audio/video URLs.
 - **Arguments**:
   - `feed_id` *(string, optional)*: Filter recent downloads by feed ID.
   - `limit` *(integer, optional, default: 10, max: 100)*: Number of episodes to return.
 - **When to use**: Answering *"What was downloaded recently?"*, *"Show me latest episodes from channel X"*, or checking if a new episode is already available.
 
-### 23. `get_sync_status`
+### 24. `get_sync_status`
 - **Purpose**: Returns a high-level operational status overview: active feeds, last sync times, next cron execution for each feed, number of episodes downloaded in the past 24 hours, failed episode counts, and disk space free.
 - **Arguments**: None `{}`.
 - **When to use**: General status checks (*"Is Podsync working?"*, *"When is the next sync?"*).
 
-### 24. `get_system_logs`
+### 25. `get_system_logs`
 - **Purpose**: Retrieves recent system and application logs from Podsync's in-memory ring buffer, filterable by severity level (`error`, `warn`, `info`, `debug`) or search query.
 - **Arguments**:
   - `limit` *(integer, optional, default: 50, max: 200)*: Number of log entries to retrieve.
@@ -197,12 +208,12 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
 - **When to use**: Diagnosing issues when feed updates fail, missing API tokens, network problems, or yt-dlp execution failures.
 
 
-### 25. `list_audiobook_dirs`
+### 26. `list_audiobook_dirs`
 - **Purpose**: Discovers and lists all folders in the configured audiobooks directory (`[audiobooks].dir`), reporting track count, total size, cover image presence, and whether the folder is already linked to an active podcast feed.
 - **Arguments**: None `{}`.
 - **When to use**: When the user asks what audiobooks are available on the server, wants to see unlinked folders, or wants to check local audiobook storage.
 
-### 26. `import_audiobook`
+### 27. `import_audiobook`
 - **Purpose**: Imports a local audiobook folder into a serial podcast feed (Podcast 2.0 / Apple Podcasts compliant with `<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`). Chapters are naturally sorted (01, 02... 10) with automatic ID3/APIC cover extraction.
 - **Arguments**:
   - `dir_name` *(string, required)*: Directory name in the audiobooks directory (e.g. `"George Orwell - 1984"`).
@@ -213,7 +224,7 @@ When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the 
   - `cron_schedule` *(string, optional)*: Update schedule (defaults to `@every 12h`).
 - **When to use**: Setting up an audiobook feed from a local directory on disk.
 
-### 27. `delete_audiobook_dir`
+### 28. `delete_audiobook_dir`
 - **Purpose**: Deletes an audiobook folder and all its audio files from the audiobooks storage on disk. If the folder is linked to an active podcast feed, it automatically removes the feed, unmounts it, and deletes it from `config.toml` and database.
 - **Arguments**:
   - `dir_name` *(string, required)*: Directory name in the audiobooks directory to delete (e.g. `"George Orwell - 1984"`).

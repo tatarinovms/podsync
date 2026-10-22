@@ -137,11 +137,12 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - Directly manage feeds, upload files, and add URLs in the dedicated **Personal feeds** tab.
   - Personal feeds are also surfaced on the main **Podcasts** tab with a **Personal** provider badge and quick action buttons.
 - **Multiple Ingestion Methods**:
-  - **URL Links**: Add episodes by URL from YouTube, VK Video, Rutube, or direct HTTP/HTTPS links to `.mp3`, `.ogg`, `.mp4` files.
+  - **URL Links**: Add episodes by URL from YouTube, VK Video, Rutube, or direct HTTP/HTTPS links to `.mp3`, `.ogg`, `.mp4` files, with format and quality/resolution selection (Audio: High/Low, Video: 480p, 720p HD, 1080p Full HD, 1440p 2K, 2160p 4K, Original) matching feed mirroring.
   - **Server Local Files**: Import media directly by local filesystem path (`file_path`).
   - **File Uploads**: Drag-and-drop or upload local audio/video files (up to 4 GiB) with real-time progress and automatic `ffmpeg` transcoding.
 - **Episode Operations**:
   - In-browser playback with integrated audio/video player.
+  - **Rename**: Change episode title in a modal dialog with instant feed RSS XML rebuild.
   - **Copy**: Clone an episode into another personal feed without duplicating physical storage.
   - **Move**: Transfer an episode between feeds while preserving its GUID.
   - **Retry**: Re-attempt failed downloads or transcoding.

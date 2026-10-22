@@ -112,7 +112,7 @@ Platform-specific metadata parsers implementing the `builder.Builder` interface:
 Core service orchestrating manually curated, universal podcast feeds:
 - **Universal Format (Audio + Video)**: Supports mixing audio tracks (MP3, OGG, OPUS, WAV, FLAC) and video tracks (MP4, MKV, WebM) within the same feed, assigning dynamic `<enclosure>` MIME types per episode.
 - **Reference-Counted Media Pool**: Uploaded and downloaded files live in a shared directory (`_personal/{media_id}/`). Copying an episode to another feed creates a new membership GUID without duplicating the file on disk. Files are only deleted when the reference counter reaches zero and deletion was confirmed.
-- **Ingestion Pipeline**: Ingests direct media URLs, platform links (YouTube, VK Video, Rutube), local server file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding.
+- **Ingestion Pipeline**: Ingests direct media URLs, platform links (YouTube, VK Video, Rutube), local server file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding. Supports audio quality (`high`/`low`) and video max height (`480`, `720`, `1080`, `1440`, `2160`, `0`) controls.
 - **State Isolation**: Operates inside an independent BadgerDB transactional namespace (`podsync/personal/v1/`), preventing collisions with `config.toml` channels.
 
 ---
@@ -170,6 +170,6 @@ Status values:
 Personal feeds maintain transactional records segregated from standard feeds:
 - `feed/{feed_id}`: Serialized `personal.Feed` (title, description, cover art URL, sort order, private flag, episode count).
 - `episode/{feed_id}/{episode_id}`: Serialized `personal.Membership` (episode GUID, pointer to shared `media_id`, added timestamp).
-- `media/{media_id}`: Serialized `personal.Media` (source URL/path, stored path, format, duration, size, status, error, reference count).
+- `media/{media_id}`: Serialized `personal.Media` (source URL/path, stored path, format, quality, max_height, duration, size, status, error, reference count).
 - `initialized`: Flag marking initial database seeding (`My Feed` / `personal`).
 - `deleted/{feed_id}` / `delete_pending`: Tombstones for async background cleanup.

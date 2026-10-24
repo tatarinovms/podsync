@@ -1726,8 +1726,52 @@
         let episodeView = null;
         let episodePage = 0;
         const episodePageSize = 40;
-        function resetEpisodePage() { episodePage = 0; renderEpisodeList(); }
-        function changeEpisodePage(delta) { episodePage = Math.max(0, episodePage + delta); renderEpisodeList(); }
+        let episodeSearchTimer = null;
+
+        function resetEpisodePage() {
+            episodePage = 0;
+            if (episodeSearchTimer) clearTimeout(episodeSearchTimer);
+            episodeSearchTimer = setTimeout(() => {
+                fetchAndRenderEpisodes();
+            }, 250);
+        }
+
+        function changeEpisodePage(delta) {
+            episodePage = Math.max(0, episodePage + delta);
+            fetchAndRenderEpisodes();
+        }
+
+        async function fetchAndRenderEpisodes() {
+            if (!episodeView) return;
+            const { feedId } = episodeView;
+            const requestId = ++episodesRequestId;
+            const listEl = document.getElementById('episodes-list');
+            const query = (document.getElementById('episodes-search')?.value || '').trim();
+            const status = document.getElementById('episodes-status-filter')?.value || 'all';
+            const duration = document.getElementById('episodes-duration-filter')?.value || 'all';
+            const sort = document.getElementById('episodes-sort')?.value || 'default';
+
+            listEl.innerHTML = `<div class="p-4 text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Loading...</div></div>`;
+
+            try {
+                const offset = episodePage * episodePageSize;
+                const url = `/api/v1/feeds/${encodeURIComponent(feedId)}/episodes?limit=${episodePageSize}&offset=${offset}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(query)}&sort=${encodeURIComponent(sort)}&duration=${encodeURIComponent(duration)}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                if (requestId !== episodesRequestId) return;
+
+                episodeView.episodes = Array.isArray(data.episodes) ? data.episodes : [];
+                episodeView.total = data.total || 0;
+                episodeView.matching = data.matching || 0;
+                episodeView.hasMore = !!data.has_more;
+
+                renderEpisodeList();
+            } catch (err) {
+                if (requestId !== episodesRequestId) return;
+                listEl.innerHTML = `<div class="p-4 text-center text-danger">Error: ${escapeHtml(err.message)}</div>`;
+            }
+        }
 
         async function showEpisodes(feedId, openModal = true) {
             const requestId = ++episodesRequestId;
@@ -1751,7 +1795,7 @@
             }
 
             try {
-                const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}`);
+                const res = await fetch(`/api/v1/feeds/${encodeURIComponent(feedId)}?limit=${episodePageSize}&offset=0`);
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
                 if (requestId !== episodesRequestId || modalEl.dataset.feedId !== feedId) return;
@@ -1760,7 +1804,11 @@
                     feedId,
                     title: data.feed?.title || f?.title || feedId,
                     isAudiobook: !!isAudiobook || data.feed?.provider === 'audiobook',
-                    episodes: Array.isArray(data.episodes) ? data.episodes : []
+                    episodes: Array.isArray(data.episodes) ? data.episodes : [],
+                    total: data.total ?? (data.episodes ? data.episodes.length : 0),
+                    matching: data.matching ?? (data.episodes ? data.episodes.length : 0),
+                    hasMore: !!data.has_more,
+                    feedData: data.feed || f
                 };
                 renderEpisodeList();
             } catch (err) {
@@ -1772,72 +1820,37 @@
 
         function renderEpisodeList() {
             if (!episodeView) return;
-            const { feedId, title, isAudiobook, episodes } = episodeView;
+            const { feedId, title, isAudiobook, episodes, total, matching, hasMore, feedData } = episodeView;
             const listEl = document.getElementById('episodes-list');
-            const query = (document.getElementById('episodes-search')?.value || '').trim().toLowerCase();
-            const status = document.getElementById('episodes-status-filter')?.value || 'all';
-            const durationFilter = document.getElementById('episodes-duration-filter')?.value || 'all';
-            const sort = document.getElementById('episodes-sort')?.value || 'default';
 
-            let visible = episodes.filter(ep => {
-                if (status !== 'all' && ep.status !== status) return false;
-                if (query && !(String(ep.title || '') + ' ' + String(ep.id || '')).toLowerCase().includes(query)) return false;
-                if (durationFilter !== 'all') {
-                    const dur = Number(ep.duration) || 0;
-                    if (durationFilter === 'short' && (dur <= 0 || dur >= 900)) return false;
-                    if (durationFilter === 'medium' && (dur < 900 || dur > 3600)) return false;
-                    if (durationFilter === 'long' && dur <= 3600) return false;
-                }
-                return true;
-            });
+            const parts = [];
+            if (feedData) {
+                parts.push(`${isAudiobook ? 'Available' : 'Downloaded'}: ${feedData.downloaded_count || 0}`);
+                if (feedData.error_count) parts.push(`Errors: ${feedData.error_count}`);
+            }
+            parts.push(`Matching: ${matching} / ${total}`);
 
-            if (sort === 'date-desc') {
-                visible.sort((a, b) => {
-                    const da = a.pub_date ? new Date(a.pub_date).getTime() : 0;
-                    const db = b.pub_date ? new Date(b.pub_date).getTime() : 0;
-                    const va = Number.isNaN(da) || da < 0 ? 0 : da;
-                    const vb = Number.isNaN(db) || db < 0 ? 0 : db;
-                    return vb - va;
-                });
-            } else if (sort === 'date-asc') {
-                visible.sort((a, b) => {
-                    const da = a.pub_date ? new Date(a.pub_date).getTime() : 0;
-                    const db = b.pub_date ? new Date(b.pub_date).getTime() : 0;
-                    const va = Number.isNaN(da) || da < 0 ? 0 : da;
-                    const vb = Number.isNaN(db) || db < 0 ? 0 : db;
-                    return va - vb;
-                });
-            } else if (sort === 'duration-desc') {
-                visible.sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0));
-            } else if (sort === 'duration-asc') {
-                visible.sort((a, b) => (Number(a.duration) || 0) - (Number(b.duration) || 0));
-            } else if (sort === 'title-asc') {
-                visible.sort((a, b) => String(a.title || a.id || '').localeCompare(String(b.title || b.id || '')));
-            }
-            const count = value => episodes.filter(ep => ep.status === value).length;
-            const parts = [`${isAudiobook ? 'Available' : 'Downloaded'}: ${count('downloaded')}`];
-            for (const [value, label] of [['new', 'Pending'], ['error', 'Errors'], ['cleaned', 'Cleaned']]) {
-                if (count(value)) parts.push(`${label}: ${count(value)}`);
-            }
-            parts.push(`Matching: ${visible.length} / ${episodes.length}`);
-            const pages = Math.max(1, Math.ceil(visible.length / episodePageSize));
+            const pages = Math.max(1, Math.ceil(matching / episodePageSize));
             episodePage = Math.min(episodePage, pages - 1);
-            const pageEpisodes = visible.slice(episodePage * episodePageSize, (episodePage + 1) * episodePageSize);
+            if (episodePage < 0) episodePage = 0;
+
             document.getElementById('episodes-page-label').innerText = `Page ${episodePage + 1} of ${pages}`;
             document.getElementById('episodes-prev').disabled = episodePage === 0;
-            document.getElementById('episodes-next').disabled = episodePage >= pages - 1;
+            document.getElementById('episodes-next').disabled = !hasMore && (episodePage >= pages - 1);
             document.getElementById('episode-pagination').classList[pages > 1 ? 'remove' : 'add']('d-none');
             document.getElementById('episodes-feed-subtitle').innerText = parts.join(' • ');
             document.getElementById('episodes-feed-title').innerText =
                 `${isAudiobook ? 'Audiobook Chapters' : 'Podcast'}: ${title}`;
-            if (!visible.length) {
-                listEl.innerHTML = episodes.length
+
+            if (!episodes.length) {
+                listEl.innerHTML = total
                     ? '<div class="p-4 text-center text-muted">No episodes match the search or status filter.</div>'
                     : `<div class="p-4 text-center text-muted">No ${isAudiobook ? 'chapters' : 'episodes'} yet.
                         <div><button class="btn btn-outline-primary btn-sm mt-2" ${actionAttrs("update", feedId)}>Scan / Update Feed Now</button></div></div>`;
                 return;
             }
-            listEl.innerHTML = pageEpisodes.map(ep => {
+
+            listEl.innerHTML = episodes.map(ep => {
                 let badge = '<span class="badge bg-secondary">Unknown</span>';
                 let size = formatBytes(ep.size);
                 let actions = '';

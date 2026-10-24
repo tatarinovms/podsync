@@ -118,6 +118,17 @@ func (c *HTTPClientManager) GetFeedDetail(ctx context.Context, id string) (*web.
 	return res.Feed, res.Episodes, nil
 }
 
+func (c *HTTPClientManager) GetFeedEpisodes(ctx context.Context, id string, query web.EpisodeQuery) (*web.EpisodePageResult, error) {
+	u := fmt.Sprintf("/api/v1/feeds/%s/episodes?limit=%d&offset=%d&status=%s&q=%s&sort=%s&duration=%s",
+		url.PathEscape(id), query.Limit, query.Offset, url.QueryEscape(query.Status), url.QueryEscape(query.Search), url.QueryEscape(query.Sort), url.QueryEscape(query.Duration))
+	var res web.EpisodePageResult
+	err := c.doRequest(ctx, http.MethodGet, u, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func (c *HTTPClientManager) AddFeed(ctx context.Context, cfg *feed.Config) error {
 	return c.doRequest(ctx, http.MethodPost, "/api/v1/feeds", cfg, nil)
 }

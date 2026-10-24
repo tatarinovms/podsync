@@ -329,6 +329,9 @@ func (m *mockDownloaderAdminMgr) GetFeedsStatus(ctx context.Context) ([]FeedStat
 func (m *mockDownloaderAdminMgr) GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error) {
 	return nil, nil, nil
 }
+func (m *mockDownloaderAdminMgr) GetFeedEpisodes(ctx context.Context, id string, query EpisodeQuery) (*EpisodePageResult, error) {
+	return &EpisodePageResult{Episodes: []*model.Episode{}}, nil
+}
 func (m *mockDownloaderAdminMgr) AddFeed(ctx context.Context, cfg *feed.Config) error { return nil }
 func (m *mockDownloaderAdminMgr) UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error {
 	m.lastFeedID = id
@@ -1066,4 +1069,18 @@ func TestFeedIDValidation(t *testing.T) {
 	srv.Handler.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "English letters")
+}
+
+func TestFeedEpisodesEndpointPagination(t *testing.T) {
+	srv := New(Config{Port: 8080, Admin: AdminConfig{Enabled: true, Username: "admin", Password: "pass"}}, nil, nil)
+	mgr := &mockDownloaderAdminMgr{}
+	srv.SetAdminManager(mgr)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/feeds/test/episodes?limit=10&offset=5&status=downloaded&q=hello", nil)
+	req.SetBasicAuth("admin", "pass")
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"episodes":[]`)
+	assert.Contains(t, w.Body.String(), `"total":0`)
 }

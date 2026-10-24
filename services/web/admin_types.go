@@ -275,11 +275,33 @@ type ImportAudiobookRequest struct {
 	PrivateFeed  bool   `json:"private_feed,omitempty"`
 }
 
+// EpisodeQuery specifies filter, pagination and sorting parameters for querying episodes
+type EpisodeQuery struct {
+	Limit    int    `json:"limit"`
+	Offset   int    `json:"offset"`
+	Status   string `json:"status"`   // "all", "downloaded", "error", "new", "cleaned"
+	Search   string `json:"search"`   // substring match on title and ID
+	Sort     string `json:"sort"`     // "date-desc", "date-asc", "title-asc", "duration-desc", "duration-asc"
+	Duration string `json:"duration"` // "all", "short", "medium", "long"
+}
+
+// EpisodePageResult represents paginated episodes response
+type EpisodePageResult struct {
+	Episodes   []*model.Episode `json:"episodes"`
+	Total      int              `json:"total"`
+	Matching   int              `json:"matching"`
+	Offset     int              `json:"offset"`
+	Limit      int              `json:"limit"`
+	HasMore    bool             `json:"has_more"`
+	NextOffset int              `json:"next_offset,omitempty"`
+}
+
 // AdminManager is the interface required by the web admin handlers
 type AdminManager interface {
 	ListFeeds(ctx context.Context) ([]FeedSummary, error)
 	GetFeedsStatus(ctx context.Context) ([]FeedStatusItem, error)
 	GetFeedDetail(ctx context.Context, id string) (*FeedSummary, []*model.Episode, error)
+	GetFeedEpisodes(ctx context.Context, id string, query EpisodeQuery) (*EpisodePageResult, error)
 	AddFeed(ctx context.Context, cfg *feed.Config) error
 	UpdateFeed(ctx context.Context, id string, update *FeedConfigUpdate) error
 	DeleteFeed(ctx context.Context, id string, deleteFiles bool) error

@@ -541,6 +541,32 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1.8. /api/v1/feeds/{id}/episodes
+	if len(parts) == 2 && parts[1] == "episodes" {
+		if r.Method != http.MethodGet {
+			s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		q := r.URL.Query()
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		offset, _ := strconv.Atoi(q.Get("offset"))
+		query := EpisodeQuery{
+			Limit:    limit,
+			Offset:   offset,
+			Status:   q.Get("status"),
+			Search:   q.Get("q"),
+			Sort:     q.Get("sort"),
+			Duration: q.Get("duration"),
+		}
+		page, err := s.adminMgr.GetFeedEpisodes(r.Context(), feedID, query)
+		if err != nil {
+			s.writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, page)
+		return
+	}
+
 	// 2. /api/v1/feeds/{id}/episodes/{episode_id}/retry
 	if len(parts) == 4 && parts[1] == "episodes" && parts[3] == "retry" {
 		if r.Method != http.MethodPost {
@@ -560,6 +586,40 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 	if len(parts) == 1 {
 		switch r.Method {
 		case http.MethodGet:
+			limitStr := r.URL.Query().Get("limit")
+			if limitStr != "" {
+				limit, _ := strconv.Atoi(limitStr)
+				offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+				query := EpisodeQuery{
+					Limit:    limit,
+					Offset:   offset,
+					Status:   r.URL.Query().Get("status"),
+					Search:   r.URL.Query().Get("q"),
+					Sort:     r.URL.Query().Get("sort"),
+					Duration: r.URL.Query().Get("duration"),
+				}
+				page, err := s.adminMgr.GetFeedEpisodes(r.Context(), feedID, query)
+				if err != nil {
+					s.writeError(w, http.StatusNotFound, err.Error())
+					return
+				}
+				summary, _, err := s.adminMgr.GetFeedDetail(r.Context(), feedID)
+				if err != nil {
+					s.writeError(w, http.StatusNotFound, err.Error())
+					return
+				}
+				s.writeJSON(w, http.StatusOK, map[string]interface{}{
+					"feed":        summary,
+					"episodes":    page.Episodes,
+					"total":       page.Total,
+					"matching":    page.Matching,
+					"offset":      page.Offset,
+					"limit":       page.Limit,
+					"has_more":    page.HasMore,
+					"next_offset": page.NextOffset,
+				})
+				return
+			}
 			summary, episodes, err := s.adminMgr.GetFeedDetail(r.Context(), feedID)
 			if err != nil {
 				s.writeError(w, http.StatusNotFound, err.Error())

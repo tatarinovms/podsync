@@ -312,6 +312,181 @@ func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.Fee
 	return &summary, episodes, nil
 }
 
+func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query web.EpisodeQuery) (*web.EpisodePageResult, error) {
+	m.mu.RLock()
+	f, ok := m.feeds[id]
+	audiobooksDir := ""
+	if m.cfg != nil {
+		audiobooksDir = m.cfg.Audiobooks.Dir
+	}
+	m.mu.RUnlock()
+
+	if !ok {
+		return nil, errors.Errorf("feed %q not found", id)
+	}
+
+	info, parseErr := builder.ParseURL(f.URL)
+	isAudiobook := (parseErr == nil && info.Provider == model.ProviderAudiobook) || strings.HasPrefix(f.URL, "audiobook://")
+
+	var allEpisodes []*model.Episode
+	totalCount := 0
+
+	if err := m.db.WalkEpisodes(ctx, id, func(episode *model.Episode) error {
+		totalCount++
+		copy := *episode
+		allEpisodes = append(allEpisodes, &copy)
+		return nil
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to load episodes")
+	}
+
+	if len(allEpisodes) == 0 && isAudiobook {
+		baseDir := audiobooksDir
+		if abBuilder, bErr := builder.NewAudiobookBuilder(baseDir); bErr == nil {
+			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
+				allEpisodes = builtFeed.Episodes
+				totalCount = len(allEpisodes)
+			}
+		}
+	}
+
+	search := strings.TrimSpace(strings.ToLower(query.Search))
+	status := strings.TrimSpace(strings.ToLower(query.Status))
+	duration := strings.TrimSpace(strings.ToLower(query.Duration))
+
+	var filtered []*model.Episode
+	for _, ep := range allEpisodes {
+		if status != "" && status != "all" && string(ep.Status) != status {
+			continue
+		}
+		if search != "" {
+			combined := strings.ToLower(ep.Title + " " + ep.ID)
+			if !strings.Contains(combined, search) {
+				continue
+			}
+		}
+		if duration != "" && duration != "all" {
+			dur := ep.Duration
+			if duration == "short" && (dur <= 0 || dur >= 900) {
+				continue
+			}
+			if duration == "medium" && (dur < 900 || dur > 3600) {
+				continue
+			}
+			if duration == "long" && dur <= 3600 {
+				continue
+			}
+		}
+		filtered = append(filtered, ep)
+	}
+
+	matchingCount := len(filtered)
+
+	sortOrder := query.Sort
+	if sortOrder == "" || sortOrder == "default" {
+		if isAudiobook || f.PlaylistSort == model.SortingAsc {
+			sortOrder = "date-asc"
+		} else {
+			sortOrder = "date-desc"
+		}
+	}
+
+	switch sortOrder {
+	case "date-asc":
+		sort.Slice(filtered, func(i, j int) bool {
+			if filtered[i].PubDate.Equal(filtered[j].PubDate) {
+				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
+			}
+			return filtered[i].PubDate.Before(filtered[j].PubDate)
+		})
+	case "date-desc":
+		sort.Slice(filtered, func(i, j int) bool {
+			if filtered[i].PubDate.Equal(filtered[j].PubDate) {
+				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
+			}
+			return filtered[i].PubDate.After(filtered[j].PubDate)
+		})
+	case "title-asc":
+		sort.Slice(filtered, func(i, j int) bool {
+			ti := filtered[i].Title
+			if ti == "" {
+				ti = filtered[i].ID
+			}
+			tj := filtered[j].Title
+			if tj == "" {
+				tj = filtered[j].ID
+			}
+			return strings.ToLower(ti) < strings.ToLower(tj)
+		})
+	case "duration-desc":
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].Duration > filtered[j].Duration
+		})
+	case "duration-asc":
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].Duration < filtered[j].Duration
+		})
+	}
+
+	limit := query.Limit
+	if limit <= 0 {
+		limit = 40
+	} else if limit > 200 {
+		limit = 200
+	}
+
+	offset := query.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > matchingCount {
+		offset = matchingCount
+	}
+
+	end := offset + limit
+	if end > matchingCount {
+		end = matchingCount
+	}
+
+	paged := filtered[offset:end]
+	hasMore := end < matchingCount
+	nextOffset := 0
+	if hasMore {
+		nextOffset = end
+	}
+
+	summary := m.buildSummary(ctx, f)
+	mediaBase := strings.TrimSuffix(summary.FeedURL, id+".xml") + url.PathEscape(id) + "/"
+
+	for _, ep := range paged {
+		if ep.Status != model.EpisodeDownloaded {
+			continue
+		}
+		filename := feed.EpisodeName(f, ep)
+		if isAudiobook {
+			filename = ep.ID
+		} else if m.storage != nil {
+			if _, err := m.storage.Size(ctx, id+"/"+filename); err != nil {
+				legacy := feed.LegacyEpisodeName(f, ep)
+				if _, err := m.storage.Size(ctx, id+"/"+legacy); err == nil {
+					filename = legacy
+				}
+			}
+		}
+		ep.MediaURL = mediaBase + url.PathEscape(filename)
+	}
+
+	return &web.EpisodePageResult{
+		Episodes:   paged,
+		Total:      totalCount,
+		Matching:   matchingCount,
+		Offset:     offset,
+		Limit:      limit,
+		HasMore:    hasMore,
+		NextOffset: nextOffset,
+	}, nil
+}
+
 // extractCoverArtFromXML reads the generated <feed_id>.xml from storage and extracts <image><url>...</url></image>
 func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
 	if val, ok := m.coverCache.Load(feedID); ok {

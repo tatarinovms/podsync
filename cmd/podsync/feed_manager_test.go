@@ -984,3 +984,63 @@ func TestSaveCoverImage(t *testing.T) {
 	assert.Equal(t, "", res2.FeedID)
 	assert.True(t, strings.HasSuffix(res2.Filename, ".jpg"))
 }
+
+func TestGetFeedEpisodes_PaginationAndFilters(t *testing.T) {
+	now := time.Now()
+	eps := map[string]*model.Episode{
+		"ep1": {ID: "ep1", Title: "Introduction to Go", PubDate: now.Add(-4 * time.Hour), Duration: 600, Status: model.EpisodeDownloaded},
+		"ep2": {ID: "ep2", Title: "Advanced Concurrency", PubDate: now.Add(-3 * time.Hour), Duration: 3600, Status: model.EpisodeDownloaded},
+		"ep3": {ID: "ep3", Title: "Network Programming", PubDate: now.Add(-2 * time.Hour), Duration: 1200, Status: model.EpisodeError},
+		"ep4": {ID: "ep4", Title: "Special Episode: BadgerDB", PubDate: now.Add(-1 * time.Hour), Duration: 4000, Status: model.EpisodeNew},
+		"ep5": {ID: "ep5", Title: "Wrap up", PubDate: now, Duration: 300, Status: model.EpisodeCleaned},
+	}
+
+	mgr := &AppFeedManager{
+		cfg:   &Config{Server: web.Config{Hostname: "https://example.com"}},
+		feeds: map[string]*feed.Config{"tech": {ID: "tech", URL: "https://youtube.com/channel/UCtech", Format: model.FormatAudio}},
+		db:    &mockFeedManagerDB{episodes: map[string]map[string]*model.Episode{"tech": eps}},
+	}
+	ctx := context.Background()
+
+	// 1. Pagination: Limit 2, Offset 0 -> Page 1
+	p1, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Limit: 2, Offset: 0, Sort: "date-desc"})
+	require.NoError(t, err)
+	assert.Equal(t, 5, p1.Total)
+	assert.Equal(t, 5, p1.Matching)
+	assert.Len(t, p1.Episodes, 2)
+	assert.True(t, p1.HasMore)
+	assert.Equal(t, 2, p1.NextOffset)
+	assert.Equal(t, "ep5", p1.Episodes[0].ID) // newest first
+
+	// 2. Pagination: Limit 2, Offset 2 -> Page 2
+	p2, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Limit: 2, Offset: 2, Sort: "date-desc"})
+	require.NoError(t, err)
+	assert.Len(t, p2.Episodes, 2)
+	assert.True(t, p2.HasMore)
+	assert.Equal(t, 4, p2.NextOffset)
+
+	// 3. Pagination: Limit 2, Offset 4 -> Page 3 (last page)
+	p3, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Limit: 2, Offset: 4, Sort: "date-desc"})
+	require.NoError(t, err)
+	assert.Len(t, p3.Episodes, 1)
+	assert.False(t, p3.HasMore)
+	assert.Equal(t, "ep1", p3.Episodes[0].ID)
+
+	// 4. Filter by status: downloaded
+	pStatus, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Status: "downloaded"})
+	require.NoError(t, err)
+	assert.Equal(t, 5, pStatus.Total)
+	assert.Equal(t, 2, pStatus.Matching)
+	assert.Len(t, pStatus.Episodes, 2)
+
+	// 5. Search query
+	pSearch, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Search: "badger"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, pSearch.Matching)
+	assert.Equal(t, "ep4", pSearch.Episodes[0].ID)
+
+	// 6. Sort duration-desc
+	pDur, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Sort: "duration-desc", Limit: 1})
+	require.NoError(t, err)
+	assert.Equal(t, "ep4", pDur.Episodes[0].ID) // 4000s duration
+}

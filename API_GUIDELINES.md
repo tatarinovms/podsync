@@ -84,7 +84,29 @@ Creates a new podcast feed.
 ```
 
 #### `GET /api/v1/feeds/{id}`
-Returns details for a specific feed and its episodes list.
+Returns details for a specific feed and its episodes list. Supports optional query parameters `?limit=40&offset=0` for server-side pagination.
+
+#### `GET /api/v1/feeds/{id}/episodes`
+Returns paginated episodes for a specific feed with server-side filtering and sorting.
+- **Query Parameters**:
+  - `limit` *(integer, optional, default: 40, max: 200)*: Number of items per page.
+  - `offset` *(integer, optional, default: 0)*: Zero-based item offset.
+  - `status` *(string, optional)*: Filter by episode status (`"downloaded"`, `"new"`, `"error"`, `"cleaned"`, or `"all"`).
+  - `q` *(string, optional)*: Search query substring matching episode title or ID.
+  - `sort` *(string, optional)*: Sort order (`"date-desc"`, `"date-asc"`, `"title-asc"`, `"duration-desc"`, `"duration-asc"`, `"default"`).
+  - `duration` *(string, optional)*: Filter by duration (`"short"` <15m, `"medium"` 15-60m, `"long"` >60m, or `"all"`).
+- **Response**:
+```json
+{
+  "episodes": [...],
+  "total": 1250,
+  "matching": 42,
+  "offset": 0,
+  "limit": 40,
+  "has_more": true,
+  "next_offset": 40
+}
+```
 
 #### `PUT /api/v1/feeds/{id}`
 Updates feed settings and triggers an immediate XML rebuild.

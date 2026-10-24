@@ -59,6 +59,23 @@ func (m *mockAdminManager) GetFeedDetail(ctx context.Context, id string) (*web.F
 	return nil, nil, nil
 }
 
+func (m *mockAdminManager) GetFeedEpisodes(ctx context.Context, id string, query web.EpisodeQuery) (*web.EpisodePageResult, error) {
+	for _, f := range m.feeds {
+		if f.ID == id {
+			return &web.EpisodePageResult{
+				Episodes: []*model.Episode{
+					{ID: "ep1", Title: "Episode 1", Status: model.EpisodeDownloaded},
+				},
+				Total:    1,
+				Matching: 1,
+				Limit:    query.Limit,
+				Offset:   query.Offset,
+			}, nil
+		}
+	}
+	return &web.EpisodePageResult{Episodes: []*model.Episode{}}, nil
+}
+
 func (m *mockAdminManager) AddFeed(ctx context.Context, cfg *feed.Config) error {
 	if m.addFeedErr != nil {
 		return m.addFeedErr

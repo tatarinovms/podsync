@@ -172,7 +172,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/feeds` | Create new podcast feed |
 | `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
 | `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
-| `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list |
+| `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list (supports `?limit=40&offset=0` pagination) |
+| `GET` | `/api/v1/feeds/{id}/episodes` | Paginated episode query (`limit`, `offset`, `status`, `q`, `sort`, `duration`) |
 | `PUT` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
 | `DELETE` | `/api/v1/feeds/{id}` | Delete feed (optional `?delete_files=true`) |
 | `POST` | `/api/v1/feeds/{id}/update` | Trigger manual update for a feed |

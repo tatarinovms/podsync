@@ -210,6 +210,9 @@ func (m *mockFeedManagerDB) GetJob(_ context.Context, _ string) (*model.UpdateJo
 func (m *mockFeedManagerDB) WalkJobs(_ context.Context, _ func(job *model.UpdateJob) error) error {
 	return nil
 }
+func (m *mockFeedManagerDB) WalkActiveJobs(_ context.Context, _ func(job *model.UpdateJob) error) error {
+	return nil
+}
 func (m *mockFeedManagerDB) DeleteJob(_ context.Context, _ string) error { return nil }
 
 func TestGetFeedsStatusDoesNotTouchDBOrStorage(t *testing.T) {

@@ -58,6 +58,9 @@ type Storage interface {
 	// WalkJobs iterates over all task jobs
 	WalkJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error
 
+	// WalkActiveJobs iterates only over active jobs (queued, running, retrying)
+	WalkActiveJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error
+
 	// DeleteJob deletes a job by ID
 	DeleteJob(ctx context.Context, jobID string) error
 }

@@ -41,6 +41,15 @@ func NewJobQueue(storage db.Storage, maxAttempts int) *JobQueue {
 	}
 }
 
+func (q *JobQueue) walkActive(ctx context.Context, cb func(job *model.UpdateJob) error) error {
+	if activeWalker, ok := q.db.(interface {
+		WalkActiveJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error
+	}); ok {
+		return activeWalker.WalkActiveJobs(ctx, cb)
+	}
+	return q.db.WalkJobs(ctx, cb)
+}
+
 func (q *JobQueue) notify() {
 	select {
 	case q.notifyCh <- struct{}{}:
@@ -172,7 +181,7 @@ func (q *JobQueue) ClaimNextJob(ctx context.Context) (*model.UpdateJob, error) {
 	now := time.Now().UTC()
 	var candidate *model.UpdateJob
 
-	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+	err := q.walkActive(ctx, func(j *model.UpdateJob) error {
 		if (j.Status == model.JobStatusQueued || j.Status == model.JobStatusRetrying) && !j.AvailableAt.After(now) {
 			if candidate == nil || j.AvailableAt.Before(candidate.AvailableAt) {
 				candidate = j
@@ -228,7 +237,7 @@ func (q *JobQueue) calculateNextWakeup(ctx context.Context) time.Duration {
 	now := time.Now().UTC()
 	shortest := q.pollPeriod
 
-	_ = q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+	_ = q.walkActive(ctx, func(j *model.UpdateJob) error {
 		if j.Status == model.JobStatusQueued || j.Status == model.JobStatusRetrying {
 			if j.AvailableAt.After(now) {
 				wait := j.AvailableAt.Sub(now)
@@ -483,10 +492,10 @@ func (q *JobQueue) ListJobs(ctx context.Context) ([]*model.UpdateJob, error) {
 	return list, err
 }
 
-// GetActiveJobsMap returns a map of feedID -> active job in a single pass.
+// GetActiveJobsMap returns a map of feedID -> active job using the active jobs index.
 func (q *JobQueue) GetActiveJobsMap(ctx context.Context) (map[string]*model.UpdateJob, error) {
 	result := make(map[string]*model.UpdateJob)
-	err := q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+	err := q.walkActive(ctx, func(j *model.UpdateJob) error {
 		if j.IsActive() && j.FeedID != "" {
 			result[j.FeedID] = j
 		}

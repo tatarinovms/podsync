@@ -22,8 +22,10 @@ const (
 	statsPath     = "stats/%s"
 	episodePrefix = "episode/%s/"
 	episodePath   = "episode/%s/%s" // FeedID + EpisodeID
-	jobPrefix     = "job/"
-	jobPath       = "job/%s"
+	jobPrefix       = "job/"
+	jobPath         = "job/%s"
+	activeJobPrefix = "job_active/"
+	activeJobPath   = "job_active/%s"
 )
 
 // BadgerConfig represents BadgerDB configuration parameters
@@ -76,6 +78,21 @@ func NewBadger(config *Config) (*Badger, error) {
 	}); err != nil {
 		return nil, errors.Wrap(err, "failed to read database version")
 	}
+
+	// Populate active jobs index from legacy records if needed
+	_ = db.Update(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = storage.getKey(jobPrefix)
+		opts.PrefetchValues = true
+		return storage.iterator(context.Background(), txn, opts, func(item *badger.Item) error {
+			var job model.UpdateJob
+			if err := storage.unmarshalObj(item, &job); err == nil && job.IsActive() {
+				activeKey := storage.getKey(activeJobPath, job.ID)
+				_ = storage.setObj(txn, activeKey, &job, true)
+			}
+			return nil
+		})
+	})
 
 	return &Badger{db: db}, nil
 }
@@ -430,8 +447,31 @@ func (b *Badger) SaveJob(_ context.Context, job *model.UpdateJob) error {
 		return errors.New("invalid job or empty job ID")
 	}
 	key := b.getKey(jobPath, job.ID)
+	activeKey := b.getKey(activeJobPath, job.ID)
 	return b.db.Update(func(txn *badger.Txn) error {
-		return b.setObj(txn, key, job, true)
+		if err := b.setObj(txn, key, job, true); err != nil {
+			return err
+		}
+		if job.IsActive() {
+			return b.setObj(txn, activeKey, job, true)
+		}
+		_ = txn.Delete(activeKey)
+		return nil
+	})
+}
+
+func (b *Badger) WalkActiveJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error {
+	return b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = b.getKey(activeJobPrefix)
+		opts.PrefetchValues = true
+		return b.iterator(ctx, txn, opts, func(item *badger.Item) error {
+			job := &model.UpdateJob{}
+			if err := b.unmarshalObj(item, job); err != nil {
+				return err
+			}
+			return cb(job)
+		})
 	})
 }
 
@@ -464,7 +504,9 @@ func (b *Badger) WalkJobs(ctx context.Context, cb func(job *model.UpdateJob) err
 
 func (b *Badger) DeleteJob(_ context.Context, jobID string) error {
 	key := b.getKey(jobPath, jobID)
+	activeKey := b.getKey(activeJobPath, jobID)
 	return b.db.Update(func(txn *badger.Txn) error {
+		_ = txn.Delete(activeKey)
 		return txn.Delete(key)
 	})
 }

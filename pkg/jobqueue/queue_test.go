@@ -2,6 +2,7 @@ package jobqueue
 
 import (
 	"context"
+	"fmt"
 	"errors"
 	"testing"
 	"time"
@@ -635,4 +636,39 @@ func TestJobQueue_ScheduledUpdateDuringRunningDoesNotSetPendingRerun(t *testing.
 	assert.Equal(t, model.JobStatusRetrying, failedJob.Status)
 	assert.Equal(t, 1, failedJob.Attempts)
 	assert.True(t, failedJob.AvailableAt.After(now.Add(25*time.Minute)))
+}
+
+func TestJobQueue_ActiveJobIndexScale(t *testing.T) {
+	q, storage := setupTestQueue(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// Seed 1,000 finished historical jobs into storage
+	for i := 0; i < 1000; i++ {
+		job := &model.UpdateJob{
+			ID:         fmt.Sprintf("history/job_%d", i),
+			FeedID:     fmt.Sprintf("feed_%d", i),
+			Status:     model.JobStatusDone,
+			FinishedAt: &now,
+			CreatedAt:  now,
+		}
+		require.NoError(t, storage.SaveJob(ctx, job))
+	}
+
+	// Add 1 active job
+	activeJob, created, err := q.EnqueueUpdate(ctx, "active_feed")
+	require.NoError(t, err)
+	assert.True(t, created)
+
+	// GetActiveJobsMap must only scan active index (1 item)
+	activeMap, err := q.GetActiveJobsMap(ctx)
+	require.NoError(t, err)
+	assert.Len(t, activeMap, 1)
+	assert.NotNil(t, activeMap["active_feed"])
+
+	// Claim must be instant and return the active job
+	claimed, err := q.ClaimNextJob(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, claimed)
+	assert.Equal(t, activeJob.ID, claimed.ID)
 }

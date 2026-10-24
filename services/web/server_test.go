@@ -2,15 +2,15 @@ package web
 
 import (
 	"bytes"
-	"mime/multipart"
-	"fmt"
-	"sync"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1092,4 +1092,33 @@ func TestServer_TimeoutsAndShutdown(t *testing.T) {
 
 	// Close shuts down session manager without panic or leak
 	require.NoError(t, srv.Close())
+}
+
+type pagedAdminManager struct {
+	mockDownloaderAdminMgr
+	query EpisodeQuery
+}
+
+func (m *pagedAdminManager) GetFeedDetail(context.Context, string) (*FeedSummary, []*model.Episode, error) {
+	panic("paginated requests must not load the full episode detail")
+}
+
+func (m *pagedAdminManager) GetFeedEpisodes(_ context.Context, id string, query EpisodeQuery) (*EpisodePageResult, error) {
+	m.query = query
+	return &EpisodePageResult{Feed: &FeedSummary{ID: id}, Episodes: []*model.Episode{{ID: "selected"}}, Total: 100, Matching: 12, Offset: query.Offset, Limit: query.Limit}, nil
+}
+
+func TestPaginatedDetailDoesNotLoadAllEpisodes(t *testing.T) {
+	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "pass"}}, nil, nil)
+	t.Cleanup(func() { require.NoError(t, srv.Close()) })
+	mgr := &pagedAdminManager{}
+	srv.SetAdminManager(mgr)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/feeds/test?limit=10&offset=5&status=downloaded&q=hello&sort=date-asc&duration=short", nil)
+	req.SetBasicAuth("admin", "pass")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"id":"selected"`)
+	assert.Contains(t, rec.Body.String(), `"total":100`)
+	assert.Equal(t, EpisodeQuery{Limit: 10, Offset: 5, Status: "downloaded", Search: "hello", Sort: "date-asc", Duration: "short"}, mgr.query)
 }

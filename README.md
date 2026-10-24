@@ -183,6 +183,8 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Health check endpoint (public, unauthenticated) |
+| `GET` | `/health/live` | Public process liveness probe |
+| `GET` | `/health/ready` | Public database readiness probe, independent of episode download errors |
 | `GET` | `/api/v1/auth/status` | Current authentication status |
 | `POST` | `/api/v1/auth/login` | Session login with JSON credentials |
 | `POST` | `/api/v1/auth/logout` | Session logout |
@@ -194,6 +196,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
 | `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
 | `GET` | `/api/v1/feeds/{id}` | Detailed feed info and episode status |
+| `GET` | `/api/v1/feeds/{id}/episodes` | Paginated episodes with `limit`, `offset`, `status`, `q`, `sort`, and `duration` filters |
 | `PUT`, `PATCH` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
 | `DELETE` | `/api/v1/feeds/{id}` | Delete feed (`?delete_files=true` to purge downloaded media) |
 | `POST` | `/api/v1/feeds/{id}/update` | Trigger immediate feed update and download cycle |

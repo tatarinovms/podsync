@@ -40,7 +40,8 @@ type Storage interface {
 	// GetEpisode gets episode by identifier
 	GetEpisode(ctx context.Context, feedID string, episodeID string) (*model.Episode, error)
 
-	// UpdateEpisode updates episode fields
+	// UpdateEpisode updates episode fields. The callback may run again on a
+	// transaction conflict and must not perform external side effects.
 	UpdateEpisode(feedID string, episodeID string, cb func(episode *model.Episode) error) error
 
 	// DeleteEpisode deletes an episode

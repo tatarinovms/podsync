@@ -354,9 +354,14 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 	search := strings.TrimSpace(strings.ToLower(query.Search))
 	status := strings.TrimSpace(strings.ToLower(query.Status))
 	duration := strings.TrimSpace(strings.ToLower(query.Duration))
+	statusCounts := make(map[model.EpisodeStatus]int)
 
 	var filtered []*model.Episode
 	for _, ep := range allEpisodes {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		statusCounts[ep.Status]++
 		if status != "" && status != "all" && string(ep.Status) != status {
 			continue
 		}
@@ -417,14 +422,23 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 			if tj == "" {
 				tj = filtered[j].ID
 			}
+			if strings.EqualFold(ti, tj) {
+				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
+			}
 			return strings.ToLower(ti) < strings.ToLower(tj)
 		})
 	case "duration-desc":
 		sort.Slice(filtered, func(i, j int) bool {
+			if filtered[i].Duration == filtered[j].Duration {
+				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
+			}
 			return filtered[i].Duration > filtered[j].Duration
 		})
 	case "duration-asc":
 		sort.Slice(filtered, func(i, j int) bool {
+			if filtered[i].Duration == filtered[j].Duration {
+				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
+			}
 			return filtered[i].Duration < filtered[j].Duration
 		})
 	}
@@ -440,8 +454,11 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 	if offset < 0 {
 		offset = 0
 	}
-	if offset > matchingCount {
-		offset = matchingCount
+	if offset >= matchingCount {
+		offset = 0
+		if matchingCount > 0 {
+			offset = ((matchingCount - 1) / limit) * limit
+		}
 	}
 
 	end := offset + limit
@@ -449,7 +466,7 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 		end = matchingCount
 	}
 
-	paged := filtered[offset:end]
+	paged := append([]*model.Episode{}, filtered[offset:end]...)
 	hasMore := end < matchingCount
 	nextOffset := 0
 	if hasMore {
@@ -478,13 +495,15 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 	}
 
 	return &web.EpisodePageResult{
-		Episodes:   paged,
-		Total:      totalCount,
-		Matching:   matchingCount,
-		Offset:     offset,
-		Limit:      limit,
-		HasMore:    hasMore,
-		NextOffset: nextOffset,
+		Feed:         &summary,
+		StatusCounts: statusCounts,
+		Episodes:     paged,
+		Total:        totalCount,
+		Matching:     matchingCount,
+		Offset:       offset,
+		Limit:        limit,
+		HasMore:      hasMore,
+		NextOffset:   nextOffset,
 	}, nil
 }
 
@@ -737,6 +756,9 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 
 	// Remove from map
 	delete(m.feeds, id)
+	if m.cfg != nil {
+		delete(m.cfg.Feeds, id)
+	}
 	if m.updater != nil {
 		m.updater.SetFeedConfig(id, nil)
 	}
@@ -1091,10 +1113,8 @@ func maskToken(s string) string {
 	return s[:4] + "••••" + s[len(s)-4:]
 }
 
+// Caller holds configWriteMu across reading, persisting and publishing tokens.
 func (m *AppFeedManager) persistTokens(providerStr string, newTokens []string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
 	provider := model.Provider(providerStr)
 	// Save to config.toml
 	if m.configPath != "" {
@@ -1146,10 +1166,13 @@ func cleanToken(providerStr, tok string) string {
 }
 
 func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
+
 	var newTokens []string
 	for _, tok := range tokens {
 		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "••••") {
+		if tok == "" || strings.Contains(tok, "•") {
 			continue
 		}
 		newTokens = append(newTokens, tok)
@@ -1159,10 +1182,13 @@ func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, t
 }
 
 func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, tokens []string) error {
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
+
 	var validTokens []string
 	for _, tok := range tokens {
 		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "••••") {
+		if tok == "" || strings.Contains(tok, "•") {
 			continue
 		}
 		validTokens = append(validTokens, tok)
@@ -1174,13 +1200,16 @@ func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, toke
 	provider := model.Provider(providerStr)
 	m.mu.RLock()
 	current := m.tokens[provider]
-	combined := append([]string(current), validTokens...)
+	combined := append(append([]string(nil), current...), validTokens...)
 	m.mu.RUnlock()
 
 	return m.persistTokens(providerStr, combined)
 }
 
 func (m *AppFeedManager) DeleteToken(ctx context.Context, providerStr string, index int) error {
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
+
 	if index < 0 {
 		return m.persistTokens(providerStr, nil)
 	}
@@ -1675,36 +1704,41 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 	m.configWriteMu.Lock()
 	defer m.configWriteMu.Unlock()
 
-	m.mu.Lock()
+	m.mu.RLock()
+	cfgCopy := m.cfg.Downloader
+	m.mu.RUnlock()
 	if update.Timeout != nil && *update.Timeout > 0 {
-		m.cfg.Downloader.Timeout = *update.Timeout
+		cfgCopy.Timeout = *update.Timeout
 	}
 	if update.SelfUpdate != nil {
-		m.cfg.Downloader.SelfUpdate = *update.SelfUpdate
+		cfgCopy.SelfUpdate = *update.SelfUpdate
 	}
 	if update.CustomBinary != nil {
-		m.cfg.Downloader.CustomBinary = *update.CustomBinary
+		cfgCopy.CustomBinary = *update.CustomBinary
 	}
 	if update.CookiesFile != nil {
-		m.cfg.Downloader.CookiesFile = *update.CookiesFile
+		cfgCopy.CookiesFile = *update.CookiesFile
 	}
 	if update.CookiesFromBrowser != nil {
-		m.cfg.Downloader.CookiesFromBrowser = *update.CookiesFromBrowser
+		cfgCopy.CookiesFromBrowser = *update.CookiesFromBrowser
 	}
 	if update.Proxy != nil {
-		m.cfg.Downloader.Proxy = *update.Proxy
+		cfgCopy.Proxy = *update.Proxy
 	}
 	if update.Language != nil {
-		m.cfg.Downloader.Language = strings.TrimSpace(*update.Language)
+		cfgCopy.Language = strings.TrimSpace(*update.Language)
 	}
 
+	if err := m.saveDownloaderToConfig(&cfgCopy); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	m.cfg.Downloader = cfgCopy
 	if m.downloader != nil {
-		m.downloader.UpdateConfig(m.cfg.Downloader)
+		m.downloader.UpdateConfig(cfgCopy)
 	}
-	cfgCopy := m.cfg.Downloader
 	m.mu.Unlock()
-
-	return m.saveDownloaderToConfig(&cfgCopy)
+	return nil
 }
 
 func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {
@@ -1758,9 +1792,11 @@ func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content strin
 		if m.downloader != nil {
 			m.downloader.SetCookiesFile("")
 		}
-		m.syncCookiesToFeeds("")
 		cfgCopy := m.cfg.Downloader
 		m.mu.Unlock()
+		if err := m.syncCookiesToFeeds(""); err != nil {
+			return err
+		}
 		return m.saveDownloaderToConfig(&cfgCopy)
 	}
 
@@ -1782,15 +1818,24 @@ func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content strin
 		m.downloader.SetCookiesFile(cookiesPath)
 	}
 
-	m.syncCookiesToFeeds(cookiesPath)
 	cfgCopy := m.cfg.Downloader
 	m.mu.Unlock()
+	if err := m.syncCookiesToFeeds(cookiesPath); err != nil {
+		return err
+	}
 
 	return m.saveDownloaderToConfig(&cfgCopy)
 }
 
-func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) {
-	for feedID, feedCfg := range m.cfg.Feeds {
+func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) error {
+	m.mu.RLock()
+	feeds := make(map[string]*feed.Config, len(m.cfg.Feeds))
+	for id, cfg := range m.cfg.Feeds {
+		copy := *cfg
+		feeds[id] = &copy
+	}
+	m.mu.RUnlock()
+	for feedID, feedCfg := range feeds {
 		if len(feedCfg.YouTubeDLArgs) == 0 {
 			continue
 		}
@@ -1819,11 +1864,22 @@ func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) {
 
 		if hasCookies {
 			feedCfg.YouTubeDLArgs = newArgs
+			if err := m.saveFeedToConfig(feedCfg); err != nil {
+				return err
+			}
+			m.mu.Lock()
 			m.cfg.Feeds[feedID] = feedCfg
-			_ = m.saveFeedToConfig(feedCfg)
+			if m.feeds != nil {
+				m.feeds[feedID] = feedCfg
+			}
+			if m.updater != nil {
+				m.updater.SetFeedConfig(feedID, feedCfg)
+			}
+			m.mu.Unlock()
 			log.Infof("updated --cookies path in feed %q to %q", feedID, newCookiesPath)
 		}
 	}
+	return nil
 }
 
 func (m *AppFeedManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {

@@ -51,10 +51,6 @@ type rssImageXML struct {
 	Href string `xml:"href,attr"`
 }
 
-type rssITunesImgXML struct {
-	Href string `xml:"href,attr"`
-}
-
 type rssEnclosureXML struct {
 	URL    string `xml:"url,attr"`
 	Length int64  `xml:"length,attr"`

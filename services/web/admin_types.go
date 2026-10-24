@@ -287,13 +287,15 @@ type EpisodeQuery struct {
 
 // EpisodePageResult represents paginated episodes response
 type EpisodePageResult struct {
-	Episodes   []*model.Episode `json:"episodes"`
-	Total      int              `json:"total"`
-	Matching   int              `json:"matching"`
-	Offset     int              `json:"offset"`
-	Limit      int              `json:"limit"`
-	HasMore    bool             `json:"has_more"`
-	NextOffset int              `json:"next_offset,omitempty"`
+	Feed         *FeedSummary                `json:"feed,omitempty"`
+	StatusCounts map[model.EpisodeStatus]int `json:"status_counts,omitempty"`
+	Episodes     []*model.Episode            `json:"episodes"`
+	Total        int                         `json:"total"`
+	Matching     int                         `json:"matching"`
+	Offset       int                         `json:"offset"`
+	Limit        int                         `json:"limit"`
+	HasMore      bool                        `json:"has_more"`
+	NextOffset   int                         `json:"next_offset,omitempty"`
 }
 
 // AdminManager is the interface required by the web admin handlers

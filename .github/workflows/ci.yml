@@ -66,6 +66,12 @@ jobs:
       - name: Run benchmarks
         if: runner.os == 'Linux'
         run: go test -bench=. -benchmem -run=^$ ./pkg/db/... ./pkg/jobqueue/...
+      - name: Run admin UI tests
+        if: runner.os == 'Linux'
+        run: |
+          node services/web/admin_ui_test.js
+          node services/web/admin_security_test.js
+          node services/web/episodes_ui_test.js
 
   coverage:
     name: Coverage

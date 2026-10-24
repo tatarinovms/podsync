@@ -2,7 +2,6 @@ package personal
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -355,35 +354,4 @@ func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input s
 		return nil, err
 	}
 	return &convertedFile{File: f, dir: dir}, nil
-}
-
-func probeMetadata(ctx context.Context, input string) (title, desc string, duration int64) {
-	cmd := exec.CommandContext(ctx, "ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", input)
-	out, err := cmd.Output()
-	if err != nil {
-		return
-	}
-	var probe struct {
-		Format struct {
-			Duration string            `json:"duration"`
-			Tags     map[string]string `json:"tags"`
-		} `json:"format"`
-	}
-	if err := json.Unmarshal(out, &probe); err != nil {
-		return
-	}
-	if d, err := strconv.ParseFloat(probe.Format.Duration, 64); err == nil {
-		duration = int64(d)
-	}
-	for k, v := range probe.Format.Tags {
-		switch strings.ToLower(k) {
-		case "title":
-			title = v
-		case "description", "comment":
-			if desc == "" {
-				desc = v
-			}
-		}
-	}
-	return
 }

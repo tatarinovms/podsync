@@ -603,21 +603,7 @@ func (s *Server) handleFeedSubroutes(w http.ResponseWriter, r *http.Request) {
 					s.writeError(w, http.StatusNotFound, err.Error())
 					return
 				}
-				summary, _, err := s.adminMgr.GetFeedDetail(r.Context(), feedID)
-				if err != nil {
-					s.writeError(w, http.StatusNotFound, err.Error())
-					return
-				}
-				s.writeJSON(w, http.StatusOK, map[string]interface{}{
-					"feed":        summary,
-					"episodes":    page.Episodes,
-					"total":       page.Total,
-					"matching":    page.Matching,
-					"offset":      page.Offset,
-					"limit":       page.Limit,
-					"has_more":    page.HasMore,
-					"next_offset": page.NextOffset,
-				})
+				s.writeJSON(w, http.StatusOK, page)
 				return
 			}
 			summary, episodes, err := s.adminMgr.GetFeedDetail(r.Context(), feedID)

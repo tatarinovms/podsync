@@ -55,7 +55,6 @@ func NewLoginRateLimiter(maxAttempts int, window time.Duration, lockout time.Dur
 	}
 }
 
-
 // UpdateConfig updates rate limiter parameters thread-safely in-place.
 func (l *LoginRateLimiter) UpdateConfig(maxAttempts int, window, lockout time.Duration) {
 	if l == nil {

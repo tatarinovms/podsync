@@ -2,8 +2,8 @@ package jobqueue
 
 import (
 	"context"
-	"fmt"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 

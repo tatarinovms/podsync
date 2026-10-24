@@ -154,7 +154,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 ### REST API Endpoints (`/api/v1`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health`, `/health/ready` | Readiness and database connectivity check |
+| `GET` | `/health/ready` | Readiness and database connectivity check |
+| `GET` | `/health` | Legacy diagnostic check, including recent download failures |
 | `GET` | `/health/live` | Lightweight process liveness probe |
 | `GET` | `/api/v1/auth/status` | Get current authentication status |
 | `POST` | `/api/v1/auth/login` | Authenticate admin session and issue cookie |
@@ -266,7 +267,7 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
 
 2. **BadgerDB Migration Path (v1 to v4)**:
    - Podsync currently uses Badger v1 (`github.com/dgraph-io/badger`), which is stable and reliable for current single-node deployments.
-   - All iterators check `ctx.Done()`, and high-frequency queries utilize metadata and stats index keys (`stats/<feed_id>`, `feed_meta/<feed_id>`) and active job keys (`job_active/<id>`).
+   - Feed, episode, and job iterators check `ctx.Done()`. High-frequency queries read feed metadata without episodes from `feed/<feed_id>`, aggregate stats from `stats/<feed_id>`, and active jobs from `job_active/<id>`.
    - *Migration to Badger v4 (`github.com/dgraph-io/badger/v4`)*:
      1. Because Badger v1 and v4 on-disk table formats are incompatible, an automated migration utility must be added to `services/migrate/` (opening source DB in read-only mode with v1, iterating keys, and streaming to target directory using v4 writer).
      2. Transition `DeleteFeed` and job cleanups to native prefix dropping `db.DropPrefix()`.

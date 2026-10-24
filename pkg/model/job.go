@@ -21,17 +21,17 @@ const (
 )
 
 type UpdateJob struct {
-	ID          string     `json:"id"` // e.g. "update/feed_id" or "retry/feed_id/episode_id"
-	FeedID      string     `json:"feed_id"`
-	EpisodeID   string     `json:"episode_id,omitempty"`
-	Kind        JobKind    `json:"kind"`
-	Status      JobStatus  `json:"status"`
-	Attempts    int        `json:"attempts"`
-	MaxAttempts int        `json:"max_attempts"`
-	AvailableAt time.Time  `json:"available_at"`
-	LastError   string     `json:"last_error,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	StartedAt   *time.Time `json:"started_at,omitempty"`
+	ID           string     `json:"id"` // e.g. "update/feed_id" or "retry/feed_id/episode_id"
+	FeedID       string     `json:"feed_id"`
+	EpisodeID    string     `json:"episode_id,omitempty"`
+	Kind         JobKind    `json:"kind"`
+	Status       JobStatus  `json:"status"`
+	Attempts     int        `json:"attempts"`
+	MaxAttempts  int        `json:"max_attempts"`
+	AvailableAt  time.Time  `json:"available_at"`
+	LastError    string     `json:"last_error,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	StartedAt    *time.Time `json:"started_at,omitempty"`
 	FinishedAt   *time.Time `json:"finished_at,omitempty"`
 	PendingRerun bool       `json:"pending_rerun,omitempty"`
 	Generation   uint64     `json:"generation,omitempty"`

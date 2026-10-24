@@ -168,14 +168,15 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 		result, err = s.personal.Upload(r.Context(), parts[0], name, file, format, quality, maxHeight)
 		status = http.StatusAccepted
 	} else if len(parts) == 3 && parts[1] == "episodes" {
-		if r.Method == http.MethodDelete {
+		switch r.Method {
+		case http.MethodDelete:
 			if r.URL.Query().Get("confirm") != "true" {
 				s.writeError(w, 400, "deletion requires confirm=true")
 				return
 			}
 			err = s.personal.DeleteEpisode(r.Context(), parts[0], parts[2], r.URL.Query().Get("delete_files") == "true")
 			status = http.StatusNoContent
-		} else if r.Method == http.MethodPatch || r.Method == http.MethodPut {
+		case http.MethodPatch, http.MethodPut:
 			var req struct {
 				Title string `json:"title"`
 			}
@@ -185,7 +186,7 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			}
 			result, err = s.personal.RenameEpisode(r.Context(), parts[0], parts[2], req.Title)
 			status = http.StatusOK
-		} else {
+		default:
 			s.writeError(w, 405, "method not allowed")
 			return
 		}

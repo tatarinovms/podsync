@@ -3,8 +3,12 @@ package db
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/dgraph-io/badger"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,6 +17,110 @@ import (
 )
 
 var testCtx = context.TODO()
+
+func TestFeedStatsConcurrentEpisodeUpdates(t *testing.T) {
+	database, err := NewBadger(&Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	f := getFeed()
+	require.NoError(t, database.AddFeed(testCtx, f.ID, f))
+	var started sync.WaitGroup
+	started.Add(2)
+	results := make(chan error, 2)
+	for _, id := range []string{"1", "2"} {
+		go func(id string) {
+			firstAttempt := true
+			results <- database.UpdateEpisode(f.ID, id, func(ep *model.Episode) error {
+				if firstAttempt {
+					firstAttempt = false
+					started.Done()
+					started.Wait()
+				}
+				ep.Status = model.EpisodeDownloaded
+				ep.Size = 100
+				return nil
+			})
+		}(id)
+	}
+	require.NoError(t, <-results)
+	require.NoError(t, <-results)
+	stats, err := database.GetFeedStats(testCtx, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &model.FeedStats{EpisodeCount: 2, DownloadedCount: 2, TotalSize: 200}, stats)
+}
+
+func TestFeedStatsLegacyAndAudiobookSnapshots(t *testing.T) {
+	database, err := NewBadger(&Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	f := &model.Feed{ID: "book", Provider: model.ProviderAudiobook, Episodes: []*model.Episode{
+		{ID: "1", Status: model.EpisodeDownloaded, Size: 100},
+		{ID: "2", Status: model.EpisodeError},
+	}}
+	require.NoError(t, database.AddFeed(testCtx, f.ID, f))
+	// Simulate a database created before stats were introduced.
+	require.NoError(t, database.db.Update(func(txn *badger.Txn) error { return txn.Delete(database.getKey(statsPath, f.ID)) }))
+	require.NoError(t, database.UpdateEpisode(f.ID, "2", func(ep *model.Episode) error { ep.Status = model.EpisodeDownloaded; ep.Size = 200; return nil }))
+	stats, err := database.GetFeedStats(testCtx, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &model.FeedStats{EpisodeCount: 2, DownloadedCount: 2, TotalSize: 300}, stats)
+	// Removing a chapter and replacing another must update the same aggregate.
+	f.Episodes = []*model.Episode{{ID: "2", Status: model.EpisodeDownloaded, Size: 250}, {ID: "3", Status: model.EpisodeNew}}
+	require.NoError(t, database.AddFeed(testCtx, f.ID, f))
+	stats, err = database.GetFeedStats(testCtx, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &model.FeedStats{EpisodeCount: 2, DownloadedCount: 1, TotalSize: 250}, stats)
+	require.NoError(t, database.DeleteEpisode(f.ID, "2"))
+	require.NoError(t, database.DeleteEpisode(f.ID, "2"))
+	stats, err = database.GetFeedStats(testCtx, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, &model.FeedStats{EpisodeCount: 1}, stats)
+}
+
+func TestActiveJobsIndexMigrationBatchesAndTransitions(t *testing.T) {
+	raw, err := badger.Open(badger.DefaultOptions(t.TempDir()).WithMaxTableSize(1 << 20).WithLogger(nil))
+	require.NoError(t, err)
+	database := &Badger{db: raw}
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	batch := raw.NewWriteBatch()
+	defer batch.Cancel()
+	for i := 0; i < 300; i++ {
+		j := &model.UpdateJob{ID: fmt.Sprintf("update/%03d", i), FeedID: fmt.Sprint(i), Status: model.JobStatusQueued, LastError: strings.Repeat("x", 2048)}
+		data, err := database.marshalObj(j)
+		require.NoError(t, err)
+		require.NoError(t, batch.Set(database.getKey(jobPath, j.ID), data))
+	}
+	require.NoError(t, batch.Flush())
+	require.NoError(t, database.initActiveJobsIndex())
+	count := func() int {
+		n := 0
+		require.NoError(t, database.WalkActiveJobs(testCtx, func(*model.UpdateJob) error { n++; return nil }))
+		return n
+	}
+	assert.Equal(t, 300, count())
+	j, err := database.GetJob(testCtx, "update/000")
+	require.NoError(t, err)
+	j.Status = model.JobStatusDone
+	require.NoError(t, database.SaveJob(testCtx, j))
+	require.NoError(t, database.DeleteJob(testCtx, "update/001"))
+	require.NoError(t, database.initActiveJobsIndex())
+	assert.Equal(t, 298, count())
+}
+
+func TestActiveJobsIndexMigrationReportsCorruption(t *testing.T) {
+	dir := t.TempDir()
+	database, err := NewBadger(&Config{Dir: dir})
+	require.NoError(t, err)
+	require.NoError(t, database.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Delete(database.getKey(activeJobIndexVersionPath)); err != nil {
+			return err
+		}
+		return txn.Set(database.getKey(jobPath, "broken"), []byte("invalid JSON"))
+	}))
+	require.NoError(t, database.Close())
+	_, err = NewBadger(&Config{Dir: dir})
+	require.ErrorContains(t, err, "active jobs index")
+}
 
 func TestNewBadger(t *testing.T) {
 	dir := t.TempDir()

@@ -42,7 +42,7 @@ func (c *HTTPClientManager) IsReachable(ctx context.Context) bool {
 	reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, c.baseURL+"/health", nil)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, c.baseURL+"/health/ready", nil)
 	if err != nil {
 		return false
 	}

@@ -191,7 +191,7 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 		mux.Handle("/debug/vars", expvar.Handler())
 	}
 
-	srv.Handler = mux
+	srv.Handler = limitAPIRequestBody(mux)
 	if cfg.NoIndex {
 		log.Info("search engine indexing blocked (no_index enabled)")
 		mux.HandleFunc("/robots.txt", robotsTxtHandler)
@@ -199,6 +199,18 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	}
 
 	return &srv
+}
+
+// Upload handlers apply their own, larger limits. All other REST bodies are
+// bounded even if a client sends no Content-Type or a misleading value.
+func limitAPIRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		isUpload := strings.HasSuffix(r.URL.Path, "/upload") || strings.HasSuffix(r.URL.Path, "/cover")
+		if strings.HasPrefix(r.URL.Path, "/api/v1/") && !isUpload {
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type HealthStatus struct {

@@ -22,6 +22,7 @@ func TestHealthUsesFailureTimeInsteadOfPublicationTime(t *testing.T) {
 	f := &model.Feed{ID: "feed", Episodes: []*model.Episode{{ID: "old", PubDate: old, Status: model.EpisodeError, ErrorAt: &now}}}
 	require.NoError(t, database.AddFeed(context.Background(), f.ID, f))
 	srv := New(Config{}, &mockFileSystem{}, database)
+	t.Cleanup(func() { require.NoError(t, srv.Close()) })
 	rec := httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, httptest.NewRequest("GET", "/health", nil))
 	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
@@ -43,9 +44,15 @@ func TestPublicURLIncludesMountOnce(t *testing.T) {
 func TestHealthLiveAndReady(t *testing.T) {
 	database, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
 	require.NoError(t, err)
-	defer database.Close()
+	closed := false
+	t.Cleanup(func() {
+		if !closed {
+			require.NoError(t, database.Close())
+		}
+	})
 
 	srv := New(Config{}, &mockFileSystem{}, database)
+	t.Cleanup(func() { require.NoError(t, srv.Close()) })
 
 	// 1. /health/live
 	rec := httptest.NewRecorder()
@@ -58,4 +65,13 @@ func TestHealthLiveAndReady(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, httptest.NewRequest("GET", "/health/ready", nil))
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), `"status":"ready"`)
+
+	require.NoError(t, database.Close())
+	closed = true
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest("GET", "/health/ready", nil))
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, httptest.NewRequest("GET", "/health/live", nil))
+	assert.Equal(t, http.StatusOK, rec.Code)
 }

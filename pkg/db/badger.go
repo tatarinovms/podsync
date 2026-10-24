@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/dgraph-io/badger"
 	"github.com/dgraph-io/badger/options"
@@ -15,17 +16,18 @@ import (
 )
 
 const (
-	versionPath   = "podsync/version"
-	feedPrefix    = "feed/"
-	feedPath      = "feed/%s"
-	statsPrefix   = "stats/"
-	statsPath     = "stats/%s"
-	episodePrefix = "episode/%s/"
-	episodePath   = "episode/%s/%s" // FeedID + EpisodeID
-	jobPrefix       = "job/"
-	jobPath         = "job/%s"
-	activeJobPrefix = "job_active/"
-	activeJobPath   = "job_active/%s"
+	versionPath               = "podsync/version"
+	feedPrefix                = "feed/"
+	feedPath                  = "feed/%s"
+	statsPrefix               = "stats/"
+	statsPath                 = "stats/%s"
+	episodePrefix             = "episode/%s/"
+	episodePath               = "episode/%s/%s" // FeedID + EpisodeID
+	jobPrefix                 = "job/"
+	jobPath                   = "job/%s"
+	activeJobPrefix           = "job_active/"
+	activeJobPath             = "job_active/%s"
+	activeJobIndexVersionPath = "index/job_active/v1"
 )
 
 // BadgerConfig represents BadgerDB configuration parameters
@@ -35,7 +37,9 @@ type BadgerConfig struct {
 }
 
 type Badger struct {
-	db *badger.DB
+	db          *badger.DB
+	lifecycleMu sync.RWMutex
+	closed      bool
 }
 
 var _ Storage = (*Badger)(nil)
@@ -76,33 +80,101 @@ func NewBadger(config *Config) (*Badger, error) {
 		}
 		return nil
 	}); err != nil {
+		_ = db.Close()
 		return nil, errors.Wrap(err, "failed to read database version")
 	}
 
-	// Populate active jobs index from legacy records if needed
-	_ = db.Update(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = storage.getKey(jobPrefix)
-		opts.PrefetchValues = true
-		return storage.iterator(context.Background(), txn, opts, func(item *badger.Item) error {
-			var job model.UpdateJob
-			if err := storage.unmarshalObj(item, &job); err == nil && job.IsActive() {
-				activeKey := storage.getKey(activeJobPath, job.ID)
-				_ = storage.setObj(txn, activeKey, &job, true)
-			}
+	if err := storage.initActiveJobsIndex(); err != nil {
+		_ = db.Close()
+		return nil, errors.Wrap(err, "failed to initialize active jobs index")
+	}
+
+	return storage, nil
+}
+
+// Run before workers start. A marker is committed only after all batches succeed,
+// so an interrupted migration can be retried without losing legacy jobs.
+func (b *Badger) initActiveJobsIndex() error {
+	marker := b.getKey(activeJobIndexVersionPath)
+	var initialized bool
+	if err := b.db.View(func(txn *badger.Txn) error {
+		err := b.getObj(txn, marker, &initialized)
+		if err == model.ErrNotFound {
 			return nil
+		}
+		return err
+	}); err != nil || initialized {
+		return err
+	}
+	batch := b.db.NewWriteBatch()
+	defer batch.Cancel()
+	err := b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = b.getKey(activeJobPrefix)
+		if err := b.iterator(context.Background(), txn, opts, func(item *badger.Item) error {
+			return batch.Delete(item.KeyCopy(nil))
+		}); err != nil {
+			return err
+		}
+		opts.Prefix = b.getKey(jobPrefix)
+		return b.iterator(context.Background(), txn, opts, func(item *badger.Item) error {
+			var job model.UpdateJob
+			if err := b.unmarshalObj(item, &job); err != nil {
+				return err
+			}
+			if !job.IsActive() {
+				return nil
+			}
+			data, err := b.marshalObj(&job)
+			if err != nil {
+				return err
+			}
+			return batch.Set(b.getKey(activeJobPath, job.ID), data)
 		})
 	})
+	if err != nil {
+		return err
+	}
+	if err := batch.Flush(); err != nil {
+		return err
+	}
+	return b.db.Update(func(txn *badger.Txn) error {
+		return b.setObj(txn, marker, true, true)
+	})
+}
 
-	return &Badger{db: db}, nil
+// Episode mutations now share the feed's stats key. Retry optimistic conflicts
+// even when workers modify different episodes of the same feed.
+func (b *Badger) update(ctx context.Context, fn func(*badger.Txn) error) error {
+	for attempt := 0; attempt < 32; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := b.db.Update(fn)
+		if err != badger.ErrConflict {
+			return err
+		}
+	}
+	return badger.ErrConflict
 }
 
 func (b *Badger) Close() error {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
+	if b.closed {
+		return nil
+	}
+	b.closed = true
 	log.Debug("closing database")
 	return b.db.Close()
 }
 
 func (b *Badger) Version() (int, error) {
+	b.lifecycleMu.RLock()
+	defer b.lifecycleMu.RUnlock()
+	if b.closed {
+		return -1, errors.New("database is closed")
+	}
 	var (
 		version = -1
 	)
@@ -115,7 +187,11 @@ func (b *Badger) Version() (int, error) {
 }
 
 func (b *Badger) AddFeed(ctx context.Context, feedID string, feed *model.Feed) error {
-	return b.db.Update(func(txn *badger.Txn) error {
+	return b.update(ctx, func(txn *badger.Txn) error {
+		stats, err := b.feedStats(ctx, txn, feedID)
+		if err != nil {
+			return err
+		}
 		// Insert or update feed info
 		feedKey := b.getKey(feedPath, feedID)
 		if err := b.setObj(txn, feedKey, feed, true); err != nil {
@@ -138,6 +214,7 @@ func (b *Badger) AddFeed(ctx context.Context, feedID string, feed *model.Feed) e
 					return err
 				}
 				if !keep[old.ID] {
+					adjustStats(stats, &old, -1)
 					return txn.Delete(item.KeyCopy(nil))
 				}
 				return nil
@@ -147,37 +224,53 @@ func (b *Badger) AddFeed(ctx context.Context, feedID string, feed *model.Feed) e
 		}
 		// Append remote episodes; refresh all chapter metadata for local books.
 		for _, episode := range feed.Episodes {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			episodeKey := b.getKey(episodePath, feedID, episode.ID)
-			err := b.setObj(txn, episodeKey, episode, isBook)
-			if err == nil || err == model.ErrAlreadyExists {
-				// Do nothing
-			} else {
+			var old model.Episode
+			if err := b.getObj(txn, episodeKey, &old); err == nil {
+				if !isBook {
+					continue
+				}
+				adjustStats(stats, &old, -1)
+			} else if err != model.ErrNotFound {
+				return err
+			}
+			if err := b.setObj(txn, episodeKey, episode, true); err != nil {
 				return errors.Wrapf(err, "failed to save episode %q", feedID)
 			}
+			adjustStats(stats, episode, 1)
 		}
 
-		// Recompute and persist aggregated feed stats atomically
-		stats := model.FeedStats{}
-		if err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
-			stats.EpisodeCount++
-			switch ep.Status {
-			case model.EpisodeDownloaded:
-				stats.DownloadedCount++
-				stats.TotalSize += ep.Size
-			case model.EpisodeError:
-				stats.ErrorCount++
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-		statsKey := b.getKey(statsPath, feedID)
-		if err := b.setObj(txn, statsKey, &stats, true); err != nil {
-			return err
-		}
+		return b.setObj(txn, b.getKey(statsPath, feedID), stats, true)
+	})
+}
 
+func adjustStats(stats *model.FeedStats, ep *model.Episode, delta int) {
+	stats.EpisodeCount += delta
+	switch ep.Status {
+	case model.EpisodeDownloaded:
+		stats.DownloadedCount += delta
+		stats.TotalSize += int64(delta) * ep.Size
+	case model.EpisodeError:
+		stats.ErrorCount += delta
+	}
+}
+
+func (b *Badger) feedStats(ctx context.Context, txn *badger.Txn, feedID string) (*model.FeedStats, error) {
+	stats := &model.FeedStats{}
+	if err := b.getObj(txn, b.getKey(statsPath, feedID), stats); err == nil {
+		return stats, nil
+	} else if err != model.ErrNotFound {
+		return nil, err
+	}
+	// Legacy databases have no stats yet. Rebuild in the mutation's snapshot.
+	err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
+		adjustStats(stats, ep, 1)
 		return nil
 	})
+	return stats, err
 }
 
 func (b *Badger) GetFeed(ctx context.Context, feedID string) (*model.Feed, error) {
@@ -247,21 +340,12 @@ func (b *Badger) GetFeedStats(ctx context.Context, feedID string) (*model.FeedSt
 	}
 
 	// Compute on the fly if missing (self-healing for legacy database records)
-	err = b.db.Update(func(txn *badger.Txn) error {
-		stats = model.FeedStats{}
-		if err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
-			stats.EpisodeCount++
-			switch ep.Status {
-			case model.EpisodeDownloaded:
-				stats.DownloadedCount++
-				stats.TotalSize += ep.Size
-			case model.EpisodeError:
-				stats.ErrorCount++
-			}
-			return nil
-		}); err != nil {
+	err = b.update(ctx, func(txn *badger.Txn) error {
+		current, err := b.feedStats(ctx, txn, feedID)
+		if err != nil {
 			return err
 		}
+		stats = *current
 		return b.setObj(txn, statsKey, &stats, true)
 	})
 	if err != nil {
@@ -288,7 +372,10 @@ func (b *Badger) WalkFeeds(ctx context.Context, cb func(feed *model.Feed) error)
 }
 
 func (b *Badger) DeleteFeed(ctx context.Context, feedID string) error {
-	return b.db.Update(func(txn *badger.Txn) error {
+	return b.update(ctx, func(txn *badger.Txn) error {
+		if _, err := txn.Get(b.getKey(statsPath, feedID)); err != nil && err != badger.ErrKeyNotFound {
+			return err
+		}
 		// Feed
 		feedKey := b.getKey(feedPath, feedID)
 		if err := txn.Delete(feedKey); err != nil {
@@ -297,7 +384,9 @@ func (b *Badger) DeleteFeed(ctx context.Context, feedID string) error {
 
 		// Stats
 		statsKey := b.getKey(statsPath, feedID)
-		_ = txn.Delete(statsKey)
+		if err := txn.Delete(statsKey); err != nil {
+			return err
+		}
 
 		// Episodes
 		opts := badger.DefaultIteratorOptions
@@ -328,18 +417,19 @@ func (b *Badger) GetEpisode(_ context.Context, feedID string, episodeID string) 
 }
 
 func (b *Badger) UpdateEpisode(feedID string, episodeID string, cb func(episode *model.Episode) error) error {
-	var (
-		key     = b.getKey(episodePath, feedID, episodeID)
-		episode model.Episode
-	)
+	key := b.getKey(episodePath, feedID, episodeID)
 
-	return b.db.Update(func(txn *badger.Txn) error {
+	return b.update(context.Background(), func(txn *badger.Txn) error {
+		var episode model.Episode
 		if err := b.getObj(txn, key, &episode); err != nil {
 			return err
 		}
 
-		oldStatus := episode.Status
-		oldSize := episode.Size
+		stats, err := b.feedStats(context.Background(), txn, feedID)
+		if err != nil {
+			return err
+		}
+		old := episode
 
 		if err := cb(&episode); err != nil {
 			return err
@@ -353,70 +443,29 @@ func (b *Badger) UpdateEpisode(feedID string, episodeID string, cb func(episode 
 			return err
 		}
 
-		// Update stats if status or size changed
-		statsKey := b.getKey(statsPath, feedID)
-		var stats model.FeedStats
-		if err := b.getObj(txn, statsKey, &stats); err == nil {
-			if oldStatus != episode.Status || oldSize != episode.Size {
-				if oldStatus == model.EpisodeDownloaded {
-					stats.DownloadedCount--
-					stats.TotalSize -= oldSize
-				} else if oldStatus == model.EpisodeError {
-					stats.ErrorCount--
-				}
-
-				if episode.Status == model.EpisodeDownloaded {
-					stats.DownloadedCount++
-					stats.TotalSize += episode.Size
-				} else if episode.Status == model.EpisodeError {
-					stats.ErrorCount++
-				}
-				if stats.DownloadedCount < 0 {
-					stats.DownloadedCount = 0
-				}
-				if stats.ErrorCount < 0 {
-					stats.ErrorCount = 0
-				}
-				if stats.TotalSize < 0 {
-					stats.TotalSize = 0
-				}
-				_ = b.setObj(txn, statsKey, &stats, true)
-			}
-		}
-
-		return nil
+		adjustStats(stats, &old, -1)
+		adjustStats(stats, &episode, 1)
+		return b.setObj(txn, b.getKey(statsPath, feedID), stats, true)
 	})
 }
 
 func (b *Badger) DeleteEpisode(feedID, episodeID string) error {
 	key := b.getKey(episodePath, feedID, episodeID)
 	statsKey := b.getKey(statsPath, feedID)
-	return b.db.Update(func(txn *badger.Txn) error {
+	return b.update(context.Background(), func(txn *badger.Txn) error {
 		var ep model.Episode
-		if err := b.getObj(txn, key, &ep); err == nil {
-			var stats model.FeedStats
-			if err := b.getObj(txn, statsKey, &stats); err == nil {
-				stats.EpisodeCount--
-				if ep.Status == model.EpisodeDownloaded {
-					stats.DownloadedCount--
-					stats.TotalSize -= ep.Size
-				} else if ep.Status == model.EpisodeError {
-					stats.ErrorCount--
-				}
-				if stats.EpisodeCount < 0 {
-					stats.EpisodeCount = 0
-				}
-				if stats.DownloadedCount < 0 {
-					stats.DownloadedCount = 0
-				}
-				if stats.ErrorCount < 0 {
-					stats.ErrorCount = 0
-				}
-				if stats.TotalSize < 0 {
-					stats.TotalSize = 0
-				}
-				_ = b.setObj(txn, statsKey, &stats, true)
-			}
+		if err := b.getObj(txn, key, &ep); err == model.ErrNotFound {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		stats, err := b.feedStats(context.Background(), txn, feedID)
+		if err != nil {
+			return err
+		}
+		adjustStats(stats, &ep, -1)
+		if err := b.setObj(txn, statsKey, stats, true); err != nil {
+			return err
 		}
 		return txn.Delete(key)
 	})
@@ -455,8 +504,7 @@ func (b *Badger) SaveJob(_ context.Context, job *model.UpdateJob) error {
 		if job.IsActive() {
 			return b.setObj(txn, activeKey, job, true)
 		}
-		_ = txn.Delete(activeKey)
-		return nil
+		return txn.Delete(activeKey)
 	})
 }
 
@@ -506,12 +554,17 @@ func (b *Badger) DeleteJob(_ context.Context, jobID string) error {
 	key := b.getKey(jobPath, jobID)
 	activeKey := b.getKey(activeJobPath, jobID)
 	return b.db.Update(func(txn *badger.Txn) error {
-		_ = txn.Delete(activeKey)
+		if err := txn.Delete(activeKey); err != nil {
+			return err
+		}
 		return txn.Delete(key)
 	})
 }
 
 func (b *Badger) iterator(ctx context.Context, txn *badger.Txn, opts badger.IteratorOptions, callback func(item *badger.Item) error) error {
+	if ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
 

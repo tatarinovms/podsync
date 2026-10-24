@@ -2,11 +2,11 @@ package web
 
 import (
 	"bytes"
-	"math"
-	"sync"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 

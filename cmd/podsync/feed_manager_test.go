@@ -1046,6 +1046,20 @@ func TestGetFeedEpisodes_PaginationAndFilters(t *testing.T) {
 	pDur, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Sort: "duration-desc", Limit: 1})
 	require.NoError(t, err)
 	assert.Equal(t, "ep4", pDur.Episodes[0].ID) // 4000s duration
+
+	// Refreshing a page after episodes disappear must return the last valid page.
+	pLast, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Limit: 2, Offset: 100, Sort: "date-desc"})
+	require.NoError(t, err)
+	assert.Equal(t, 4, pLast.Offset)
+	assert.Len(t, pLast.Episodes, 1)
+	assert.False(t, pLast.HasMore)
+	assert.Equal(t, 2, pLast.StatusCounts[model.EpisodeDownloaded])
+
+	pEmpty, err := mgr.GetFeedEpisodes(ctx, "tech", web.EpisodeQuery{Search: "missing"})
+	require.NoError(t, err)
+	assert.NotNil(t, pEmpty.Episodes)
+	assert.Empty(t, pEmpty.Episodes)
+	assert.Equal(t, 0, pEmpty.Offset)
 }
 
 func TestUpdateFeed_DecoupledLocks(t *testing.T) {
@@ -1084,4 +1098,37 @@ func TestUpdateFeed_DecoupledLocks(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "Updated Title", mgr.feeds["test"].Custom.Title)
+}
+
+func TestConcurrentTokenAppends(t *testing.T) {
+	mgr := &AppFeedManager{}
+	start := make(chan struct{})
+	errs := make(chan error, 32)
+	for i := 0; i < 32; i++ {
+		go func(i int) {
+			<-start
+			errs <- mgr.AddTokens(context.Background(), "youtube", []string{fmt.Sprintf("token-%02d", i)})
+		}(i)
+	}
+	close(start)
+	for i := 0; i < 32; i++ {
+		require.NoError(t, <-errs)
+	}
+	assert.Len(t, mgr.tokens[model.ProviderYoutube], 32)
+}
+
+func TestCookiesPublishNewFeedConfig(t *testing.T) {
+	original := &feed.Config{ID: "show", YouTubeDLArgs: []string{"--cookies", "old.txt"}}
+	mgr := &AppFeedManager{cfg: &Config{Feeds: map[string]*feed.Config{"show": original}}, feeds: map[string]*feed.Config{"show": original}}
+	require.NoError(t, mgr.syncCookiesToFeeds("new.txt"))
+	assert.Equal(t, []string{"--cookies", "old.txt"}, original.YouTubeDLArgs)
+	assert.Equal(t, []string{"--cookies", "new.txt"}, mgr.feeds["show"].YouTubeDLArgs)
+	assert.Same(t, mgr.feeds["show"], mgr.cfg.Feeds["show"])
+}
+
+func TestDownloaderConfigWriteFailurePreservesMemory(t *testing.T) {
+	mgr := &AppFeedManager{configPath: filepath.Join(t.TempDir(), "missing.toml"), cfg: &Config{Downloader: ytdl.Config{Timeout: 60}}}
+	timeout := 120
+	require.Error(t, mgr.UpdateDownloaderConfig(context.Background(), &web.DownloaderConfigUpdate{Timeout: &timeout}))
+	assert.Equal(t, 60, mgr.cfg.Downloader.Timeout)
 }

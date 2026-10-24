@@ -154,7 +154,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 				if strings.HasPrefix(path, "/api/") {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusTooManyRequests)
-					w.Write([]byte(fmt.Sprintf(`{"error":"Too many failed login attempts. Retry after %d seconds."}`, sec)))
+					fmt.Fprintf(w, `{"error":"Too many failed login attempts. Retry after %d seconds."}`, sec)
 					return
 				}
 				http.Error(w, fmt.Sprintf("Too many failed login attempts. Retry after %d seconds.", sec), http.StatusTooManyRequests)

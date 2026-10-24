@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pelletier/go-toml"

@@ -38,7 +38,14 @@ await page.route('**/api/v1/**',async route=>{
  else if(path.startsWith('/api/v1/feeds/')) {
  const feed=feeds.find(f=>f.id===path.split('/')[4]);
  if (route.request().method() === 'PUT') { const changes=route.request().postDataJSON(); feed.title=changes.custom.title; feed.author=changes.custom.author; feed.config={...feed.config,...changes}; }
- data={feed,episodes};
+ if (u.searchParams.has('limit')) {
+  const q = (u.searchParams.get('q') || '').toLowerCase();
+  const status = u.searchParams.get('status');
+  const matching = episodes.filter(ep => (!q || (ep.title+' '+ep.id).toLowerCase().includes(q)) && (!status || status==='all' || ep.status===status));
+  const limit = Number(u.searchParams.get('limit')) || 40;
+  const offset = Math.max(0, Number(u.searchParams.get('offset')) || 0);
+  data={feed,episodes:matching.slice(offset,offset+limit),total:episodes.length,matching:matching.length,offset,limit,has_more:offset+limit<matching.length,status_counts:{downloaded:102,error:1}};
+ } else data={feed,episodes};
  }
  else if(path==='/api/v1/system/logs') data={entries:[{timestamp:'2026-10-21T10:00:00Z',level:'info',message:'Feed updated successfully'}],current_level:'info'};
  else if(path==='/api/v1/tokens') data=[];
@@ -66,10 +73,13 @@ assert.equal(await page.locator('#episodes-list .list-group-item').count(),40);
 assert.equal(await page.locator('.modal.show').count(),0);
 assert(page.url().endsWith('#feed/podcast-0/episodes'));
 await page.locator('#episodes-next').click();
+await page.waitForFunction(()=>document.getElementById('episodes-list').textContent.includes('Episode 41'));
 assert.match(await page.locator('#episodes-list').innerText(),/Episode 41/);
 await page.locator('#episodes-search').fill('Episode 103');
+await page.waitForFunction(()=>document.querySelectorAll('#episodes-list .list-group-item').length===1);
 assert.equal(await page.locator('#episodes-list .list-group-item').count(),1);
 await page.locator('#episodes-search').fill('');
+await page.waitForFunction(()=>document.querySelectorAll('#episodes-list .list-group-item').length===40);
 await screenshot('episodes.png', false);
 await page.locator('[data-section="settings"]').click();
 await page.waitForFunction(()=>document.getElementById('fs-feed-id').value==='podcast-0');

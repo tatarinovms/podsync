@@ -131,7 +131,7 @@ func parseRSSURL(link string, parsed *url.URL) (model.Info, error) {
 
 func sanitizeSlug(s string) string {
 	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))
+		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9')
 	})
 	clean := strings.Join(parts, "_")
 	clean = strings.Trim(clean, "_")

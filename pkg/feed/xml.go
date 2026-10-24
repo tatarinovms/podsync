@@ -178,7 +178,8 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			downloadURL = fmt.Sprintf("%s/%s/%s", strings.TrimRight(hostname, "/"), cfg.ID, episodeName)
 		)
 
-		if feed.Provider == model.ProviderAudiobook {
+		switch feed.Provider {
+		case model.ProviderAudiobook:
 			episodeName = episode.ID
 			downloadURL = fmt.Sprintf("%s/%s/%s", strings.TrimRight(hostname, "/"), cfg.ID, url.PathEscape(episodeName))
 			ext := strings.ToLower(filepath.Ext(episode.ID))
@@ -190,7 +191,7 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			default:
 				enclosureType = itunes.MP3
 			}
-		} else if feed.Provider == model.ProviderRSS {
+		case model.ProviderRSS:
 			ext := strings.ToLower(filepath.Ext(episodeName))
 			switch ext {
 			case ".m4a", ".m4b":

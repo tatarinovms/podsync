@@ -81,14 +81,15 @@ func (q *JobQueue) EnqueueUpdate(ctx context.Context, feedID string, isManual ..
 	if err == nil {
 		if existing != nil && existing.IsActive() {
 			if manual {
-				if existing.Status == model.JobStatusRunning {
+				switch existing.Status {
+				case model.JobStatusRunning:
 					if !existing.PendingRerun {
 						existing.PendingRerun = true
 						if err := q.db.SaveJob(ctx, existing); err != nil {
 							return nil, false, errors.Wrapf(err, "failed to persist pending rerun for job %q", jobID)
 						}
 					}
-				} else if existing.Status == model.JobStatusRetrying {
+				case model.JobStatusRetrying:
 					existing.AvailableAt = time.Now().UTC()
 					if err := q.db.SaveJob(ctx, existing); err != nil {
 						return nil, false, errors.Wrapf(err, "failed to persist reset backoff for job %q", jobID)

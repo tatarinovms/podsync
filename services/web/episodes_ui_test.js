@@ -14,7 +14,7 @@ const context = {
     document: {getElementById:el, documentElement:{setAttribute(){}},querySelector(){return null;},addEventListener(){},querySelectorAll(){return [];}},
     window:{location:{href:'http://localhost/admin/'}},
     bootstrap:{Toast:class {},Modal:{getOrCreateInstance(){return {show(){}};}}},
-    URL, console, setInterval(){}, clearInterval(){}, setTimeout(){}, navigator:{},
+    URL, console, setInterval(){}, clearInterval(){}, setTimeout(){}, clearTimeout(){}, navigator:{},
     localStorage:{getItem(){return 'mocha';},setItem(){}}
 };
 vm.createContext(context);
@@ -38,11 +38,22 @@ async function run() {
     assert(!html.includes('>Queued<'));
     assert(el('episodes-feed-subtitle').innerText.includes('Cleaned: 1'));
     el('episodes-status-filter').value = 'error';
-    context.renderEpisodeList();
+    let requestedURL;
+    context.fetch = async url => {
+        requestedURL = new URL(url, 'http://localhost');
+        return {ok:true,json:async()=>({feed:{title:'Podcast'},episodes:[episodes[2]],total:4,matching:1,status_counts:{downloaded:1,new:1,error:1,cleaned:1}})};
+    };
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('status'), 'error');
     assert(el('episodes-list').innerHTML.includes('Error title'));
     assert(!el('episodes-list').innerHTML.includes('Pending title'));
     el('episodes-search').value = 'no match';
-    context.renderEpisodeList();
+    context.fetch = async url => {
+        requestedURL = new URL(url, 'http://localhost');
+        return {ok:true,json:async()=>({episodes:[],total:4,matching:0})};
+    };
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('q'), 'no match');
     assert(el('episodes-list').innerHTML.includes('No episodes match'));
 
     const pending = [];
@@ -61,12 +72,18 @@ async function run() {
         {id:'ep-new',title:'New Episode',status:'downloaded',duration:5400,pub_date:'2026-05-01T00:00:00Z'},
         {id:'ep-mid',title:'Mid Episode',status:'downloaded',duration:1800,pub_date:'2025-06-01T00:00:00Z'}
     ];
-    context.fetch = async () => ({ok:true,json:async()=>({feed:{title:'Sort Test'},episodes:sortEpisodes})});
+    let serverEpisodes = sortEpisodes;
+    context.fetch = async url => {
+        requestedURL = new URL(url, 'http://localhost');
+        return {ok:true,json:async()=>({feed:{title:'Sort Test'},episodes:serverEpisodes,total:3,matching:serverEpisodes.length})};
+    };
     await context.showEpisodes('sort-feed');
 
     // Date descending: New -> Mid -> Old
     el('episodes-sort').value = 'date-desc';
-    context.renderEpisodeList();
+    serverEpisodes = [sortEpisodes[1], sortEpisodes[2], sortEpisodes[0]];
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('sort'), 'date-desc');
     let idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
     let idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
     let idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
@@ -74,7 +91,9 @@ async function run() {
 
     // Date ascending: Old -> Mid -> New
     el('episodes-sort').value = 'date-asc';
-    context.renderEpisodeList();
+    serverEpisodes = [sortEpisodes[0], sortEpisodes[2], sortEpisodes[1]];
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('sort'), 'date-asc');
     idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
     idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
     idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
@@ -82,7 +101,9 @@ async function run() {
 
     // Duration descending: New (5400) -> Mid (1800) -> Old (300)
     el('episodes-sort').value = 'duration-desc';
-    context.renderEpisodeList();
+    serverEpisodes = [sortEpisodes[1], sortEpisodes[2], sortEpisodes[0]];
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('sort'), 'duration-desc');
     idxNew = el('episodes-list').innerHTML.indexOf('New Episode');
     idxMid = el('episodes-list').innerHTML.indexOf('Mid Episode');
     idxOld = el('episodes-list').innerHTML.indexOf('Old Episode');
@@ -90,14 +111,18 @@ async function run() {
 
     // Duration filter: short (< 15m / 900s) -> only Old (300)
     el('episodes-duration-filter').value = 'short';
-    context.renderEpisodeList();
+    serverEpisodes = [sortEpisodes[0]];
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('duration'), 'short');
     assert(el('episodes-list').innerHTML.includes('Old Episode'));
     assert(!el('episodes-list').innerHTML.includes('Mid Episode'));
     assert(!el('episodes-list').innerHTML.includes('New Episode'));
 
     // Duration filter: long (> 60m / 3600s) -> only New (5400)
     el('episodes-duration-filter').value = 'long';
-    context.renderEpisodeList();
+    serverEpisodes = [sortEpisodes[1]];
+    await context.fetchAndRenderEpisodes();
+    assert.equal(requestedURL.searchParams.get('duration'), 'long');
     assert(!el('episodes-list').innerHTML.includes('Old Episode'));
     assert(!el('episodes-list').innerHTML.includes('Mid Episode'));
     assert(el('episodes-list').innerHTML.includes('New Episode'));
@@ -105,6 +130,25 @@ async function run() {
     // Reset duration filter
     el('episodes-duration-filter').value = 'all';
     el('episodes-sort').value = 'default';
+
+    // A background refresh preserves the current page and active filters.
+    context.fetch = async url => {
+        requestedURL = new URL(url, 'http://localhost');
+        return {ok:true,json:async()=>({feed:{title:'Sort Test'},episodes:[sortEpisodes[1]],total:100,matching:100,offset:40,has_more:true})};
+    };
+    await context.changeEpisodePage(1);
+    el('episodes-search').value = 'Go & Rust';
+    el('episodes-status-filter').value = 'downloaded';
+    await context.showEpisodes('sort-feed', false);
+    assert.equal(requestedURL.searchParams.get('offset'), '40');
+    assert.equal(requestedURL.searchParams.get('q'), 'Go & Rust');
+    assert.equal(requestedURL.searchParams.get('status'), 'downloaded');
+    assert.equal(el('episodes-page-label').innerText, 'Page 2 of 3');
+    // If the last page disappears, use the offset returned by the server.
+    context.fetch = async () => ({ok:true,json:async()=>({episodes:[sortEpisodes[0]],total:1,matching:1,offset:0,has_more:false})});
+    await context.showEpisodes('sort-feed', false);
+    assert.equal(el('episodes-page-label').innerText, 'Page 1 of 1');
+    assert.equal(el('episodes-next').disabled, true);
 
     context.fetch = async()=>({ok:true,json:async()=>({feed:{title:'Book',provider:'audiobook'},episodes:[
         {id:'01.mp3',title:'Chapter',order:'1',status:'downloaded',pub_date:'2020-01-01',media_url:'/book/01.mp3'}

@@ -154,7 +154,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 ### REST API Endpoints (`/api/v1`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/v1/health` | Service health check |
+| `GET` | `/health`, `/health/ready` | Readiness and database connectivity check |
+| `GET` | `/health/live` | Lightweight process liveness probe |
 | `GET` | `/api/v1/auth/status` | Get current authentication status |
 | `POST` | `/api/v1/auth/login` | Authenticate admin session and issue cookie |
 | `POST` | `/api/v1/auth/logout` | Invalidate current admin session |

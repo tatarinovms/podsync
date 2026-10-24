@@ -157,7 +157,9 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	})
 	mux.Handle(mountPath, fileServer)
 
-	// Add health check endpoint
+	// Add health check endpoints
+	mux.HandleFunc("/health/live", srv.healthLiveHandler)
+	mux.HandleFunc("/health/ready", srv.healthReadyHandler)
 	mux.HandleFunc("/health", srv.healthCheckHandler)
 
 	// Admin Web UI and REST API
@@ -203,6 +205,35 @@ type HealthStatus struct {
 	Message        string    `json:"message,omitempty"`
 }
 
+func (s *Server) healthLiveHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "ok",
+		"timestamp": time.Now().UTC(),
+	})
+}
+
+func (s *Server) healthReadyHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.db != nil {
+		if _, err := s.db.Version(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":    "unhealthy",
+				"error":     "database unavailable",
+				"timestamp": time.Now().UTC(),
+			})
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "ready",
+		"timestamp": time.Now().UTC(),
+	})
+}
+
 func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -210,15 +241,21 @@ func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	failedCount := 0
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 
-	// Walk through all feeds to count recent failures
-	err := s.db.WalkFeeds(ctx, func(feed *model.Feed) error {
-		return s.db.WalkEpisodes(ctx, feed.ID, func(episode *model.Episode) error {
-			if episode.Status == model.EpisodeError && episode.ErrorAt != nil && episode.ErrorAt.After(cutoffTime) {
-				failedCount++
+	var err error
+	if s.db != nil {
+		// Walk through feeds using fast stats index to avoid episode scans when error count is 0
+		err = s.db.WalkFeeds(ctx, func(feed *model.Feed) error {
+			if stats, sErr := s.db.GetFeedStats(ctx, feed.ID); sErr == nil && stats != nil && stats.ErrorCount == 0 {
+				return nil
 			}
-			return nil
+			return s.db.WalkEpisodes(ctx, feed.ID, func(episode *model.Episode) error {
+				if episode.Status == model.EpisodeError && episode.ErrorAt != nil && episode.ErrorAt.After(cutoffTime) {
+					failedCount++
+				}
+				return nil
+			})
 		})
-	})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -242,7 +279,7 @@ func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	json.NewEncoder(w).Encode(status)
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 func robotsTxtHandler(w http.ResponseWriter, r *http.Request) {

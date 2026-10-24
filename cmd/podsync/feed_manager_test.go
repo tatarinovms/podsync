@@ -1047,3 +1047,41 @@ func TestGetFeedEpisodes_PaginationAndFilters(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ep4", pDur.Episodes[0].ID) // 4000s duration
 }
+
+func TestUpdateFeed_DecoupledLocks(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("[feeds.test]\nurl = \"https://example.com/feed\"\n"), 0600))
+	initial := &feed.Config{ID: "test", URL: "https://example.com/feed", Custom: feed.Custom{Title: "Initial"}}
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg:        &Config{Feeds: map[string]*feed.Config{"test": initial}},
+		feeds:      map[string]*feed.Config{"test": initial},
+		updates:    make(chan *feed.Config, 2),
+	}
+
+	// While configWriteMu is held by an ongoing disk write simulation,
+	// readers can still acquire m.mu.RLock() and read feeds without blocking.
+	mgr.configWriteMu.Lock()
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		mgr.mu.RLock()
+		defer mgr.mu.RUnlock()
+		assert.Equal(t, "Initial", mgr.feeds["test"].Custom.Title)
+	}()
+
+	select {
+	case <-readDone:
+		// Read succeeded without being blocked by configWriteMu!
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("read operation was blocked by configWriteMu")
+	}
+	mgr.configWriteMu.Unlock()
+
+	// UpdateFeed successfully persists new config
+	err := mgr.UpdateFeed(context.Background(), "test", &web.FeedConfigUpdate{
+		Custom: feed.Custom{Title: "Updated Title"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Title", mgr.feeds["test"].Custom.Title)
+}

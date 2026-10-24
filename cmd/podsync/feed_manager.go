@@ -50,6 +50,7 @@ type feedStats struct {
 
 type AppFeedManager struct {
 	mu             sync.RWMutex
+	configWriteMu  sync.Mutex
 	configPath     string
 	cfg            *Config
 	feeds          map[string]*feed.Config
@@ -626,8 +627,8 @@ func isAudiobookFeed(f *feed.Config) bool {
 }
 
 func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
 	if !regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(newFeed.ID) {
 		return errors.New("feed ID must contain only Latin letters, digits, underscores, or hyphens")
@@ -636,9 +637,17 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 	if newFeed.ID == "personal" || strings.HasPrefix(newFeed.ID, "personal-") || newFeed.ID == "_personal" {
 		return errors.New("this feed ID is reserved for personal feeds")
 	}
+
+	m.mu.RLock()
 	if _, exists := m.feeds[newFeed.ID]; exists {
+		m.mu.RUnlock()
 		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
 	}
+	if err := m.checkUpdateCapacityLocked(); err != nil {
+		m.mu.RUnlock()
+		return err
+	}
+	m.mu.RUnlock()
 
 	if isAudiobookFeed(newFeed) {
 		newFeed.CronSchedule = ""
@@ -651,18 +660,24 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 			return errors.Wrap(err, "invalid update schedule")
 		}
 	}
-	if err := m.checkUpdateCapacityLocked(); err != nil {
-		return err
-	}
 
 	if err := m.saveFeedToConfig(newFeed); err != nil {
 		return errors.Wrap(err, "failed to save feed configuration")
+	}
+
+	m.mu.Lock()
+	if _, exists := m.feeds[newFeed.ID]; exists {
+		m.mu.Unlock()
+		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
 	}
 
 	// Add to in-memory map
 	m.feeds[newFeed.ID] = newFeed
 	if m.updater != nil {
 		m.updater.SetFeedConfig(newFeed.ID, newFeed)
+	}
+	if m.cfg != nil && m.cfg.Feeds != nil {
+		m.cfg.Feeds[newFeed.ID] = newFeed
 	}
 
 	// Mount if audiobook
@@ -681,21 +696,34 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 		}
 	}
 
-	return m.queueUpdateLocked(newFeed)
+	queueErr := m.queueUpdateLocked(newFeed)
+	m.mu.Unlock()
+	return queueErr
 }
 
 func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
+	m.mu.RLock()
 	f, exists := m.feeds[id]
 	if !exists {
+		m.mu.RUnlock()
 		return errors.Errorf("feed %q not found", id)
 	}
+	feedURL := f.URL
+	var dataDir, storageType string
+	if m.cfg != nil {
+		dataDir = m.cfg.Storage.Local.DataDir
+		storageType = m.cfg.Storage.Type
+	}
+	m.mu.RUnlock()
+
 	if err := m.deleteFeedFromConfig(id); err != nil {
 		return errors.Wrapf(err, "failed to remove feed %q from configuration", id)
 	}
 
+	m.mu.Lock()
 	// Unmount if mounted
 	if mounter, ok := m.storage.(fs.Mounter); ok {
 		mounter.Unmount(id)
@@ -713,6 +741,7 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 		m.updater.SetFeedConfig(id, nil)
 	}
 	m.coverCache.Delete(id)
+	m.mu.Unlock()
 
 	// Clean database
 	if err := m.db.DeleteFeed(ctx, id); err != nil {
@@ -722,16 +751,15 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 	// Optionally delete files from disk/storage
 	if deleteFiles {
 		_ = m.storage.Delete(ctx, fmt.Sprintf("%s.xml", id))
-		info, err := builder.ParseURL(f.URL)
+		info, err := builder.ParseURL(feedURL)
 		isAudiobook := (err == nil && info.Provider == model.ProviderAudiobook)
-		if m.cfg.Storage.Type == "local" && !isAudiobook {
-			feedDir := filepath.Join(m.cfg.Storage.Local.DataDir, id)
+		if storageType == "local" && !isAudiobook {
+			feedDir := filepath.Join(dataDir, id)
 			_ = os.RemoveAll(feedDir)
 			log.Infof("deleted files for feed %q at %s", id, feedDir)
 		}
 	}
 
-	_ = f
 	return nil
 }
 
@@ -1063,7 +1091,10 @@ func maskToken(s string) string {
 	return s[:4] + "••••" + s[len(s)-4:]
 }
 
-func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []string) error {
+func (m *AppFeedManager) persistTokens(providerStr string, newTokens []string) error {
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
+
 	provider := model.Provider(providerStr)
 	// Save to config.toml
 	if m.configPath != "" {
@@ -1084,6 +1115,8 @@ func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []str
 			return err
 		}
 	}
+
+	m.mu.Lock()
 	if m.tokens == nil {
 		m.tokens = make(map[model.Provider]StringSlice)
 	}
@@ -1092,6 +1125,7 @@ func (m *AppFeedManager) persistTokensLocked(providerStr string, newTokens []str
 	} else {
 		delete(m.tokens, provider)
 	}
+	m.mu.Unlock()
 
 	return nil
 }
@@ -1112,29 +1146,23 @@ func cleanToken(providerStr, tok string) string {
 }
 
 func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	var newTokens []string
 	for _, tok := range tokens {
 		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "•") {
+		if tok == "" || strings.Contains(tok, "••••") {
 			continue
 		}
 		newTokens = append(newTokens, tok)
 	}
 
-	return m.persistTokensLocked(providerStr, newTokens)
+	return m.persistTokens(providerStr, newTokens)
 }
 
 func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, tokens []string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	var validTokens []string
 	for _, tok := range tokens {
 		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "•") {
+		if tok == "" || strings.Contains(tok, "••••") {
 			continue
 		}
 		validTokens = append(validTokens, tok)
@@ -1144,23 +1172,24 @@ func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, toke
 	}
 
 	provider := model.Provider(providerStr)
+	m.mu.RLock()
 	current := m.tokens[provider]
 	combined := append([]string(current), validTokens...)
+	m.mu.RUnlock()
 
-	return m.persistTokensLocked(providerStr, combined)
+	return m.persistTokens(providerStr, combined)
 }
 
 func (m *AppFeedManager) DeleteToken(ctx context.Context, providerStr string, index int) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	if index < 0 {
-		return m.persistTokensLocked(providerStr, nil)
+		return m.persistTokens(providerStr, nil)
 	}
 
 	provider := model.Provider(providerStr)
+	m.mu.RLock()
 	current := m.tokens[provider]
 	if index >= len(current) {
+		m.mu.RUnlock()
 		return fmt.Errorf("token index %d out of bounds (total tokens: %d)", index, len(current))
 	}
 
@@ -1170,8 +1199,9 @@ func (m *AppFeedManager) DeleteToken(ctx context.Context, providerStr string, in
 			remaining = append(remaining, tok)
 		}
 	}
+	m.mu.RUnlock()
 
-	return m.persistTokensLocked(providerStr, remaining)
+	return m.persistTokens(providerStr, remaining)
 }
 
 func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, error) {
@@ -1216,20 +1246,18 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 }
 
 func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
-	m.mu.Lock()
-	var unlocked bool
-	defer func() {
-		if !unlocked {
-			m.mu.Unlock()
-		}
-	}()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
+	m.mu.RLock()
 	f, exists := m.feeds[id]
 	if !exists {
+		m.mu.RUnlock()
 		return errors.Errorf("feed %q not found", id)
 	}
 	resolved, err := update.WithCurrent(f)
 	if err != nil {
+		m.mu.RUnlock()
 		return err
 	}
 	update = resolved
@@ -1294,14 +1322,25 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	}
 	if !isAudiobookFeed(f) && f.CronSchedule != "" {
 		if _, err := cron.ParseStandard(f.CronSchedule); err != nil {
+			m.mu.RUnlock()
 			return errors.Wrap(err, "invalid update schedule")
 		}
 	}
 	if err := m.checkUpdateCapacityLocked(); err != nil {
+		m.mu.RUnlock()
 		return err
 	}
+	m.mu.RUnlock()
+
+	// Persist config to disk without holding m.mu
 	if err := m.saveFeedToConfig(f); err != nil {
 		return err
+	}
+
+	m.mu.Lock()
+	if _, exists := m.feeds[id]; !exists {
+		m.mu.Unlock()
+		return errors.Errorf("feed %q not found", id)
 	}
 	m.feeds[id] = f
 	if m.updater != nil {
@@ -1338,7 +1377,6 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 
 	m.invalidateStats(id)
 	queueErr := m.queueUpdateLocked(f)
-	unlocked = true
 	m.mu.Unlock()
 
 	if m.db != nil {
@@ -1634,9 +1672,10 @@ func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.Download
 }
 
 func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web.DownloaderConfigUpdate) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
+	m.mu.Lock()
 	if update.Timeout != nil && *update.Timeout > 0 {
 		m.cfg.Downloader.Timeout = *update.Timeout
 	}
@@ -1662,8 +1701,10 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 	if m.downloader != nil {
 		m.downloader.UpdateConfig(m.cfg.Downloader)
 	}
+	cfgCopy := m.cfg.Downloader
+	m.mu.Unlock()
 
-	return m.saveDownloaderToConfig(&m.cfg.Downloader)
+	return m.saveDownloaderToConfig(&cfgCopy)
 }
 
 func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {
@@ -1693,28 +1734,34 @@ func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) 
 }
 
 func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
-	cookiesPath := m.cfg.Downloader.CookiesFile
-	if cookiesPath == "" {
-		if m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
+	m.mu.RLock()
+	cookiesPath := ""
+	if m.cfg != nil {
+		cookiesPath = m.cfg.Downloader.CookiesFile
+		if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
 			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
-		} else {
+		} else if cookiesPath == "" {
 			cookiesPath = "cookies.txt"
 		}
 	}
+	m.mu.RUnlock()
 
 	content = strings.TrimSpace(content)
 	if content == "" {
 		// Remove cookies file
 		_ = os.Remove(cookiesPath)
+		m.mu.Lock()
 		m.cfg.Downloader.CookiesFile = ""
 		if m.downloader != nil {
 			m.downloader.SetCookiesFile("")
 		}
 		m.syncCookiesToFeeds("")
-		return m.saveDownloaderToConfig(&m.cfg.Downloader)
+		cfgCopy := m.cfg.Downloader
+		m.mu.Unlock()
+		return m.saveDownloaderToConfig(&cfgCopy)
 	}
 
 	// Ensure parent directory exists
@@ -1729,14 +1776,17 @@ func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content strin
 		return errors.Wrap(err, "failed to save cookies file")
 	}
 
+	m.mu.Lock()
 	m.cfg.Downloader.CookiesFile = cookiesPath
 	if m.downloader != nil {
 		m.downloader.SetCookiesFile(cookiesPath)
 	}
 
 	m.syncCookiesToFeeds(cookiesPath)
+	cfgCopy := m.cfg.Downloader
+	m.mu.Unlock()
 
-	return m.saveDownloaderToConfig(&m.cfg.Downloader)
+	return m.saveDownloaderToConfig(&cfgCopy)
 }
 
 func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) {
@@ -2163,10 +2213,16 @@ func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo
 }
 
 func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
-	currentPassword := m.cfg.Server.Admin.Password
+	m.mu.RLock()
+	currentPassword := ""
+	if m.cfg != nil && m.cfg.Server.Admin.Password != "" {
+		currentPassword = m.cfg.Server.Admin.Password
+	}
+	m.mu.RUnlock()
+
 	if currentPassword != "" && currentPassword != oldPassword {
 		return errors.New("current password does not match")
 	}
@@ -2189,14 +2245,19 @@ func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPas
 			return errors.Wrap(err, "failed to save config file")
 		}
 	}
-	m.cfg.Server.Admin.Password = newPassword
+
+	m.mu.Lock()
+	if m.cfg != nil {
+		m.cfg.Server.Admin.Password = newPassword
+	}
+	m.mu.Unlock()
 
 	return nil
 }
 
 func (m *AppFeedManager) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
 
 	if m.configPath != "" {
 		tree, err := toml.LoadFile(m.configPath)
@@ -2212,9 +2273,13 @@ func (m *AppFeedManager) UpdateAdminSecurity(ctx context.Context, maxAttempts in
 		}
 	}
 
-	m.cfg.Server.Admin.MaxAttempts = maxAttempts
-	m.cfg.Server.Admin.WindowPeriod = window
-	m.cfg.Server.Admin.LockoutPeriod = lockout
+	m.mu.Lock()
+	if m.cfg != nil {
+		m.cfg.Server.Admin.MaxAttempts = maxAttempts
+		m.cfg.Server.Admin.WindowPeriod = window
+		m.cfg.Server.Admin.LockoutPeriod = lockout
+	}
+	m.mu.Unlock()
 
 	return nil
 }

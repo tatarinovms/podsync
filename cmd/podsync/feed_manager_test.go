@@ -156,6 +156,12 @@ func (m *mockFeedManagerDB) AddFeed(_ context.Context, id string, feed *model.Fe
 func (m *mockFeedManagerDB) GetFeed(_ context.Context, _ string) (*model.Feed, error) {
 	return nil, nil
 }
+func (m *mockFeedManagerDB) GetFeedMetadata(_ context.Context, _ string) (*model.Feed, error) {
+	return nil, nil
+}
+func (m *mockFeedManagerDB) GetFeedStats(_ context.Context, _ string) (*model.FeedStats, error) {
+	return nil, nil
+}
 func (m *mockFeedManagerDB) WalkFeeds(_ context.Context, _ func(feed *model.Feed) error) error {
 	return nil
 }

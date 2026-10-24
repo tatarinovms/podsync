@@ -33,6 +33,12 @@ func (t *testDB) AddFeed(_ context.Context, _ string, _ *model.Feed) error {
 func (t *testDB) GetFeed(_ context.Context, _ string) (*model.Feed, error) {
 	return nil, errors.New("not implemented")
 }
+func (t *testDB) GetFeedMetadata(_ context.Context, _ string) (*model.Feed, error) {
+	return nil, errors.New("not implemented")
+}
+func (t *testDB) GetFeedStats(_ context.Context, _ string) (*model.FeedStats, error) {
+	return nil, errors.New("not implemented")
+}
 func (t *testDB) WalkFeeds(_ context.Context, _ func(feed *model.Feed) error) error { return nil }
 func (t *testDB) DeleteFeed(_ context.Context, _ string) error                      { return errors.New("not implemented") }
 func (t *testDB) DeleteEpisode(_ string, _ string) error                            { return errors.New("not implemented") }

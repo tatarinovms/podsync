@@ -303,3 +303,65 @@ func TestBadger_Jobs(t *testing.T) {
 	_, err = db.GetJob(ctx, "update/test")
 	assert.Equal(t, model.ErrNotFound, err)
 }
+
+func TestBadger_GetFeedMetadata(t *testing.T) {
+	dir := t.TempDir()
+
+	db, err := NewBadger(&Config{Dir: dir})
+	require.NoError(t, err)
+	defer db.Close()
+
+	feed := getFeed()
+	err = db.AddFeed(testCtx, feed.ID, feed)
+	require.NoError(t, err)
+
+	meta, err := db.GetFeedMetadata(testCtx, feed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, feed.ID, meta.ID)
+	assert.Equal(t, feed.Title, meta.Title)
+	assert.Equal(t, feed.Author, meta.Author)
+	assert.Nil(t, meta.Episodes, "GetFeedMetadata must not load episodes")
+}
+
+func TestBadger_GetFeedStats(t *testing.T) {
+	dir := t.TempDir()
+
+	db, err := NewBadger(&Config{Dir: dir})
+	require.NoError(t, err)
+	defer db.Close()
+
+	feed := getFeed()
+	err = db.AddFeed(testCtx, feed.ID, feed)
+	require.NoError(t, err)
+
+	stats, err := db.GetFeedStats(testCtx, feed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.EpisodeCount)
+	assert.Equal(t, 0, stats.DownloadedCount)
+	assert.Equal(t, 0, stats.ErrorCount)
+	assert.Equal(t, int64(0), stats.TotalSize)
+
+	// Update episode 1 to downloaded
+	err = db.UpdateEpisode(feed.ID, "1", func(ep *model.Episode) error {
+		ep.Status = model.EpisodeDownloaded
+		ep.Size = 1000
+		return nil
+	})
+	require.NoError(t, err)
+
+	stats, err = db.GetFeedStats(testCtx, feed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 2, stats.EpisodeCount)
+	assert.Equal(t, 1, stats.DownloadedCount)
+	assert.Equal(t, int64(1000), stats.TotalSize)
+
+	// Delete episode 2
+	err = db.DeleteEpisode(feed.ID, "2")
+	require.NoError(t, err)
+
+	stats, err = db.GetFeedStats(testCtx, feed.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stats.EpisodeCount)
+	assert.Equal(t, 1, stats.DownloadedCount)
+	assert.Equal(t, int64(1000), stats.TotalSize)
+}

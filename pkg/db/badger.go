@@ -18,6 +18,8 @@ const (
 	versionPath   = "podsync/version"
 	feedPrefix    = "feed/"
 	feedPath      = "feed/%s"
+	statsPrefix   = "stats/"
+	statsPath     = "stats/%s"
 	episodePrefix = "episode/%s/"
 	episodePath   = "episode/%s/%s" // FeedID + EpisodeID
 	jobPrefix     = "job/"
@@ -95,7 +97,7 @@ func (b *Badger) Version() (int, error) {
 	return version, err
 }
 
-func (b *Badger) AddFeed(_ context.Context, feedID string, feed *model.Feed) error {
+func (b *Badger) AddFeed(ctx context.Context, feedID string, feed *model.Feed) error {
 	return b.db.Update(func(txn *badger.Txn) error {
 		// Insert or update feed info
 		feedKey := b.getKey(feedPath, feedID)
@@ -113,7 +115,7 @@ func (b *Badger) AddFeed(_ context.Context, feedID string, feed *model.Feed) err
 			}
 			opts := badger.DefaultIteratorOptions
 			opts.Prefix = b.getKey(episodePrefix, feedID)
-			if err := b.iterator(txn, opts, func(item *badger.Item) error {
+			if err := b.iterator(ctx, txn, opts, func(item *badger.Item) error {
 				var old model.Episode
 				if err := b.unmarshalObj(item, &old); err != nil {
 					return err
@@ -137,11 +139,31 @@ func (b *Badger) AddFeed(_ context.Context, feedID string, feed *model.Feed) err
 			}
 		}
 
+		// Recompute and persist aggregated feed stats atomically
+		stats := model.FeedStats{}
+		if err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
+			stats.EpisodeCount++
+			switch ep.Status {
+			case model.EpisodeDownloaded:
+				stats.DownloadedCount++
+				stats.TotalSize += ep.Size
+			case model.EpisodeError:
+				stats.ErrorCount++
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		statsKey := b.getKey(statsPath, feedID)
+		if err := b.setObj(txn, statsKey, &stats, true); err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
 
-func (b *Badger) GetFeed(_ context.Context, feedID string) (*model.Feed, error) {
+func (b *Badger) GetFeed(ctx context.Context, feedID string) (*model.Feed, error) {
 	var (
 		feed    = model.Feed{}
 		feedKey = b.getKey(feedPath, feedID)
@@ -154,7 +176,7 @@ func (b *Badger) GetFeed(_ context.Context, feedID string) (*model.Feed, error) 
 		}
 
 		// Query episodes
-		if err := b.walkEpisodes(txn, feedID, func(episode *model.Episode) error {
+		if err := b.walkEpisodes(ctx, txn, feedID, func(episode *model.Episode) error {
 			feed.Episodes = append(feed.Episodes, episode)
 			return nil
 		}); err != nil {
@@ -169,12 +191,75 @@ func (b *Badger) GetFeed(_ context.Context, feedID string) (*model.Feed, error) 
 	return &feed, nil
 }
 
-func (b *Badger) WalkFeeds(_ context.Context, cb func(feed *model.Feed) error) error {
+func (b *Badger) GetFeedMetadata(_ context.Context, feedID string) (*model.Feed, error) {
+	var (
+		feed    = model.Feed{}
+		feedKey = b.getKey(feedPath, feedID)
+	)
+
+	if err := b.db.View(func(txn *badger.Txn) error {
+		return b.getObj(txn, feedKey, &feed)
+	}); err != nil {
+		return nil, err
+	}
+
+	return &feed, nil
+}
+
+func (b *Badger) GetFeedStats(ctx context.Context, feedID string) (*model.FeedStats, error) {
+	var (
+		stats    = model.FeedStats{}
+		statsKey = b.getKey(statsPath, feedID)
+	)
+
+	found := false
+	err := b.db.View(func(txn *badger.Txn) error {
+		if err := b.getObj(txn, statsKey, &stats); err == nil {
+			found = true
+			return nil
+		} else if err != model.ErrNotFound {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return &stats, nil
+	}
+
+	// Compute on the fly if missing (self-healing for legacy database records)
+	err = b.db.Update(func(txn *badger.Txn) error {
+		stats = model.FeedStats{}
+		if err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
+			stats.EpisodeCount++
+			switch ep.Status {
+			case model.EpisodeDownloaded:
+				stats.DownloadedCount++
+				stats.TotalSize += ep.Size
+			case model.EpisodeError:
+				stats.ErrorCount++
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		return b.setObj(txn, statsKey, &stats, true)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &stats, nil
+}
+
+func (b *Badger) WalkFeeds(ctx context.Context, cb func(feed *model.Feed) error) error {
 	return b.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = b.getKey(feedPrefix)
 		opts.PrefetchValues = true
-		return b.iterator(txn, opts, func(item *badger.Item) error {
+		return b.iterator(ctx, txn, opts, func(item *badger.Item) error {
 			feed := &model.Feed{}
 			if err := b.unmarshalObj(item, feed); err != nil {
 				return err
@@ -185,7 +270,7 @@ func (b *Badger) WalkFeeds(_ context.Context, cb func(feed *model.Feed) error) e
 	})
 }
 
-func (b *Badger) DeleteFeed(_ context.Context, feedID string) error {
+func (b *Badger) DeleteFeed(ctx context.Context, feedID string) error {
 	return b.db.Update(func(txn *badger.Txn) error {
 		// Feed
 		feedKey := b.getKey(feedPath, feedID)
@@ -193,11 +278,15 @@ func (b *Badger) DeleteFeed(_ context.Context, feedID string) error {
 			return errors.Wrapf(err, "failed to delete feed %q", feedID)
 		}
 
+		// Stats
+		statsKey := b.getKey(statsPath, feedID)
+		_ = txn.Delete(statsKey)
+
 		// Episodes
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = b.getKey(episodePrefix, feedID)
 		opts.PrefetchValues = false
-		if err := b.iterator(txn, opts, func(item *badger.Item) error {
+		if err := b.iterator(ctx, txn, opts, func(item *badger.Item) error {
 			return txn.Delete(item.KeyCopy(nil))
 		}); err != nil {
 			return errors.Wrapf(err, "failed to iterate episodes for feed %q", feedID)
@@ -232,6 +321,9 @@ func (b *Badger) UpdateEpisode(feedID string, episodeID string, cb func(episode 
 			return err
 		}
 
+		oldStatus := episode.Status
+		oldSize := episode.Size
+
 		if err := cb(&episode); err != nil {
 			return err
 		}
@@ -240,28 +332,90 @@ func (b *Badger) UpdateEpisode(feedID string, episodeID string, cb func(episode 
 			return errors.New("can't change episode ID")
 		}
 
-		return b.setObj(txn, key, &episode, true)
+		if err := b.setObj(txn, key, &episode, true); err != nil {
+			return err
+		}
+
+		// Update stats if status or size changed
+		statsKey := b.getKey(statsPath, feedID)
+		var stats model.FeedStats
+		if err := b.getObj(txn, statsKey, &stats); err == nil {
+			if oldStatus != episode.Status || oldSize != episode.Size {
+				if oldStatus == model.EpisodeDownloaded {
+					stats.DownloadedCount--
+					stats.TotalSize -= oldSize
+				} else if oldStatus == model.EpisodeError {
+					stats.ErrorCount--
+				}
+
+				if episode.Status == model.EpisodeDownloaded {
+					stats.DownloadedCount++
+					stats.TotalSize += episode.Size
+				} else if episode.Status == model.EpisodeError {
+					stats.ErrorCount++
+				}
+				if stats.DownloadedCount < 0 {
+					stats.DownloadedCount = 0
+				}
+				if stats.ErrorCount < 0 {
+					stats.ErrorCount = 0
+				}
+				if stats.TotalSize < 0 {
+					stats.TotalSize = 0
+				}
+				_ = b.setObj(txn, statsKey, &stats, true)
+			}
+		}
+
+		return nil
 	})
 }
 
 func (b *Badger) DeleteEpisode(feedID, episodeID string) error {
 	key := b.getKey(episodePath, feedID, episodeID)
+	statsKey := b.getKey(statsPath, feedID)
 	return b.db.Update(func(txn *badger.Txn) error {
+		var ep model.Episode
+		if err := b.getObj(txn, key, &ep); err == nil {
+			var stats model.FeedStats
+			if err := b.getObj(txn, statsKey, &stats); err == nil {
+				stats.EpisodeCount--
+				if ep.Status == model.EpisodeDownloaded {
+					stats.DownloadedCount--
+					stats.TotalSize -= ep.Size
+				} else if ep.Status == model.EpisodeError {
+					stats.ErrorCount--
+				}
+				if stats.EpisodeCount < 0 {
+					stats.EpisodeCount = 0
+				}
+				if stats.DownloadedCount < 0 {
+					stats.DownloadedCount = 0
+				}
+				if stats.ErrorCount < 0 {
+					stats.ErrorCount = 0
+				}
+				if stats.TotalSize < 0 {
+					stats.TotalSize = 0
+				}
+				_ = b.setObj(txn, statsKey, &stats, true)
+			}
+		}
 		return txn.Delete(key)
 	})
 }
 
 func (b *Badger) WalkEpisodes(ctx context.Context, feedID string, cb func(episode *model.Episode) error) error {
 	return b.db.View(func(txn *badger.Txn) error {
-		return b.walkEpisodes(txn, feedID, cb)
+		return b.walkEpisodes(ctx, txn, feedID, cb)
 	})
 }
 
-func (b *Badger) walkEpisodes(txn *badger.Txn, feedID string, cb func(episode *model.Episode) error) error {
+func (b *Badger) walkEpisodes(ctx context.Context, txn *badger.Txn, feedID string, cb func(episode *model.Episode) error) error {
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = b.getKey(episodePrefix, feedID)
 	opts.PrefetchValues = true
-	return b.iterator(txn, opts, func(item *badger.Item) error {
+	return b.iterator(ctx, txn, opts, func(item *badger.Item) error {
 		feed := &model.Episode{}
 		if err := b.unmarshalObj(item, feed); err != nil {
 			return err
@@ -293,12 +447,12 @@ func (b *Badger) GetJob(_ context.Context, jobID string) (*model.UpdateJob, erro
 	return &job, nil
 }
 
-func (b *Badger) WalkJobs(_ context.Context, cb func(job *model.UpdateJob) error) error {
+func (b *Badger) WalkJobs(ctx context.Context, cb func(job *model.UpdateJob) error) error {
 	return b.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.Prefix = b.getKey(jobPrefix)
 		opts.PrefetchValues = true
-		return b.iterator(txn, opts, func(item *badger.Item) error {
+		return b.iterator(ctx, txn, opts, func(item *badger.Item) error {
 			job := &model.UpdateJob{}
 			if err := b.unmarshalObj(item, job); err != nil {
 				return err
@@ -315,11 +469,18 @@ func (b *Badger) DeleteJob(_ context.Context, jobID string) error {
 	})
 }
 
-func (b *Badger) iterator(txn *badger.Txn, opts badger.IteratorOptions, callback func(item *badger.Item) error) error {
+func (b *Badger) iterator(ctx context.Context, txn *badger.Txn, opts badger.IteratorOptions, callback func(item *badger.Item) error) error {
 	iter := txn.NewIterator(opts)
 	defer iter.Close()
 
 	for iter.Rewind(); iter.Valid(); iter.Next() {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
 		item := iter.Item()
 
 		if err := callback(item); err != nil {

@@ -380,7 +380,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	}
 
 	// Try to get enriched metadata from DB
-	if dbFeed, err := m.db.GetFeed(ctx, f.ID); err == nil && dbFeed != nil {
+	if dbFeed, err := m.db.GetFeedMetadata(ctx, f.ID); err == nil && dbFeed != nil {
 		summary.Title = dbFeed.Title
 		summary.Description = dbFeed.Description
 		summary.Author = dbFeed.Author
@@ -688,17 +688,24 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 	var epCount, dlCount, errCount int
 	var totalSize int64
 	if m.db != nil {
-		_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
-			epCount++
-			switch ep.Status {
-			case model.EpisodeDownloaded:
-				dlCount++
-				totalSize += ep.Size
-			case model.EpisodeError:
-				errCount++
-			}
-			return nil
-		})
+		if stats, err := m.db.GetFeedStats(ctx, f.ID); err == nil && stats != nil {
+			epCount = stats.EpisodeCount
+			dlCount = stats.DownloadedCount
+			errCount = stats.ErrorCount
+			totalSize = stats.TotalSize
+		} else {
+			_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
+				epCount++
+				switch ep.Status {
+				case model.EpisodeDownloaded:
+					dlCount++
+					totalSize += ep.Size
+				case model.EpisodeError:
+					errCount++
+				}
+				return nil
+			})
+		}
 	}
 
 	m.statsMu.Lock()
@@ -1160,7 +1167,7 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 	m.mu.Unlock()
 
 	if m.db != nil {
-		if dbFeed, err := m.db.GetFeed(ctx, id); err == nil && dbFeed != nil {
+		if dbFeed, err := m.db.GetFeedMetadata(ctx, id); err == nil && dbFeed != nil {
 			dbFeed.PrivateFeed = f.PrivateFeed
 			dbFeed.Episodes = nil // Metadata-only update must not replace a concurrent chapter scan.
 			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
@@ -1705,7 +1712,7 @@ func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID str
 	collectFromFeed := func(feedConfig *feed.Config) {
 		feedTitle := feedConfig.ID
 		provider := ""
-		if dbFeed, err := m.db.GetFeed(ctx, feedConfig.ID); err == nil && dbFeed != nil {
+		if dbFeed, err := m.db.GetFeedMetadata(ctx, feedConfig.ID); err == nil && dbFeed != nil {
 			if dbFeed.Title != "" {
 				feedTitle = dbFeed.Title
 			}
@@ -1830,7 +1837,7 @@ func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID st
 	collectFromFeed := func(feedConfig *feed.Config) {
 		feedTitle := feedConfig.ID
 		provider := ""
-		if dbFeed, err := m.db.GetFeed(ctx, feedConfig.ID); err == nil && dbFeed != nil {
+		if dbFeed, err := m.db.GetFeedMetadata(ctx, feedConfig.ID); err == nil && dbFeed != nil {
 			if dbFeed.Title != "" {
 				feedTitle = dbFeed.Title
 			}
@@ -1915,7 +1922,7 @@ func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo
 		feedTitle := f.ID
 		provider := ""
 		var lastUpdate *time.Time
-		if dbFeed, err := m.db.GetFeed(ctx, f.ID); err == nil && dbFeed != nil {
+		if dbFeed, err := m.db.GetFeedMetadata(ctx, f.ID); err == nil && dbFeed != nil {
 			if dbFeed.Title != "" {
 				feedTitle = dbFeed.Title
 			}

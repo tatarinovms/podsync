@@ -446,7 +446,7 @@ func main() {
 				_feed := scheduled.config
 				if isAudiobookFeed(_feed) {
 					// New books configured by hand need an initial build, without cron.
-					_, dbErr := database.GetFeed(ctx, _feed.ID)
+					_, dbErr := database.GetFeedMetadata(ctx, _feed.ID)
 					size, xmlErr := storage.Size(ctx, _feed.ID+".xml")
 					if dbErr != nil || xmlErr != nil || size == 0 {
 						if feedManager.JobQueue() != nil {

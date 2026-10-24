@@ -22,8 +22,14 @@ type Storage interface {
 	// - Synchronize audiobook chapters with a supplied non-nil directory snapshot
 	AddFeed(ctx context.Context, feedID string, feed *model.Feed) error
 
-	// GetFeed gets a feed by ID
+	// GetFeed gets a feed by ID with all its episodes loaded
 	GetFeed(ctx context.Context, feedID string) (*model.Feed, error)
+
+	// GetFeedMetadata gets a feed by ID without loading episodes (fast metadata lookup)
+	GetFeedMetadata(ctx context.Context, feedID string) (*model.Feed, error)
+
+	// GetFeedStats gets aggregated statistics for a feed (episode count, download count, errors, total size)
+	GetFeedStats(ctx context.Context, feedID string) (*model.FeedStats, error)
 
 	// WalkFeeds iterates over feeds saved to database
 	WalkFeeds(ctx context.Context, cb func(feed *model.Feed) error) error

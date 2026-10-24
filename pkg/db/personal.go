@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
@@ -42,7 +43,7 @@ func (t personalTx) Delete(key string) error { return t.txn.Delete([]byte(person
 func (t personalTx) Walk(prefix string, fn func(string, []byte) error) error {
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = []byte(personalPrefix + prefix)
-	return t.b.iterator(t.txn, opts, func(item *badger.Item) error {
+	return t.b.iterator(context.Background(), t.txn, opts, func(item *badger.Item) error {
 		data, err := item.ValueCopy(nil)
 		if err != nil {
 			return err

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -364,4 +365,92 @@ func TestBadger_GetFeedStats(t *testing.T) {
 	assert.Equal(t, 1, stats.EpisodeCount)
 	assert.Equal(t, 1, stats.DownloadedCount)
 	assert.Equal(t, int64(1000), stats.TotalSize)
+}
+
+func BenchmarkWalkEpisodes(b *testing.B) {
+	dir := b.TempDir()
+	database, err := NewBadger(&Config{Dir: dir})
+	require.NoError(b, err)
+	defer database.Close()
+
+	ctx := context.Background()
+	feed := &model.Feed{
+		ID:    "bench-feed",
+		Title: "Bench",
+	}
+	for i := 0; i < 500; i++ {
+		feed.Episodes = append(feed.Episodes, &model.Episode{
+			ID:       fmt.Sprintf("ep-%d", i),
+			Title:    fmt.Sprintf("Episode %d", i),
+			Status:   model.EpisodeDownloaded,
+			Duration: 1800,
+			Size:     1024 * 1024 * 10,
+		})
+	}
+	require.NoError(b, database.AddFeed(ctx, feed.ID, feed))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		count := 0
+		_ = database.WalkEpisodes(ctx, feed.ID, func(ep *model.Episode) error {
+			count++
+			return nil
+		})
+	}
+}
+
+func BenchmarkGetFeedMetadata(b *testing.B) {
+	dir := b.TempDir()
+	database, err := NewBadger(&Config{Dir: dir})
+	require.NoError(b, err)
+	defer database.Close()
+
+	ctx := context.Background()
+	feed := &model.Feed{
+		ID:    "bench-feed",
+		Title: "Bench",
+	}
+	for i := 0; i < 500; i++ {
+		feed.Episodes = append(feed.Episodes, &model.Episode{
+			ID:       fmt.Sprintf("ep-%d", i),
+			Title:    fmt.Sprintf("Episode %d", i),
+			Status:   model.EpisodeDownloaded,
+			Duration: 1800,
+			Size:     1024 * 1024 * 10,
+		})
+	}
+	require.NoError(b, database.AddFeed(ctx, feed.ID, feed))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = database.GetFeedMetadata(ctx, feed.ID)
+	}
+}
+
+func BenchmarkGetFeedStats(b *testing.B) {
+	dir := b.TempDir()
+	database, err := NewBadger(&Config{Dir: dir})
+	require.NoError(b, err)
+	defer database.Close()
+
+	ctx := context.Background()
+	feed := &model.Feed{
+		ID:    "bench-feed",
+		Title: "Bench",
+	}
+	for i := 0; i < 500; i++ {
+		feed.Episodes = append(feed.Episodes, &model.Episode{
+			ID:       fmt.Sprintf("ep-%d", i),
+			Title:    fmt.Sprintf("Episode %d", i),
+			Status:   model.EpisodeDownloaded,
+			Duration: 1800,
+			Size:     1024 * 1024 * 10,
+		})
+	}
+	require.NoError(b, database.AddFeed(ctx, feed.ID, feed))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = database.GetFeedStats(ctx, feed.ID)
+	}
 }

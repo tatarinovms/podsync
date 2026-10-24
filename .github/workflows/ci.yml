@@ -51,11 +51,21 @@ jobs:
       - name: Install ffmpeg (Ubuntu)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Run tests
+      - name: Run tests (Linux with race detection)
+        if: runner.os == 'Linux'
+        env:
+          VIMEO_TEST_API_KEY: ${{ secrets.VIMEO_ACCESS_TOKEN }}
+          YOUTUBE_TEST_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: go test -v -race ./...
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
         env:
           VIMEO_TEST_API_KEY: ${{ secrets.VIMEO_ACCESS_TOKEN }}
           YOUTUBE_TEST_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: go test -v ./...
+      - name: Run benchmarks
+        if: runner.os == 'Linux'
+        run: go test -bench=. -benchmem -run=^$ ./pkg/db/... ./pkg/jobqueue/...
 
   coverage:
     name: Coverage
@@ -75,7 +85,7 @@ jobs:
         env:
           VIMEO_TEST_API_KEY: ${{ secrets.VIMEO_ACCESS_TOKEN }}
           YOUTUBE_TEST_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: go test -coverprofile=coverage.txt ./...
+        run: go test -race -coverprofile=coverage.txt ./...
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v7
         with:

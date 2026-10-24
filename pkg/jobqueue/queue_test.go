@@ -672,3 +672,35 @@ func TestJobQueue_ActiveJobIndexScale(t *testing.T) {
 	require.NotNil(t, claimed)
 	assert.Equal(t, activeJob.ID, claimed.ID)
 }
+
+func BenchmarkClaimNextJob(b *testing.B) {
+	storage, err := db.NewBadger(&db.Config{Dir: b.TempDir()})
+	require.NoError(b, err)
+	defer storage.Close()
+
+	q := NewJobQueue(storage, 5)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// 500 completed historical jobs
+	for i := 0; i < 500; i++ {
+		job := &model.UpdateJob{
+			ID:         fmt.Sprintf("history/job_%d", i),
+			FeedID:     fmt.Sprintf("feed_%d", i),
+			Status:     model.JobStatusDone,
+			FinishedAt: &now,
+			CreatedAt:  now,
+		}
+		require.NoError(b, storage.SaveJob(ctx, job))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		feedID := fmt.Sprintf("active_%d", i)
+		_, _, _ = q.EnqueueUpdate(ctx, feedID)
+		claimed, _ := q.ClaimNextJob(ctx)
+		if claimed != nil {
+			_ = q.MarkDone(ctx, claimed.ID, claimed.ClaimToken)
+		}
+	}
+}

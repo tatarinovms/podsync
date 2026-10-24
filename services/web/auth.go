@@ -26,22 +26,39 @@ type Session struct {
 type SessionManager struct {
 	mu       sync.RWMutex
 	sessions map[string]Session
+	stopOnce sync.Once
+	stop     chan struct{}
 }
 
 func NewSessionManager() *SessionManager {
 	sm := &SessionManager{
 		sessions: make(map[string]Session),
+		stop:     make(chan struct{}),
 	}
 
 	// Periodically clean up expired sessions
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
-		for range ticker.C {
-			sm.cleanup()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				sm.cleanup()
+			case <-sm.stop:
+				return
+			}
 		}
 	}()
 
 	return sm
+}
+
+func (sm *SessionManager) Close() {
+	sm.stopOnce.Do(func() {
+		if sm.stop != nil {
+			close(sm.stop)
+		}
+	})
 }
 
 func (sm *SessionManager) CreateSession(username string) (string, error) {

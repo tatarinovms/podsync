@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"expvar"
 	"fmt"
@@ -135,6 +136,8 @@ func New(cfg Config, storage http.FileSystem, database db.Storage) *Server {
 	}
 
 	srv.Addr = fmt.Sprintf("%s:%d", bindAddress, port)
+	srv.ReadHeaderTimeout = 10 * time.Second
+	srv.IdleTimeout = 120 * time.Second
 	log.Debugf("using address: %s:%s", bindAddress, srv.Addr)
 
 	// Use a custom mux instead of http.DefaultServeMux to avoid exposing
@@ -309,4 +312,18 @@ func (s *Server) UpdateSecurityConfig(maxAttempts int, window, lockout time.Dura
 	s.cfg.Admin.WindowPeriod = formatConfigDuration(window)
 	s.cfg.Admin.LockoutPeriod = formatConfigDuration(lockout)
 	s.cfgMu.Unlock()
+}
+
+func (s *Server) Close() error {
+	if s.sessions != nil {
+		s.sessions.Close()
+	}
+	return s.Server.Close()
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.sessions != nil {
+		s.sessions.Close()
+	}
+	return s.Server.Shutdown(ctx)
 }

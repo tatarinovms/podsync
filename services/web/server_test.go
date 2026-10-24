@@ -1084,3 +1084,12 @@ func TestFeedEpisodesEndpointPagination(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"episodes":[]`)
 	assert.Contains(t, w.Body.String(), `"total":0`)
 }
+
+func TestServer_TimeoutsAndShutdown(t *testing.T) {
+	srv := New(Config{Port: 8080}, &mockFileSystem{}, nil)
+	assert.Equal(t, 10*time.Second, srv.ReadHeaderTimeout)
+	assert.Equal(t, 120*time.Second, srv.IdleTimeout)
+
+	// Close shuts down session manager without panic or leak
+	require.NoError(t, srv.Close())
+}

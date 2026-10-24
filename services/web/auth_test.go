@@ -116,3 +116,16 @@ func TestAdminUIDelivery(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Contains(t, rr.Body.String(), "Podsync Management Console")
 }
+
+func TestSessionManager_Close(t *testing.T) {
+	sm := NewSessionManager()
+	token, err := sm.CreateSession("alice")
+	require.NoError(t, err)
+
+	_, ok := sm.ValidateToken(token)
+	assert.True(t, ok)
+
+	// Closing twice must be safe (sync.Once)
+	sm.Close()
+	sm.Close()
+}

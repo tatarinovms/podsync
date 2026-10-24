@@ -9,6 +9,9 @@ import (
 	"sync"
 )
 
+// Max allowed MCP HTTP body size (4 MB) to prevent unbounded memory allocation
+const maxMCPRequestBody = 4 * 1024 * 1024
+
 type sseClient struct {
 	id       string
 	msgChan  chan []byte
@@ -48,6 +51,7 @@ func (h *HTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HTTPHandler) handleDirectJSONRPC(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxMCPRequestBody)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read body: %v", err), http.StatusBadRequest)
@@ -136,6 +140,7 @@ func (h *HTTPHandler) handleMessages(w http.ResponseWriter, r *http.Request) {
 	client, exists := h.clients[sessionID]
 	h.mu.RUnlock()
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxMCPRequestBody)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read body: %v", err), http.StatusBadRequest)

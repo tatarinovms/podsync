@@ -256,3 +256,25 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
     - All tab titles, navigation items, page headings, subtitles, button labels, form placeholders, badges, status indicators, empty states, modal text, and notifications must strictly be written in English.
     - Never introduce Russian, Cyrillic, or any non-English text into HTML templates, JavaScript code, or backend default strings (e.g. default personal feed name is `My Feed`, never `Моя лента`).
     - User input containing Cyrillic or non-ASCII characters (e.g., feed titles used as URL slugs/IDs) must be safely handled (e.g. automatic transliteration to ASCII/Latin slugs via `transliterateCyrillic` and red outline/validation for invalid characters).
+
+---
+
+## 7. Dependency & Infrastructure Architecture Notes
+
+1. **Docker Build Layer Caching**:
+   `Dockerfile` caches Go module downloads in a dedicated layer (`COPY go.mod go.sum ./` followed by `RUN go mod download`) prior to copying the full source tree (`COPY . .`). This prevents expensive dependency re-downloads on every source code commit.
+
+2. **BadgerDB Migration Path (v1 to v4)**:
+   - Podsync currently uses Badger v1 (`github.com/dgraph-io/badger`), which is stable and reliable for current single-node deployments.
+   - All iterators check `ctx.Done()`, and high-frequency queries utilize metadata and stats index keys (`stats/<feed_id>`, `feed_meta/<feed_id>`) and active job keys (`job_active/<id>`).
+   - *Migration to Badger v4 (`github.com/dgraph-io/badger/v4`)*:
+     1. Because Badger v1 and v4 on-disk table formats are incompatible, an automated migration utility must be added to `services/migrate/` (opening source DB in read-only mode with v1, iterating keys, and streaming to target directory using v4 writer).
+     2. Transition `DeleteFeed` and job cleanups to native prefix dropping `db.DropPrefix()`.
+     3. Enable native ZSTD compression in v4 badger options to reduce database footprint.
+
+3. **AWS SDK Migration Path (v1 to v2)**:
+   - `pkg/fs/s3.go` currently utilizes `github.com/aws/aws-sdk-go` v1.
+   - When migrating to `github.com/aws/aws-sdk-go-v2`:
+     1. Replace `s3.New(session)` with `s3.NewFromConfig(cfg)`.
+     2. Replace `s3manager.Uploader` with `feature/s3/manager` v2.
+     3. Update config parsing and credential provider resolution in `cmd/podsync/config.go`.

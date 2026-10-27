@@ -224,6 +224,13 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/system/logs/level` | `POST` | Change server logging level on the fly (info, debug, warn, error) |
 | `/api/v1/system/logs/download` | `GET` | Download complete server log file as text |
 | `/api/v1/mcp/config` | `GET` | Get MCP stdio and SSE client connection configuration |
+| `/api/v1/system` | `GET` | Get system metrics, disk usage, and dependencies |
+| `/api/v1/downloader` | `GET` | Get yt-dlp downloader configuration, cookies status, and proxy |
+| `/api/v1/downloader` | `POST` | Update downloader settings (timeout, proxy, browser, self-update) |
+| `/api/v1/downloader/cookies` | `GET` | Get Netscape cookies.txt content |
+| `/api/v1/downloader/cookies` | `POST` | Save or upload new Netscape cookies.txt content |
+| `/api/v1/downloader/cookies` | `DELETE` | Clear and delete installed cookies.txt file |
+| `/api/v1/downloader/test` | `POST` | Test URL extraction with yt-dlp and configured cookies/proxy |
 
 Episode queries return `feed`, `episodes`, `total`, `matching`, `status_counts`,
 `offset`, `limit`, `has_more`, and `next_offset` when another page exists.
@@ -236,10 +243,8 @@ accepts the same query parameters when `limit` is supplied, while requests witho
 For monitoring, use public `/health/live` for process liveness and `/health/ready`
 for database readiness. Legacy `/health` also reports recent episode download
 failures and can return 503 while the process and database remain available.
-| `/api/v1/system` | `GET` | Get system metrics, disk usage, and dependencies |
-| `/api/v1/downloader` | `GET` | Get yt-dlp downloader configuration, cookies status, and proxy |
-| `/api/v1/downloader` | `POST` | Update downloader settings (timeout, proxy, browser, self-update) |
-| `/api/v1/downloader/cookies` | `GET` | Get Netscape cookies.txt content |
-| `/api/v1/downloader/cookies` | `POST` | Save or upload new Netscape cookies.txt content |
-| `/api/v1/downloader/cookies` | `DELETE` | Clear and delete installed cookies.txt file |
-| `/api/v1/downloader/test` | `POST` | Test URL extraction with yt-dlp and configured cookies/proxy |
+
+The **MCP Server** settings provide connection parameters for stdio and HTTP/SSE.
+Updated stdio clients relay JSON-RPC directly to the daemon's `POST /mcp`, including
+all personal-feed tools. See the [MCP guide](./mcp.md) for setup, version reporting,
+and troubleshooting older clients.

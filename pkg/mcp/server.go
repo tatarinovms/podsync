@@ -17,12 +17,21 @@ import (
 type Server struct {
 	mgr      web.AdminManager
 	personal *personal.Service
+	version  string
 }
 
 // NewServer creates a new MCP server backed by web.AdminManager
 func NewServer(mgr web.AdminManager) *Server {
 	return &Server{
-		mgr: mgr,
+		mgr:     mgr,
+		version: "dev",
+	}
+}
+
+// SetVersion sets the binary build version before the server starts serving.
+func (s *Server) SetVersion(version string) {
+	if version = strings.TrimSpace(version); version != "" {
+		s.version = version
 	}
 }
 
@@ -75,7 +84,7 @@ func (s *Server) dispatch(ctx context.Context, req *JSONRPCRequest) JSONRPCRespo
 			},
 			ServerInfo: Implementation{
 				Name:    "podsync-mcp",
-				Version: "v2.13.9",
+				Version: s.version,
 			},
 			Instructions: "Podsync MCP Server provides tools to manage podcast feeds, monitor downloads, retry episodes, inspect system status, and configure API tokens for YouTube, VK Video, Vimeo, SoundCloud, and Twitch.",
 		}

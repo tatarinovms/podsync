@@ -203,7 +203,7 @@ sudo journalctl -u podsync -f -n 50
 
 Проверка доступности healthcheck:
 ```bash
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ---
@@ -271,7 +271,7 @@ docker compose up -d
 docker compose logs -f
 
 # Проверка health
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ---
@@ -279,6 +279,19 @@ curl -I http://localhost:8080/health
 ## 3. Настройка интеграции MCP с OpenCode и Hermes
 
 После запуска сервиса AI-агенты могут управлять подкастами через Model Context Protocol.
+
+В обновлённых сборках `podsync --mcp` проверяет
+`http://localhost:<server.port>/health/ready` и, если сервер готов, передаёт JSON-RPC
+в `POST /mcp` с Basic Auth из `[server.admin]`. Через это подключение доступны все
+28 инструментов, включая персональные ленты. Для полного списка библиотеки
+вызывайте `list_feeds` и `list_personal_feeds`. Локальный автопрокси использует
+обычный HTTP на настроенном порту; для HTTPS или другого хоста используйте
+удалённое подключение.
+
+После установки новой сборки перезапустите основной сервер и MCP-подключение
+клиента. При проксировании ответ `initialize` содержит версию основного сервера
+в `serverInfo.version`. Если прямой HTTP MCP показывает персональные ленты, а
+stdio сообщает об их недоступности, см. [диагностику MCP](./mcp.md#диагностика-старых-stdio-клиентов).
 
 ### 3.1: OpenCode (`opencode.json` / `opencode.jsonc`)
 Добавьте в `opencode.json` в корне проекта или в `~/.config/opencode/opencode.json`:
@@ -402,7 +415,7 @@ fi
 sudo systemctl start podsync
 sleep 2
 
-if curl -fs "http://localhost:8080/health" > /dev/null; then
+if curl -fs "http://localhost:8080/health/ready" > /dev/null; then
   echo "Podsync успешно обновлён до $LATEST_TAG и работает стабильно!"
 else
   echo "Сбой healthcheck после обновления! Откат к резервной копии..."
@@ -426,7 +439,7 @@ docker compose up -d
 # 3. Проверка статуса
 docker compose ps
 docker compose logs --tail=20 podsync
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ---
@@ -435,7 +448,7 @@ curl -I http://localhost:8080/health
 
 | Действие | Рекомендуемый инструмент / команда |
 |---|---|
-| **Проверка здоровья сервиса** | `curl -s http://localhost:8080/health` или MCP-инструмент `get_sync_status` |
+| **Проверка готовности сервиса** | `curl -s http://localhost:8080/health/ready` или MCP-инструмент `get_sync_status` |
 | **Анализ ошибок загрузки** | MCP-инструмент `get_download_errors` |
 | **Просмотр свежих эпизодов** | MCP-инструмент `get_recent_downloads` |
 | **Добавление нового канала** | MCP-инструмент `add_feed` (автоматически обновляет `config.toml`) |

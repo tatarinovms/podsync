@@ -30,7 +30,7 @@ The MCP server operates in two interchangeable modes:
 ```
 
 1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output.
-   - **Auto-Proxy**: When launched, the CLI checks if a Podsync daemon is already running locally on `http://localhost:<server.port>` using `[server.admin]` credentials. If reachable, it automatically acts as an HTTP client proxy, routing all tool calls through the running daemon to prevent BadgerDB lock conflicts (`resource temporarily unavailable`).
+   - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 28 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
    - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote SSE Mode** instead.
    - **Standalone Mode**: If no daemon is listening on `localhost:<server.port>`, the CLI opens the database directly in standalone mode.
 2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
@@ -40,6 +40,10 @@ The MCP server operates in two interchangeable modes:
 ## 2. Tools Reference
 
 The MCP server provides 28 specialized tools:
+
+For a complete library inventory, call both `list_feeds` (channels and audiobooks)
+and `list_personal_feeds` (curated personal feeds). An empty result from one does
+not mean the entire library is empty.
 
 ### Monitoring & Status
 | Tool Name | Arguments | Description |
@@ -154,8 +158,12 @@ opencode mcp list
 
 ### Stdio Proxy vs Standalone Mode
 When starting with `podsync --config config.toml --mcp`:
-1. **HTTP Proxy Mode**: Podsync checks if a primary daemon is already running locally on `http://localhost:<server.port>`. If reachable, `--mcp` connects as a lightweight HTTP client proxy via Basic Auth credentials from `[server.admin]`. Note: this check targets `localhost` on the configured `server.port` (without reverse-proxy path or TLS wrappers).
+1. **HTTP Proxy Mode**: Podsync checks if a primary daemon is already running locally on `http://localhost:<server.port>/health/ready`. If reachable, `--mcp` relays JSON-RPC directly to `POST /mcp` using Basic Auth credentials from `[server.admin]`. Personal-feed tools work through the same stdio connection; no separate REST implementation is needed. Note: this check targets `localhost` on the configured `server.port` (without reverse-proxy path or TLS wrappers).
 2. **Standalone Daemon Mode**: If no local server is listening on `localhost:<server.port>`, the `--mcp` process initializes the database, storage, and feed manager directly to serve MCP tool requests.
+
+The `initialize` response reports the serving binary's build version in
+`serverInfo.version` (`dev` when no version is supplied). In proxy mode this is
+the running daemon's version, even when the stdio client has a different version.
 
 ### Method B: Hermes Agent (Nous Hermes)
 
@@ -234,6 +242,11 @@ In your Cursor or Cline MCP Settings:
 You can directly test the MCP server over HTTP using `curl`:
 
 ```bash
+# Initialize and inspect serverInfo.version (use your configured port and credentials)
+curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"diagnostic","version":"1.0"}}}'
+
 # Call get_sync_status
 curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
@@ -248,7 +261,25 @@ curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
 curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_recent_downloads","arguments":{"limit":5}}}'
+
+# List personal feeds separately from channel feeds
+curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_personal_feeds","arguments":{}}}'
 ```
+
+### Troubleshooting Older Stdio Clients
+
+If stdio reports `personal feeds service is not enabled` but direct `POST /mcp`
+returns personal feeds, update the binary used by the client's `command` and
+restart that MCP connection. Older clients wrapped a REST proxy in a local MCP
+server without attaching the personal-feed service. Updated clients relay the
+entire MCP exchange to the daemon.
+
+If `serverInfo.version` is still hardcoded to an older release, update and restart
+the daemon as well, then reconnect and send `initialize` again. In proxy mode the
+reported version belongs to the daemon. A 401 response means the Basic Auth
+credentials in `[server.admin]` need checking; it does not mean the library is empty.
 
 ### Agent Skill Integration
 To make AI agents fully autonomous when managing Podsync, provide them with the skill definition in:

@@ -6,8 +6,13 @@ import (
 	"io"
 )
 
-// RunStdio runs the MCP server reading JSON-RPC messages from in and writing responses to out
-func RunStdio(ctx context.Context, server *Server, in io.Reader, out io.Writer) error {
+// MessageHandler can dispatch MCP requests locally or relay them to a daemon.
+type MessageHandler interface {
+	HandleMessage(context.Context, []byte) ([]byte, error)
+}
+
+// RunStdio reads newline-delimited JSON-RPC and writes one response per line.
+func RunStdio(ctx context.Context, server MessageHandler, in io.Reader, out io.Writer) error {
 	scanner := bufio.NewScanner(in)
 	// Allow large messages (e.g. feeds with lots of episodes)
 	const maxScanTokenSize = 10 * 1024 * 1024 // 10MB

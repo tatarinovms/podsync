@@ -29,16 +29,24 @@ Podsync включает встроенный сервер **MCP (Model Context 
 ```
 
 1. **Режим Stdio (`podsync --mcp`)**: Запускается локально на машине через стандартные потоки ввода/вывода (stdin/stdout).
-   - **Auto-Proxy**: При запуске утилита проверяет, запущен ли уже основной демон Podsync на `http://localhost:<server.port>`, используя учётные данные из `[server.admin]`. Если сервис отвечает, CLI прозрачно проксирует все вызовы инструментов через запущенный экземпляр по HTTP, предотвращая конфликты блокировки базы BadgerDB (`resource temporarily unavailable`).
+   - **Auto-Proxy**: При запуске утилита проверяет `http://localhost:<server.port>/health/ready`. Если сервис отвечает, CLI передаёт JSON-RPC напрямую в `POST /mcp` основного экземпляра с Basic Auth из `[server.admin]`. Все 28 инструментов, включая шесть инструментов персональных лент, ресурсы, промпты и ответ инициализации обслуживает этот экземпляр. Поведение stdio и прямого HTTP MCP совпадает; отдельная реализация personal-инструментов через REST не требуется. Это также предотвращает конфликты блокировки базы BadgerDB (`resource temporarily unavailable`).
    - **Ограничения**: Автопрокси опрашивает только локальный порт `http://localhost:<server.port>`. Он не поддерживает TLS (HTTPS), внешние доменные имена и префиксы reverse-proxy (например, `/podsync/`). Если сервис работает за обратным прокси или на удалённом сервере, используйте **Remote SSE Mode**.
    - **Автономный режим (Standalone)**: Если на `localhost:<server.port>` сервис не обнаружен, утилита открывает базу данных напрямую на чтение/запись.
 2. **Удалённый режим SSE (`/mcp/sse`)**: Встроен непосредственно в веб-сервер Podsync. Позволяет агентам на других серверах, в Docker-контейнерах или за reverse-proxy (Nginx/Traefik с HTTPS) безопасно подключаться по HTTP/HTTPS с базовой авторизацией.
+
+Ответ `initialize` возвращает версию обслуживающей сборки в `serverInfo.version`
+(`dev`, если версия не задана). В режиме прокси это версия работающего демона,
+даже если stdio-клиент собран с другой версией.
 
 ---
 
 ## 2. Справочник инструментов (Tools Reference)
 
 MCP-сервер предоставляет 28 специализированных инструментов:
+
+Для полного списка библиотеки вызывайте оба инструмента: `list_feeds` для каналов
+и аудиокниг и `list_personal_feeds` для персональных лент. Пустой результат одного
+из них не означает, что вся библиотека пуста.
 
 ### Мониторинг и статус
 | Имя инструмента | Аргументы | Описание |
@@ -227,6 +235,11 @@ opencode mcp list
 Проверить работу сервера MCP по протоколу HTTP можно напрямую:
 
 ```bash
+# Инициализация и проверка serverInfo.version (подставьте свой порт и учётные данные)
+curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"diagnostic","version":"1.0"}}}'
+
 # Вызов get_sync_status
 curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
@@ -241,7 +254,26 @@ curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
 curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_recent_downloads","arguments":{"limit":5}}}'
+
+# Персональные ленты запрашиваются отдельно от каналов
+curl -u admin:secretpassword -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"list_personal_feeds","arguments":{}}}'
 ```
+
+### Диагностика старых stdio-клиентов
+
+Если stdio возвращает `personal feeds service is not enabled`, а прямой запрос
+в `POST /mcp` показывает персональные ленты, обновите бинарник из поля `command`
+в настройках клиента и перезапустите MCP-подключение. Старые клиенты создавали
+локальный MCP-сервер поверх REST-прокси без сервиса персональных лент. Обновлённые
+клиенты передают весь обмен MCP работающему серверу.
+
+Если `serverInfo.version` всё ещё содержит старую захардкоженную версию, обновите
+и перезапустите также основной сервер, затем переподключитесь и повторите
+`initialize`. При проксировании возвращается версия основного сервера. Ответ 401
+означает, что нужно проверить Basic Auth в `[server.admin]`; это не признак пустой
+библиотеки.
 
 ### Навык для AI-агентов (Agent Skill)
 Готовое описание навыка для агентов размещено в:

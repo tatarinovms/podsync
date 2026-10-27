@@ -299,8 +299,21 @@ func TestInitialize(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, ProtocolVersion, initResult.ProtocolVersion)
 	assert.Equal(t, "podsync-mcp", initResult.ServerInfo.Name)
+	assert.Equal(t, "dev", initResult.ServerInfo.Version)
 	assert.NotNil(t, initResult.Capabilities.Tools)
 	assert.NotNil(t, initResult.Capabilities.Resources)
+}
+
+func TestInitializeBuildVersion(t *testing.T) {
+	server, _ := setupTestServer()
+	server.SetVersion("v2.22.0")
+	resp, err := server.HandleMessage(context.Background(), []byte(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
+	require.NoError(t, err)
+	var result struct {
+		Result InitializeResult `json:"result"`
+	}
+	require.NoError(t, json.Unmarshal(resp, &result))
+	assert.Equal(t, "v2.22.0", result.Result.ServerInfo.Version)
 }
 
 func TestToolsList(t *testing.T) {

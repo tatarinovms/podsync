@@ -1,6 +1,6 @@
 FROM golang:1.25 AS builder
 
-ARG TAG="v2.13.9"
+ARG TAG="dev"
 ENV TAG=${TAG}
 ENV COMMIT=""
 

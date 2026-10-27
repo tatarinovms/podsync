@@ -16,7 +16,7 @@ import (
 	"github.com/mxpv/podsync/services/web"
 )
 
-// HTTPClientManager implements web.AdminManager by proxying calls to a running Podsync HTTP server
+// HTTPClientManager relays MCP messages and implements web.AdminManager over REST.
 type HTTPClientManager struct {
 	baseURL  string
 	username string
@@ -35,6 +35,40 @@ func NewHTTPClientManager(baseURL, username, password string) *HTTPClientManager
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// HandleMessage forwards the complete MCP exchange to the running daemon. Tools,
+// resources, prompts and serverInfo are all provided by that same instance.
+func (c *HTTPClientManager) HandleMessage(ctx context.Context, data []byte) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/mcp", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("MCP server returned HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil // Notifications have no JSON-RPC response.
+	}
+	// HTTP responses may contain formatting newlines; stdio requires one line.
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, body); err != nil {
+		return nil, fmt.Errorf("invalid MCP response: %w", err)
+	}
+	return compact.Bytes(), nil
 }
 
 // IsReachable checks if the remote Podsync server is running and responding to health check

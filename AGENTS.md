@@ -53,8 +53,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── jobqueue/             # Persistent disk-backed job queue with crash recovery and concurrency control
 │   ├── logbuffer/            # Thread-safe in-memory circular ring buffer for real-time logs
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
-│   │   ├── server.go         # 21 MCP tools, resources (podsync://*), and diagnostic prompts
-│   │   └── proxy.go          # HTTP client proxy implementing web.AdminManager over REST
+│   │   ├── server.go         # 28 MCP tools, resources (podsync://*), and diagnostic prompts
+│   │   └── proxy.go          # JSON-RPC relay to /mcp and web.AdminManager REST client
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
@@ -224,6 +224,11 @@ Podsync exposes 28 MCP tools. `update_feed_config` applies only supplied fields,
 
 Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE** (`/mcp` and `/mcp/sse`).
 
+When a local daemon is ready, stdio relays JSON-RPC directly to `POST /mcp` with
+Basic Auth. All 28 tools, including personal feeds, resources and prompts are
+served by that daemon. Set the MCP server version from the binary build version
+before serving; proxied initialization preserves the daemon's version.
+
 ---
 
 ## 6. Golden Rules for AI Agents
@@ -257,6 +262,12 @@ Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE**
     - All tab titles, navigation items, page headings, subtitles, button labels, form placeholders, badges, status indicators, empty states, modal text, and notifications must strictly be written in English.
     - Never introduce Russian, Cyrillic, or any non-English text into HTML templates, JavaScript code, or backend default strings (e.g. default personal feed name is `My Feed`, never `Моя лента`).
     - User input containing Cyrillic or non-ASCII characters (e.g., feed titles used as URL slugs/IDs) must be safely handled (e.g. automatic transliteration to ASCII/Latin slugs via `transliterateCyrillic` and red outline/validation for invalid characters).
+12. **Mandatory Documentation & Skills Review After Changes**:
+    - Before completing any change, review its impact on `README.md`, `README_RU.md`, `docs/`, and `.agents/skills/`. Update affected documentation and skills as part of the same change.
+    - Keep English and Russian documentation consistent: update both README files and the corresponding guides in `docs/` and `docs/ru/` whenever documented behavior changes.
+    - Cover changes to features, API/MCP behavior, transports, configuration, defaults, deployment, and troubleshooting, including fixes that do not add or remove tools. Keep examples, commands, endpoint descriptions, and tool counts accurate.
+    - When agent workflows change, update the affected skills under `.agents/skills/` and synchronize their installed copies. For the Podsync skill, use all four locations listed in Rule 9.
+    - Before reporting completion, check affected local links and examples and run applicable documentation synchronization checks. If no documentation or skill changes are needed, confirm that during the review.
 
 ---
 

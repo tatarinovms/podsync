@@ -54,7 +54,7 @@ const banner = `
 `
 
 var (
-	version = "v2.13.9"
+	version = "dev"
 	commit  = "none"
 	date    = "unknown"
 	arch    = ""
@@ -130,8 +130,7 @@ func main() {
 		proxyMgr := mcp.NewHTTPClientManager(baseURL, cfg.Server.Admin.Username, cfg.Server.Admin.Password)
 		if proxyMgr.IsReachable(ctx) {
 			log.Infof("MCP: connected to running Podsync server at %s", baseURL)
-			mcpServer := mcp.NewServer(proxyMgr)
-			if err := mcp.RunStdio(ctx, mcpServer, os.Stdin, os.Stdout); err != nil {
+			if err := mcp.RunStdio(ctx, proxyMgr, os.Stdin, os.Stdout); err != nil {
 				log.WithError(err).Error("MCP stdio session terminated")
 			}
 			return
@@ -514,6 +513,7 @@ func main() {
 
 	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)
 	mcpServer := mcp.NewServer(feedManager)
+	mcpServer.SetVersion(version)
 	mcpServer.SetPersonalFeeds(personalFeeds)
 	srv.SetMCPHandler(mcp.NewHTTPHandler(mcpServer))
 

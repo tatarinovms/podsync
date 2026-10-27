@@ -204,7 +204,7 @@ sudo journalctl -u podsync -f -n 50
 
 Verify service is responding:
 ```bash
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ---
@@ -278,7 +278,7 @@ docker compose up -d
 docker compose logs -f
 
 # Check health
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ---
@@ -286,6 +286,18 @@ curl -I http://localhost:8080/health
 ## 3. Configuring OpenCode & Hermes for MCP Integration
 
 Once Podsync is running (either as systemd service or via Docker), AI agents can manage feeds, inspect downloads, and retry errors through MCP.
+
+With updated binaries, `podsync --mcp` probes
+`http://localhost:<server.port>/health/ready` and relays JSON-RPC to `POST /mcp`
+using `[server.admin]` Basic Auth when the daemon is ready. All 28 tools, including
+personal-feed tools, are available through this connection. For a complete library,
+call both `list_feeds` and `list_personal_feeds`. Local auto-proxy uses plain HTTP
+on the configured port; use the remote connection for HTTPS or a different host.
+
+After installing an updated binary, restart both the daemon and the MCP client
+connection. `initialize` reports the daemon's build version in `serverInfo.version`
+when proxying. See [MCP troubleshooting](./mcp.md#troubleshooting-older-stdio-clients)
+if personal feeds appear through direct HTTP MCP but are unavailable over stdio.
 
 ### 3.1: OpenCode (`opencode.json` / `opencode.jsonc`)
 Add to `opencode.json` in your project root or `~/.config/opencode/opencode.json`:
@@ -414,7 +426,7 @@ fi
 sudo systemctl start podsync
 sleep 2
 
-if curl -fs "http://localhost:8080/health" > /dev/null; then
+if curl -fs "http://localhost:8080/health/ready" > /dev/null; then
   echo "Podsync successfully upgraded to $LATEST_TAG and running healthy!"
 else
   echo "Health check failed after upgrade! Reverting to backup binary..."
@@ -440,7 +452,7 @@ docker compose up -d
 # 3. Verify status
 docker compose ps
 docker compose logs --tail=20 podsync
-curl -I http://localhost:8080/health
+curl -I http://localhost:8080/health/ready
 ```
 
 ### 4.3: Upgrading via Source Build (Git)
@@ -467,7 +479,7 @@ When an agent needs to perform tasks on Podsync:
 
 | Action | Recommended Tool / Command |
 |---|---|
-| **Check service health** | `curl -s http://localhost:8080/health` or MCP tool `get_sync_status` |
+| **Check service readiness** | `curl -s http://localhost:8080/health/ready` or MCP tool `get_sync_status` |
 | **Inspect download errors** | MCP tool `get_download_errors` |
 | **View recent downloads** | MCP tool `get_recent_downloads` |
 | **Add a new podcast channel** | MCP tool `add_feed` (auto-updates `config.toml`) |

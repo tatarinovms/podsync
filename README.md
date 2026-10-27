@@ -32,7 +32,7 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Smart Token Extraction**: Paste the entire OAuth redirect URL when adding VK API tokens — Podsync automatically parses out the access token.
 - **Accurate Disk Usage & Active Episodes**: Card metrics accurately reflect only active (downloaded) episodes and their true disk footprint, while cleaned/purged episodes are clearly distinguished in episode inspection.
 - **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations.
-- **Model Context Protocol (MCP) Server**: Built-in MCP server with 27 tools for AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
+- **Model Context Protocol (MCP) Server**: Built-in MCP server with 28 tools for AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
 - **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, security, tokens, downloaders, and audiobooks.
@@ -242,7 +242,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 
 ## Model Context Protocol (MCP) Server
 
-Podsync includes a built-in **MCP Server** with 27 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
+Podsync includes a built-in **MCP Server** with 28 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
 
 An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). See the [MCP Guide](./docs/mcp.md) for full details and setup instructions.
 
@@ -259,8 +259,14 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
   ```bash
   ./bin/podsync --config config.toml --mcp
   ```
-  *(Automatically proxies to a running Podsync instance if active, or operates standalone with the local database).*
+  *(Automatically relays JSON-RPC to the running instance's `POST /mcp`, including personal-feed tools, or operates standalone with the local database).*
 - **HTTP / SSE Mode**: Available at `/mcp` and `/mcp/sse` when the web server is running.
+
+Both connection modes provide all 28 tools. For a complete library inventory,
+call `list_feeds` for channels and audiobooks and `list_personal_feeds` for curated
+personal feeds. In proxy mode, `serverInfo.version` reports the daemon's build
+version. See [MCP troubleshooting](./docs/mcp.md#troubleshooting-older-stdio-clients)
+if an older stdio client reports that personal feeds are unavailable.
 
 ## How to run
 

@@ -85,13 +85,19 @@ All endpoints require administrator authentication (Basic Auth or session cookie
 
 AI assistants (**Claude Desktop**, **OpenCode**, **Cursor**, **Cline**, **Antigravity**) can manage personal feeds via the following MCP tools:
 
+All six tools are available through `podsync --mcp`, direct `POST /mcp`, and SSE.
+When a local daemon is ready, updated stdio clients relay requests to its `/mcp`
+endpoint with Basic Auth from `[server.admin]`. Use `list_personal_feeds` for this
+collection; `list_feeds` lists channels and audiobooks. For older clients reporting
+`personal feeds service is not enabled`, see [MCP troubleshooting](./mcp.md#troubleshooting-older-stdio-clients).
+
 | Tool Name | Arguments | Description |
 |---|---|---|
-| **`list_personal_feeds`** | `{}` | List all curated personal feeds, episode counts, total sizes, and feed URLs. |
+| **`list_personal_feeds`** | `{}` | List all curated personal feeds, episode counts, and feed URLs. |
 | **`get_personal_feed`** | `feed_id` *(req)* | Get metadata and all episodes (with status, source URL/file, and media URL). |
 | **`create_personal_feed`** | `title` *(req)*, `description`, `cover_art`, `playlist_sort`, `private_feed` | Create a new curated personal podcast feed. |
 | **`add_personal_episode`** | `feed_id` *(req)*, `url` *(opt)*, `file_path` *(opt)*, `title` *(opt)*, `format` *(opt)*, `quality` *(opt)*, `max_height` *(opt)* | Add an episode from a URL or local server file path. |
-| **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)* | Delete an episode from a personal feed and clean up storage. |
+| **`delete_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `delete_files` *(opt, default: false)* | Remove an episode; delete media only when requested and no other feed references it. |
 | **`rename_personal_episode`** | `feed_id` *(req)*, `episode_id` *(req)*, `title` *(req)* | Rename an episode in a personal podcast feed. |
 
 ---

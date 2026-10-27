@@ -1,7 +1,7 @@
 ---
 name: "podsync"
 description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
-version: "1.0.0"
+version: "1.0.1"
 triggers:
   - "podsync"
   - "podcast"
@@ -18,12 +18,19 @@ This skill provides comprehensive instructions for AI agents on how to monitor, 
 
 ---
 
+## MCP Connection and Library Scope
+
+- In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 28 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
+- `initialize` reports the serving binary's build version in `serverInfo.version` (`dev` if unspecified). In proxy mode this is the daemon's version, which may differ from the stdio client's version.
+- For a complete library inventory, call both `list_feeds` and `list_personal_feeds`. The first lists channel feeds and audiobooks; personal feeds have a separate tool. An empty result from either tool does not mean the entire library is empty.
+- Older stdio clients can report `personal feeds service is not enabled` while direct HTTP MCP works. Compare `tools/list` and `list_personal_feeds` through authenticated `POST /mcp` before concluding that personal feeds are absent. Updating and restarting the stdio client enables the relay; update the daemon as well to correct an older hardcoded `serverInfo.version`.
+
 ## MCP Tools Reference
 
-When connected to Podsync's MCP server (`podsync --mcp` or `/mcp/sse`), use the following tools:
+When connected to Podsync's MCP server (`podsync --mcp`, `POST /mcp`, or `/mcp/sse`), use the following tools:
 
 ### 1. `list_feeds`
-- **Purpose**: Lists all active podcast feeds, episode count, downloaded count, error count, disk space used, and direct RSS URLs.
+- **Purpose**: Lists configured channel feeds and audiobooks, episode count, downloaded count, error count, disk space used, and direct RSS URLs. Use `list_personal_feeds` for curated personal feeds.
 - **Arguments**: None `{}`.
 - **When to use**: Whenever the user asks:
   - *"What podcasts do I have?"*

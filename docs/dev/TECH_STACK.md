@@ -1,5 +1,7 @@
 # Technology Stack & Dependencies
 
+See the [developer documentation index](./README.md) for related guides.
+
 This document provides a comprehensive inventory of the programming languages, runtime dependencies, external binaries, third-party libraries, and UI frameworks used in **Podsync**.
 
 ---
@@ -29,11 +31,11 @@ These utilities must be present in the execution environment ($PATH) or packaged
 
 ## 3. Go Modules & Key Libraries
 
-From [`go.mod`](file:///Volumes/HDD/project/podsync/go.mod):
+From [`go.mod`](../../go.mod):
 
 ### Storage, Persistence & Job Queue
 - **`github.com/dgraph-io/badger`** (`v1.6.2`): Embedded key-value database providing ACID transactions, zero external server dependencies, and high-performance disk-backed caching.
-- **`pkg/jobqueue`**: In-house persistent disk-backed job queue with SQLite / BadgerDB state tracking, crash recovery, and worker concurrency controls.
+- **`pkg/jobqueue`**: In-house persistent disk-backed job queue with BadgerDB state tracking, crash recovery, and worker concurrency controls.
 - **`github.com/aws/aws-sdk-go`**: AWS S3 client SDK for offloading podcast audio/video hosting to cloud object storage.
 
 ### Scheduling & Synchronization
@@ -89,5 +91,5 @@ Embedded directly within the Go binary (`//go:embed ui/*` from `services/web/ui/
 
 - **RSS 2.0 & iTunes Podcast Specifications**: Compliant XML schema with audio/video enclosures, artwork, categories, explicit tags, and `<itunes:block>yes</itunes:block>` for private feeds.
 - **Podcast 2.0**: Serial feed specification (`<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`) for episodic audiobook chapters.
-- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing 27 JSON-RPC 2.0 tools and resources over Stdio and HTTP Server-Sent Events (SSE).
+- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing 28 JSON-RPC 2.0 tools and resources over Stdio and HTTP Server-Sent Events (SSE). When a daemon is ready, stdio relays the complete exchange to its authenticated `POST /mcp` endpoint.
 - **Netscape Cookie Format**: Standard cookies header format used by `yt-dlp` to authenticate and bypass bot challenges.

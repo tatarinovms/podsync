@@ -102,6 +102,7 @@ Log in using the configured username and password.
   - Interactive chips for **All**, **Updating**, and **Needs attention** with real-time numeric badges.
 - **Mobile Responsive Layout**:
   - Collapsible offcanvas navigation via the top-bar burger menu with touch-friendly 44px interactive targets and `prefers-reduced-motion` compliance.
+  - The top-bar OPML download button is hidden below 576px to keep the navigation within the viewport.
 
 ### 2. Unified Subscription Window (RSS, Apps & QR)
 - Clicking **Subscribe** on any card or detail page opens a unified dialog:

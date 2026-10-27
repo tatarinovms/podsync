@@ -103,23 +103,6 @@ func TestLocal_Delete(t *testing.T) {
 	assert.True(t, errors.Is(err, os.ErrNotExist))
 }
 
-func TestLocal_copyFile(t *testing.T) {
-	reader := bytes.NewReader([]byte{1, 2, 4})
-	tmpDir, err := os.MkdirTemp("", "")
-	assert.NoError(t, err)
-
-	file := filepath.Join(tmpDir, "1")
-
-	l := &Local{}
-	size, err := l.copyFile(reader, file)
-	assert.NoError(t, err)
-	assert.EqualValues(t, 3, size)
-
-	stat, err := os.Stat(file)
-	assert.NoError(t, err)
-	assert.EqualValues(t, 3, stat.Size())
-}
-
 func TestLocal_NoListing(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "")
 	assert.NoError(t, err)

@@ -69,6 +69,9 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── update/               # Feed update orchestrator and regex episode matcher
 │   └── migrate/              # Tooling for media filename migration
 ├── docs/                     # Guides, token setup instructions, and MCP specs
+│   ├── dev/                  # Architecture, API/design guides, workflow, and review checklist
+│   └── ru/                   # Russian user guides and developer documentation index
+├── tests/e2e/               # Playwright browser regression tests with isolated npm dependencies
 ├── .agents/skills/podsync/   # Standard agent skill definition for MCP
 ├── Dockerfile                # Multi-stage Docker build (Go builder + Alpine runtime with yt-dlp)
 ├── docker-compose.yml        # Docker compose configuration for running Podsync
@@ -275,6 +278,7 @@ before serving; proxied initialization preserves the daemon's version.
 
 1. **Docker Build Layer Caching**:
    `Dockerfile` caches Go module downloads in a dedicated layer (`COPY go.mod go.sum ./` followed by `RUN go mod download`) prior to copying the full source tree (`COPY . .`). This prevents expensive dependency re-downloads on every source code commit.
+   `.dockerignore` excludes Git history, documentation, agent configuration, local credentials, databases, and media. Pass `TAG` and `COMMIT` as Docker build arguments; do not rely on `.git` being available inside the builder. Release/nightly workflows and `make docker` supply these arguments.
 
 2. **BadgerDB Migration Path (v1 to v4)**:
    - Podsync currently uses Badger v1 (`github.com/dgraph-io/badger`), which is stable and reliable for current single-node deployments.
@@ -290,3 +294,9 @@ before serving; proxied initialization preserves the daemon's version.
      1. Replace `s3.New(session)` with `s3.NewFromConfig(cfg)`.
      2. Replace `s3manager.Uploader` with `feature/s3/manager` v2.
      3. Update config parsing and credential provider resolution in `cmd/podsync/config.go`.
+
+## 8. Developer Guides & Browser Tests
+
+- Internal architecture, API, design, stack, workflow, and review guides live in [`docs/dev/`](docs/dev/README.md). Keep the root focused on `AGENTS.md` and the two README files.
+- Browser regression tests live in `tests/e2e/`; install their pinned dependencies with `npm ci`, install Chromium with `npx playwright install chromium`, and run `npm test` from that directory. CI runs them in the **Browser tests** job.
+- Dependency-free Node.js UI tests remain in `services/web/`.

@@ -73,6 +73,24 @@ jobs:
           node services/web/admin_security_test.js
           node services/web/episodes_ui_test.js
 
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: tests/e2e
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install test dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser tests
+        run: npm test
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

@@ -1,6 +1,12 @@
 # 🎨 Design System & UI Guidelines: Catppuccin (Latte & Mocha)
 
+See the [developer documentation index](./README.md) for related guides.
+
 > **Instructions for AI agents:** This document is the single source of truth for the project's visual design. All UI components, pages, and styles MUST follow the Catppuccin palette and rules below. Never use default framework colors or pure black/white; use the designated Catppuccin tokens instead.
+
+Button layout must respect Bootstrap visibility utilities such as `.d-none` and
+`.d-sm-inline-flex`. Keep the base `.btn` display rule free of `!important` so
+responsive and conditional controls can be hidden.
 
 ## 1. Design Philosophy (Aesthetic Direction)
 

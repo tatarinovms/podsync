@@ -1,8 +1,9 @@
 FROM golang:1.25 AS builder
 
 ARG TAG="dev"
+ARG COMMIT="unknown"
 ENV TAG=${TAG}
-ENV COMMIT=""
+ENV COMMIT=${COMMIT}
 
 WORKDIR /build
 

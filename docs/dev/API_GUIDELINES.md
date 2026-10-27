@@ -1,5 +1,7 @@
 # REST API Guidelines & Specification
 
+See the [developer documentation index](./README.md) for related guides.
+
 This document defines the REST API standards, endpoint contracts, authentication mechanisms, and request/response payloads for **Podsync** (`/api/v1`).
 
 ---

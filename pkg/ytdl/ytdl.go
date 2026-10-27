@@ -482,10 +482,6 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 	return args
 }
 
-func buildArgs(feedConfig *feed.Config, episode *model.Episode, outputFilePath string) []string {
-	return (*YoutubeDl)(nil).buildArgs(feedConfig, episode, outputFilePath)
-}
-
 func (dl *YoutubeDl) GetConfig() Config {
 	dl.cfgMu.RLock()
 	defer dl.cfgMu.RUnlock()

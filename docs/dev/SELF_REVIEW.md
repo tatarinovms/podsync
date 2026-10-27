@@ -1,5 +1,7 @@
 # Agent & Developer Self-Review Checklist
 
+See the [developer documentation index](./README.md) for related guides.
+
 Before committing changes, opening pull requests, or creating release tags, run through this comprehensive checklist to guarantee system stability, security, and UI consistency.
 
 ---
@@ -24,7 +26,7 @@ Before committing changes, opening pull requests, or creating release tags, run 
   - When feed settings change, `m.updates <- f` is queued so the RSS XML file `{feed_id}.xml` is regenerated immediately.
 - [ ] **BadgerDB Safety**:
   - No unclosed BadgerDB iterators or transactions (`defer it.Close()`, `defer txn.Discard()`).
-  - Keys use correct namespace prefixes (`feed:`, `episode:`, `state:`).
+  - Keys use the correct namespaces (`feed/`, `episode/`, `stats/`, `job/`, and `podsync/personal/v1/`); preserve existing state keys.
 
 ---
 
@@ -63,14 +65,18 @@ Before committing changes, opening pull requests, or creating release tags, run 
   - No direct calls to `bootstrap.Modal.getInstance(el).hide()`.
   - Uses `closeModal(modalId)` to cleanly remove backdrops and restore scrollability.
 - [ ] **File Sync**:
-  - Copied `services/web/ui/index.html` to `html/index.html`.
+  - Kept all four Web UI assets in `services/web/ui/` and `html/` byte-for-byte identical; `Local.Open` serves the root copy when web UI serving is enabled.
 
 ---
 
 ## 6. MCP & Skill Synchronization
 
-- [ ] **Tool Count**: All 27 MCP tools in `pkg/mcp/server.go` have matching implementations in `pkg/mcp/proxy.go` and `cmd/podsync/feed_manager.go`.
+- [ ] **Tool Count**: All 28 MCP tools in `pkg/mcp/server.go` have handlers and synchronized references. Stdio proxy mode relays JSON-RPC to the daemon, including personal-feed tools.
 - [ ] **Skill Parity**:
   - Updated `.agents/skills/podsync/SKILL.md`.
   - Copied to `/Users/tatarinovms/.gemini/config/skills/podsync/SKILL.md` and project skill directories.
   - All scalar strings in YAML frontmatter are enclosed in double quotes (`"..."`).
+
+- [ ] **Documentation**: Reviewed both README files, affected English/Russian guides, and skills; updated changed behavior, examples, and links.
+- [ ] **UI Tests**: Ran the dependency-free Node.js tests and, when changing browser behavior, the [Playwright suite](../../tests/e2e/README.md).
+- [ ] **Docker Metadata**: Version and commit reach Docker builds through `TAG` and `COMMIT` build arguments; `.git/` and local data stay outside the context.

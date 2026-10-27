@@ -2,3 +2,32 @@
 node_modules/
 vendor/
 bin/
+
+# Repository history, agent configuration, and documentation
+.git/
+.github/
+.agents/
+.gemini/
+.codex/
+.claude/
+.vscode/
+docs/
+**/*.md
+tests/
+**/node_modules/
+
+# Local configuration, credentials, databases, and downloaded media
+/config.toml
+/cookies.txt
+/data/
+/db/
+
+# Generated output and caches
+dist/
+venv/
+*.log
+*.test
+*.prof
+coverage.txt
+coverage.out
+.DS_Store

@@ -1,5 +1,7 @@
 # Project Structure & Package Responsibilities
 
+See the [developer documentation index](./README.md) for related guides.
+
 This document outlines the directory structure of **Podsync**, mapping each package and critical file to its responsibility in the overall architecture.
 
 ---
@@ -27,6 +29,9 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 │   └── web/                  # REST API server and Catppuccin Web Admin Console
 │       └── ui/               # Embedded SPA assets (admin.css, admin.js, index.html, theme.js)
 ├── docs/                     # Guides, deployment documentation, and manuals
+│   ├── dev/                  # Internal architecture, design, API, workflow, and review guides
+│   └── ru/                   # Russian documentation
+├── tests/e2e/               # Playwright browser regression suite and pinned npm dependencies
 ├── .agents/skills/podsync/   # Agent skill definition for MCP assistants
 ├── Dockerfile                # Multi-stage Docker container build
 ├── docker-compose.yml        # Docker compose service definition
@@ -82,8 +87,8 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`buffer.go`**: Thread-safe circular ring buffer capturing system log entries for live querying and real-time frontend streaming.
 
 ### 2.9 `pkg/mcp/` (Model Context Protocol)
-- **`server.go`**: Implements the MCP protocol server exposing 27 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
-- **`proxy.go`**: `HTTPClientManager` that forwards MCP commands to a running Podsync instance via HTTP REST.
+- **`server.go`**: Implements the MCP protocol server exposing 28 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
+- **`proxy.go`**: `HTTPClientManager` that relays stdio JSON-RPC to a running instance's `POST /mcp` endpoint and provides a REST client for `web.AdminManager`.
 - **`sse.go`**: SSE transport implementation for MCP clients.
 
 ### 2.10 `services/web/` (HTTP Server & Web UI)

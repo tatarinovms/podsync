@@ -12,8 +12,8 @@ all: build test
 GOARCH ?= $(shell go env GOARCH)
 GOOS ?= $(shell go env GOOS)
 
-TAG ?= $(shell git tag --points-at HEAD)
-COMMIT ?= $(shell git rev-parse --short HEAD)
+TAG ?= $(shell git describe --tags --exact-match HEAD 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE := $(shell date)
 
 #
@@ -38,7 +38,7 @@ build:
 IMAGE_TAG ?= localhost/podsync
 .PHONY: docker
 docker:
-	docker buildx build -t $(IMAGE_TAG) .
+	docker buildx build --build-arg TAG="$(TAG)" --build-arg COMMIT="$(COMMIT)" -t $(IMAGE_TAG) .
 
 #
 # Run unit tests

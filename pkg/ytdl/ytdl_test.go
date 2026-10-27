@@ -115,7 +115,7 @@ func TestBuildArgs(t *testing.T) {
 
 	for _, tst := range tests {
 		t.Run(tst.name, func(t *testing.T) {
-			result := buildArgs(&feed.Config{
+			result := (*YoutubeDl)(nil).buildArgs(&feed.Config{
 				Format:        tst.format,
 				Quality:       tst.quality,
 				CustomFormat:  tst.customFormat,

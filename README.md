@@ -75,6 +75,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 ## Documentation
 
+- [Developer documentation](./docs/dev/README.md)
 - [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
 - [Web Admin Console Guide](./docs/web_admin.md)
 - [Audiobooks Guide](./docs/audiobooks.md)
@@ -322,6 +323,11 @@ Or build locally:
 ```bash
 make docker
 ```
+
+The build context excludes Git history, documentation, agent skills, local
+configuration, databases, and downloaded media. `make docker` passes the version
+and commit as build arguments. With `docker build`, set `--build-arg TAG=...` and
+`--build-arg COMMIT=...` to supply metadata; defaults are `dev` and `unknown`.
 
 ### Run via Docker Compose:
 

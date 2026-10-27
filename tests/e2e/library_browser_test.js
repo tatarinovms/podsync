@@ -1,4 +1,4 @@
-// Run with Playwright available on NODE_PATH: node services/web/library_browser_test.js
+// Run from tests/e2e: npm ci && npx playwright install chromium && npm test
 // Uses a temporary local server and mocked API responses; never contacts a live Podsync server.
 const {chromium} = require('playwright');
 const assert = require('node:assert/strict');
@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';
     if (!['index.html', 'admin.js', 'admin.css', 'theme.js'].includes(file)) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
-    res.end(fs.readFileSync(path.join(__dirname, 'ui', file)));
+    res.end(fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'web', 'ui', file)));
 });
 (async()=>{
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -20,6 +20,19 @@ const browser = await chromium.launch({headless:true, ...(process.env.PLAYWRIGHT
 let page;
 try {
 page=await browser.newPage({viewport:{width:1440,height:1050}});
+// Serve the UI's pinned CDN dependencies locally, including icon fonts.
+const cdnFiles = Object.fromEntries([
+ ['bootstrap@5.3.3', 'dist/css/bootstrap.min.css'],
+ ['bootstrap@5.3.3', 'dist/js/bootstrap.bundle.min.js'],
+ ['bootstrap-icons@1.11.3', 'font/bootstrap-icons.css'],
+ ['bootstrap-icons@1.11.3', 'font/fonts/bootstrap-icons.woff2'],
+ ['bootstrap-icons@1.11.3', 'font/fonts/bootstrap-icons.woff'],
+ ['qrious@4.0.2', 'dist/qrious.min.js'],
+].map(([pkg, file]) => ['/npm/'+pkg+'/'+file, require.resolve(pkg.split('@')[0]+'/'+file)]));
+await page.route('https://cdn.jsdelivr.net/**', route => {
+ const file = cdnFiles[new URL(route.request().url()).pathname];
+ return file ? route.fulfill({path:file}) : route.abort();
+});
 async function screenshot(name, fullPage = true) {
  await page.waitForTimeout(350);
  await page.screenshot({path:path.join(screenshots,name),fullPage});
@@ -34,6 +47,7 @@ await page.route('**/api/v1/**',async route=>{
  let data={};
  if(path.endsWith('/auth/status')) data={enabled:true,authenticated:true,username:'Admin'};
  else if(path==='/api/v1/feeds') data=feeds;
+ else if(path==='/api/v1/personal-feeds') data=[];
  else if(path==='/api/v1/feeds/status') data=feeds.map(f=>({id:f.id,status:f.updating?'running':'idle'}));
  else if(path.startsWith('/api/v1/feeds/')) {
  const feed=feeds.find(f=>f.id===path.split('/')[4]);
@@ -55,7 +69,7 @@ await page.addInitScript(()=>localStorage.setItem('podsync-theme','mocha'));
 await page.goto(origin);
 await page.waitForSelector('.feed-card');
 
-assert.deepEqual(requests.filter(p=>!p.endsWith('/status') || p.includes('/auth/')), ['/api/v1/auth/status', '/api/v1/feeds']);
+assert.deepEqual(requests.filter(p=>!p.endsWith('/status') || p.includes('/auth/')), ['/api/v1/auth/status', '/api/v1/feeds', '/api/v1/personal-feeds']);
 assert.equal(await page.locator('.feed-card').count(), 6);
 assert.deepEqual(await page.locator('#main-content > .tab-pane').evaluateAll(es=>es.map(e=>e.id)), ['tab-feeds','tab-personal','tab-audiobooks','tab-tokens','tab-system','tab-downloader','tab-mcp','tab-logs','episodesModal']);
 await screenshot('mocha-desktop.png', true);

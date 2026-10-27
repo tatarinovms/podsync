@@ -75,6 +75,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 ## Документация
 
+- [Документация для разработчиков](./docs/ru/development.md)
 - [Руководство по развертыванию для AI-агентов (OpenCode, Hermes)](./docs/ru/deployment_guide_agents.md)
 - [Руководство по Web Admin консоли](./docs/ru/web_admin.md)
 - [Руководство по локальным аудиокнигам](./docs/ru/audiobooks.md)
@@ -320,6 +321,12 @@ docker run \
 ```bash
 make docker
 ```
+
+Из контекста сборки исключены история Git, документация, навыки агентов,
+локальная конфигурация, базы данных и загруженные медиафайлы. `make docker`
+передаёт версию и коммит как аргументы сборки. При вызове `docker build`
+задавайте `--build-arg TAG=...` и `--build-arg COMMIT=...`; значения по умолчанию —
+`dev` и `unknown`.
 
 ### Запуск через Docker Compose:
 

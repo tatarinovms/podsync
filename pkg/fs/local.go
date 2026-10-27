@@ -227,18 +227,3 @@ func (l *Local) Size(_ctx context.Context, name string) (int64, error) {
 
 	return stat.Size(), nil
 }
-
-func (l *Local) copyFile(source io.Reader, destinationPath string) (int64, error) {
-	dest, err := os.Create(destinationPath)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to create destination file")
-	}
-	defer dest.Close()
-
-	written, err := io.Copy(dest, source)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to copy data")
-	}
-
-	return written, nil
-}

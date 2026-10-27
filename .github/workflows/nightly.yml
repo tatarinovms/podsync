@@ -38,10 +38,10 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v7
-        env:
-          TAG: nightly
-          COMMIT: ${{ github.sha }}
         with:
+          build-args: |
+            TAG=nightly
+            COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64

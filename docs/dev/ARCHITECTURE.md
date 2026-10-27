@@ -1,5 +1,7 @@
 # Architecture & System Design
 
+See the [developer documentation index](./README.md) for related guides.
+
 This document details the architectural principles, component structure, data flow, concurrency patterns, and storage mechanisms of **Podsync**.
 
 ---
@@ -35,7 +37,7 @@ flowchart TD
         
         YTDLP["Downloader Engine\n(yt-dlp + ffmpeg)"]
         XMLGen["Podcast XML Builder\n(pkg/feed/xml.go)"]
-        BadgerDB["BadgerDB v3\n(Embedded Key-Value DB)"]
+        BadgerDB["BadgerDB v1\n(Embedded Key-Value DB)"]
         Storage["Storage Layer\n(Local / S3 / Virtual Mounter)"]
     end
 
@@ -153,18 +155,20 @@ sequenceDiagram
 
 ---
 
-## 4. Database Schema (BadgerDB v3)
+## 4. Database Schema (BadgerDB v1)
 
 Podsync uses embedded BadgerDB keys with structured binary/JSON prefixes:
-- `feed:{feed_id}`: Serialized `model.Feed` (metadata, title, description, author, cover URL, provider).
-- `episode:{feed_id}:{episode_id}`: Serialized `model.Episode` (status, size, duration, file path, download timestamp, error state).
-- `state:{key}`: Server state variables, tokens, and pagination cursors.
+- `feed/{feed_id}`: Serialized `model.Feed` (metadata, title, description, author, cover URL, provider).
+- `episode/{feed_id}/{episode_id}`: Serialized `model.Episode` (status, size, duration, file path, download timestamp, error state).
+- `stats/{feed_id}`: Aggregated episode counts and downloaded media size.
+- `job/{job_id}` and `job_active/{job_id}`: Persistent jobs and active-job index.
+- Server state uses the keys supplied by callers; the database version is stored at `podsync/version`.
 
 Status values:
-- `EpisodeNew` (0): Discovered but not yet downloaded.
-- `EpisodeDownloaded` (1): Stored on disk and served via RSS enclosure.
-- `EpisodeError` (2): Failed to download (network, rate limit, ffmpeg error).
-- `EpisodeCleaned` (3): Pruned by retention policy (`keep_last`).
+- `EpisodeNew` (`new`): Discovered but not yet downloaded.
+- `EpisodeDownloaded` (`downloaded`): Stored on disk and served via RSS enclosure.
+- `EpisodeError` (`error`): Failed to download (network, rate limit, ffmpeg error).
+- `EpisodeCleaned` (`cleaned`): Pruned by retention policy (`keep_last`).
 
 ### 4.1 Personal Feeds Namespace (`podsync/personal/v1/`)
 Personal feeds maintain transactional records segregated from standard feeds:

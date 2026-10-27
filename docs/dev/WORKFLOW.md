@@ -1,5 +1,7 @@
 # Development & Operational Workflow
 
+See the [developer documentation index](./README.md) for related guides.
+
 This guide details the standard development lifecycle, test procedures, tagging, release processes, and deployment strategies for **Podsync**.
 
 ---
@@ -80,6 +82,28 @@ go test -v ./pkg/personal
 go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...
 ```
 
+### 2.3 Web UI Tests
+
+Run the dependency-free Node.js suites from the repository root:
+
+```bash
+node services/web/admin_ui_test.js
+node services/web/admin_security_test.js
+node services/web/episodes_ui_test.js
+```
+
+Run the browser regression suite separately:
+
+```bash
+cd tests/e2e
+npm ci
+npx playwright install chromium
+npm test
+```
+
+See the [browser test guide](../../tests/e2e/README.md) for Linux dependencies,
+screenshots, and executable overrides. CI runs this suite in **Browser tests**.
+
 ---
 
 ## 3. Web UI Workflow (`services/web/ui/`)
@@ -94,6 +118,10 @@ cp services/web/ui/admin.js html/admin.js
 cp services/web/ui/admin.css html/admin.css
 cp services/web/ui/theme.js html/theme.js
 ```
+
+The embedded admin UI reads `services/web/ui/`; local storage's `Local.Open`
+serves the root `html/` assets when web UI serving is enabled. Both paths are
+currently used.
 
 ### 3.2 Modal Lifecycle Rules
 - **Do not use** `bootstrap.Modal.getInstance(el).hide()`. It can evaluate to `null` if the instance was created with `getOrCreateInstance` or detached.
@@ -133,8 +161,10 @@ Follow conventional commit prefixes:
    ```
 4. Create an annotated git tag and push:
    ```bash
-   git tag v2.13.9
-   git push origin main --tags
+   # Replace vX.Y.Z with the intended release version.
+   git tag -a vX.Y.Z -m "Release vX.Y.Z"
+   git push origin main
+   git push origin refs/tags/vX.Y.Z
    ```
 
 ---
@@ -145,6 +175,12 @@ Follow conventional commit prefixes:
 ```bash
 docker build -t podsync:local .
 ```
+
+The context excludes `.git/`, documentation, agent configuration, local
+credentials, databases, downloaded media, and build artifacts. To include version
+metadata, use `make docker` or pass `--build-arg TAG=...` and
+`--build-arg COMMIT=...` to `docker build`. The Docker defaults are `dev` and
+`unknown`; release/nightly workflows pass their tag and commit explicitly.
 
 ### 5.2 Running with Docker Compose
 ```bash

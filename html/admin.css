@@ -270,7 +270,7 @@
 
         /* 2. Buttons: Primary (Mauve), Secondary (Ghost/Surface2), Danger (Red) */
         .btn {
-            display: inline-flex !important;
+            display: inline-flex;
             align-items: center !important;
             justify-content: center !important;
             line-height: 1.5 !important;

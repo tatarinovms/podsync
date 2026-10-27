@@ -173,6 +173,12 @@ youtube = "YOUR_YOUTUBE_KEY" # Или через переменную PODSYNC_YO
 | `PODSYNC_DOWNLOADER_PROXY` | URL прокси HTTP/HTTPS/SOCKS5 для загрузчика | `socks5://127.0.0.1:1080` |
 | `PODSYNC_DOWNLOADER_CUSTOM_BINARY` | Путь к кастомному исполняемому файлу yt-dlp | `/usr/local/bin/yt-dlp` |
 
+### Локальные аудиокниги
+
+Поместите каждую книгу в отдельную подпапку `[audiobooks].dir` и импортируйте её
+через **Admin → Audiobooks**. Настройка томов Docker, загрузка файлов и обновление
+книг описаны в [руководстве по аудиокнигам](./docs/ru/audiobooks.md).
+
 ## Веб-панель администратора и REST API
 
 Podsync содержит встроенную панель управления, доступную по адресу `/admin`. См. [Руководство по Web Admin](./docs/ru/web_admin.md) для получения подробной информации.

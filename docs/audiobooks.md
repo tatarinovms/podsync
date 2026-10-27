@@ -28,6 +28,12 @@ Set the root audiobooks directory in `config.toml` (or via `PODSYNC_AUDIOBOOKS_D
   dir = "/mnt/dietpi_userdata/podsync/audiobooks"
 ```
 
+If no directory is configured, Podsync uses an `audiobooks` folder beside the
+config file. With the bundled Docker Compose and example configuration,
+`./data/audiobooks` is available at `/app/data/audiobooks`. An external library
+can instead be mounted with `/your/books:/app/data/audiobooks`. Use a writable
+mount for web uploads or embedded cover extraction.
+
 Example directory layout on the server:
 
 ```text
@@ -54,7 +60,11 @@ Example directory layout on the server:
    - Provide a unique **Feed ID** (slug);
    - Customize Title, Author/Narrator, and Description;
    - Click **Import as Podcast Feed**.
-4. The feed URL will be generated immediately (e.g., `https://rssreader.example.com/solaris.xml`).
+4. Import queues RSS generation. The feed URL (e.g., `https://rssreader.example.com/solaris.xml`) becomes usable when that generation finishes.
+
+Put each book in a separate subfolder. Folders are discovered automatically,
+but are not subscribed until imported. Chapters are served from the existing
+files without copying them into another media directory.
 
 ### 2. Via Web UI File Upload
 
@@ -62,7 +72,12 @@ You can upload audio tracks directly from your browser:
 - Drag and drop audio files (e.g. `.mp3`, `.m4b`, `.m4a`) and optional cover image (`cover.jpg`/`cover.png`) directly into the upload area on the **Audiobooks** tab (upload raw audio files; ZIP archives are not automatically extracted by the server);
 - Set the target book folder name;
 - Check **"Auto-import as Podcast feed"** to automatically create the feed upon upload completion;
-- **Upload Limit**: Supports uploads up to **1 GiB** per batch with streaming multipart processing.
+- **Upload Limit**: The browser uploads one file at a time; each must be smaller than **1 GiB**. The REST API limits the entire multipart request, including form overhead, to **1 GiB**. Import larger files from the library folder.
+
+Retrying an upload accepts identical existing files and rejects conflicting
+content. Upload and import errors are reported separately: files may have been
+saved even if the subsequent import failed. A queued import means RSS generation
+is still pending.
 
 ### 3. Via REST API
 
@@ -98,6 +113,17 @@ AI assistants can manage audiobooks using dedicated MCP tools:
 - `list_audiobook_dirs`: Report directories, track count, total size, and linked feed status.
 - `import_audiobook`: `{"dir_name": "Solaris", "id": "solaris", "title": "Solaris", "author": "Stanislaw Lem"}`.
 - `delete_audiobook_dir`: `{"dir_name": "Solaris"}` (unmounts feed, removes from config & DB, and cleans files from disk).
+
+---
+
+## Updating an Imported Book
+
+Audiobooks do not run on cron. Use **Update** after changing chapter files or
+their tags. Books added directly to `config.toml` receive an initial build on
+startup when their database entry or RSS file is missing.
+
+**Hide from podcast directories** requests exclusion from public directories.
+It does not restrict access to RSS or media URLs.
 
 ---
 

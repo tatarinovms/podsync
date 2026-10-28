@@ -986,9 +986,10 @@
 .status-filter span { margin-left: 5px; font-variant-numeric: tabular-nums; opacity: .8; }
 .status-filter.active { color: var(--ctp-text); background: var(--ctp-mantle); border-color: var(--card-border); }
 .status-filter:hover { color: var(--text-accent); }
-.feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 20px; }
+.feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 20px; width: 100%; max-width: 100%; }
+.feed-grid > * { min-width: 0; }
 .feed-grid > .library-empty { grid-column: 1 / -1; padding: 64px 20px; text-align: center; }
-.feed-card { display: flex; flex-direction: column; gap: 20px; padding: 22px; border-radius: var(--library-radius); border: 1px solid var(--card-border); background: var(--ctp-mantle); box-shadow: none; transform: none; transition: border-color .15s ease; }
+.feed-card { display: flex; flex-direction: column; gap: 20px; width: 100%; min-width: 0; max-width: 100%; padding: 22px; border-radius: var(--library-radius); border: 1px solid var(--card-border); background: var(--ctp-mantle); box-shadow: none; transform: none; transition: border-color .15s ease; }
 .feed-card:hover { border-color: var(--ctp-overlay0); box-shadow: none; transform: none; }
 .feed-card-top { display: flex; align-items: flex-start; gap: 16px; }
 .feed-art { width: 64px; height: 64px; flex-shrink: 0; position: relative; }
@@ -1086,7 +1087,7 @@ button.feed-state { border: 0; background: transparent; padding: 0; min-height: 
     .library-heading .btn { flex-shrink: 0; font-size: .8rem; }
     .library-filters { flex-wrap: wrap; }
     .status-filter { min-height: 44px; padding-inline: 10px; }
-    .feed-grid { gap: 14px; }
+    .feed-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
     .feed-card { padding: 18px !important; }
     .feed-grid[data-view="list"] .feed-card { display: flex; }
     .feed-grid[data-view="list"] .feed-card-bottom .feed-state { display: inline-flex; }
@@ -1100,7 +1101,9 @@ button.feed-state { border: 0; background: transparent; padding: 0; min-height: 
     .feed-detail-heading > .flex-grow-1 { flex-basis: calc(100% - 90px); }
     .detail-cover { width: 64px; height: 64px; border-radius: 14px; }
     .feed-detail-heading h1 { font-size: 1.5rem; overflow-wrap: anywhere; }
-    .feed-detail .card { padding: 0 !important; }
+    .feed-detail .card.p-0 { padding: 0 !important; }
+    #personal-detail .card.p-4 { padding: 16px !important; }
+    #personal-detail .row, #personal-detail .row > *, #personal-url-form, #personal-upload-form { min-width: 0; }
     #detail-history { padding: 16px !important; }
     .detail-navigation { gap: 18px; }
     .episode-pagination .btn, .detail-navigation button { min-height: 44px; }
@@ -1171,6 +1174,9 @@ button.feed-state { border: 0; background: transparent; padding: 0; min-height: 
     .btn-close { min-width: var(--control-touch-size); min-height: var(--control-touch-size); }
 }
 #personal-episodes video { max-height: 360px; }
+
+/* Preserve Bootstrap Icons in narrow flex layouts. */
+i.bi { display: inline-block; flex: 0 0 auto; line-height: 1; }
 
 .feed-state.error > i { color: var(--ctp-red); }
 label .text-danger { color: var(--text-danger) !important; }

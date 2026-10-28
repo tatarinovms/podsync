@@ -271,8 +271,43 @@ for (const width of [280,320,390,576,768,951]) {
  await screenshot(`latte-mobile-${width}.png`, true);
 }
 await page.evaluate(()=>toggleTheme());
-await page.setViewportSize({width:390,height:844});
+await page.setViewportSize({width:375,height:667});
 await screenshot('mocha-mobile.png', true);
+// Personal-feed cards and the add-media forms use the same mobile width as podcasts.
+const podcastCardLayout = await page.locator('#feeds-container .feed-card').first().evaluate(el=>{
+ const r=el.getBoundingClientRect(); return {x:r.x,right:r.right};
+});
+assert(podcastCardLayout.right<=375,'Podcast card fits the mobile viewport');
+await page.locator('#mainTabs [data-bs-target="#tab-personal"]').evaluate(el=>bootstrap.Tab.getOrCreateInstance(el).show());
+await page.waitForFunction(()=>currentTab==='tab-personal');
+await page.evaluate(()=>{
+ personalFeeds=[{id:'personal-test',title:'A personal feed with a long title',description:'A curated feed for mobile layout checks.',episode_count:3,feed_url:'http://localhost:8080/personal-test.xml'}];
+ personalRenderCards();
+});
+const personalCardLayout = await page.locator('#personal-list .feed-card').evaluate(el=>{
+ const r=el.getBoundingClientRect(); return {x:r.x,right:r.right,width:r.width};
+});
+assert.equal(personalCardLayout.x,podcastCardLayout.x,'Personal-feed cards align with podcast cards');
+assert(personalCardLayout.right<=375,'Personal-feed card fits the mobile viewport');
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Personal-feed list does not overflow on mobile');
+await page.evaluate(()=>{
+ document.getElementById('personal-main-view').classList.add('d-none');
+ document.getElementById('personal-detail').classList.remove('d-none');
+});
+const personalFormLayout = await page.locator('#personal-url-form').evaluate(form=>{
+ const card=form.closest('.card'); const heading=card.querySelector('h6');
+ const add=form.querySelector('button[type="submit"]'); const trigger=form.querySelector('.select-trigger');
+ const box=card.getBoundingClientRect(); const rect=el=>el.getBoundingClientRect();
+ return {card:box.toJSON(),heading:rect(heading).toJSON(),add:rect(add).toJSON(),trigger:rect(trigger).toJSON()};
+});
+assert(personalFormLayout.heading.x-personalFormLayout.card.x>=15,'Personal form heading has a mobile inset');
+assert(personalFormLayout.add.x-personalFormLayout.card.x>=15&&personalFormLayout.card.right-personalFormLayout.add.right>=15,'Add URL button stays inside its card');
+assert(personalFormLayout.trigger.x-personalFormLayout.card.x>=15&&personalFormLayout.card.right-personalFormLayout.trigger.right>=15,'Personal select has room on both sides');
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Personal feed detail does not overflow on mobile');
+await screenshot('mocha-personal-mobile.png', true);
+await page.locator('#mainTabs [data-bs-target="#tab-feeds"]').evaluate(el=>bootstrap.Tab.getOrCreateInstance(el).show());
+await page.waitForFunction(()=>currentTab==='tab-feeds');
+await page.evaluate(()=>{ personalFeeds=[]; syncPersonalIntoAllFeeds(); });
 // A large library retains unchanged cards and keeps search focused without extra requests.
 await page.setViewportSize({width:1440,height:1050});
 for (let i=6; i<300; i++) feeds.push({...feeds[0],id:'bulk-'+i,title:'Library item '+i,updating:false,error_count:0});

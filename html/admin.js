@@ -46,8 +46,10 @@
                 const val = raw.trim();
                 const hasDisallowed = !/^[a-zA-Z0-9_-]*$/.test(raw);
                 const isEmpty = val.length === 0;
+                const isInvalid = hasDisallowed || (inputEl.dataset.touched === "true" && isEmpty);
+                inputEl.setAttribute('aria-invalid', String(isInvalid));
 
-                if (hasDisallowed || (inputEl.dataset.touched === "true" && isEmpty)) {
+                if (isInvalid) {
                     inputEl.classList.add("is-invalid");
                     inputEl.classList.remove("is-valid");
                 } else if (!isEmpty) {
@@ -3218,7 +3220,7 @@
                     <tr>
                         <td class="fw-semibold">
                             <i aria-hidden="true" class="bi bi-folder-fill text-warning me-2"></i>${escapeHtml(d.name)}
-                            ${d.suggested_title && d.suggested_author ? `<div class="text-muted small fw-normal ms-4">${escapeHtml(d.suggested_author)} — ${escapeHtml(d.suggested_title)}</div>` : ''}
+                            ${d.suggested_title && d.suggested_author ? `<div class="text-muted small fw-normal ms-4">${escapeHtml(d.suggested_author)}: ${escapeHtml(d.suggested_title)}</div>` : ''}
                         </td>
                         <td><span class="badge bg-body-secondary text-body">${d.file_count} chapters</span></td>
                         <td class="text-muted small">${sizeMB} MB</td>

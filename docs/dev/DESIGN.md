@@ -14,6 +14,35 @@ responsive and conditional controls can be hidden.
 - **Themes:** Support 🌻 **Catppuccin Latte** (light mode) and 🌿 **Catppuccin Mocha** (dark mode).
 - **Shapes:** Soft corners (`rounded-xl`, `rounded-2xl`), subtle 1px borders, delicate shadows in Latte, and surface-layer contrast in Mocha.
 
+## Theme source and selection controls
+
+`tokens/podsync.json` is the application theme source. It stores the Catppuccin
+primitives and semantic roles for Latte and Mocha. Run
+`python3 scripts/build_podsync_theme.py` from the repository root after editing
+it. The generator updates the marked theme block in both copies of `admin.css`;
+`--check` verifies that neither copy has drifted.
+
+Use `--text-muted`, `--text-accent`, `--text-success`, `--text-warning`,
+`--text-danger`, `--text-info`, `--text-code` and `--text-on-muted` for their
+respective text roles. In Latte, tinted surfaces need darker text than the
+primitive accent. Keep accent borders and tinted surfaces while measuring text
+contrast in default, hover, focus and validation states in both themes.
+
+All single-choice fields use the shared `podsync-select` in `select.js`. It
+exposes `value`, `options`, `selectedIndex`, `disabled`, required form validation
+and reset to existing callers, and emits bubbling input/change events for user
+selection. Its button is a named combobox; the popup is a listbox. Arrow keys,
+Home/End, typeahead, Enter, Space, Escape and Tab are supported. The popup uses
+the browser popover layer so modal scrolling does not clip options. Labels
+must reference the component's id through `for`.
+
+The library toolbar starts with a narrow grid and adds columns at wider
+breakpoints. Keep selected filter values readable, including at 280 and 768px.
+Action pairs retain 105px minimum width and 35px desktop height. Mobile actions,
+including compact schedule presets and popup options, use at least 44px height;
+compact desktop presets retain at least 24px height. Close icons use the shared
+icon font and a Catppuccin focus outline.
+
 ## 2. Color Palette (Color Tokens)
 
 Use only the HEX values specified here for the design palette.

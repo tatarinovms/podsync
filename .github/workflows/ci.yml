@@ -86,6 +86,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install test dependencies
         run: npm ci
+      - name: Check generated UI theme
+        run: python3 ../../scripts/build_podsync_theme.py --check
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run browser tests

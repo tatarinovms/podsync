@@ -7,7 +7,7 @@
     <title>Podsync Management Console</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=8">
+    <link rel="stylesheet" href="./admin.css?v=9">
 </head>
 <body>
 
@@ -28,11 +28,11 @@
             <div id="login-error" class="alert alert-danger d-none py-2 small" role="alert"></div>
             <form id="login-form">
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold">Username</label>
+                    <label class="form-label small fw-semibold" for="login-username">Username</label>
                     <input type="text" id="login-username" class="form-control" required autocomplete="username" placeholder="admin">
                 </div>
                 <div class="mb-4">
-                    <label class="form-label small fw-semibold">Password</label>
+                    <label class="form-label small fw-semibold" for="login-password">Password</label>
                     <input type="password" id="login-password" class="form-control" required autocomplete="current-password" placeholder="••••••••">
                 </div>
                 <button type="submit" id="login-btn" class="btn btn-brand w-100 py-2">
@@ -106,8 +106,8 @@
                     </header>
                     <div class="library-toolbar">
                         <div class="library-search"><i aria-hidden="true" class="bi bi-search"></i><input type="search" id="feed-search" class="form-control" placeholder="Search your library…" aria-label="Search podcasts" oninput="filterFeeds()"></div>
-                        <select id="feed-type-filter" class="form-select" aria-label="Podcast type" onchange="filterFeeds()"><option value="all">All types</option><option value="channels">Channels</option><option value="personal">Personal</option><option value="audiobooks">Audiobooks</option></select>
-                        <select id="feed-sort" class="form-select" aria-label="Sort podcasts" onchange="filterFeeds()"><option value="title">Title A–Z</option><option value="updated">Recently updated</option><option value="size">Largest first</option></select>
+                        <podsync-select id="feed-type-filter" class="form-select" aria-label="Podcast type" onchange="filterFeeds()"><option value="all">All types</option><option value="channels">Channels</option><option value="personal">Personal</option><option value="audiobooks">Audiobooks</option></podsync-select>
+                        <podsync-select id="feed-sort" class="form-select" aria-label="Sort podcasts" onchange="filterFeeds()"><option value="title">Title A-Z</option><option value="updated">Recently updated</option><option value="size">Largest first</option></podsync-select>
                         <div class="view-switch" role="group" aria-label="Library view"><button id="view-grid" class="btn active" aria-label="Card view" aria-pressed="true" onclick="setLibraryView('grid')"><i aria-hidden="true" class="bi bi-grid"></i></button><button id="view-list" class="btn" aria-label="List view" aria-pressed="false" onclick="setLibraryView('list')"><i aria-hidden="true" class="bi bi-list-ul"></i></button></div>
                     </div>
                     <div class="library-filters">
@@ -171,29 +171,29 @@
                                         <div class="row g-2 mb-3">
                                             <div class="col-sm-6">
                                                 <label for="personal-url-format" class="form-label small text-muted">Format</label>
-                                                <select id="personal-url-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUrlQuality()">
+                                                <podsync-select id="personal-url-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUrlQuality()">
                                                     <option value="audio" selected>Audio (MP3)</option>
                                                     <option value="video">Video (MP4)</option>
                                                     <option value="auto">Auto-detect</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                             <div class="col-sm-6" id="personal-url-audio-quality-col">
                                                 <label for="personal-url-quality" class="form-label small text-muted">Audio Quality</label>
-                                                <select id="personal-url-quality" class="form-select form-select-sm">
+                                                <podsync-select id="personal-url-quality" class="form-select form-select-sm">
                                                     <option value="high" selected>High</option>
                                                     <option value="low">Low</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                             <div class="col-sm-6" id="personal-url-video-quality-col" style="display: none;">
                                                 <label for="personal-url-max-height" class="form-label small text-muted">Video Quality</label>
-                                                <select id="personal-url-max-height" class="form-select form-select-sm">
+                                                <podsync-select id="personal-url-max-height" class="form-select form-select-sm">
                                                     <option value="480">480p</option>
                                                     <option value="720" selected>720p (HD)</option>
                                                     <option value="1080">1080p (Full HD)</option>
                                                     <option value="1440">1440p (2K)</option>
                                                     <option value="2160">2160p (4K)</option>
                                                     <option value="0">Default (Original)</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                         </div>
                                         <button class="btn btn-brand btn-sm" type="submit"><i aria-hidden="true" class="bi bi-plus-lg me-1"></i>Add URL</button>
@@ -216,29 +216,29 @@
                                         <div class="row g-2 mb-3">
                                             <div class="col-sm-6">
                                                 <label for="personal-upload-format" class="form-label small text-muted">Format</label>
-                                                <select id="personal-upload-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUploadQuality()">
+                                                <podsync-select id="personal-upload-format" class="form-select form-select-sm" aria-label="Format" onchange="togglePersonalUploadQuality()">
                                                     <option value="audio" selected>Audio (MP3)</option>
                                                     <option value="video">Video (MP4)</option>
                                                     <option value="auto">Auto-detect</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                             <div class="col-sm-6" id="personal-upload-audio-quality-col">
                                                 <label for="personal-upload-quality" class="form-label small text-muted">Audio Quality</label>
-                                                <select id="personal-upload-quality" class="form-select form-select-sm">
+                                                <podsync-select id="personal-upload-quality" class="form-select form-select-sm">
                                                     <option value="high" selected>High</option>
                                                     <option value="low">Low</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                             <div class="col-sm-6" id="personal-upload-video-quality-col" style="display: none;">
                                                 <label for="personal-upload-max-height" class="form-label small text-muted">Video Quality</label>
-                                                <select id="personal-upload-max-height" class="form-select form-select-sm">
+                                                <podsync-select id="personal-upload-max-height" class="form-select form-select-sm">
                                                     <option value="480">480p</option>
                                                     <option value="720" selected>720p (HD)</option>
                                                     <option value="1080">1080p (Full HD)</option>
                                                     <option value="1440">1440p (2K)</option>
                                                     <option value="2160">2160p (4K)</option>
                                                     <option value="0">Default (Original)</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                         </div>
                                         <button class="btn btn-brand btn-sm" type="submit"><i aria-hidden="true" class="bi bi-upload me-1"></i>Upload file</button>
@@ -347,7 +347,7 @@
                                 </ul>
                                 <div class="mt-3 p-2 rounded border small text-muted" style="background-color: var(--ctp-crust);">
                                     <i aria-hidden="true" class="bi bi-info-circle text-primary me-1"></i>
-                                    <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. You can copy the entire URL from your browser's address bar (or just the token) — Podsync will automatically extract the token for you!
+                                    <strong>VK Tip:</strong> After confirming permissions, a blank page will open. The security warning <em>"Please do not copy data from the address bar..."</em> is <strong>not an error</strong>, but a standard VK notice. You can copy the entire URL from your browser's address bar (or just the token). Podsync will automatically extract the token for you!
                                 </div>
                             </div>
                         </div>
@@ -548,9 +548,9 @@
 
                                     <div class="mb-3">
                                         <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <label class="form-label small fw-semibold mb-0">Netscape cookies.txt content</label>
+                                            <label class="form-label small fw-semibold mb-0" for="dl-cookies-content">Netscape cookies.txt content</label>
                                             <div class="d-flex gap-2">
-                                                <input type="file" id="cookies-file-input" class="d-none" accept=".txt" onchange="uploadCookiesFile(event)">
+                                                <input type="file" id="cookies-file-input" class="d-none" aria-label="Upload cookies.txt file" accept=".txt" onchange="uploadCookiesFile(event)">
                                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('cookies-file-input').click()">
                                                     <i aria-hidden="true" class="bi bi-upload me-1"></i> Upload file
                                                 </button>
@@ -564,10 +564,10 @@
 
                                     <!-- Cookies from browser alternative -->
                                     <div class="mb-3 pt-3 border-top">
-                                        <label class="form-label small fw-semibold">Or use Cookies from Browser (<code>--cookies-from-browser</code>)</label>
+                                        <label class="form-label small fw-semibold" for="dl-browser-select">Or use Cookies from Browser (<code>--cookies-from-browser</code>)</label>
                                         <div class="row g-2">
                                             <div class="col-sm-6">
-                                                <select id="dl-browser-select" class="form-select form-select-sm">
+                                                <podsync-select id="dl-browser-select" class="form-select form-select-sm">
                                                     <option value="">None (use cookies.txt or none)</option>
                                                     <option value="chrome">Google Chrome</option>
                                                     <option value="firefox">Mozilla Firefox</option>
@@ -577,7 +577,7 @@
                                                     <option value="opera">Opera</option>
                                                     <option value="vivaldi">Vivaldi</option>
                                                     <option value="chromium">Chromium</option>
-                                                </select>
+                                                </podsync-select>
                                             </div>
                                             <div class="col-sm-6">
                                                 <input type="text" id="dl-browser-profile" class="form-control form-control-sm" placeholder="Profile (e.g. Default, Profile 1)">
@@ -612,24 +612,24 @@
                                 <div class="card-body">
                                     <form id="downloader-settings-form" onsubmit="saveDownloaderSettings(event)">
                                         <div class="mb-3">
-                                            <label class="form-label small fw-semibold">HTTP / SOCKS5 Proxy</label>
+                                            <label class="form-label small fw-semibold" for="dl-proxy">HTTP / SOCKS5 Proxy</label>
                                             <input type="text" id="dl-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080 or http://user:pass@host:port">
                                             <div class="form-text small">Passed directly to yt-dlp via <code>--proxy</code>.</div>
                                         </div>
 
                                         <div class="mb-3">
-                                            <label class="form-label small fw-semibold">Preferred Audio / Content Language</label>
+                                            <label class="form-label small fw-semibold" for="dl-language">Preferred Audio / Content Language</label>
                                             <input type="text" id="dl-language" class="form-control form-control-sm" placeholder="e.g. ru, en, de (optional)">
                                             <div class="form-text small">Default audio track language for multi-audio videos (YouTube dubbing). Passed to yt-dlp. Overridden by per-feed language if set.</div>
                                         </div>
 
                                         <div class="row g-2 mb-3">
                                             <div class="col-sm-6">
-                                                <label class="form-label small fw-semibold">Timeout (Minutes)</label>
+                                                <label class="form-label small fw-semibold" for="dl-timeout">Timeout (Minutes)</label>
                                                 <input type="number" id="dl-timeout" class="form-control form-control-sm" value="10" min="1" max="120">
                                             </div>
                                             <div class="col-sm-6">
-                                                <label class="form-label small fw-semibold">Custom Binary Path</label>
+                                                <label class="form-label small fw-semibold" for="dl-custom-binary">Custom Binary Path</label>
                                                 <input type="text" id="dl-custom-binary" class="form-control form-control-sm font-monospace" placeholder="Optional (e.g. /usr/bin/yt-dlp)">
                                             </div>
                                         </div>
@@ -656,7 +656,7 @@
                                 <div class="card-body">
                                     <p class="small text-muted mb-3">Run a live extraction with yt-dlp using your configured cookies and proxy to ensure YouTube bot detection is bypassed.</p>
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Test Video URL</label>
+                                        <label class="form-label small fw-semibold" for="dl-test-url">Test Video URL</label>
                                         <div class="input-group input-group-sm">
                                             <input type="url" id="dl-test-url" class="form-control" value="https://www.youtube.com/watch?v=w9h5wyk-rdg">
                                             <button type="button" id="btn-test-downloader" class="btn btn-brand btn-sm" onclick="testDownloaderLive()">
@@ -698,7 +698,7 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold text-muted">SSE Stream Endpoint</label>
+                                        <label class="form-label small fw-semibold text-muted" for="mcp-sse-url">SSE Stream Endpoint</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-sse-url" class="form-control font-monospace form-control-sm" readonly>
                                             <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-sse-url', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
@@ -706,14 +706,14 @@
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold text-muted">Admin Username</label>
+                                            <label class="form-label small fw-semibold text-muted" for="mcp-username">Admin Username</label>
                                             <div class="input-group">
                                                 <input type="text" id="mcp-username" class="form-control form-control-sm" readonly>
                                                 <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-username', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold text-muted">Admin Password</label>
+                                            <label class="form-label small fw-semibold text-muted" for="mcp-password">Admin Password</label>
                                             <div class="input-group">
                                                 <input type="password" id="mcp-password" class="form-control form-control-sm" readonly>
                                                 <button class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i aria-hidden="true" class="bi bi-eye"></i></button>
@@ -722,7 +722,7 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold text-muted">HTTP Basic Auth Header</label>
+                                        <label class="form-label small fw-semibold text-muted" for="mcp-basic-auth">HTTP Basic Auth Header</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-basic-auth" class="form-control font-monospace form-control-sm" readonly>
                                             <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-basic-auth', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
@@ -739,21 +739,21 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold text-muted">Executable Path</label>
+                                        <label class="form-label small fw-semibold text-muted" for="mcp-binary-path">Executable Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-binary-path" class="form-control font-monospace form-control-sm" readonly>
                                             <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-binary-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold text-muted">Config File Path</label>
+                                        <label class="form-label small fw-semibold text-muted" for="mcp-config-path">Config File Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-config-path" class="form-control font-monospace form-control-sm" readonly>
                                             <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-config-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div>
-                                        <label class="form-label small fw-semibold text-muted">Command Line</label>
+                                        <label class="form-label small fw-semibold text-muted" for="mcp-cmdline">Command Line</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-cmdline" class="form-control font-monospace form-control-sm" readonly>
                                             <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-cmdline', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
@@ -1019,9 +1019,9 @@
 
                                 <div class="input-group input-group-sm" style="max-width: 190px;">
                                     <span class="input-group-text"><i aria-hidden="true" class="bi bi-funnel"></i> Feed:</span>
-                                    <select id="logs-feed-select" class="form-select" onchange="onLogsFeedChange()">
+                                    <podsync-select id="logs-feed-select" class="form-select" onchange="onLogsFeedChange()">
                                         <option value="">All Feeds</option>
-                                    </select>
+                                    </podsync-select>
                                 </div>
                             </div>
 
@@ -1029,22 +1029,22 @@
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <div class="d-flex align-items-center me-2">
                                     <span id="logs-live-dot" class="spinner-grow spinner-grow-sm text-success me-1 d-none" style="width: 8px; height: 8px;" role="status"></span>
-                                    <label class="form-label small mb-0 me-1 text-muted">Auto-refresh:</label>
-                                    <select id="logs-autorefresh-select" class="form-select form-select-sm" style="width: 100px;" onchange="setLogsAutoRefresh(this.value)">
+                                    <label class="form-label small mb-0 me-1 text-muted" for="logs-autorefresh-select">Auto-refresh:</label>
+                                    <podsync-select id="logs-autorefresh-select" class="form-select form-select-sm" style="width: 100px;" onchange="setLogsAutoRefresh(this.value)">
                                         <option value="0">Off</option>
                                         <option value="2000" selected>Every 2s</option>
                                         <option value="5000">Every 5s</option>
-                                    </select>
+                                    </podsync-select>
                                 </div>
 
                                 <div class="d-flex align-items-center me-2">
-                                    <label class="form-label small mb-0 me-1 text-muted">Lines:</label>
-                                    <select id="logs-limit-select" class="form-select form-select-sm" style="width: 85px;" onchange="loadLogs()">
+                                    <label class="form-label small mb-0 me-1 text-muted" for="logs-limit-select">Lines:</label>
+                                    <podsync-select id="logs-limit-select" class="form-select form-select-sm" style="width: 85px;" onchange="loadLogs()">
                                         <option value="100">100</option>
                                         <option value="250" selected>250</option>
                                         <option value="500">500</option>
                                         <option value="1000">1000</option>
-                                    </select>
+                                    </podsync-select>
                                 </div>
 
                                 <div class="form-check form-switch me-2 mb-0">
@@ -1094,27 +1094,27 @@
                     <div class="d-flex flex-column flex-md-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
                         <input id="episodes-search" type="search" class="form-control form-control-sm flex-grow-1" placeholder="Search episodes" aria-label="Search episodes" oninput="resetEpisodePage()">
                         <div class="d-flex flex-wrap gap-2">
-                            <select id="episodes-status-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode status" onchange="resetEpisodePage()">
+                            <podsync-select id="episodes-status-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode status" onchange="resetEpisodePage()">
                                 <option value="all">All statuses</option>
                                 <option value="downloaded">Downloaded / available</option>
                                 <option value="new">Pending</option>
                                 <option value="error">Errors</option>
                                 <option value="cleaned">Cleaned</option>
-                            </select>
-                            <select id="episodes-duration-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode duration" onchange="resetEpisodePage()">
+                            </podsync-select>
+                            <podsync-select id="episodes-duration-filter" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Episode duration" onchange="resetEpisodePage()">
                                 <option value="all">All durations</option>
                                 <option value="short">&lt; 15 min</option>
-                                <option value="medium">15–60 min</option>
+                                <option value="medium">15-60 min</option>
                                 <option value="long">&gt; 60 min</option>
-                            </select>
-                            <select id="episodes-sort" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Sort episodes" onchange="resetEpisodePage()">
+                            </podsync-select>
+                            <podsync-select id="episodes-sort" class="form-select form-select-sm w-auto flex-grow-1" aria-label="Sort episodes" onchange="resetEpisodePage()">
                                 <option value="default">Default order</option>
                                 <option value="date-desc">Date: Newest first</option>
                                 <option value="date-asc">Date: Oldest first</option>
                                 <option value="duration-desc">Duration: Longest first</option>
                                 <option value="duration-asc">Duration: Shortest first</option>
-                                <option value="title-asc">Title: A–Z</option>
-                            </select>
+                                <option value="title-asc">Title: A-Z</option>
+                            </podsync-select>
                         </div>
                     </div>
                     <div id="episodes-list" class="list-group list-group-flush">
@@ -1161,46 +1161,46 @@
                             <!-- 1. General & Schedule -->
                             <div class="tab-pane fade show active" id="fs-tab-general">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold" id="fs-url-label">Source URL</label>
+                                    <label class="form-label small fw-semibold" id="fs-url-label" for="fs-url">Source URL</label>
                                     <input type="text" id="fs-url" class="form-control form-control-sm font-monospace text-muted" readonly disabled>
                                 </div>
                                 <div class="row g-2 mb-3" id="fs-channel-media-row">
                                     <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Media Format</label>
-                                        <select id="fs-format" class="form-select form-select-sm" onchange="toggleMaxHeight()">
+                                        <label class="form-label small fw-semibold" for="fs-format">Media Format</label>
+                                        <podsync-select id="fs-format" class="form-select form-select-sm" onchange="toggleMaxHeight()">
                                             <option value="audio">Audio (MP3 / M4A)</option>
                                             <option value="video">Video (MP4)</option>
-                                        </select>
+                                        </podsync-select>
                                     </div>
                                     <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Quality</label>
-                                        <select id="fs-quality" class="form-select form-select-sm">
+                                        <label class="form-label small fw-semibold" for="fs-quality">Quality</label>
+                                        <podsync-select id="fs-quality" class="form-select form-select-sm">
                                             <option value="high">High</option>
                                             <option value="low">Low</option>
-                                        </select>
+                                        </podsync-select>
                                     </div>
                                     <div class="col-sm-4" id="fs-max-height-col">
-                                        <label class="form-label small fw-semibold">Max Height (Video)</label>
-                                        <select id="fs-max-height" class="form-select form-select-sm">
+                                        <label class="form-label small fw-semibold" for="fs-max-height">Max Height (Video)</label>
+                                        <podsync-select id="fs-max-height" class="form-select form-select-sm">
                                             <option value="0">Default (Original)</option>
                                             <option value="480">480p</option>
                                             <option value="720">720p (HD)</option>
                                             <option value="1080">1080p (Full HD)</option>
                                             <option value="1440">1440p (2K)</option>
                                             <option value="2160">2160p (4K)</option>
-                                        </select>
+                                        </podsync-select>
                                     </div>
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-4" id="fs-channel-page-size-col">
-                                        <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
+                                        <label class="form-label small fw-semibold" for="fs-page-size">Page Size (Fetch count)</label>
                                         <input type="number" id="fs-page-size" class="form-control form-control-sm" min="1" max="500" value="50">
                                         <div class="form-text small">Number of recent episodes to query from channel.</div>
                                     </div>
                                     <div class="col-sm-8" id="fs-cron-col">
-                                        <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
+                                        <label class="form-label small fw-semibold" for="fs-cron-schedule">Update Schedule (Cron / Interval)</label>
                                         <div class="input-group input-group-sm mb-1">
-                                            <input type="text" id="fs-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
+                                            <input type="text" id="fs-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *" aria-describedby="fs-cron-help">
                                         </div>
                                         <div class="d-flex gap-1 flex-wrap">
                                             <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setPresetCron('@every 1h')">1h</button>
@@ -1214,15 +1214,15 @@
                                 </div>
                                 <div class="row g-2 mb-3" id="fs-channel-sort-row">
                                     <div class="col-sm-6" id="fs-channel-sort-col">
-                                        <label class="form-label small fw-semibold">Playlist Sorting</label>
-                                        <select id="fs-playlist-sort" class="form-select form-select-sm">
+                                        <label class="form-label small fw-semibold" for="fs-playlist-sort">Playlist Sorting</label>
+                                        <podsync-select id="fs-playlist-sort" class="form-select form-select-sm">
                                             <option value="">Default (Source order)</option>
                                             <option value="asc">Ascending (Oldest first)</option>
                                             <option value="desc">Descending (Newest first)</option>
-                                        </select>
+                                        </podsync-select>
                                     </div>
                                     <div class="col-sm-6" id="fs-channel-lang-col">
-                                        <label class="form-label small fw-semibold">Preferred Audio Language</label>
+                                        <label class="form-label small fw-semibold" for="fs-custom-lang">Preferred Audio Language</label>
                                         <input type="text" id="fs-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
                                         <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
                                     </div>
@@ -1236,7 +1236,7 @@
                                 </div>
                                 <div class="mb-3" id="fs-channel-ytdl-args-row">
                                     <div class="d-flex align-items-center justify-content-between mb-1">
-                                        <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
+                                        <label class="form-label small fw-semibold mb-0" for="fs-ytdl-args">Extra yt-dlp Arguments</label>
                                         <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="fs-cookies-hint">Global cookies: data/cookies.txt</span>
                                     </div>
                                     <div class="input-group input-group-sm mb-1">
@@ -1264,7 +1264,7 @@
                             <!-- 2. Retention & Cleanup -->
                             <div class="tab-pane fade" id="fs-tab-cleanup">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
+                                    <label class="form-label small fw-semibold" for="fs-keep-last">Keep Last (Episodes on Disk)</label>
                                     <input type="number" id="fs-keep-last" class="form-control form-control-sm" min="0" max="5000" placeholder="0 = unlimited (keep all episodes)">
                                     <div class="form-text small mt-1">
                                         <i aria-hidden="true" class="bi bi-info-circle me-1"></i>Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
@@ -1276,37 +1276,37 @@
                             <div class="tab-pane fade" id="fs-tab-filters">
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Title Include Match (Regex)</label>
+                                        <label class="form-label small fw-semibold" for="fs-filter-title">Title Include Match (Regex)</label>
                                         <input type="text" id="fs-filter-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)podcast|interview">
                                         <div class="form-text small">Only download episodes matching this regex.</div>
                                     </div>
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Title Exclude Match (Regex)</label>
+                                        <label class="form-label small fw-semibold" for="fs-filter-not-title">Title Exclude Match (Regex)</label>
                                         <input type="text" id="fs-filter-not-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)short|teaser|live">
                                         <div class="form-text small">Skip episodes matching this regex.</div>
                                     </div>
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Description Include (Regex)</label>
+                                        <label class="form-label small fw-semibold" for="fs-filter-desc">Description Include (Regex)</label>
                                         <input type="text" id="fs-filter-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
                                     </div>
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Description Exclude (Regex)</label>
+                                        <label class="form-label small fw-semibold" for="fs-filter-not-desc">Description Exclude (Regex)</label>
                                         <input type="text" id="fs-filter-not-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
                                     </div>
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Min Duration (Seconds)</label>
+                                        <label class="form-label small fw-semibold" for="fs-min-duration">Min Duration (Seconds)</label>
                                         <input type="number" id="fs-min-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 600 (10 min)">
                                     </div>
                                     <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Max Duration (Seconds)</label>
+                                        <label class="form-label small fw-semibold" for="fs-max-duration">Max Duration (Seconds)</label>
                                         <input type="number" id="fs-max-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 7200 (2 hours)">
                                     </div>
                                     <div class="col-sm-4">
-                                        <label class="form-label small fw-semibold">Max Age (Days)</label>
+                                        <label class="form-label small fw-semibold" for="fs-max-age">Max Age (Days)</label>
                                         <input type="number" id="fs-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
                                     </div>
                                 </div>
@@ -1316,20 +1316,20 @@
                             <div class="tab-pane fade" id="fs-tab-custom">
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Custom Title</label>
+                                        <label class="form-label small fw-semibold" for="fs-custom-title">Custom Title</label>
                                         <input type="text" id="fs-custom-title" class="form-control form-control-sm" placeholder="Overrides source channel title">
                                     </div>
                                     <div class="col-sm-6">
-                                        <label class="form-label small fw-semibold">Custom Author</label>
+                                        <label class="form-label small fw-semibold" for="fs-custom-author">Custom Author</label>
                                         <input type="text" id="fs-custom-author" class="form-control form-control-sm" placeholder="Overrides source channel author">
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Custom Description</label>
+                                    <label class="form-label small fw-semibold" for="fs-custom-desc">Custom Description</label>
                                     <textarea id="fs-custom-desc" class="form-control form-control-sm" rows="2" placeholder="Custom podcast description for RSS feed"></textarea>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
+                                    <label class="form-label small fw-semibold" for="fs-custom-cover">Custom Cover Art Image URL</label>
                                     <div class="input-group input-group-sm mb-1">
                                         <input type="url" id="fs-custom-cover" class="form-control" placeholder="https://example.com/cover.jpg" oninput="updateCoverPreview('fs')">
                                         <label class="btn btn-outline-secondary btn-sm" for="fs-cover-file" title="Upload cover image">
@@ -1344,7 +1344,7 @@
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-sm-8">
-                                        <label class="form-label small fw-semibold">Category (iTunes)</label>
+                                        <label class="form-label small fw-semibold" for="fs-custom-category">Category (iTunes)</label>
                                         <input type="text" id="fs-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
                                     </div>
                                     <div class="col-sm-4 d-flex align-items-end pb-1">
@@ -1366,7 +1366,7 @@
                             <!-- 5. Advanced -->
                             <div class="tab-pane fade" id="fs-tab-advanced">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold">Filename Template</label>
+                                    <label class="form-label small fw-semibold" for="fs-filename-template">Filename Template</label>
                                     <input type="text" id="fs-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
                                     <div class="form-text small">Supported tokens: <code>{{id}}</code>, <code>{{title}}</code>, <code>{{pub_date}}</code>, <code>{{feed_id}}</code>. Leave empty for default.</div>
                                 </div>
@@ -1387,41 +1387,41 @@
         </div>
     </div>
 
-    <div class="modal fade" id="subscribeModal" tabindex="-1" aria-labelledby="subscribe-title"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="subscribe-title">Subscribe</h2><button class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"></button></div><div class="modal-body" id="subscribe-body"></div></div></div></div>
+    <div class="modal fade" id="subscribeModal" tabindex="-1" aria-labelledby="subscribe-title"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="subscribe-title">Subscribe</h2><button class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div><div class="modal-body" id="subscribe-body"></div></div></div></div>
 
     <!-- Modal: Import Audiobook -->
-    <div class="modal fade" id="importAudiobookModal" tabindex="-1">
+    <div class="modal fade" id="importAudiobookModal" tabindex="-1" aria-labelledby="importAudiobookModal-title">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-bottom">
                     <div>
-                        <h5 class="modal-title fw-bold">Import Local Audiobook</h5>
+                        <h5 class="modal-title fw-bold" id="importAudiobookModal-title">Import Local Audiobook</h5>
                         <div class="text-muted small">Create serial podcast RSS feed from server folder</div>
                     </div>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="modal-body p-4">
                     <form id="import-audiobook-form" onsubmit="event.preventDefault(); submitImportAudiobook();">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Directory Name <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold" for="import-dir-name">Directory Name <span class="text-danger">*</span></label>
                             <input type="text" id="import-dir-name" class="form-control" readonly required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Feed ID (Slug) <span class="text-danger">*</span></label>
-                            <input type="text" id="import-feed-id" class="form-control" placeholder="e.g. 1984-orwell" required pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+                            <label class="form-label small fw-bold" for="import-feed-id">Feed ID (Slug) <span class="text-danger">*</span></label>
+                            <input type="text" id="import-feed-id" class="form-control" placeholder="e.g. 1984-orwell" required pattern="[a-zA-Z0-9_-]+" autocomplete="off" aria-describedby="import-feed-id-feedback">
                             <div class="invalid-feedback small" id="import-feed-id-feedback">Only English letters (A-Z, a-z), numbers, dashes (-), and underscores (_) are allowed.</div>
                             <div class="form-text small">Unique URL slug (a-z, 0-9, dash, underscore). RSS URL: <code>/<span id="import-feed-slug-preview">1984-orwell</span>.xml</code></div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Book Title</label>
+                            <label class="form-label small fw-bold" for="import-feed-title">Book Title</label>
                             <input type="text" id="import-feed-title" class="form-control" placeholder="Defaults to directory name or ID3 album">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Author / Narrator</label>
+                            <label class="form-label small fw-bold" for="import-feed-author">Author / Narrator</label>
                             <input type="text" id="import-feed-author" class="form-control" placeholder="Defaults to parsed author or ID3 artist">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Description</label>
+                            <label class="form-label small fw-bold" for="import-feed-desc">Description</label>
                             <textarea id="import-feed-desc" class="form-control" rows="2" placeholder="Optional book synopsis"></textarea>
                         </div>
                         <div class="border rounded p-2 bg-body-tertiary mb-3">
@@ -1442,30 +1442,30 @@
     </div>
 
     <!-- Modal: Upload Audiobook -->
-    <div class="modal fade" id="uploadAudiobookModal" tabindex="-1">
+    <div class="modal fade" id="uploadAudiobookModal" tabindex="-1" aria-labelledby="uploadAudiobookModal-title">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header border-bottom">
                     <div>
-                        <h5 class="modal-title fw-bold">Upload Audiobook Files</h5>
+                        <h5 class="modal-title fw-bold" id="uploadAudiobookModal-title">Upload Audiobook Files</h5>
                         <div class="text-muted small">Upload tracks and optional cover image to the server</div>
                     </div>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="modal-body p-4">
                     <form id="upload-audiobook-form" onsubmit="event.preventDefault(); submitUploadAudiobook();">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Book Folder Name <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold" for="upload-book-dir">Book Folder Name <span class="text-danger">*</span></label>
                             <input type="text" id="upload-book-dir" class="form-control" placeholder="e.g. George Orwell - 1984" required>
                             <div class="form-text small">Folder will be created in the audiobooks directory</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Audio Files (MP3, M4B, M4A, etc.) <span class="text-danger">*</span></label>
+                            <label class="form-label small fw-bold" for="upload-audio-files">Audio Files (MP3, M4B, M4A, etc.) <span class="text-danger">*</span></label>
                             <input type="file" id="upload-audio-files" class="form-control" multiple accept=".mp3,.m4b,.m4a,.aac,.ogg,.opus,.flac" required>
                             <div class="form-text small">Select all audio chapters/tracks (multi-select supported)</div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small fw-bold">Cover Image (Optional)</label>
+                            <label class="form-label small fw-bold" for="upload-cover-file">Cover Image (Optional)</label>
                             <input type="file" id="upload-cover-file" class="form-control" accept="image/jpeg,image/png">
                             <div class="form-text small">Optional JPG/PNG cover art (or will be extracted from ID3 tags)</div>
                         </div>
@@ -1494,34 +1494,34 @@
     </div>
 
     <!-- Modal: Add Feed -->
-    <div class="modal fade" id="addFeedModal" tabindex="-1">
+    <div class="modal fade" id="addFeedModal" tabindex="-1" aria-labelledby="addFeedModal-title">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header border-bottom">
                     <div>
-                        <h5 class="modal-title fw-bold mb-0">
+                        <h5 class="modal-title fw-bold mb-0" id="addFeedModal-title">
                             <i aria-hidden="true" class="bi bi-plus-circle text-primary me-2"></i>Add Podcast
                         </h5>
                         <div class="text-muted small mt-1">Configure source URL, download format, schedule, and feed options</div>
                     </div>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="modal-body p-0">
                     <form id="add-feed-form">
                         <div class="p-3 border-bottom bg-body-tertiary">
-                            <div id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
+                            <div role="alert" id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
                             <div class="row g-2">
                                 <div class="col-md-7">
-                                    <label class="form-label small fw-semibold">Source URL (YouTube / VK Video / Rutube / RSS Feed / etc) <span class="text-danger">*</span></label>
+                                    <label class="form-label small fw-semibold" for="new-feed-url">Source URL (YouTube / VK Video / Rutube / RSS Feed / etc) <span class="text-danger">*</span></label>
                                     <div class="input-group input-group-sm">
-                                        <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="handleFeedUrlInput(this.value)">
+                                        <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="handleFeedUrlInput(this.value)" aria-describedby="new-feed-url-help">
                                         <button class="btn btn-outline-secondary" type="button" id="btn-preview-feed" onclick="triggerFeedPreview()" title="Fetch feed info"><i aria-hidden="true" class="bi bi-search"></i></button>
                                     </div>
-                                    <div class="form-text small">Paste a channel, playlist, or ready-made podcast RSS link for local mirroring.</div>
+                                    <div class="form-text small" id="new-feed-url-help">Paste a channel, playlist, or ready-made podcast RSS link for local mirroring.</div>
                                 </div>
                                 <div class="col-md-5">
-                                    <label class="form-label small fw-semibold">Feed ID (URL slug) <span class="text-danger">*</span></label>
-                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+                                    <label class="form-label small fw-semibold" for="new-feed-id">Feed ID (URL slug) <span class="text-danger">*</span></label>
+                                    <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER" pattern="[a-zA-Z0-9_-]+" autocomplete="off" aria-describedby="new-feed-id-help new-feed-id-feedback">
                                     <div class="invalid-feedback small" id="new-feed-id-feedback">Only English letters (A-Z, a-z), numbers, dashes (-), and underscores (_) are allowed.</div>
                                     <div class="form-text small" id="new-feed-id-help">Used in RSS URL: <code>/<span id="new-feed-slug-preview">CLANBEAVER</span>.xml</code></div>
                                 </div>
@@ -1596,39 +1596,39 @@
                                 <div class="tab-pane fade show active" id="af-tab-general">
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Media Format</label>
-                                            <select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
+                                            <label class="form-label small fw-semibold" for="new-feed-format">Media Format</label>
+                                            <podsync-select id="new-feed-format" class="form-select form-select-sm" onchange="toggleAddMaxHeight()">
                                                 <option value="audio">Audio (MP3 / M4A)</option>
                                                 <option value="video" selected>Video (MP4)</option>
-                                            </select>
+                                            </podsync-select>
                                         </div>
                                         <div class="col-sm-6" id="new-feed-max-height-col">
-                                            <label class="form-label small fw-semibold">Video Quality</label>
-                                            <select id="new-feed-max-height" class="form-select form-select-sm">
+                                            <label class="form-label small fw-semibold" for="new-feed-max-height">Video Quality</label>
+                                            <podsync-select id="new-feed-max-height" class="form-select form-select-sm">
                                                 <option value="480">480p</option>
                                                 <option value="720" selected>720p (HD)</option>
                                                 <option value="1080">1080p (Full HD)</option>
-                                            </select>
+                                            </podsync-select>
                                         </div>
                                         <div class="col-sm-6" id="new-feed-audio-quality-col" style="display: none;">
-                                            <label class="form-label small fw-semibold">Audio Quality</label>
-                                            <select id="new-feed-quality" class="form-select form-select-sm">
+                                            <label class="form-label small fw-semibold" for="new-feed-quality">Audio Quality</label>
+                                            <podsync-select id="new-feed-quality" class="form-select form-select-sm">
                                                 <option value="high" selected>High</option>
                                                 <option value="low">Low</option>
-                                            </select>
+                                            </podsync-select>
                                         </div>
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-4 add-advanced-field d-none">
-                                            <label class="form-label small fw-semibold">Page Size (Fetch count)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-pagesize">Page Size (Fetch count)</label>
                                             <input type="number" id="new-feed-pagesize" class="form-control form-control-sm" min="1" max="500" value="50">
                                             <div class="form-text small">Number of recent episodes to query from channel.</div>
                                         </div>
                                         <div class="col-sm-8">
-                                            <label class="form-label small fw-semibold">Update Schedule (Cron / Interval)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-cron-schedule">Update Schedule (Cron / Interval)</label>
                                             <div class="input-group input-group-sm mb-1">
-                                                <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *">
-                                            </div>
+                                                <input type="text" id="new-feed-cron-schedule" class="form-control form-control-sm font-monospace" placeholder="@every 12h or 0 */4 * * *" aria-describedby="new-feed-cron-help">
+                                            </div><div class="visually-hidden" id="new-feed-cron-help">Use a five-field cron expression or an interval such as @every 12h.</div>
                                             <div class="d-flex gap-1 flex-wrap">
                                                 <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 1h')">1h</button>
                                                 <button type="button" class="btn btn-xs btn-outline-secondary" onclick="setAddPresetCron('@every 6h')">6h</button>
@@ -1641,22 +1641,22 @@
                                     <div class="add-advanced-field d-none">
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Playlist Sorting</label>
-                                            <select id="new-feed-playlist-sort" class="form-select form-select-sm">
+                                            <label class="form-label small fw-semibold" for="new-feed-playlist-sort">Playlist Sorting</label>
+                                            <podsync-select id="new-feed-playlist-sort" class="form-select form-select-sm">
                                                 <option value="" selected>Default (Source order)</option>
                                                 <option value="asc">Ascending (Oldest first)</option>
                                                 <option value="desc">Descending (Newest first)</option>
-                                            </select>
+                                            </podsync-select>
                                         </div>
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Preferred Audio Language</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-custom-lang">Preferred Audio Language</label>
                                             <input type="text" id="new-feed-custom-lang" class="form-control form-control-sm" placeholder="e.g. ru, en (overrides global)">
                                             <div class="form-text small">Language for multi-audio videos &amp; YouTube dubbing.</div>
                                         </div>
                                     </div>
                                     <div class="mb-3">
                                         <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <label class="form-label small fw-semibold mb-0">Extra yt-dlp Arguments</label>
+                                            <label class="form-label small fw-semibold mb-0" for="new-feed-ytdl-args">Extra yt-dlp Arguments</label>
                                             <span class="badge bg-secondary font-monospace" style="font-size: 0.72rem;" id="new-feed-cookies-hint">Global cookies: data/cookies.txt</span>
                                         </div>
                                         <div class="input-group input-group-sm mb-1">
@@ -1685,7 +1685,7 @@
                                 <!-- 2. Retention & Cleanup -->
                                 <div class="tab-pane fade" id="af-tab-cleanup">
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Keep Last (Episodes on Disk)</label>
+                                        <label class="form-label small fw-semibold" for="new-feed-keeplast">Keep Last (Episodes on Disk)</label>
                                         <input type="number" id="new-feed-keeplast" class="form-control form-control-sm" min="0" max="5000" value="50" placeholder="0 = unlimited (keep all episodes)">
                                         <div class="form-text small mt-1">
                                             <i aria-hidden="true" class="bi bi-info-circle me-1"></i>Automatically synced with Page Size by default. Automatically deletes older downloaded media files from disk to prevent storage exhaustion, while keeping episode metadata in the RSS feed. Set to <code>0</code> to retain all episodes indefinitely.
@@ -1697,37 +1697,37 @@
                                 <div class="tab-pane fade" id="af-tab-filters">
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Title Include Match (Regex)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-filter-title">Title Include Match (Regex)</label>
                                             <input type="text" id="new-feed-filter-title" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)podcast|interview">
                                             <div class="form-text small">Only download episodes matching this regex.</div>
                                         </div>
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Title Exclude Match (Regex)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-filter-nottitle">Title Exclude Match (Regex)</label>
                                             <input type="text" id="new-feed-filter-nottitle" class="form-control form-control-sm font-monospace" placeholder="e.g. (?i)short|teaser|live">
                                             <div class="form-text small">Skip episodes matching this regex.</div>
                                         </div>
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Description Include (Regex)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-filter-desc">Description Include (Regex)</label>
                                             <input type="text" id="new-feed-filter-desc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
                                         </div>
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Description Exclude (Regex)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-filter-notdesc">Description Exclude (Regex)</label>
                                             <input type="text" id="new-feed-filter-notdesc" class="form-control form-control-sm font-monospace" placeholder="Optional regex">
                                         </div>
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Min Duration (Seconds)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-min-duration">Min Duration (Seconds)</label>
                                             <input type="number" id="new-feed-min-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 600 (10 min)">
                                         </div>
                                         <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Max Duration (Seconds)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-max-duration">Max Duration (Seconds)</label>
                                             <input type="number" id="new-feed-max-duration" class="form-control form-control-sm" min="0" placeholder="e.g. 7200 (2 hours)">
                                         </div>
                                         <div class="col-sm-4">
-                                            <label class="form-label small fw-semibold">Max Age (Days)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-max-age">Max Age (Days)</label>
                                             <input type="number" id="new-feed-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
                                         </div>
                                     </div>
@@ -1737,20 +1737,20 @@
                                 <div class="tab-pane fade" id="af-tab-custom">
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Custom Title</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-custom-title">Custom Title</label>
                                             <input type="text" id="new-feed-custom-title" class="form-control form-control-sm" placeholder="Overrides source channel title">
                                         </div>
                                         <div class="col-sm-6">
-                                            <label class="form-label small fw-semibold">Custom Author</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-custom-author">Custom Author</label>
                                             <input type="text" id="new-feed-custom-author" class="form-control form-control-sm" placeholder="Overrides source channel author">
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Custom Description</label>
+                                        <label class="form-label small fw-semibold" for="new-feed-custom-desc">Custom Description</label>
                                         <textarea id="new-feed-custom-desc" class="form-control form-control-sm" rows="2" placeholder="Custom podcast description for RSS feed"></textarea>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Custom Cover Art Image URL</label>
+                                        <label class="form-label small fw-semibold" for="new-feed-custom-cover">Custom Cover Art Image URL</label>
                                         <div class="input-group input-group-sm mb-1">
                                             <input type="url" id="new-feed-custom-cover" class="form-control" placeholder="https://example.com/cover.jpg" oninput="updateCoverPreview('new-feed')">
                                             <label class="btn btn-outline-secondary btn-sm" for="new-feed-cover-file" title="Upload cover image">
@@ -1765,7 +1765,7 @@
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-sm-8">
-                                            <label class="form-label small fw-semibold">Category (iTunes)</label>
+                                            <label class="form-label small fw-semibold" for="new-feed-custom-category">Category (iTunes)</label>
                                             <input type="text" id="new-feed-custom-category" class="form-control form-control-sm" placeholder="e.g. Technology, News, Comedy">
                                         </div>
                                         <div class="col-sm-4 d-flex align-items-end pb-1">
@@ -1780,7 +1780,7 @@
                                 <!-- 5. Advanced -->
                                 <div class="tab-pane fade" id="af-tab-advanced">
                                     <div class="mb-3">
-                                        <label class="form-label small fw-semibold">Filename Template</label>
+                                        <label class="form-label small fw-semibold" for="new-feed-filename-template">Filename Template</label>
                                         <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
                                         <div class="form-text small">Supported tokens: <code>{{id}}</code>, <code>{{title}}</code>, <code>{{pub_date}}</code>, <code>{{feed_id}}</code>. Leave empty for default.</div>
                                     </div>
@@ -1802,7 +1802,7 @@
     </div>
 
     <!-- Modal: QR Code -->
-    <div class="modal fade" id="qrModal" tabindex="-1">
+    <div class="modal fade" id="qrModal" tabindex="-1" aria-labelledby="feed-errors-title">
         <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content text-center p-4">
                 <h5 class="fw-bold mb-1" id="qr-feed-title">Podcast</h5>
@@ -1817,7 +1817,7 @@
     </div>
 
     <!-- Modal: Feed Error Log Viewer -->
-    <div class="modal fade" id="feedErrorsModal" tabindex="-1">
+    <div class="modal fade" id="feedErrorsModal" tabindex="-1" aria-labelledby="feed-errors-title">
         <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header border-bottom">
@@ -1827,7 +1827,7 @@
                         </h5>
                         <p class="text-muted small mb-0" id="feed-errors-subtitle">Loading error details...</p>
                     </div>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="modal-body p-3" id="feed-errors-body">
                     <!-- Loaded dynamically -->
@@ -1855,7 +1855,7 @@
                     <h5 class="modal-title fw-bold mb-0" id="securitySettingsTitle">
                         <i aria-hidden="true" class="bi bi-shield-lock text-primary me-2"></i>Security &amp; Rate Limit Settings
                     </h5>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <form id="securitySettingsForm" onsubmit="submitSecuritySettings(event)">
                     <div class="modal-body p-4">
@@ -1869,20 +1869,20 @@
 
                         <div class="mb-3">
                             <label for="sec-input-window" class="form-label small fw-semibold">Observation Window</label>
-                            <select id="sec-input-window" class="form-select form-select-sm">
+                            <podsync-select id="sec-input-window" class="form-select form-select-sm">
                                 <option value="1m">1 minute</option>
                                 <option value="5m" selected>5 minutes</option>
                                 <option value="10m">10 minutes</option>
                                 <option value="15m">15 minutes</option>
                                 <option value="30m">30 minutes</option>
                                 <option value="1h">1 hour</option>
-                            </select>
+                            </podsync-select>
                             <div class="form-text small">Time window during which failed attempts are tracked.</div>
                         </div>
 
                         <div class="mb-3">
                             <label for="sec-input-lockout" class="form-label small fw-semibold">Lockout Duration (HTTP 429 Retry-After)</label>
-                            <select id="sec-input-lockout" class="form-select form-select-sm">
+                            <podsync-select id="sec-input-lockout" class="form-select form-select-sm">
                                 <option value="1m">1 minute</option>
                                 <option value="5m" selected>5 minutes</option>
                                 <option value="10m">10 minutes</option>
@@ -1890,7 +1890,7 @@
                                 <option value="30m">30 minutes</option>
                                 <option value="1h">1 hour</option>
                                 <option value="24h">24 hours</option>
-                            </select>
+                            </podsync-select>
                             <div class="form-text small">How long the client IP and username remain locked out when exceeding limit.</div>
                         </div>
                     </div>
@@ -1911,7 +1911,7 @@
             <div class="modal-content shadow">
                 <div class="modal-header">
                     <h6 class="modal-title fw-bold" id="changePasswordTitle"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
-                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))"></button>
+                    <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <form id="changePasswordForm" onsubmit="submitChangePassword(event)">
                     <div class="modal-body">
@@ -1944,14 +1944,14 @@
         <div id="app-toast" class="toast align-items-center shadow-lg" role="alert">
             <div class="d-flex">
                 <div class="toast-body" id="toast-message">Link copied to clipboard!</div>
-                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
             </div>
         </div>
     </div>
 
     <!-- Bootstrap Bundle with Popper -->
     <div class="modal fade" id="personalEditModal" tabindex="-1" aria-labelledby="personal-edit-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalSave(event)">
-        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-edit-heading">Create Feed</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalEditModal')"></button></div>
+        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-edit-heading">Create Feed</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalEditModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
         <div class="modal-body">
             <div id="personal-edit-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
             <div class="mb-3"><label for="personal-edit-title" class="form-label small text-muted">Title *</label><input class="form-control" id="personal-edit-title" required placeholder="e.g. My Watch Later"></div>
@@ -1959,18 +1959,18 @@
             <div class="mb-3"><label for="personal-edit-cover" class="form-label small text-muted">Cover image URL</label><input class="form-control mb-2" id="personal-edit-cover" type="url" placeholder="https://example.com/cover.jpg"></div>
             <div class="mb-3"><label for="personal-edit-cover-file" class="form-label small text-muted">Or upload cover image</label><input class="form-control" id="personal-edit-cover-file" type="file" accept="image/jpeg,image/png,image/webp"></div>
 
-            <div class="mb-3"><label for="personal-edit-sort" class="form-label small text-muted">Episode order</label><select class="form-select" id="personal-edit-sort"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></div>
+            <div class="mb-3"><label for="personal-edit-sort" class="form-label small text-muted">Episode order</label><podsync-select class="form-select" id="personal-edit-sort"><option value="desc">Newest first</option><option value="asc">Oldest first</option></podsync-select></div>
             <div class="form-check"><input class="form-check-input" type="checkbox" id="personal-edit-private"><label class="form-check-label small" for="personal-edit-private">Do not index in podcast catalogs</label></div>
         </div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalEditModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save</button></div>
     </form></div></div>
     <div class="modal fade" id="personalTransferModal" tabindex="-1" aria-labelledby="personal-transfer-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalTransferSave(event)">
-        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-transfer-heading">Move Episode</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalTransferModal')"></button></div><div class="modal-body"><div id="personal-transfer-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><div class="mb-3"><label class="form-label small text-muted" for="personal-target">Target feed *</label><select class="form-select" id="personal-target" required></select><div class="text-muted small mt-2">The same media file will be reused without re-uploading.</div></div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalTransferModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Confirm</button></div>
+        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-transfer-heading">Move Episode</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalTransferModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div><div class="modal-body"><div id="personal-transfer-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><div class="mb-3"><label class="form-label small text-muted" for="personal-target">Target feed *</label><podsync-select class="form-select" id="personal-target" required></podsync-select><div class="text-muted small mt-2">The same media file will be reused without re-uploading.</div></div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalTransferModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Confirm</button></div>
     </form></div></div>
     <div class="modal fade" id="personalDeleteModal" tabindex="-1" aria-labelledby="personal-delete-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalDeleteSave(event)">
-        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-delete-heading">Confirm Deletion</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalDeleteModal')"></button></div><div class="modal-body"><div id="personal-delete-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><p id="personal-delete-text" class="mb-3"></p><div class="form-check"><input class="form-check-input" type="checkbox" id="personal-delete-files" checked><label class="form-check-label small" for="personal-delete-files">Delete unreferenced media files from storage as well</label></div><div class="text-muted small mt-2">Files used by other feeds will be preserved in any case.</div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalDeleteModal')">Cancel</button><button type="submit" class="btn btn-danger btn-sm"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button></div>
+        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-delete-heading">Confirm Deletion</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalDeleteModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div><div class="modal-body"><div id="personal-delete-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><p id="personal-delete-text" class="mb-3"></p><div class="form-check"><input class="form-check-input" type="checkbox" id="personal-delete-files" checked><label class="form-check-label small" for="personal-delete-files">Delete unreferenced media files from storage as well</label></div><div class="text-muted small mt-2">Files used by other feeds will be preserved in any case.</div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalDeleteModal')">Cancel</button><button type="submit" class="btn btn-danger btn-sm"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button></div>
     </form></div></div>
     <div class="modal fade" id="personalRenameModal" tabindex="-1" aria-labelledby="personal-rename-heading" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" onsubmit="personalRenameSave(event)">
-        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-rename-heading">Rename Episode</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalRenameModal')"></button></div><div class="modal-body"><div id="personal-rename-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><div class="mb-3"><label class="form-label small text-muted" for="personal-rename-title">Title *</label><input class="form-control" id="personal-rename-title" required placeholder="Episode title"></div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalRenameModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save</button></div>
+        <div class="modal-header border-bottom"><h5 class="modal-title fw-bold mb-0" id="personal-rename-heading">Rename Episode</h5><button type="button" class="btn-close" aria-label="Close" onclick="closeModal('personalRenameModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div><div class="modal-body"><div id="personal-rename-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div><div class="mb-3"><label class="form-label small text-muted" for="personal-rename-title">Title *</label><input class="form-control" id="personal-rename-title" required placeholder="Episode title"></div></div><div class="modal-footer border-top"><button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('personalRenameModal')">Cancel</button><button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-check-lg me-1"></i>Save</button></div>
     </form></div></div>
 
 
@@ -1979,7 +1979,8 @@
     <!-- Lightweight standalone QR Code generator (qrious) -->
     <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
 
-    <script src="./admin.js?v=11"></script>
+    <script src="./select.js?v=1"></script>
+    <script src="./admin.js?v=12"></script>
 
 </body>
 </html>

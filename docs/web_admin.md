@@ -104,6 +104,19 @@ Log in using the configured username and password.
   - Collapsible offcanvas navigation via the top-bar burger menu with touch-friendly 44px interactive targets and `prefers-reduced-motion` compliance.
   - The top-bar OPML download button is hidden below 576px to keep the navigation within the viewport.
 
+### Keyboard and form accessibility
+
+Selection controls share a combobox with a padded chevron. Press Enter or Space
+to open it, use arrow keys or Home/End to highlight an option, and Enter to apply
+it. Typing highlights matching options. Escape cancels the highlighted change;
+Tab closes the list and continues through the form. Inside a dialog, Escape
+closes an open list before closing the dialog.
+
+Form fields have associated labels and feed ID validation is exposed through
+`aria-invalid` and linked help text. The library filters wrap at narrow widths;
+mobile buttons, schedule presets and selection options have 44px touch targets.
+Latte uses semantic text colors for readable status badges and secondary text.
+
 ### 2. Unified Subscription Window (RSS, Apps & QR)
 - Clicking **Subscribe** on any card or detail page opens a unified dialog:
   - **Direct RSS Feed URL**: Read-only URL box with a one-click **Copy** button.

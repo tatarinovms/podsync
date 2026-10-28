@@ -9,7 +9,7 @@ const os = require('node:os');
 const screenshots = fs.mkdtempSync(path.join(os.tmpdir(), 'podsync-ui-'));
 const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';
-    if (!['index.html', 'admin.js', 'admin.css', 'theme.js'].includes(file)) { res.writeHead(404).end(); return; }
+    if (!['index.html', 'admin.js', 'admin.css', 'theme.js', 'select.js'].includes(file)) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
     res.end(fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'web', 'ui', file)));
 });
@@ -68,11 +68,67 @@ await page.route('**/api/v1/**',async route=>{
 await page.addInitScript(()=>localStorage.setItem('podsync-theme','mocha'));
 await page.goto(origin);
 await page.waitForSelector('.feed-card');
+await page.addStyleTag({content:'*{transition:none!important;animation:none!important;scroll-behavior:auto!important}'});
+
+await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
+async function assertAccessible(context) {
+ const violations = await page.evaluate(async () => (await axe.run(document, {
+  runOnly: {type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}
+ })).violations.map(v => ({id:v.id,targets:v.nodes.map(n=>n.target)})));
+ assert.deepEqual(violations, [], context);
+}
 
 assert.deepEqual(requests.filter(p=>!p.endsWith('/status') || p.includes('/auth/')), ['/api/v1/auth/status', '/api/v1/feeds', '/api/v1/personal-feeds']);
 assert.equal(await page.locator('.feed-card').count(), 6);
 assert.deepEqual(await page.locator('#main-content > .tab-pane').evaluateAll(es=>es.map(e=>e.id)), ['tab-feeds','tab-personal','tab-audiobooks','tab-tokens','tab-system','tab-downloader','tab-mcp','tab-logs','episodesModal']);
 await screenshot('mocha-desktop.png', true);
+await assertAccessible('Mocha library');
+// A shared combobox keeps selection, focus and keyboard behavior consistent.
+const typeCombo=page.locator('#feed-type-filter [role="combobox"]');
+await typeCombo.focus();
+await typeCombo.press('End');
+assert.equal(await typeCombo.getAttribute('aria-expanded'),'true');
+await assertAccessible('Open podcast type list');
+assert.equal(await page.locator('#feed-type-filter [role="option"]').evaluateAll(elements=>elements.every(el=>el.getBoundingClientRect().height<=parseFloat(getComputedStyle(el).minHeight)+1)),true,'Short option labels fit on one line');
+await screenshot('combobox-open.png', false);
+await typeCombo.press('Escape');
+assert.equal(await page.locator('#feed-type-filter').evaluate(el=>el.value),'all');
+for (const key of 'audiobooks') await typeCombo.press(key);
+await typeCombo.press('Enter');
+assert.equal(await page.locator('.feed-card').count(),1);
+assert.equal(await page.locator('#feed-type-filter').evaluate(el=>el.value),'audiobooks');
+assert.equal(await typeCombo.evaluate(el=>el===document.activeElement),true);
+await typeCombo.press('Home');
+await typeCombo.press('Enter');
+assert.equal(await page.locator('.feed-card').count(),6);
+await page.locator('#feed-type-filter').evaluate(el=>{el.disabled=true;});
+assert.equal(await typeCombo.isDisabled(),true);
+await page.locator('#feed-type-filter').evaluate(el=>{el.disabled=false;});
+await typeCombo.click();
+await typeCombo.press('Tab');
+assert.equal(await typeCombo.getAttribute('aria-expanded'),'false');
+// Dynamic options, required validation and form reset use the same component.
+await page.evaluate(()=>{
+ const form=document.createElement('form');form.id='select-test-form';
+ form.innerHTML='<label for="select-test">Test choice</label><podsync-select id="select-test" required><option value="">Choose</option><option value="second">Second</option></podsync-select>';
+ document.body.append(form);
+});
+assert.equal(await page.locator('#select-test').evaluate(el=>el.checkValidity()),false);
+await page.locator('#select-test').evaluate(el=>{el.value='second';});
+assert.equal(await page.locator('#select-test').evaluate(el=>el.checkValidity()),true);
+await page.locator('#select-test-form').evaluate(el=>el.reset());
+assert.equal(await page.locator('#select-test').evaluate(el=>el.value),'');
+await page.locator('#select-test').evaluate(el=>{el.innerHTML='<option value="replacement">Replacement</option>';});
+await page.waitForFunction(()=>document.querySelector('#select-test .select-value').textContent==='Replacement');
+await page.locator('#select-test').evaluate(el=>{
+ const option=document.createElement('option');option.value='blocked';option.text='Blocked';option.disabled=true;el.append(option);
+});
+await page.locator('label[for="select-test"]').click();
+assert.equal(await page.locator('#select-test [role="combobox"]').evaluate(el=>el===document.activeElement),true);
+await page.locator('#select-test [role="combobox"]').press('End');
+await page.locator('#select-test [role="combobox"]').press('Enter');
+assert.equal(await page.locator('#select-test').evaluate(el=>el.value),'replacement','Keyboard skips disabled options');
+await page.locator('#select-test-form').evaluate(el=>el.remove());
 await page.getByRole('button',{name:'List view',exact:true}).click();
 assert.equal(await page.locator('#feeds-container').getAttribute('data-view'),'list');
 await screenshot('mocha-list.png', true);
@@ -97,6 +153,7 @@ await page.waitForFunction(()=>document.querySelectorAll('#episodes-list .list-g
 await screenshot('episodes.png', false);
 await page.locator('[data-section="settings"]').click();
 await page.waitForFunction(()=>document.getElementById('fs-feed-id').value==='podcast-0');
+await assertAccessible('Mocha feed settings');
 await page.locator('#fs-btn-custom').click();
 await page.locator('#fs-custom-title').fill('The Curious Mind — Updated');
 await page.locator('#feed-settings-form button[type="submit"]').click();
@@ -133,7 +190,8 @@ before=requests.filter(p=>p==='/api/v1/system/logs').length;
 await page.locator('#mainTabs [data-bs-target="#tab-logs"]').click();
 await page.waitForSelector('#logs-terminal .log-line');
 assert.equal(requests.filter(p=>p==='/api/v1/system/logs').length-before,1);
-await page.locator('#logs-autorefresh-select').selectOption('5000');
+await page.locator('#logs-autorefresh-select [role=combobox]').click();
+await page.getByRole('option', {name:'Every 5s',exact:true}).click();
 assert.equal(await page.evaluate(()=>logsAutoRefreshTimer!==null),true);
 await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
 assert.equal(await page.evaluate(()=>logsAutoRefreshTimer===null),true);
@@ -144,6 +202,11 @@ assert.equal(await page.evaluate(()=>logsAutoRefreshTimer===null),true);
 // The short add form keeps every advanced field available when requested.
 await page.locator('.library-heading [data-bs-target="#addFeedModal"]').click();
 await page.waitForSelector('#addFeedModal.show');
+await assertAccessible('Mocha add podcast dialog');
+const modalCombo=page.locator('#new-feed-format [role="combobox"]');
+await modalCombo.click();
+await modalCombo.press('Escape');
+assert.equal(await page.locator('#addFeedModal.show').count(),1,'Escape closes the list before the dialog');
 assert.equal(await page.locator('#new-feed-playlist-sort').isVisible(),false);
 assert.equal(await page.locator('#new-feed-cron-schedule').isVisible(),true);
 await page.locator('#add-advanced-toggle').click();
@@ -163,14 +226,48 @@ await page.waitForSelector('#feed-history-list .history-entry');
 await page.getByRole('button',{name:'Back to library',exact:true}).click();
 await page.evaluate(()=>toggleTheme());
 assert.equal(await page.locator('html').getAttribute('data-theme'),'latte');
+await assertAccessible('Latte library');
+await page.locator('.feed-card').filter({hasText:'The Curious Mind'}).getByRole('button',{name:'Open',exact:true}).click();
+await page.waitForSelector('#episodes-list .list-group-item');
+await assertAccessible('Latte episodes and status badges');
+await page.locator('[data-section="settings"]').click();
+await page.waitForFunction(()=>document.getElementById('fs-feed-id').value==='podcast-0');
+await assertAccessible('Latte feed settings');
+await page.getByRole('button',{name:'Back to library',exact:true}).click();
+await page.locator('.library-heading [data-bs-target="#addFeedModal"]').click();
+await page.waitForSelector('#addFeedModal.show');
+await assertAccessible('Latte add podcast dialog');
+await page.setViewportSize({width:320,height:844});
+for (const selector of ['#addFeedModal .btn-xs','#addFeedModal .btn-close','#btn-preview-feed']) {
+ const sizes=await page.locator(selector).evaluateAll(elements=>elements.map(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height})).filter(size=>size.width>0&&size.height>0));
+ assert(sizes.every(size=>size.width>=44&&size.height>=44),`Small mobile target: ${selector}`);
+}
+await page.locator('#new-feed-id').fill('invalid!');
+assert.equal(await page.locator('#new-feed-id').getAttribute('aria-invalid'),'true');
+await assertAccessible('Latte mobile validation error');
+await screenshot('latte-validation-mobile.png', false);
+await page.locator('#new-feed-id').fill('valid-slug');
+assert.equal(await page.locator('#new-feed-id').getAttribute('aria-invalid'),'false');
+await page.locator('#addFeedModal .btn-close').click();
+await page.waitForSelector('#addFeedModal.show',{state:'hidden'});
+await page.setViewportSize({width:1440,height:1050});
 await screenshot('latte-desktop.png', true);
-for (const width of [390,320]) {
+for (const width of [280,320,390,576,768,951]) {
  await page.setViewportSize({width,height:844});
- assert.equal(await page.locator('.app-sidebar').isVisible(),false);
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
- await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
- assert.equal(await page.locator('.app-sidebar').isVisible(),true);
- await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Library overflow at ${width}px`);
+ if(width<768){
+  assert.equal(await page.locator('.app-sidebar').isVisible(),false);
+  await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
+  assert.equal(await page.locator('.app-sidebar').isVisible(),true);
+  await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
+  const smallButtons=await page.locator('button').evaluateAll(elements=>elements.filter(el=>{
+   const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden'&&(r.width<44||r.height<44);
+  }).map(el=>el.outerHTML));
+  assert.deepEqual(smallButtons,[],`Small library targets at ${width}px`);
+ }
+ for(const id of ['feed-type-filter','feed-sort']) {
+  assert.equal(await page.locator('#'+id+' .select-value').evaluate(el=>el.scrollWidth<=el.clientWidth),true,`Clipped filter ${id} at ${width}px`);
+ }
  await screenshot(`latte-mobile-${width}.png`, true);
 }
 await page.evaluate(()=>toggleTheme());
@@ -202,7 +299,7 @@ await page.getByRole('button',{name:'Back to library',exact:true}).click();
 await page.waitForFunction(()=>Math.abs(scrollY-libraryScroll)<2);
 assert(Math.abs(await page.evaluate(()=>scrollY)-scrollBefore)<2,'library scroll should be restored within browser pixel rounding');
 assert.deepEqual(errors,[]);
-console.log('Browser checks passed: navigation, filters, pagination, settings save, subscriptions, lazy requests, log polling, add form, audiobook protection, both themes, 320/390px layouts, 300-feed library, DOM reuse, scroll restoration.');
+console.log('Browser checks passed: navigation, filters, pagination, settings save, subscriptions, lazy requests, log polling, add form, audiobook protection, both themes, axe accessibility, combobox keyboard and form behavior, 280-951px layouts, 300-feed library, DOM reuse, scroll restoration.');
 console.log('Screenshots: '+screenshots);
 } catch (err) {
  await page.screenshot({path:path.join(screenshots,'failure.png'),fullPage:true});

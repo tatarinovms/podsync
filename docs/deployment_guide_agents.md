@@ -289,7 +289,7 @@ Once Podsync is running (either as systemd service or via Docker), AI agents can
 
 With updated binaries, `podsync --mcp` probes
 `http://localhost:<server.port>/health/ready` and relays JSON-RPC to `POST /mcp`
-using `[server.admin]` Basic Auth when the daemon is ready. All 28 tools, including
+using `[server.admin]` Basic Auth when the daemon is ready. All 32 tools, including
 personal-feed tools, are available through this connection. For a complete library,
 call both `list_feeds` and `list_personal_feeds`. Local auto-proxy uses plain HTTP
 on the configured port; use the remote connection for HTTPS or a different host.
@@ -385,6 +385,8 @@ When upgrading a running Podsync instance to a newer version:
 
 ### 4.1: Upgrading Linux Systemd Service (Zero Database Data Loss)
 
+For a native installation whose service user can write the Podsync executable, the **System → Podsync Updates** card is the preferred method. It verifies the GitHub Release checksum, replaces the binary, and restarts the process. Use the manual procedure below when the binary directory requires elevated permissions.
+
 Agents can execute this automated 4-step upgrade workflow:
 
 ```bash
@@ -438,7 +440,7 @@ fi
 
 ### 4.2: Upgrading Docker / Docker Compose
 
-For containerized setups:
+The web admin update button intentionally does not modify Docker containers. For containerized setups, run these commands on the Docker host:
 
 ```bash
 cd /path/to/podsync-compose

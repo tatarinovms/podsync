@@ -59,7 +59,6 @@ From [`go.mod`](../../go.mod):
 - **`pkg/logbuffer`**: Thread-safe in-memory circular ring buffer for real-time log querying via Web UI and MCP.
 - **`google.golang.org/api`**: YouTube Data API v3 client.
 - **`github.com/silentsokolov/go-vimeo`**: Vimeo API client.
-- **`github.com/nicklaw5/helix`**: Twitch Helix API client.
 
 ---
 

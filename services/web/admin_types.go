@@ -116,6 +116,17 @@ type SystemStats struct {
 	Storage    string    `json:"storage_type"`
 }
 
+// PodsyncUpdateInfo describes the latest published Podsync release.
+type PodsyncUpdateInfo struct {
+	CurrentVersion  string `json:"current_version"`
+	LatestVersion   string `json:"latest_version"`
+	ReleaseURL      string `json:"release_url"`
+	UpdateAvailable bool   `json:"update_available"`
+	CanUpdate       bool   `json:"can_update"`
+	Container       bool   `json:"container"`
+	Message         string `json:"message"`
+}
+
 // TokenInfo represents a provider's configured tokens
 type TokenInfo struct {
 	Provider string   `json:"provider"`
@@ -151,6 +162,16 @@ type DownloaderConfigUpdate struct {
 	CookiesFromBrowser *string `json:"cookies_from_browser"`
 	Proxy              *string `json:"proxy"`
 	Language           *string `json:"language,omitempty"`
+}
+
+// NetworkConfigInfo contains outbound DNS settings for provider API requests.
+type NetworkConfigInfo struct {
+	DNSServers []string `json:"dns_servers"`
+}
+
+// NetworkConfigUpdate contains runtime-updatable outbound DNS settings.
+type NetworkConfigUpdate struct {
+	DNSServers *[]string `json:"dns_servers"`
 }
 
 // CookiesPayload holds cookies file content
@@ -315,8 +336,12 @@ type AdminManager interface {
 	AddTokens(ctx context.Context, provider string, tokens []string) error
 	DeleteToken(ctx context.Context, provider string, index int) error
 	GetSystemStats(ctx context.Context) (*SystemStats, error)
+	GetPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error)
+	ApplyPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error)
 	GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error)
 	UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error
+	GetNetworkConfig(ctx context.Context) (*NetworkConfigInfo, error)
+	UpdateNetworkConfig(ctx context.Context, cfg *NetworkConfigUpdate) error
 	GetCookiesContent(ctx context.Context) (string, error)
 	UpdateCookiesContent(ctx context.Context, content string) error
 	TestDownloader(ctx context.Context, testURL string) (*TestDownloaderResult, error)

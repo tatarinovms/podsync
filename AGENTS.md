@@ -6,7 +6,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 1. Project Overview & Tech Stack
 
-**Podsync** is a high-performance Go service that converts video and audio channels, playlists, communities, user profiles (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch), and **local audiobook folder collections** into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
+**Podsync** is a high-performance Go service that converts video and audio channels, playlists, communities, user profiles (YouTube, Rutube, VK Video, Vimeo, SoundCloud), and **local audiobook folder collections** into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
 
 ### Core Technologies
 - **Language**: Go 1.25+ (`go.mod`)
@@ -43,7 +43,6 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── youtube.go        # YouTube Data API v3 builder
 │   │   ├── vimeo.go          # Vimeo API builder
 │   │   ├── soundcloud.go     # SoundCloud HTML scraper / client
-│   │   ├── twitch.go         # Twitch Helix API builder
 │   │   └── url.go            # URL parsing and platform detection
 │   ├── db/                   # BadgerDB wrappers for Feeds, Episodes, and State
 │   ├── feed/                 # Podcast RSS XML generation, OPML export, API key rotation
@@ -53,9 +52,10 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── jobqueue/             # Persistent disk-backed job queue with crash recovery and concurrency control
 │   ├── logbuffer/            # Thread-safe in-memory circular ring buffer for real-time logs
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
-│   │   ├── server.go         # 28 MCP tools, resources (podsync://*), and diagnostic prompts
+│   │   ├── server.go         # 32 MCP tools, resources (podsync://*), and diagnostic prompts
 │   │   └── proxy.go          # JSON-RPC relay to /mcp and web.AdminManager REST client
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
+│   ├── selfupdate/           # Verified native binary update from GitHub Releases
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
@@ -169,6 +169,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes (`?feed_id=...&limit=...`) |
 | `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `GET` | `/api/v1/system` | Get system metrics, disk usage, and dependencies |
+| `GET`, `POST` | `/api/v1/system/update` | Check GitHub Releases or install the latest release and restart a native process |
 | `GET` | `/api/v1/system/logs` | Query in-memory server logs (level/search/feed_id filter) |
 | `GET` | `/api/v1/system/logs/download` | Download complete server log file as text |
 | `DELETE` | `/api/v1/system/logs` | Clear in-memory system log buffer |
@@ -197,6 +198,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/downloader` | Update downloader timeout, proxy, language, browser cookies |
 | `GET`/`POST`/`DELETE` | `/api/v1/downloader/cookies` | Manage Netscape `cookies.txt` content |
 | `POST` | `/api/v1/downloader/test` | Test yt-dlp metadata extraction against URL |
+| `GET`, `POST` | `/api/v1/network` | Get or update custom DNS servers for provider API and RSS metadata requests |
 | `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
 | `GET` | `/api/v1/personal-feeds` | List all personal podcast feeds |
 | `POST` | `/api/v1/personal-feeds` | Create new personal podcast feed |
@@ -216,19 +218,19 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes 28 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
+Podsync exposes 32 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
 - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
 - `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`
 - `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
 - `get_download_errors`, `get_recent_downloads`, `get_sync_status`
-- `get_system_stats`, `get_tokens`, `update_tokens`, `delete_tokens`
-- `get_downloader_config`, `update_downloader_config`, `test_downloader`
+- `get_system_stats`, `get_podsync_update`, `update_podsync`, `get_tokens`, `update_tokens`, `delete_tokens`
+- `get_downloader_config`, `update_downloader_config`, `get_network_config`, `update_network_config`, `test_downloader`
 - `get_system_logs`
 
 Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE** (`/mcp` and `/mcp/sse`).
 
 When a local daemon is ready, stdio relays JSON-RPC directly to `POST /mcp` with
-Basic Auth. All 28 tools, including personal feeds, resources and prompts are
+Basic Auth. All 32 tools, including personal feeds, resources and prompts are
 served by that daemon. Set the MCP server version from the binary build version
 before serving; proxied initialization preserves the daemon's version.
 
@@ -236,7 +238,7 @@ before serving; proxied initialization preserves the daemon's version.
 
 ## 6. Golden Rules for AI Agents
 
-1. **Never break existing platform builders**: Any modifications to `pkg/builder/` must preserve full backwards compatibility across all supported providers (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch, Audiobooks).
+1. **Never break existing platform builders**: Any modifications to `pkg/builder/` must preserve full backwards compatibility across all supported providers (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Audiobooks).
 2. **Preserve BadgerDB integrity**: Always handle transactions cleanly and prevent corrupt keys.
 3. **Always run `-race` tests**: After modifying Go code, run `go test -race ./...` to verify there are no data races.
 4. **Instant XML Rebuild on Config Change**: Whenever feed metadata or `private_feed` is updated, ensure `m.updates <- f` is queued so the XML file on disk reflects changes immediately.
@@ -249,6 +251,7 @@ before serving; proxied initialization preserves the daemon's version.
    - In YAML frontmatter, always enclose scalar string values in double quotes (`"..."`).
    - Keep `.agents/skills/podsync/SKILL.md` and user config skill directories synchronized.
 9. **Mandatory MCP Tools Synchronization & Automated Verification**:
+	- Whenever adding a capability to `web.AdminManager`, decide whether agents need it through MCP. Add the matching tool or record a web-only reason in `adminManagerMCPExposure`; `TestAdminManagerMCPCoverage` fails until this decision is explicit.
    - Whenever adding, removing, or modifying MCP tools in `pkg/mcp/server.go`:
      1. Update `getToolDefinitions()` and `callTool()`.
      2. Update the `#tab-mcp` tools reference table in `services/web/ui/index.html` (tool name, description, arguments).
@@ -256,7 +259,7 @@ before serving; proxied initialization preserves the daemon's version.
      4. Update `docs/mcp.md` (tool count and reference table).
      5. Update `AGENTS.md` (tool count and list in Section 5).
      6. Update `SKILL.md` (and propagate to all 4 skill locations: `.agents/skills/podsync/`, `.gemini/skills/podsync/`, `~/.gemini/config/skills/podsync/`, `~/.gemini/antigravity-cli/skills/podsync/`).
-     7. Run `go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...` to automatically verify that all registered tools match the UI table and documentation.
+     7. Run `go test -v -run 'Test(MCPToolsDocumentationSync|AdminManagerMCPCoverage)' ./pkg/mcp/...` to verify tool documentation and explicit MCP coverage for every admin capability.
 10. **Button Metrics & Interaction Consistency**:
     - Preserve unified action pair button metrics: standard `btn-sm`, `min-width: 105px`, 35px desktop height, and >= 44px mobile touch target.
     - Cancel / Close buttons must always precede Save / Update / Confirm buttons, with secondary styling on the left and Mauve `.btn-brand` primary styling on the right.

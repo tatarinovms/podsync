@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -22,14 +26,16 @@ import (
 )
 
 type mockAdminManager struct {
-	feeds       []web.FeedSummary
-	stats       *web.SystemStats
-	tokens      []web.TokenInfo
-	addFeedErr  error
-	updFeedErr  error
-	retryErr    error
-	delFeedErr  error
-	updTokenErr error
+	feeds         []web.FeedSummary
+	stats         *web.SystemStats
+	tokens        []web.TokenInfo
+	addFeedErr    error
+	updFeedErr    error
+	retryErr      error
+	delFeedErr    error
+	updTokenErr   error
+	networkConfig web.NetworkConfigInfo
+	podsyncUpdate web.PodsyncUpdateInfo
 }
 
 func (m *mockAdminManager) ListFeeds(ctx context.Context) ([]web.FeedSummary, error) {
@@ -132,6 +138,14 @@ func (m *mockAdminManager) GetSystemStats(ctx context.Context) (*web.SystemStats
 	return m.stats, nil
 }
 
+func (m *mockAdminManager) GetPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+	return &m.podsyncUpdate, nil
+}
+
+func (m *mockAdminManager) ApplyPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+	return &m.podsyncUpdate, nil
+}
+
 func (m *mockAdminManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
 	return &web.DownloaderConfigInfo{
 		Timeout:        10,
@@ -140,6 +154,17 @@ func (m *mockAdminManager) GetDownloaderConfig(ctx context.Context) (*web.Downlo
 }
 
 func (m *mockAdminManager) UpdateDownloaderConfig(ctx context.Context, cfg *web.DownloaderConfigUpdate) error {
+	return nil
+}
+
+func (m *mockAdminManager) GetNetworkConfig(ctx context.Context) (*web.NetworkConfigInfo, error) {
+	return &web.NetworkConfigInfo{DNSServers: append([]string(nil), m.networkConfig.DNSServers...)}, nil
+}
+
+func (m *mockAdminManager) UpdateNetworkConfig(ctx context.Context, cfg *web.NetworkConfigUpdate) error {
+	if cfg.DNSServers != nil {
+		m.networkConfig.DNSServers = append([]string(nil), (*cfg.DNSServers)...)
+	}
 	return nil
 }
 
@@ -275,6 +300,13 @@ func setupTestServer() (*Server, *mockAdminManager) {
 		tokens: []web.TokenInfo{
 			{Provider: "youtube", Tokens: []string{"AIza••••9Y4"}, FromEnv: false},
 		},
+		podsyncUpdate: web.PodsyncUpdateInfo{
+			CurrentVersion:  "v2.13.9",
+			LatestVersion:   "v2.14.0",
+			UpdateAvailable: true,
+			CanUpdate:       true,
+			Message:         "Podsync v2.14.0 was installed and will restart now.",
+		},
 	}
 	return NewServer(mockMgr), mockMgr
 }
@@ -348,7 +380,7 @@ func TestToolsList(t *testing.T) {
 }
 
 func TestToolsCall(t *testing.T) {
-	server, _ := setupTestServer()
+	server, mgr := setupTestServer()
 	ctx := context.Background()
 
 	t.Run("list_feeds", func(t *testing.T) {
@@ -417,6 +449,28 @@ func TestToolsCall(t *testing.T) {
 		assert.Contains(t, string(resData), "v2.13.9")
 	})
 
+	t.Run("get_podsync_update", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":64,"method":"tools/call","params":{"name":"get_podsync_update","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+		var resp JSONRPCResponse
+		require.NoError(t, json.Unmarshal(respBytes, &resp))
+		require.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "v2.14.0")
+	})
+
+	t.Run("update_podsync", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":65,"method":"tools/call","params":{"name":"update_podsync","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+		var resp JSONRPCResponse
+		require.NoError(t, json.Unmarshal(respBytes, &resp))
+		require.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "will restart now")
+	})
+
 	t.Run("get_downloader_config", func(t *testing.T) {
 		req := `{"jsonrpc":"2.0","id":60,"method":"tools/call","params":{"name":"get_downloader_config","arguments":{}}}`
 		respBytes, err := server.HandleMessage(ctx, []byte(req))
@@ -441,6 +495,32 @@ func TestToolsCall(t *testing.T) {
 		assert.Nil(t, resp.Error)
 		resData, _ := json.Marshal(resp.Result)
 		assert.Contains(t, string(resData), "Successfully updated downloader configuration")
+	})
+
+	t.Run("get_network_config", func(t *testing.T) {
+		mgr.networkConfig.DNSServers = []string{"1.1.1.1"}
+		req := `{"jsonrpc":"2.0","id":62,"method":"tools/call","params":{"name":"get_network_config","arguments":{}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		require.NoError(t, json.Unmarshal(respBytes, &resp))
+		require.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "1.1.1.1")
+	})
+
+	t.Run("update_network_config", func(t *testing.T) {
+		req := `{"jsonrpc":"2.0","id":63,"method":"tools/call","params":{"name":"update_network_config","arguments":{"dns_servers":["9.9.9.9","1.1.1.1"]}}}`
+		respBytes, err := server.HandleMessage(ctx, []byte(req))
+		require.NoError(t, err)
+
+		var resp JSONRPCResponse
+		require.NoError(t, json.Unmarshal(respBytes, &resp))
+		require.Nil(t, resp.Error)
+		resData, _ := json.Marshal(resp.Result)
+		assert.Contains(t, string(resData), "Successfully updated network DNS configuration")
+		assert.Equal(t, []string{"9.9.9.9", "1.1.1.1"}, mgr.networkConfig.DNSServers)
 	})
 
 	t.Run("get_download_errors", func(t *testing.T) {
@@ -699,4 +779,109 @@ func TestMCPToolsDocumentationSync(t *testing.T) {
 
 	assert.Contains(t, docsContent, fmt.Sprintf("%d specialized tools", len(tools)), "docs/mcp.md tool count is out of date")
 	assert.Contains(t, agentsContent, fmt.Sprintf("%d MCP tools", len(tools)), "AGENTS.md tool count is out of date")
+}
+
+// adminManagerMCPExposure makes MCP availability an explicit decision for every
+// AdminManager capability. Add an entry whenever AdminManager gains a method:
+// name the MCP tool, or leave Tool empty and record why it is web-only.
+var adminManagerMCPExposure = map[string]struct {
+	Tool   string
+	Reason string
+}{
+	"ListFeeds":              {Tool: "list_feeds"},
+	"GetFeedsStatus":         {Reason: "Dashboard-only lightweight status polling."},
+	"GetFeedDetail":          {Tool: "get_feed"},
+	"GetFeedEpisodes":        {Reason: "Dashboard-only paginated episode browsing; get_feed provides MCP episode details."},
+	"AddFeed":                {Tool: "add_feed"},
+	"UpdateFeed":             {Tool: "update_feed_config"},
+	"DeleteFeed":             {Tool: "delete_feed"},
+	"TriggerUpdate":          {Tool: "update_feed"},
+	"TriggerUpdateAll":       {Tool: "update_all_feeds"},
+	"RetryEpisode":           {Tool: "retry_episode"},
+	"GetTokens":              {Tool: "get_tokens"},
+	"UpdateTokens":           {Tool: "update_tokens"},
+	"AddTokens":              {Tool: "update_tokens"},
+	"DeleteToken":            {Tool: "delete_tokens"},
+	"GetSystemStats":         {Tool: "get_system_stats"},
+	"GetPodsyncUpdate":       {Tool: "get_podsync_update"},
+	"ApplyPodsyncUpdate":     {Tool: "update_podsync"},
+	"GetDownloaderConfig":    {Tool: "get_downloader_config"},
+	"UpdateDownloaderConfig": {Tool: "update_downloader_config"},
+	"GetNetworkConfig":       {Tool: "get_network_config"},
+	"UpdateNetworkConfig":    {Tool: "update_network_config"},
+	"GetCookiesContent":      {Reason: "Cookies contain sensitive session data and are available only to the authenticated web admin."},
+	"UpdateCookiesContent":   {Reason: "Cookies contain sensitive session data and are available only to the authenticated web admin."},
+	"TestDownloader":         {Tool: "test_downloader"},
+	"GetDownloadErrors":      {Tool: "get_download_errors"},
+	"GetRecentDownloads":     {Tool: "get_recent_downloads"},
+	"GetSyncStatus":          {Tool: "get_sync_status"},
+	"ChangePassword":         {Reason: "Credential changes are available only through the authenticated web admin."},
+	"UpdateAdminSecurity":    {Reason: "Login protection settings are available only through the authenticated web admin."},
+	"GetSystemLogs":          {Tool: "get_system_logs"},
+	"ClearSystemLogs":        {Reason: "Destructive log maintenance is available only through the authenticated web admin."},
+	"SetLogLevel":            {Reason: "Runtime logging configuration is available only through the authenticated web admin."},
+	"GetLogLevel":            {Reason: "Runtime logging configuration is available only through the authenticated web admin."},
+	"DownloadLogs":           {Reason: "Log-file download is available only through the authenticated web admin."},
+	"ListAudiobookDirs":      {Tool: "list_audiobook_dirs"},
+	"ImportAudiobook":        {Tool: "import_audiobook"},
+	"GetAudiobooksDir":       {Reason: "Local filesystem path is exposed only to the authenticated web admin."},
+	"SaveAudiobookFile":      {Reason: "Multipart file upload is available only through the authenticated web admin."},
+	"DeleteAudiobookDir":     {Tool: "delete_audiobook_dir"},
+	"SaveCoverImage":         {Reason: "Multipart cover upload is available only through the authenticated web admin."},
+}
+
+func TestAdminManagerMCPCoverage(t *testing.T) {
+	methods := adminManagerMethods(t)
+	covered := make([]string, 0, len(adminManagerMCPExposure))
+	for method := range adminManagerMCPExposure {
+		covered = append(covered, method)
+	}
+	sort.Strings(covered)
+	assert.Equal(t, methods, covered, "every AdminManager method must explicitly declare its MCP exposure")
+
+	server, _ := setupTestServer()
+	registered := make(map[string]struct{})
+	for _, tool := range server.getToolDefinitions() {
+		registered[tool.Name] = struct{}{}
+	}
+	for method, exposure := range adminManagerMCPExposure {
+		if exposure.Tool == "" {
+			assert.NotEmptyf(t, exposure.Reason, "%s is not exposed through MCP and needs a reason", method)
+			continue
+		}
+		_, ok := registered[exposure.Tool]
+		assert.Truef(t, ok, "%s references MCP tool %q, but it is not registered", method, exposure.Tool)
+	}
+}
+
+func adminManagerMethods(t *testing.T) []string {
+	t.Helper()
+	path := filepath.Join("..", "..", "services", "web", "admin_types.go")
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	require.NoError(t, err)
+
+	for _, declaration := range file.Decls {
+		gen, ok := declaration.(*ast.GenDecl)
+		if !ok || gen.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || typeSpec.Name.Name != "AdminManager" {
+				continue
+			}
+			iface, ok := typeSpec.Type.(*ast.InterfaceType)
+			require.True(t, ok, "AdminManager must remain an interface")
+			methods := make([]string, 0, len(iface.Methods.List))
+			for _, field := range iface.Methods.List {
+				for _, name := range field.Names {
+					methods = append(methods, name.Name)
+				}
+			}
+			sort.Strings(methods)
+			return methods
+		}
+	}
+	t.Fatal("AdminManager interface not found")
+	return nil
 }

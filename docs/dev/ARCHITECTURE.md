@@ -8,7 +8,7 @@ This document details the architectural principles, component structure, data fl
 
 ## 1. High-Level Architecture
 
-Podsync operates as a self-hosted content pipeline that transforms external video and audio sources (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch) as well as local directory audiobook collections into podcast feeds compatible with Apple Podcasts, Pocket Casts, Overcast, AntennaPod, and any RSS reader.
+Podsync operates as a self-hosted content pipeline that transforms external video and audio sources (YouTube, Rutube, VK Video, Vimeo, SoundCloud) as well as local directory audiobook collections into podcast feeds compatible with Apple Podcasts, Pocket Casts, Overcast, AntennaPod, and any RSS reader.
 
 ```mermaid
 flowchart TD
@@ -32,7 +32,7 @@ flowchart TD
             VKBuilder["VK Video Builder\n(VK API v5.199)"]
             RUBuilder["Rutube Builder\n(yt-dlp)"]
             ABBuilder["Audiobook Builder\n(ID3 / APIC tags)"]
-            OtherBuilders["Vimeo / SC / Twitch"]
+            OtherBuilders["Vimeo / SoundCloud"]
         end
         
         YTDLP["Downloader Engine\n(yt-dlp + ffmpeg)"]

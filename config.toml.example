@@ -73,13 +73,18 @@ password = "password"
   # e.g. https://example-bucket-name.s3.us-west-2.amazonaws.com/example/prefix/
   prefix = "example/prefix"
 
-# API keys to be used to access YouTube, Vimeo, Twitch, and VK Video.
+# Optional DNS resolvers for provider API and RSS metadata requests.
+# Leave empty or remove this section to use the operating system resolver.
+# yt-dlp is a separate process and continues to use the operating system DNS.
+[network]
+dns_servers = ["1.1.1.1", "9.9.9.9"]
+
+# API keys to be used to access YouTube, Vimeo, SoundCloud, Rutube, and VK Video.
 # These can be either specified as string parameter or array of string (so those will be rotated).
 # Alternatively, you can set the following environment variables:
 #   PODSYNC_YOUTUBE_API_KEY for YouTube
 #   PODSYNC_VIMEO_API_KEY for Vimeo
 #   PODSYNC_SOUNDCLOUD_API_KEY for Soundcloud
-#   PODSYNC_TWITCH_API_KEY for Twitch (format: CLIENT_ID:CLIENT_SECRET)
 #   PODSYNC_VKVIDEO_API_KEY for VK Video (or PODSYNC_VK_API_KEY)
 # Environment variables support multiple keys separated by spaces for API key rotation:
 #   export PODSYNC_YOUTUBE_API_KEY="key1 key2 key3"

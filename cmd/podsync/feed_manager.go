@@ -30,6 +30,8 @@ import (
 	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/logbuffer"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/network"
+	"github.com/mxpv/podsync/pkg/selfupdate"
 	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
@@ -74,6 +76,10 @@ type AppFeedManager struct {
 	statsMu        sync.RWMutex
 	statsCache     map[string]feedStats
 	queue          *jobqueue.JobQueue
+	selfUpdater    *selfupdate.Updater
+	restart        func() error
+	selfUpdateMu   sync.Mutex
+	selfUpdating   bool
 }
 
 func NewAppFeedManager(
@@ -1071,7 +1077,6 @@ func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
 		{model.ProviderYoutube, []string{"PODSYNC_YOUTUBE_API_KEY"}},
 		{model.ProviderVimeo, []string{"PODSYNC_VIMEO_API_KEY"}},
 		{model.ProviderSoundcloud, []string{"PODSYNC_SOUNDCLOUD_API_KEY"}},
-		{model.ProviderTwitch, []string{"PODSYNC_TWITCH_API_KEY"}},
 		{model.ProviderRutube, []string{"PODSYNC_RUTUBE_API_KEY"}},
 	}
 
@@ -1272,6 +1277,76 @@ func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, 
 	}
 
 	return stats, nil
+}
+
+// SetSelfUpdater enables native binary updates from the official GitHub release.
+func (m *AppFeedManager) SetSelfUpdater(updater *selfupdate.Updater, restart func() error) {
+	m.mu.Lock()
+	m.selfUpdater = updater
+	m.restart = restart
+	m.mu.Unlock()
+}
+
+func (m *AppFeedManager) GetPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+	m.mu.RLock()
+	updater := m.selfUpdater
+	m.mu.RUnlock()
+	if updater == nil {
+		return nil, errors.New("Podsync self-update is unavailable because the executable path could not be determined")
+	}
+	status, err := updater.Status(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return podsyncUpdateInfo(status), nil
+}
+
+func (m *AppFeedManager) ApplyPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+	m.selfUpdateMu.Lock()
+	if m.selfUpdating {
+		m.selfUpdateMu.Unlock()
+		return nil, errors.New("a Podsync update is already in progress")
+	}
+	m.selfUpdating = true
+	m.selfUpdateMu.Unlock()
+	defer func() {
+		m.selfUpdateMu.Lock()
+		m.selfUpdating = false
+		m.selfUpdateMu.Unlock()
+	}()
+
+	m.mu.RLock()
+	updater := m.selfUpdater
+	restart := m.restart
+	m.mu.RUnlock()
+	if updater == nil || restart == nil {
+		return nil, errors.New("Podsync self-update is unavailable because the executable path could not be determined")
+	}
+	status, err := updater.Apply(ctx)
+	if err != nil {
+		return podsyncUpdateInfo(status), err
+	}
+	info := podsyncUpdateInfo(status)
+	info.Message = fmt.Sprintf("Podsync %s was installed and will restart now.", status.LatestVersion)
+	go func() {
+		time.Sleep(750 * time.Millisecond)
+		if err := restart(); err != nil {
+			log.WithError(err).Error("failed to restart Podsync after update")
+		}
+	}()
+	return info, nil
+}
+
+func podsyncUpdateInfo(status selfupdate.Status) *web.PodsyncUpdateInfo {
+	return &web.PodsyncUpdateInfo{
+		CurrentVersion:  status.CurrentVersion,
+		LatestVersion:   status.LatestVersion,
+		ReleaseURL:      status.ReleaseURL,
+		UpdateAvailable: status.UpdateAvailable,
+		CanUpdate:       status.CanUpdate,
+		Container:       status.Container,
+		Message:         status.Message,
+	}
 }
 
 func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
@@ -1739,6 +1814,64 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 	}
 	m.mu.Unlock()
 	return nil
+}
+
+func (m *AppFeedManager) GetNetworkConfig(ctx context.Context) (*web.NetworkConfigInfo, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.cfg == nil {
+		return &web.NetworkConfigInfo{}, nil
+	}
+	return &web.NetworkConfigInfo{DNSServers: append([]string(nil), m.cfg.Network.DNSServers...)}, nil
+}
+
+func (m *AppFeedManager) UpdateNetworkConfig(ctx context.Context, update *web.NetworkConfigUpdate) error {
+	if update == nil || update.DNSServers == nil {
+		return errors.New("dns_servers is required")
+	}
+	servers := make([]string, 0, len(*update.DNSServers))
+	for _, server := range *update.DNSServers {
+		server = strings.TrimSpace(server)
+		if server != "" {
+			servers = append(servers, server)
+		}
+	}
+	if err := network.ValidateDNSServers(servers); err != nil {
+		return err
+	}
+
+	m.configWriteMu.Lock()
+	defer m.configWriteMu.Unlock()
+	if err := m.saveNetworkToConfig(servers); err != nil {
+		return err
+	}
+	if m.updater != nil {
+		if err := m.updater.SetDNSServers(servers); err != nil {
+			return err
+		}
+	}
+	m.mu.Lock()
+	if m.cfg != nil {
+		m.cfg.Network.DNSServers = append([]string(nil), servers...)
+	}
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *AppFeedManager) saveNetworkToConfig(servers []string) error {
+	if m.configPath == "" {
+		return nil
+	}
+	tree, err := toml.LoadFile(m.configPath)
+	if err != nil {
+		return err
+	}
+	if len(servers) == 0 {
+		tree.Delete("network.dns_servers")
+	} else {
+		tree.Set("network.dns_servers", servers)
+	}
+	return writeConfigTree(m.configPath, tree)
 }
 
 func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {

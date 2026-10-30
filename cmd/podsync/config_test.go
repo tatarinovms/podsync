@@ -30,6 +30,9 @@ dir = "/home/user/db/"
 self_update = true
 timeout = 15
 
+[network]
+dns_servers = ["1.1.1.1", "9.9.9.9"]
+
 [feeds]
   [feeds.XYZ]
   url = "https://youtube.com/watch?v=ygIUF678y40"
@@ -106,6 +109,26 @@ timeout = 15
 
 	assert.True(t, config.Downloader.SelfUpdate)
 	assert.EqualValues(t, 15, config.Downloader.Timeout)
+	assert.Equal(t, []string{"1.1.1.1", "9.9.9.9"}, config.Network.DNSServers)
+}
+
+func TestNetworkDNSConfig(t *testing.T) {
+	path := setup(t, `
+[server]
+data_dir = "/data"
+
+[network]
+dns_servers = ["invalid-server"]
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`)
+	defer os.Remove(path)
+
+	_, err := LoadConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid DNS server")
 }
 
 func TestFilenameTemplateValidation(t *testing.T) {
@@ -458,6 +481,24 @@ data_dir = "/data"
 
 		// Should parse multiple keys from environment variable
 		assert.ElementsMatch(t, []string{"key1", "key2", "key3"}, config.Tokens[model.ProviderYoutube])
+	})
+
+	t.Run("DNS servers environment variable", func(t *testing.T) {
+		const file = `
+[server]
+data_dir = "/data"
+
+[feeds]
+  [feeds.A]
+  url = "https://youtube.com/watch?v=ygIUF678y40"
+`
+		path := setup(t, file)
+		defer os.Remove(path)
+
+		t.Setenv("PODSYNC_DNS_SERVERS", "1.1.1.1, 9.9.9.9")
+		config, err := LoadConfig(path)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"1.1.1.1", "9.9.9.9"}, config.Network.DNSServers)
 	})
 
 	t.Run("vkvideo environment variable", func(t *testing.T) {

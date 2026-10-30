@@ -20,6 +20,7 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/network"
 	"github.com/mxpv/podsync/pkg/ytdl"
 )
 
@@ -38,6 +39,8 @@ type Manager struct {
 	fs         fs.Storage
 	feeds      map[string]*feed.Config
 	keys       map[model.Provider]feed.KeyProvider
+	networkMu  sync.RWMutex
+	apiClient  *http.Client
 }
 
 func NewUpdater(
@@ -48,6 +51,24 @@ func NewUpdater(
 	db db.Storage,
 	fs fs.Storage,
 ) (*Manager, error) {
+	return NewUpdaterWithDNSServers(feeds, keys, hostname, downloader, db, fs, nil)
+}
+
+// NewUpdaterWithDNSServers creates an update manager whose metadata requests
+// use the supplied DNS resolvers. Empty servers use the operating system DNS.
+func NewUpdaterWithDNSServers(
+	feeds map[string]*feed.Config,
+	keys map[model.Provider]feed.KeyProvider,
+	hostname string,
+	downloader Downloader,
+	db db.Storage,
+	fs fs.Storage,
+	dnsServers []string,
+) (*Manager, error) {
+	apiClient, err := network.NewHTTPClient(dnsServers)
+	if err != nil {
+		return nil, err
+	}
 	feedSnapshot := make(map[string]*feed.Config, len(feeds))
 	for id, cfg := range feeds {
 		feedSnapshot[id] = cfg
@@ -59,7 +80,26 @@ func NewUpdater(
 		fs:         fs,
 		feeds:      feedSnapshot,
 		keys:       keys,
+		apiClient:  apiClient,
 	}, nil
+}
+
+// SetDNSServers changes the resolvers used by subsequent provider API calls.
+func (u *Manager) SetDNSServers(dnsServers []string) error {
+	apiClient, err := network.NewHTTPClient(dnsServers)
+	if err != nil {
+		return err
+	}
+	u.networkMu.Lock()
+	u.apiClient = apiClient
+	u.networkMu.Unlock()
+	return nil
+}
+
+func (u *Manager) getAPIClient() *http.Client {
+	u.networkMu.RLock()
+	defer u.networkMu.RUnlock()
+	return u.apiClient
 }
 
 func (u *Manager) SetFeedConfig(id string, cfg *feed.Config) {
@@ -140,7 +180,7 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	}
 
 	// Create an updater for this feed type
-	provider, err := builder.New(ctx, info.Provider, key, u.downloader)
+	provider, err := builder.NewWithHTTPClient(ctx, info.Provider, key, u.downloader, u.getAPIClient())
 	if err != nil {
 		return err
 	}

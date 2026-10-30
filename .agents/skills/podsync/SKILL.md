@@ -1,7 +1,7 @@
 ---
 name: "podsync"
-description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, and rotate API keys."
-version: "1.0.1"
+description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, rotate API keys, and check or install verified native releases."
+version: "1.0.2"
 triggers:
   - "podsync"
   - "podcast"
@@ -20,7 +20,7 @@ This skill provides comprehensive instructions for AI agents on how to monitor, 
 
 ## MCP Connection and Library Scope
 
-- In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 28 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
+- In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 32 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
 - `initialize` reports the serving binary's build version in `serverInfo.version` (`dev` if unspecified). In proxy mode this is the daemon's version, which may differ from the stdio client's version.
 - For a complete library inventory, call both `list_feeds` and `list_personal_feeds`. The first lists channel feeds and audiobooks; personal feeds have a separate tool. An empty result from either tool does not mean the entire library is empty.
 - Older stdio clients can report `personal feeds service is not enabled` while direct HTTP MCP works. Compare `tools/list` and `list_personal_feeds` through authenticated `POST /mcp` before concluding that personal feeds are absent. Updating and restarting the stdio client enables the relay; update the daemon as well to correct an older hardcoded `serverInfo.version`.
@@ -149,19 +149,19 @@ When connected to Podsync's MCP server (`podsync --mcp`, `POST /mcp`, or `/mcp/s
 - **When to use**: Health checks, checking remaining disk capacity, or troubleshooting download failures.
 
 ### 16. `get_tokens`
-- **Purpose**: Returns masked API keys for all providers (`youtube`, `vkvideo`, `vimeo`, `soundcloud`, `twitch`) and indicates if they are loaded from ENV or `config.toml`.
+- **Purpose**: Returns masked API keys for all providers (`youtube`, `vkvideo`, `vimeo`, `soundcloud`, `rutube`) and indicates if they are loaded from ENV or `config.toml`.
 - **Arguments**: None `{}`.
 
 ### 17. `update_tokens`
 - **Purpose**: Updates API keys for a provider in `config.toml`. Accepts multiple keys to enable automatic Round-Robin quota rotation (especially useful for YouTube API).
 - **Arguments**:
-  - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
+  - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"rutube"`.
   - `tokens` *(array of strings, required)*: List of API keys.
 
 ### 18. `delete_tokens`
 - **Purpose**: Deletes a specific API token by index, or clears all configured API tokens for a provider from `config.toml`.
 - **Arguments**:
-  - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"twitch"`.
+  - `provider` *(string, required)*: `"youtube"`, `"vkvideo"`, `"vimeo"`, `"soundcloud"`, or `"rutube"`.
   - `index` *(integer, optional)*: 0-based index of a specific token to delete. If omitted or negative, all tokens for the provider are removed.
 - **When to use**: Removing invalid, revoked, or unnecessary API keys (either a single key from rotation or the entire provider).
 
@@ -237,6 +237,25 @@ When connected to Podsync's MCP server (`podsync --mcp`, `POST /mcp`, or `/mcp/s
   - `dir_name` *(string, required)*: Directory name in the audiobooks directory to delete (e.g. `"George Orwell - 1984"`).
 - **When to use**: When the user asks to delete, clean up, or remove an audiobook folder from the server. Always confirm with the user before deleting.
 
+### 29. `get_network_config`
+- **Purpose**: Returns custom DNS server IP addresses used for provider API and RSS metadata requests.
+- **Arguments**: None `{}`.
+
+### 30. `update_network_config`
+- **Purpose**: Updates custom DNS servers immediately and saves them to `config.toml`.
+- **Arguments**:
+  - `dns_servers` *(array of strings, required)*: IPv4 or IPv6 DNS server addresses. Pass `[]` to restore the operating system resolver.
+
+### 31. `get_podsync_update`
+- **Purpose**: Checks the latest Podsync GitHub Release and reports the installed version, the latest version, the release URL, and whether this installation can update itself.
+- **Arguments**: None `{}`.
+- **When to use**: When the user wants to check whether Podsync can be updated.
+
+### 32. `update_podsync`
+- **Purpose**: Downloads the matching latest GitHub Release, verifies its SHA-256 checksum, replaces the native Podsync binary, and restarts the process.
+- **Arguments**: None `{}`.
+- **When to use**: Only after the user asks to install the current Podsync release. It is unavailable for Docker deployments.
+
 ## MCP Resources
 
 Agents can read live context from Podsync via resources:
@@ -311,3 +330,4 @@ curl -u "$USER:$PASS" -X DELETE "$HOST/api/v1/audiobooks/dirs?name=My+Book"
 1. **Space Management**: Before adding large feeds with video format, call `get_system_stats` to verify sufficient disk space.
 2. **Episode Retries**: If an episode has an error status, check the error message in `get_feed`. If it was an intermittent network error or YouTube rate limit, call `retry_episode`.
 3. **Key Rotation**: When managing YouTube feeds that frequently hit quota limits, recommend configuring 2-3 YouTube API keys using `update_tokens` for automatic Round-Robin rotation.
+4. **New capabilities**: When adding a `web.AdminManager` capability, decide whether agents need an MCP tool. The `TestAdminManagerMCPCoverage` check requires a registered tool or a documented web-only reason before tests pass.

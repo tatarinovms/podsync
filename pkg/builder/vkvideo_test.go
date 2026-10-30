@@ -56,6 +56,11 @@ func TestCleanVKToken(t *testing.T) {
 	}
 }
 
+func TestRedactVKAccessToken(t *testing.T) {
+	value := `Get "https://api.vk.com/method/utils.resolveScreenName?access_token=secret-token&screen_name=protechru": timeout`
+	require.Equal(t, `Get "https://api.vk.com/method/utils.resolveScreenName?access_token=REDACTED&screen_name=protechru": timeout`, redactVKAccessToken(value))
+}
+
 func TestVkVideoBuilder_MissingToken(t *testing.T) {
 	b, err := NewVkVideoBuilder("", nil)
 	require.NoError(t, err)

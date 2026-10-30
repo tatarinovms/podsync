@@ -68,6 +68,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/feeds/", s.authMiddleware(http.HandlerFunc(s.handleFeedSubroutes)))
 
 	mux.Handle("/api/v1/tokens", s.authMiddleware(http.HandlerFunc(s.handleTokens)))
+	mux.Handle("/api/v1/system/update", s.authMiddleware(http.HandlerFunc(s.handlePodsyncUpdate)))
 	mux.Handle("/api/v1/system", s.authMiddleware(http.HandlerFunc(s.handleSystem)))
 	mux.Handle("/api/v1/system/errors", s.authMiddleware(http.HandlerFunc(s.handleSystemErrors)))
 	mux.Handle("/api/v1/system/recent", s.authMiddleware(http.HandlerFunc(s.handleSystemRecent)))
@@ -79,6 +80,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/downloader", s.authMiddleware(http.HandlerFunc(s.handleDownloader)))
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
 	mux.Handle("/api/v1/downloader/test", s.authMiddleware(http.HandlerFunc(s.handleDownloaderTest)))
+	mux.Handle("/api/v1/network", s.authMiddleware(http.HandlerFunc(s.handleNetwork)))
 	mux.Handle("/api/v1/mcp/config", s.authMiddleware(http.HandlerFunc(s.handleMCPConfig)))
 
 	mux.Handle("/api/v1/audiobooks/dirs", s.authMiddleware(http.HandlerFunc(s.handleAudiobookDirs)))
@@ -728,6 +730,32 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, stats)
 }
 
+func (s *Server) handlePodsyncUpdate(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		info, err := s.adminMgr.GetPodsyncUpdate(r.Context())
+		if err != nil {
+			s.writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, info)
+	case http.MethodPost:
+		info, err := s.adminMgr.ApplyPodsyncUpdate(r.Context())
+		if err != nil {
+			s.writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, info)
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
 func (s *Server) handleMCPConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -796,6 +824,40 @@ func (s *Server) handleDownloader(w http.ResponseWriter, r *http.Request) {
 		}
 		s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleNetwork(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		cfg, err := s.adminMgr.GetNetworkConfig(r.Context())
+		if err != nil {
+			s.writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, cfg)
+	case http.MethodPost:
+		var req NetworkConfigUpdate
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if req.DNSServers == nil {
+			s.writeError(w, http.StatusBadRequest, "dns_servers is required")
+			return
+		}
+		if err := s.adminMgr.UpdateNetworkConfig(r.Context(), &req); err != nil {
+			s.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 	default:
 		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}

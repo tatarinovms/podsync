@@ -14,7 +14,7 @@ func TestAdministrativeRoutesRequireAuthentication(t *testing.T) {
 		"/api/v1/feeds", "/api/v1/feeds/status", "/api/v1/feeds/book",
 		"/api/v1/feeds/update-all", "/api/v1/feeds/book/update", "/api/v1/feeds/book/episodes/chapter/retry",
 		"/api/v1/tokens", "/api/v1/system", "/api/v1/system/errors", "/api/v1/system/recent",
-		"/api/v1/system/status", "/api/v1/system/logs", "/api/v1/system/logs/level", "/api/v1/system/logs/download",
+		"/api/v1/system/status", "/api/v1/system/update", "/api/v1/system/logs", "/api/v1/system/logs/level", "/api/v1/system/logs/download",
 		"/api/v1/downloader", "/api/v1/downloader/cookies", "/api/v1/downloader/test", "/api/v1/mcp/config",
 		"/api/v1/audiobooks/dirs", "/api/v1/audiobooks/import", "/api/v1/audiobooks/upload", "/api/v1/audiobooks/config",
 		"/api/v1/auth/password", "/api/v1/auth/security", "/api/v1/covers/upload", "/api/v1/feeds/book/cover",

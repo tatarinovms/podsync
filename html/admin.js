@@ -2148,8 +2148,55 @@
                     ffmpegBadge.innerText = 'Not found';
                 }
 
+                loadPodsyncUpdate();
+
             } catch (err) {
                 console.error("System load error:", err);
+            }
+        }
+
+        async function loadPodsyncUpdate() {
+            const version = document.getElementById('sys-update-version');
+            const message = document.getElementById('sys-update-message');
+            const button = document.getElementById('btn-podsync-update');
+            const releaseLink = document.getElementById('podsync-release-link');
+            if (!version || !message || !button || !releaseLink) return;
+
+            button.disabled = true;
+            try {
+                const res = await fetch('/api/v1/system/update');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to check GitHub Releases');
+
+                version.innerText = data.latest_version || 'Unavailable';
+                message.innerText = data.message || (data.update_available ? 'An update is available.' : 'Podsync is up to date.');
+                if (data.release_url) {
+                    releaseLink.href = data.release_url;
+                    releaseLink.classList.remove('d-none');
+                }
+                button.disabled = !(data.update_available && data.can_update);
+            } catch (err) {
+                version.innerText = 'Unavailable';
+                message.innerText = `Unable to check updates: ${err.message}`;
+            }
+        }
+
+        async function updatePodsync() {
+            if (!confirm('Download the latest Podsync release and restart the service now?')) return;
+            const button = document.getElementById('btn-podsync-update');
+            if (!button) return;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Updating...';
+            try {
+                const res = await fetch('/api/v1/system/update', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Podsync update failed');
+                showToast(data.message || 'Podsync was updated and is restarting.');
+                setTimeout(() => window.location.reload(), 4000);
+            } catch (err) {
+                showToast(`Podsync update failed: ${err.message}`);
+                button.innerHTML = '<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync';
+                loadPodsyncUpdate();
             }
         }
 
@@ -2194,6 +2241,12 @@
                 if (!res.ok) throw new Error('Failed to load downloader config');
                 downloaderConfig = await res.json();
                 renderDownloaderConfig();
+
+                const networkRes = await fetch('/api/v1/network');
+                if (networkRes.ok) {
+                    const networkConfig = await networkRes.json();
+                    document.getElementById('network-dns-servers').value = (networkConfig.dns_servers || []).join(', ');
+                }
 
                 // Also load cookies content
                 const cookiesRes = await fetch('/api/v1/downloader/cookies');
@@ -2321,6 +2374,27 @@
                     throw new Error(err.error || 'Failed to update downloader settings');
                 }
                 alert('Downloader settings saved successfully!');
+                await loadDownloaderConfig();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function saveNetworkSettings(e) {
+            e.preventDefault();
+            const rawServers = document.getElementById('network-dns-servers').value;
+            const dnsServers = rawServers.split(/[\s,]+/).map(server => server.trim()).filter(Boolean);
+            try {
+                const res = await fetch('/api/v1/network', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dns_servers: dnsServers })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to update network settings');
+                }
+                alert('Network settings saved and applied to provider API requests.');
                 await loadDownloaderConfig();
             } catch (err) {
                 alert('Error: ' + err.message);

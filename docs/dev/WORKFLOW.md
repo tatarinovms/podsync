@@ -78,8 +78,8 @@ go test -v ./pkg/builder
 # Test Personal Feeds Service
 go test -v ./pkg/personal
 
-# Test MCP Server & Documentation Synchronization
-go test -v -run TestMCPToolsDocumentationSync ./pkg/mcp/...
+# Test MCP Server, Documentation Synchronization, and Admin Capability Coverage
+go test -v -run 'Test(MCPToolsDocumentationSync|AdminManagerMCPCoverage)' ./pkg/mcp/...
 ```
 
 ### 2.3 Web UI Tests

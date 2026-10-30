@@ -19,6 +19,7 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/network"
 	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/web"
 )
@@ -45,6 +46,13 @@ type Config struct {
 	Audiobooks AudiobooksConfig `toml:"audiobooks"`
 	// Jobs configuration
 	Jobs JobsConfig `toml:"jobs"`
+	// Network config controls DNS used for provider API and RSS metadata requests.
+	Network NetworkConfig `toml:"network"`
+}
+
+type NetworkConfig struct {
+	// DNSServers overrides the system resolver for provider API and RSS metadata requests.
+	DNSServers []string `toml:"dns_servers"`
 }
 
 type JobsConfig struct {
@@ -145,6 +153,9 @@ func (c *Config) validate() error {
 		if !pathReg.MatchString(c.Server.Path) {
 			result = multierror.Append(result, errors.Errorf("Server handle path must be match %s or empty", model.PathRegex))
 		}
+	}
+	if err := network.ValidateDNSServers(c.Network.DNSServers); err != nil {
+		result = multierror.Append(result, err)
 	}
 
 	switch c.Storage.Type {
@@ -293,7 +304,6 @@ func (c *Config) applyEnv() {
 		model.ProviderYoutube:    {"PODSYNC_YOUTUBE_API_KEY"},
 		model.ProviderVimeo:      {"PODSYNC_VIMEO_API_KEY"},
 		model.ProviderSoundcloud: {"PODSYNC_SOUNDCLOUD_API_KEY"},
-		model.ProviderTwitch:     {"PODSYNC_TWITCH_API_KEY"},
 		model.ProviderVkVideo:    {"PODSYNC_VKVIDEO_API_KEY", "PODSYNC_VK_API_KEY"},
 		model.ProviderRutube:     {"PODSYNC_RUTUBE_API_KEY"},
 	}
@@ -343,6 +353,11 @@ func (c *Config) applyEnv() {
 		if days, err := strconv.Atoi(val); err == nil && days > 0 {
 			c.Jobs.HistoryDays = days
 		}
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DNS_SERVERS"); ok {
+		c.Network.DNSServers = strings.FieldsFunc(val, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\t' || r == '\n'
+		})
 	}
 
 	// Downloader environment variables

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -182,9 +183,16 @@ func cleanVKToken(token string) string {
 }
 
 func newVKAPIClient(token string) *vkAPIClient {
+	return newVKAPIClientWithHTTPClient(token, nil)
+}
+
+func newVKAPIClientWithHTTPClient(token string, httpClient *http.Client) *vkAPIClient {
 	token = cleanVKToken(token)
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
 	return &vkAPIClient{
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: httpClient,
 		token:      token,
 		apiURL:     defaultVKAPIHost,
 		apiVersion: defaultVKAPIVersion,
@@ -209,7 +217,7 @@ func (c *vkAPIClient) doRequest(ctx context.Context, method string, params url.V
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "request to %s failed", method)
+		return nil, errors.Errorf("request to %s failed: %s", method, redactVKAccessToken(err.Error()))
 	}
 	defer resp.Body.Close()
 
@@ -219,6 +227,12 @@ func (c *vkAPIClient) doRequest(ctx context.Context, method string, params url.V
 	}
 
 	return body, nil
+}
+
+var vkAccessTokenPattern = regexp.MustCompile(`access_token=[^&\s"']+`)
+
+func redactVKAccessToken(value string) string {
+	return vkAccessTokenPattern.ReplaceAllString(value, "access_token=REDACTED")
 }
 
 func (c *vkAPIClient) call(ctx context.Context, method string, params url.Values) ([]byte, error) {
@@ -393,8 +407,13 @@ type VkVideoBuilder struct {
 }
 
 func NewVkVideoBuilder(token string, downloader Downloader) (*VkVideoBuilder, error) {
+	return NewVkVideoBuilderWithHTTPClient(token, downloader, nil)
+}
+
+// NewVkVideoBuilderWithHTTPClient creates a VK builder with an optional API client.
+func NewVkVideoBuilderWithHTTPClient(token string, downloader Downloader, httpClient *http.Client) (*VkVideoBuilder, error) {
 	return &VkVideoBuilder{
-		client:     newVKAPIClient(token),
+		client:     newVKAPIClientWithHTTPClient(token, httpClient),
 		downloader: downloader,
 	}, nil
 }

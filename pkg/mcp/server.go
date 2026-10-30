@@ -86,7 +86,7 @@ func (s *Server) dispatch(ctx context.Context, req *JSONRPCRequest) JSONRPCRespo
 				Name:    "podsync-mcp",
 				Version: s.version,
 			},
-			Instructions: "Podsync MCP Server provides tools to manage podcast feeds, monitor downloads, retry episodes, inspect system status, and configure API tokens for YouTube, VK Video, Vimeo, SoundCloud, and Twitch.",
+			Instructions: "Podsync MCP Server provides tools to manage podcast feeds, monitor downloads, retry episodes, inspect system status, and configure API tokens for YouTube, VK Video, Vimeo, SoundCloud, and Rutube.",
 		}
 
 	case "ping":
@@ -134,7 +134,7 @@ func (s *Server) dispatch(ctx context.Context, req *JSONRPCRequest) JSONRPCRespo
 				{
 					URI:         "podsync://tokens",
 					Name:        "API Tokens",
-					Description: "Status and masked keys for YouTube, VK Video, Vimeo, SoundCloud, Twitch",
+					Description: "Status and masked keys for YouTube, VK Video, Vimeo, SoundCloud, and Rutube",
 					MimeType:    "application/json",
 				},
 			},
@@ -386,6 +386,22 @@ func (s *Server) getToolDefinitions() []Tool {
 			},
 		},
 		{
+			Name:        "get_podsync_update",
+			Description: "Check the latest Podsync GitHub Release and whether this native installation can install it",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "update_podsync",
+			Description: "Install the latest verified Podsync GitHub Release and restart a native process; unavailable for Docker deployments",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
 			Name:        "get_tokens",
 			Description: "Get configured API keys (masked) and origin (ENV vs config.toml) for all providers",
 			InputSchema: InputSchema{
@@ -399,6 +415,29 @@ func (s *Server) getToolDefinitions() []Tool {
 			InputSchema: InputSchema{
 				Type:       "object",
 				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "get_network_config",
+			Description: "Get custom DNS servers used for provider API and RSS metadata requests",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertyDef{},
+			},
+		},
+		{
+			Name:        "update_network_config",
+			Description: "Set custom DNS servers for provider API and RSS metadata requests; an empty list restores system DNS",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertyDef{
+					"dns_servers": {
+						Type:        "array",
+						Description: "DNS server IPv4 or IPv6 addresses; use [] to restore the system resolver",
+						Items:       &PropertyDef{Type: "string"},
+					},
+				},
+				Required: []string{"dns_servers"},
 			},
 		},
 		{
@@ -447,8 +486,8 @@ func (s *Server) getToolDefinitions() []Tool {
 				Properties: map[string]PropertyDef{
 					"provider": {
 						Type:        "string",
-						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch', 'rutube'",
-						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch", "rutube"},
+						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', or 'rutube'",
+						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "rutube"},
 					},
 					"tokens": {
 						Type:        "array",
@@ -466,8 +505,8 @@ func (s *Server) getToolDefinitions() []Tool {
 				Properties: map[string]PropertyDef{
 					"provider": {
 						Type:        "string",
-						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', 'twitch', 'rutube'",
-						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "twitch", "rutube"},
+						Description: "Provider identifier: 'youtube', 'vkvideo', 'vimeo', 'soundcloud', or 'rutube'",
+						Enum:        []string{"youtube", "vkvideo", "vimeo", "soundcloud", "rutube"},
 					},
 					"index": {
 						Type:        "integer",
@@ -1097,6 +1136,26 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil
 
+	case "get_podsync_update":
+		info, err := s.mgr.GetPodsyncUpdate(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(info, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "update_podsync":
+		info, err := s.mgr.ApplyPodsyncUpdate(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(info, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
 	case "get_tokens":
 		tokens := s.mgr.GetTokens(ctx)
 		data, _ := json.MarshalIndent(tokens, "", "  ")
@@ -1207,6 +1266,33 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 			Content: []ContentItem{{Type: "text", Text: string(data)}},
 		}, nil
 
+	case "get_network_config":
+		cfg, err := s.mgr.GetNetworkConfig(ctx)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(cfg, "", "  ")
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: string(data)}},
+		}, nil
+
+	case "update_network_config":
+		rawServers, ok := args["dns_servers"]
+		if !ok {
+			return CallToolResult{}, fmt.Errorf("dns_servers parameter is required")
+		}
+		servers, err := stringSliceArgument(rawServers, "dns_servers")
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		update := web.NetworkConfigUpdate{DNSServers: &servers}
+		if err := s.mgr.UpdateNetworkConfig(ctx, &update); err != nil {
+			return CallToolResult{}, err
+		}
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: "Successfully updated network DNS configuration"}},
+		}, nil
+
 	case "update_downloader_config":
 		var update web.DownloaderConfigUpdate
 		if rawTimeout, ok := args["timeout"].(float64); ok && rawTimeout > 0 {
@@ -1285,6 +1371,25 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 
 	default:
 		return CallToolResult{}, fmt.Errorf("unknown tool %q", name)
+	}
+}
+
+func stringSliceArgument(value interface{}, name string) ([]string, error) {
+	switch values := value.(type) {
+	case []string:
+		return append([]string(nil), values...), nil
+	case []interface{}:
+		result := make([]string, len(values))
+		for i, item := range values {
+			value, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s[%d] must be a string", name, i)
+			}
+			result[i] = value
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("%s must be an array of strings", name)
 	}
 }
 

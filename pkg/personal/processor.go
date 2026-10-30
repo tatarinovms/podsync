@@ -49,7 +49,6 @@ func isPlatformURL(rawURL string) bool {
 		"rutube.ru",
 		"vimeo.com",
 		"soundcloud.com",
-		"twitch.tv",
 		"tiktok.com",
 		"dzen.ru",
 		"bilibili.com",

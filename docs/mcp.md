@@ -30,7 +30,7 @@ The MCP server operates in two interchangeable modes:
 ```
 
 1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output.
-   - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 28 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
+   - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 32 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
    - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote SSE Mode** instead.
    - **Standalone Mode**: If no daemon is listening on `localhost:<server.port>`, the CLI opens the database directly in standalone mode.
 2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
@@ -39,7 +39,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 28 specialized tools:
+The MCP server provides 32 specialized tools:
 
 For a complete library inventory, call both `list_feeds` (channels and audiobooks)
 and `list_personal_feeds` (curated personal feeds). An empty result from one does
@@ -52,6 +52,8 @@ not mean the entire library is empty.
 | **`get_download_errors`** | `feed_id` *(opt)*, `limit` *(opt, def: 20)* | List failed episode downloads with cleaned diagnostic causes (e.g., bot detection, 429 rate limits, private videos) and recommendations. |
 | **`get_recent_downloads`** | `feed_id` *(opt)*, `limit` *(opt, def: 10)* | List recent successfully downloaded episodes with file sizes, publication dates, and direct media URLs. |
 | **`get_system_stats`** | `{}` | Retrieve live system health, RAM usage, disk usage (`data_dir`), and availability of `yt-dlp` and `ffmpeg`. |
+| **`get_podsync_update`** | `{}` | Check the latest GitHub Release and whether this native installation can install it. |
+| **`update_podsync`** | `{}` | Install the latest verified GitHub Release and restart a native Podsync process. Docker deployments return an unavailable status. |
 | **`get_system_logs`** | `level` *(opt)*, `search` *(opt)*, `feed_id` *(opt)*, `limit` *(opt, def: 50)* | Fetch recent system log entries from in-memory ring buffer, filterable by severity or query. |
 
 ### Feed Management
@@ -71,8 +73,10 @@ not mean the entire library is empty.
 |---|---|---|
 | **`get_downloader_config`** | `{}` | Get yt-dlp binary path, custom binary override, version, self-update status, timeout, cookies status, and proxy settings. |
 | **`update_downloader_config`** | `timeout`, `proxy`, `cookies_from_browser`, `language`, `custom_binary`, `self_update` | Update yt-dlp downloader options, proxy, preferred audio language, custom binary override, or self-update behavior. |
+| **`get_network_config`** | `{}` | Get custom DNS servers for provider API and RSS metadata requests. |
+| **`update_network_config`** | `dns_servers` *(req, string array)* | Set DNS server IP addresses; pass `[]` to restore the system resolver. |
 | **`test_downloader`** | `url` *(opt)* | Test yt-dlp downloader against a video URL to verify cookies and connectivity. |
-| **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Rutube, Vimeo, SoundCloud, and Twitch. |
+| **`get_tokens`** | `{}` | View current API key status (masked for security) for YouTube, VK Video, Rutube, Vimeo, and SoundCloud. |
 | **`update_tokens`** | `provider` *(req)*, `tokens` *(req)* | Update API tokens (supports multiple tokens for automatic round-robin rotation). |
 | **`delete_tokens`** | `provider` *(req)*, `index` *(opt)* | Delete a specific API token by index, or clear all configured tokens for a provider from `config.toml`. |
 

@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/pkg/errors"
 
@@ -14,23 +15,27 @@ type Builder interface {
 }
 
 func New(ctx context.Context, provider model.Provider, key string, downloader Downloader) (Builder, error) {
+	return NewWithHTTPClient(ctx, provider, key, downloader, nil)
+}
+
+// NewWithHTTPClient creates a builder using client for provider API and RSS
+// metadata requests. A nil client uses the system resolver.
+func NewWithHTTPClient(ctx context.Context, provider model.Provider, key string, downloader Downloader, client *http.Client) (Builder, error) {
 	switch provider {
 	case model.ProviderYoutube:
-		return NewYouTubeBuilder(key, downloader)
+		return NewYouTubeBuilderWithHTTPClient(key, downloader, client)
 	case model.ProviderVimeo:
-		return NewVimeoBuilder(ctx, key)
+		return NewVimeoBuilderWithHTTPClient(ctx, key, client)
 	case model.ProviderSoundcloud:
 		return NewSoundcloudBuilder()
-	case model.ProviderTwitch:
-		return NewTwitchBuilder(key)
 	case model.ProviderVkVideo:
-		return NewVkVideoBuilder(key, downloader)
+		return NewVkVideoBuilderWithHTTPClient(key, downloader, client)
 	case model.ProviderRutube:
-		return NewRutubeBuilder(downloader)
+		return NewRutubeBuilderWithHTTPClient(downloader, client)
 	case model.ProviderAudiobook:
 		return NewAudiobookBuilder("")
 	case model.ProviderRSS:
-		return NewRSSBuilder(), nil
+		return NewRSSBuilderWithHTTPClient(client), nil
 	default:
 		return nil, errors.Errorf("unsupported provider %q", provider)
 	}

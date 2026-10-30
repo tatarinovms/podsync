@@ -580,7 +580,6 @@
         .provider-vkvideo { background-color: rgba(var(--ctp-blue-rgb), 0.16) !important; color: var(--ctp-blue) !important; border: 1px solid rgba(var(--ctp-blue-rgb), 0.3) !important; }
         .provider-vimeo { background-color: rgba(var(--ctp-lavender-rgb), 0.16) !important; color: var(--ctp-lavender) !important; border: 1px solid rgba(var(--ctp-lavender-rgb), 0.3) !important; }
         .provider-soundcloud { background-color: rgba(var(--ctp-peach-rgb), 0.16) !important; color: var(--text-warning) !important; border: 1px solid rgba(var(--ctp-peach-rgb), 0.3) !important; }
-        .provider-twitch { background-color: rgba(var(--ctp-mauve-rgb), 0.16) !important; color: var(--text-accent) !important; border: 1px solid rgba(var(--ctp-mauve-rgb), 0.3) !important; }
         .provider-rutube { background-color: rgba(var(--ctp-teal-rgb), 0.16) !important; color: var(--ctp-teal) !important; border: 1px solid rgba(var(--ctp-teal-rgb), 0.3) !important; }
         .provider-audiobook { background-color: rgba(var(--ctp-mauve-rgb), 0.16) !important; color: var(--text-accent) !important; border: 1px solid rgba(var(--ctp-mauve-rgb), 0.3) !important; }
         .provider-unknown { background-color: rgba(var(--ctp-text-rgb), 0.1) !important; color: var(--ctp-text) !important; border: 1px solid rgba(var(--ctp-text-rgb), 0.25) !important; }

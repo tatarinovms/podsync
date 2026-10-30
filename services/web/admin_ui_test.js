@@ -125,6 +125,9 @@ assert(cardHtml.includes('Click to view error log'), "Missing error badge toolti
 assert.equal(typeof context.showFeedErrors, "function", "showFeedErrors must be a function");
 assert.equal(typeof context.retryFeedError, "function", "retryFeedError must be a function");
 assert.equal(typeof context.retryAllErrorsForFeed, "function", "retryAllErrorsForFeed must be a function");
+assert.equal(typeof context.saveNetworkSettings, "function", "Network DNS settings save handler must be available");
+assert.equal(typeof context.loadPodsyncUpdate, "function", "Podsync update status loader must be available");
+assert.equal(typeof context.updatePodsync, "function", "Podsync update action must be available");
 
 console.log('UI search, filter, and rendering tests passed!');
 

@@ -312,6 +312,7 @@ type mockDownloaderAdminMgr struct {
 	dlCfg          DownloaderConfigInfo
 	cookies        string
 	testResponse   TestDownloaderResult
+	networkConfig  NetworkConfigInfo
 	lastProvider   string
 	lastTokens     []string
 	lastDeleteIdx  int
@@ -370,6 +371,14 @@ func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemSta
 	return nil, nil
 }
 
+func (m *mockDownloaderAdminMgr) GetPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error) {
+	return &PodsyncUpdateInfo{CurrentVersion: "v1.0.0", LatestVersion: "v1.1.0", UpdateAvailable: true, CanUpdate: true}, nil
+}
+
+func (m *mockDownloaderAdminMgr) ApplyPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error) {
+	return &PodsyncUpdateInfo{CurrentVersion: "v1.0.0", LatestVersion: "v1.1.0", Message: "Podsync v1.1.0 was installed and will restart now."}, nil
+}
+
 func (m *mockDownloaderAdminMgr) GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error) {
 	return &m.dlCfg, nil
 }
@@ -383,6 +392,17 @@ func (m *mockDownloaderAdminMgr) UpdateDownloaderConfig(ctx context.Context, cfg
 	}
 	if cfg.Language != nil {
 		m.dlCfg.Language = *cfg.Language
+	}
+	return nil
+}
+
+func (m *mockDownloaderAdminMgr) GetNetworkConfig(ctx context.Context) (*NetworkConfigInfo, error) {
+	return &m.networkConfig, nil
+}
+
+func (m *mockDownloaderAdminMgr) UpdateNetworkConfig(ctx context.Context, cfg *NetworkConfigUpdate) error {
+	if cfg.DNSServers != nil {
+		m.networkConfig.DNSServers = append([]string(nil), (*cfg.DNSServers)...)
 	}
 	return nil
 }
@@ -549,6 +569,52 @@ func TestDownloaderEndpoints(t *testing.T) {
 	srv.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Sample Video")
+}
+
+func TestPodsyncUpdateEndpoint(t *testing.T) {
+	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
+	srv.SetAdminManager(&mockDownloaderAdminMgr{})
+
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		req := httptest.NewRequest(method, "/api/v1/system/update", nil)
+		req.SetBasicAuth("admin", "password")
+		rec := httptest.NewRecorder()
+		srv.Handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code, method)
+		assert.Contains(t, rec.Body.String(), `"latest_version":"v1.1.0"`)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/system/update", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestNetworkEndpoints(t *testing.T) {
+	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
+	mgr := &mockDownloaderAdminMgr{networkConfig: NetworkConfigInfo{DNSServers: []string{"1.1.1.1"}}}
+	srv.SetAdminManager(mgr)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/network", nil)
+	req.SetBasicAuth("admin", "password")
+	rec := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "1.1.1.1")
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/network", strings.NewReader(`{"dns_servers":["9.9.9.9","1.1.1.1"]}`))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, []string{"9.9.9.9", "1.1.1.1"}, mgr.networkConfig.DNSServers)
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/network", strings.NewReader(`{}`))
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
 func TestAdminTokensAPI(t *testing.T) {

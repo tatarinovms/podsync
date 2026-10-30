@@ -8,7 +8,7 @@
   <b>English</b> | <a href="README_RU.md">Русский</a>
 </p>
 
-Podsync is a versatile, lightweight podcast generator service that turns **YouTube**, **Rutube**, **VK Video**, **Vimeo**, **SoundCloud**, **Twitch**, and **Local Audiobooks** into standard podcast RSS feeds.
+Podsync is a versatile, lightweight podcast generator service that turns **YouTube**, **Rutube**, **VK Video**, **Vimeo**, **SoundCloud**, and **Local Audiobooks** into standard podcast RSS feeds.
 
 Podcast applications provide superior content delivery: automatic download of new episodes in the background, position remembering and resume, synchronization between devices, and offline listening. Podsync brings this seamless experience to video platforms and your personal audio collection.
 
@@ -29,17 +29,18 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Brute-Force Protection & Security Settings**: Sliding-window rate limiter protecting web login and HTTP Basic Auth from brute-force attacks, configurable via Web UI, environment variables, or `config.toml` (max failed attempts, observation window, lockout duration).
 - **Real-Time In-Memory System Logs**: Built-in log console in the web admin with live auto-refresh (2s polling), search/filter by keyword, level filtering (DEBUG, INFO, WARN, ERROR), dynamic on-the-fly log level switching, and 1-click log download.
 - **Downloader & Dependency Diagnostics**: Live status and version detection for both `yt-dlp` and `ffmpeg`, Netscape `cookies.txt` management (upload/view/clear, extract from browser) to bypass YouTube bot checks, HTTP/SOCKS5 proxy configuration, and live URL extraction test.
+- **Verified Native Updates**: The System tab checks the latest GitHub Release and can install its matching archive on supported Linux or macOS hosts after SHA-256 verification, then restart Podsync. Docker deployments use the Compose update commands in the deployment guide.
 - **Smart Token Extraction**: Paste the entire OAuth redirect URL when adding VK API tokens — Podsync automatically parses out the access token.
 - **Accurate Disk Usage & Active Episodes**: Card metrics accurately reflect only active (downloaded) episodes and their true disk footprint, while cleaned/purged episodes are clearly distinguished in episode inspection.
 - **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations. Keyboard-operated selection controls, associated form labels, responsive filters and larger mobile touch targets support accessible administration.
-- **Model Context Protocol (MCP) Server**: Built-in MCP server with 28 tools for AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
+- **Model Context Protocol (MCP) Server**: Built-in MCP server with 32 tools for AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
 - **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, security, tokens, downloaders, and audiobooks.
 
 ## Features
 
-- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, Twitch, local Audiobooks, and third-party Podcast RSS mirrors.
+- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, local Audiobooks, and third-party Podcast RSS mirrors.
 - Supports feeds configuration: video/audio, quality profile, max video height ceiling, and download scope limits.
 - mp3 encoding with ffmpeg.
 - Direct-to-disk streaming downloads avoiding `/tmp` storage exhaustion.
@@ -112,6 +113,11 @@ enabled = true
 username = "admin"
 password = "secretpassword"
 
+[network]
+# Optional: override DNS for provider API and RSS metadata requests.
+# yt-dlp continues to use the operating system DNS.
+dns_servers = ["1.1.1.1", "9.9.9.9"]
+
 [storage]
   [storage.local]
   data_dir = "/app/data/"
@@ -163,11 +169,11 @@ All key settings can be configured via environment variables:
 | `PODSYNC_ADMIN_LOCKOUT` | Lockout duration after exceeding max attempts | `15m` |
 | `PODSYNC_JOBS_WORKERS` | Concurrent job queue download workers | `2` |
 | `PODSYNC_AUDIOBOOKS_DIR` | Root directory for local audiobook folders | `/app/data/audiobooks` |
+| `PODSYNC_DNS_SERVERS` | Comma- or space-separated DNS server IPs for provider API and RSS metadata requests | `1.1.1.1,9.9.9.9` |
 | `PODSYNC_VKVIDEO_API_KEY` | VK Video token(s), space-separated for rotation (alias: `PODSYNC_VK_API_KEY`) | `vk_token1 vk_token2` |
 | `PODSYNC_YOUTUBE_API_KEY` | YouTube API key(s), space-separated for rotation | `key1 key2 key3` |
 | `PODSYNC_VIMEO_API_KEY` | Vimeo API key(s), space-separated for rotation | `key1 key2` |
 | `PODSYNC_SOUNDCLOUD_API_KEY` | SoundCloud API key(s), space-separated for rotation | `key1 key2` |
-| `PODSYNC_TWITCH_API_KEY` | Twitch API credentials (`CLIENT_ID:CLIENT_SECRET`) | `id1:secret1 id2:secret2` |
 | `PODSYNC_DOWNLOADER_COOKIES_FILE` | Path to Netscape `cookies.txt` file for yt-dlp | `/app/data/cookies.txt` |
 | `PODSYNC_DOWNLOADER_COOKIES_FROM_BROWSER` | Browser name to extract cookies from (e.g. chrome, firefox, safari, brave) | `chrome` or `firefox:Default` |
 | `PODSYNC_DOWNLOADER_PROXY` | HTTP/HTTPS/SOCKS5 proxy URL for yt-dlp downloader traffic | `socks5://127.0.0.1:1080` |
@@ -236,6 +242,7 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes |
 | `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `GET` | `/api/v1/system` | System metrics (RAM, uptime, disk space, yt-dlp & ffmpeg versions) |
+| `GET`, `POST` | `/api/v1/system/update` | Check the latest GitHub Release or install it and restart a native Podsync process |
 | `GET` | `/api/v1/tokens` | Get masked API tokens for all providers |
 | `POST` | `/api/v1/tokens` | Update API tokens (supports key rotation and URL parsing) |
 | `DELETE` | `/api/v1/tokens` | Delete token by `?provider=...&index=...` |
@@ -245,11 +252,13 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `POST` | `/api/v1/downloader/cookies` | Save or upload new Netscape cookies.txt content |
 | `DELETE` | `/api/v1/downloader/cookies` | Clear and delete installed cookies.txt file |
 | `POST` | `/api/v1/downloader/test` | Test URL extraction with yt-dlp and configured cookies/proxy |
+| `GET` | `/api/v1/network` | Get custom DNS servers for provider API and RSS metadata requests |
+| `POST` | `/api/v1/network` | Update custom DNS servers; use `{"dns_servers":["1.1.1.1","9.9.9.9"]}` or an empty list for system DNS |
 | `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
 
 ## Model Context Protocol (MCP) Server
 
-Podsync includes a built-in **MCP Server** with 28 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
+Podsync includes a built-in **MCP Server** with 32 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
 
 An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). See the [MCP Guide](./docs/mcp.md) for full details and setup instructions.
 
@@ -257,8 +266,8 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
 - **Feed Management**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
 - **Personal Feeds**: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`
 - **Audiobooks**: `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
-- **System & Logs**: `get_system_stats`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`
-- **Downloader & Diagnostics**: `get_downloader_config`, `update_downloader_config`, `test_downloader`
+- **System & Logs**: `get_system_stats`, `get_podsync_update`, `update_podsync`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`
+- **Downloader, Network & Diagnostics**: `get_downloader_config`, `update_downloader_config`, `get_network_config`, `update_network_config`, `test_downloader`
 - **Tokens**: `get_tokens`, `update_tokens`, `delete_tokens`
 
 ### How to use MCP:
@@ -269,7 +278,7 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
   *(Automatically relays JSON-RPC to the running instance's `POST /mcp`, including personal-feed tools, or operates standalone with the local database).*
 - **HTTP / SSE Mode**: Available at `/mcp` and `/mcp/sse` when the web server is running.
 
-Both connection modes provide all 28 tools. For a complete library inventory,
+Both connection modes provide all 32 tools. For a complete library inventory,
 call `list_feeds` for channels and audiobooks and `list_personal_feeds` for curated
 personal feeds. In proxy mode, `serverInfo.version` reports the daemon's build
 version. See [MCP troubleshooting](./docs/mcp.md#troubleshooting-older-stdio-clients)

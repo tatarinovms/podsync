@@ -214,13 +214,21 @@ func (v *VimeoBuilder) Build(ctx context.Context, cfg *feed.Config) (*model.Feed
 }
 
 func NewVimeoBuilder(ctx context.Context, token string) (*VimeoBuilder, error) {
+	return NewVimeoBuilderWithHTTPClient(ctx, token, nil)
+}
+
+// NewVimeoBuilderWithHTTPClient creates a Vimeo builder with an optional API client.
+func NewVimeoBuilderWithHTTPClient(ctx context.Context, token string, client *http.Client) (*VimeoBuilder, error) {
 	if token == "" {
 		return nil, errors.New("empty Vimeo access token")
+	}
+	if client != nil {
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
 	}
 
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
 
-	client := vimeo.NewClient(tc, nil)
-	return &VimeoBuilder{client}, nil
+	vimeoClient := vimeo.NewClient(tc, nil)
+	return &VimeoBuilder{vimeoClient}, nil
 }

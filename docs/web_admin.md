@@ -169,7 +169,6 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Rutube** (`PODSYNC_RUTUBE_API_KEY`, optional — Rutube is public)
   - **Vimeo** (`PODSYNC_VIMEO_API_KEY`)
   - **SoundCloud** (`PODSYNC_SOUNDCLOUD_API_KEY`)
-  - **Twitch** (`PODSYNC_TWITCH_API_KEY`)
 - Existing keys are masked (`••••••••`) for security.
 - Add or update keys directly from the web interface — changes are automatically saved to `config.toml`.
 
@@ -184,6 +183,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Memory Usage**: Real-time RAM allocated by the Podsync process.
   - **Server Uptime**: How long the Podsync daemon has been running.
   - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
+  - **Podsync Updates**: Checks the latest GitHub Release. On a supported native Linux or macOS installation, **Update Podsync** downloads the matching release archive, verifies its SHA-256 from `checksums.txt`, replaces the executable, and restarts the process. The button is disabled for Docker deployments; follow the Compose update commands in the deployment guide instead.
 
 ### 7. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
@@ -193,6 +193,11 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **HTTP/SOCKS5 Proxy**: Configure custom proxy routing (`--proxy`) for yt-dlp traffic.
   - **Engine Options**: Configure download timeouts and 24h automatic self-update.
   - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
+
+### 8. Network DNS
+- The **Network DNS** card accepts comma-separated IPv4 or IPv6 resolver addresses.
+- Saved addresses apply immediately to Podsync provider API and RSS metadata requests, including VK Video. Leave the field empty to return to the operating system DNS resolver.
+- `yt-dlp` is a separate process and continues to use the operating system DNS.
 
 ---
 
@@ -212,6 +217,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/system/errors` | `GET` | List download errors with diagnostic causes and recommendations |
 | `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |
+| `/api/v1/system/update` | `GET`, `POST` | Check the latest GitHub Release or install it and restart a native Podsync process |
 | `/api/v1/feeds` | `GET` | List all configured feeds with stats |
 | `/api/v1/feeds` | `POST` | Add a new feed |
 | `/api/v1/feeds/status` | `GET` | Lightweight in-memory feed status (state: idle, queued, running; last_error, update times) |
@@ -245,6 +251,8 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/downloader/cookies` | `POST` | Save or upload new Netscape cookies.txt content |
 | `/api/v1/downloader/cookies` | `DELETE` | Clear and delete installed cookies.txt file |
 | `/api/v1/downloader/test` | `POST` | Test URL extraction with yt-dlp and configured cookies/proxy |
+| `/api/v1/network` | `GET` | Get custom DNS servers for provider API and RSS metadata requests |
+| `/api/v1/network` | `POST` | Update custom DNS servers (`dns_servers`) |
 
 Episode queries return `feed`, `episodes`, `total`, `matching`, `status_counts`,
 `offset`, `limit`, `has_more`, and `next_offset` when another page exists.

@@ -74,10 +74,16 @@ type RSSBuilder struct {
 }
 
 func NewRSSBuilder() *RSSBuilder {
+	return NewRSSBuilderWithHTTPClient(nil)
+}
+
+// NewRSSBuilderWithHTTPClient creates an RSS builder with an optional HTTP client.
+func NewRSSBuilderWithHTTPClient(client *http.Client) *RSSBuilder {
+	if client == nil {
+		client = &http.Client{Timeout: rssHTTPTimeout}
+	}
 	return &RSSBuilder{
-		client: &http.Client{
-			Timeout: rssHTTPTimeout,
-		},
+		client: client,
 	}
 }
 

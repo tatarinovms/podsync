@@ -343,7 +343,6 @@
                                     </li>
                                     <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>YouTube:</strong> Google Cloud Console &rarr; YouTube Data API v3</li>
                                     <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>Vimeo:</strong> Developer App Access Token</li>
-                                    <li><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-2"></i><strong>Twitch:</strong> Twitch Developer Console (ID:SECRET)</li>
                                 </ul>
                                 <div class="mt-3 p-2 rounded border small text-muted" style="background-color: var(--ctp-crust);">
                                     <i aria-hidden="true" class="bi bi-info-circle text-primary me-1"></i>
@@ -411,6 +410,25 @@
                                         <span>Podsync Version</span>
                                         <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Podsync Updates</h6>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                    <span class="small text-muted">Latest release</span>
+                                    <span id="sys-update-version" class="badge bg-light text-secondary border">Checking...</span>
+                                </div>
+                                <p id="sys-update-message" class="small text-muted mb-3">Checking GitHub Releases for an update.</p>
+                                <div class="d-flex align-items-center gap-2 mt-auto">
+                                    <button id="btn-podsync-update" type="button" class="btn btn-brand btn-sm" onclick="updatePodsync()" disabled>
+                                        <i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync
+                                    </button>
+                                    <a id="podsync-release-link" class="btn btn-secondary btn-sm d-none" target="_blank" rel="noopener noreferrer">
+                                        Release notes
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -643,6 +661,24 @@
                                             <button type="submit" class="btn btn-brand btn-sm">
                                                 <i aria-hidden="true" class="bi bi-save me-1"></i> Save Downloader Settings
                                             </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div class="card shadow-sm mb-4">
+                                <div class="card-header bg-transparent py-3">
+                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-router me-2 text-primary"></i>Network DNS</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form onsubmit="saveNetworkSettings(event)">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold" for="network-dns-servers">Custom DNS Servers</label>
+                                            <input type="text" id="network-dns-servers" class="form-control form-control-sm font-monospace" placeholder="1.1.1.1, 9.9.9.9">
+                                            <div class="form-text small">Comma-separated IPv4 or IPv6 addresses. Used immediately for provider API and RSS metadata requests; leave empty to use the system DNS. yt-dlp uses the operating system DNS.</div>
+                                        </div>
+                                        <div class="d-flex justify-content-end">
+                                            <button type="submit" class="btn btn-brand btn-sm"><i aria-hidden="true" class="bi bi-save me-1"></i>Save Network Settings</button>
                                         </div>
                                     </form>
                                 </div>
@@ -911,6 +947,16 @@
                                         <td><span class="badge bg-light text-muted border">None</span></td>
                                     </tr>
                                     <tr>
+                                        <td><code>get_podsync_update</code></td>
+                                        <td>Check the latest GitHub Release and whether this installation can update</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_podsync</code></td>
+                                        <td>Install the latest verified GitHub Release and restart a native process</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
                                         <td><code>get_tokens</code></td>
                                         <td>Check configured API keys (masked) for all providers</td>
                                         <td><span class="badge bg-light text-muted border">None</span></td>
@@ -929,6 +975,16 @@
                                         <td><code>get_downloader_config</code></td>
                                         <td>Inspect yt-dlp binary version, path, cookies file stats, and proxy setting</td>
                                         <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>get_network_config</code></td>
+                                        <td>Inspect custom DNS servers used for provider API and RSS metadata requests</td>
+                                        <td><span class="badge bg-light text-muted border">None</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>update_network_config</code></td>
+                                        <td>Update custom DNS servers; use an empty list to restore system DNS</td>
+                                        <td><code>dns_servers[]</code></td>
                                     </tr>
                                     <tr>
                                         <td><code>update_downloader_config</code></td>

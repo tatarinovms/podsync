@@ -519,11 +519,19 @@ func (yt *YouTubeBuilder) Build(ctx context.Context, cfg *feed.Config) (*model.F
 }
 
 func NewYouTubeBuilder(key string, ytdlp Downloader) (*YouTubeBuilder, error) {
+	return NewYouTubeBuilderWithHTTPClient(key, ytdlp, nil)
+}
+
+// NewYouTubeBuilderWithHTTPClient creates a YouTube builder with an optional API client.
+func NewYouTubeBuilderWithHTTPClient(key string, ytdlp Downloader, client *http.Client) (*YouTubeBuilder, error) {
 	if key == "" {
 		return nil, errors.New("empty YouTube API key")
 	}
+	if client == nil {
+		client = &http.Client{}
+	}
 
-	yt, err := youtube.NewService(context.Background(), option.WithHTTPClient(&http.Client{}))
+	yt, err := youtube.NewService(context.Background(), option.WithHTTPClient(client))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create youtube client")
 	}

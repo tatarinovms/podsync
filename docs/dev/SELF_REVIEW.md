@@ -71,7 +71,8 @@ Before committing changes, opening pull requests, or creating release tags, run 
 
 ## 6. MCP & Skill Synchronization
 
-- [ ] **Tool Count**: All 28 MCP tools in `pkg/mcp/server.go` have handlers and synchronized references. Stdio proxy mode relays JSON-RPC to the daemon, including personal-feed tools.
+- [ ] **Tool Count**: All 32 MCP tools in `pkg/mcp/server.go` have handlers and synchronized references. Stdio proxy mode relays JSON-RPC to the daemon, including personal-feed tools.
+- [ ] **MCP Coverage Decision**: Every `web.AdminManager` method is listed in `adminManagerMCPExposure` with a registered MCP tool or a documented web-only reason. Run `TestAdminManagerMCPCoverage`.
 - [ ] **Skill Parity**:
   - Updated `.agents/skills/podsync/SKILL.md`.
   - Copied to `/Users/tatarinovms/.gemini/config/skills/podsync/SKILL.md` and project skill directories.

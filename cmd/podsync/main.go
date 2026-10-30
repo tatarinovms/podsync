@@ -15,6 +15,7 @@ import (
 	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/pkg/personal"
+	"github.com/mxpv/podsync/pkg/selfupdate"
 	"github.com/mxpv/podsync/services/migrate"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
@@ -217,7 +218,7 @@ func main() {
 	}
 
 	log.Debug("creating update manager")
-	manager, err := update.NewUpdater(cfg.Feeds, keys, cfg.Server.PublicURL(), downloader, database, storage)
+	manager, err := update.NewUpdaterWithDNSServers(cfg.Feeds, keys, cfg.Server.PublicURL(), downloader, database, storage, cfg.Network.DNSServers)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create updater")
 	}
@@ -288,6 +289,11 @@ func main() {
 	)
 
 	feedManager.queue = personalQueue
+	if executable, err := os.Executable(); err != nil {
+		log.WithError(err).Warn("Podsync self-update is unavailable")
+	} else {
+		feedManager.SetSelfUpdater(selfupdate.New(version, executable), restartCurrentProcess)
+	}
 
 	group, ctx := errgroup.WithContext(ctx)
 	defer func() {

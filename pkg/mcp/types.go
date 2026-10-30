@@ -111,9 +111,10 @@ type InputSchema struct {
 
 // PropertyDef describes a parameter property
 type PropertyDef struct {
-	Type        string   `json:"type"`
-	Description string   `json:"description,omitempty"`
-	Enum        []string `json:"enum,omitempty"`
+	Type        string       `json:"type"`
+	Description string       `json:"description,omitempty"`
+	Enum        []string     `json:"enum,omitempty"`
+	Items       *PropertyDef `json:"items,omitempty"`
 }
 
 // ListToolsResult represents the result of tools/list

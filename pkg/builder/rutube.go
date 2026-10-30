@@ -70,10 +70,16 @@ type RutubeBuilder struct {
 }
 
 func NewRutubeBuilder(downloader Downloader) (*RutubeBuilder, error) {
+	return NewRutubeBuilderWithHTTPClient(downloader, nil)
+}
+
+// NewRutubeBuilderWithHTTPClient creates a Rutube builder with an optional API client.
+func NewRutubeBuilderWithHTTPClient(downloader Downloader, client *http.Client) (*RutubeBuilder, error) {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
 	return &RutubeBuilder{
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client:     client,
 		downloader: downloader,
 		userAgent:  rutubeDefaultUserAgent,
 		baseURL:    rutubeDefaultBaseURL,

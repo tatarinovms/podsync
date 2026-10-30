@@ -123,7 +123,7 @@ Latte uses semantic text colors for readable status badges and secondary text.
   - **QR Code Generator**: Instant on-screen QR code for camera scanning with phones and tablets.
   - **Podcast Player Deep-Links**: Direct one-tap subscription for:
     - **Apple Podcasts** (`podcast://...`)
-    - **Pocket Casts** (`pktc://subscribe/...`)
+    - **Pocket Casts** (`https://pocketcasts.com/follow/...`)
     - **Overcast** (`overcast://...`)
 
 ### 3. Dedicated Podcast Page (Episodes, Settings & History)

@@ -639,7 +639,7 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	cleanURL = strings.TrimPrefix(cleanURL, "http://")
 
 	summary.AppleURL = fmt.Sprintf("podcast://%s", cleanURL)
-	summary.PocketCastsURL = fmt.Sprintf("pktc://subscribe/%s", cleanURL)
+	summary.PocketCastsURL = fmt.Sprintf("https://pocketcasts.com/follow/%s", feedURL)
 	summary.OvercastURL = fmt.Sprintf("overcast://x-callback-url/add?url=%s", url.QueryEscape(feedURL))
 
 	return summary

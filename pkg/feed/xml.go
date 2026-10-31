@@ -393,9 +393,7 @@ func FormatXML(podcast *itunes.Podcast, f *model.Feed) string {
 			if ep.ChaptersURL != "" {
 				chapterTag := fmt.Sprintf("\n\t\t<podcast:chapters url=%q type=\"application/json+chapters\"/>", ep.ChaptersURL)
 				target := fmt.Sprintf("<guid>%s</guid>", ep.ID)
-				if strings.Contains(raw, target) {
-					raw = strings.Replace(raw, target, target+chapterTag, 1)
-				}
+				raw = strings.Replace(raw, target, target+chapterTag, 1)
 			}
 		}
 	}

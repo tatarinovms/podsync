@@ -3,8 +3,8 @@ package update
 import (
 	"bytes"
 	"context"
-	"io"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 

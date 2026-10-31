@@ -106,10 +106,10 @@ func (u *Updater) Apply(ctx context.Context) (Status, error) {
 	}
 	status := u.statusForRelease(rel)
 	if !status.CanUpdate {
-		return status, fmt.Errorf("Podsync update is unavailable: %s", status.Message)
+		return status, fmt.Errorf("podsync update is unavailable: %s", status.Message)
 	}
 	if !status.UpdateAvailable {
-		return status, fmt.Errorf("Podsync is already running %s", status.CurrentVersion)
+		return status, fmt.Errorf("podsync is already running %s", status.CurrentVersion)
 	}
 
 	archive, checksum, err := releaseFiles(rel, u.platform)
@@ -207,7 +207,11 @@ func releaseFiles(rel release, platform platform) (releaseAsset, releaseAsset, e
 	if !ok {
 		return releaseAsset{}, releaseAsset{}, fmt.Errorf("no release archive is available for %s/%s", platform.os, platform.arch)
 	}
-	prefix := "Podsync_" + strings.TrimPrefix(rel.TagName, "v") + "_" + strings.Title(platform.os) + "_" + arch
+	osTitle := platform.os
+	if len(platform.os) > 0 {
+		osTitle = strings.ToUpper(platform.os[:1]) + platform.os[1:]
+	}
+	prefix := "Podsync_" + strings.TrimPrefix(rel.TagName, "v") + "_" + osTitle + "_" + arch
 	var archive, checksums releaseAsset
 	for _, asset := range rel.Assets {
 		switch {

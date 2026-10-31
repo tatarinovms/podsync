@@ -13,19 +13,19 @@ var ErrInvalid = errors.New("invalid personal feed request")
 var ErrConflict = errors.New("personal feed conflict")
 
 type Feed struct {
-	ID           string        `json:"id"`
-	Type         string        `json:"type"`
-	Title        string        `json:"title"`
-	Description  string        `json:"description"`
-	CoverArt     string        `json:"cover_art"`
-	Format       model.Format  `json:"format"`
-	PlaylistSort model.Sorting `json:"playlist_sort"`
+	ID            string        `json:"id"`
+	Type          string        `json:"type"`
+	Title         string        `json:"title"`
+	Description   string        `json:"description"`
+	CoverArt      string        `json:"cover_art"`
+	Format        model.Format  `json:"format"`
+	PlaylistSort  model.Sorting `json:"playlist_sort"`
 	PrivateFeed   bool          `json:"private_feed"`
 	QuickAddToken string        `json:"quick_add_token,omitempty"`
 	CreatedAt     time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
-	FeedURL      string        `json:"feed_url"`
-	EpisodeCount int           `json:"episode_count"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	FeedURL       string        `json:"feed_url"`
+	EpisodeCount  int           `json:"episode_count"`
 }
 
 type Patch struct {

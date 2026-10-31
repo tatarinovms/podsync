@@ -85,10 +85,10 @@ type Feed struct {
 
 // FeedStats represents aggregated statistics for a feed
 type FeedStats struct {
-	EpisodeCount    int   `json:\"episode_count\"`
-	DownloadedCount int   `json:\"downloaded_count\"`
-	ErrorCount      int   `json:\"error_count\"`
-	TotalSize       int64 `json:\"total_size\"`
+	EpisodeCount    int   `json:"episode_count"`
+	DownloadedCount int   `json:"downloaded_count"`
+	ErrorCount      int   `json:"error_count"`
+	TotalSize       int64 `json:"total_size"`
 }
 
 type EpisodeStatus string

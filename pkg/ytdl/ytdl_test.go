@@ -247,3 +247,77 @@ func TestBuildArgsWithLanguage(t *testing.T) {
 	}
 	assert.Equal(t, 1, count)
 }
+
+func TestBuildArgsWithIgnoreLive(t *testing.T) {
+	dl := &YoutubeDl{}
+	feedCfg := &feed.Config{
+		Format:     model.FormatAudio,
+		Quality:    model.QualityHigh,
+		IgnoreLive: true,
+	}
+	ep := &model.Episode{
+		VideoURL: "https://youtube.com/watch?v=live123",
+	}
+	args := dl.buildArgs(feedCfg, ep, "/tmp/out.mp3")
+	assert.Contains(t, args, "--match-filters")
+	assert.Contains(t, args, "!is_live & live_status !=? 'is_upcoming' & live_status !=? 'is_live'")
+}
+
+func TestBuildArgsWithNormalizeAudio(t *testing.T) {
+	dl := &YoutubeDl{}
+	feedCfg := &feed.Config{
+		Format:         model.FormatAudio,
+		Quality:        model.QualityHigh,
+		NormalizeAudio: true,
+	}
+	ep := &model.Episode{
+		VideoURL: "https://youtube.com/watch?v=audio123",
+	}
+	args := dl.buildArgs(feedCfg, ep, "/tmp/out.mp3")
+	assert.Contains(t, args, "--postprocessor-args")
+	assert.Contains(t, args, "ExtractAudio:-af loudnorm=I=-16:TP=-1.5:LRA=11")
+}
+
+func TestProxyRouting(t *testing.T) {
+	dl := &YoutubeDl{
+		proxy: "http://default-proxy:8080",
+		proxies: map[string]string{
+			"youtube": "socks5://127.0.0.1:1080",
+			"vkvideo": "direct",
+			"rutube":  "direct",
+			"vimeo":   "http://vimeo-proxy:3128",
+		},
+	}
+
+	// 1. YouTube URL uses YouTube proxy
+	assert.Equal(t, "socks5://127.0.0.1:1080", dl.ProxyForURL("https://www.youtube.com/watch?v=123", ""))
+	assert.Equal(t, "socks5://127.0.0.1:1080", dl.ProxyForURL("https://youtu.be/123", ""))
+
+	// 2. VK Video and Rutube bypass proxy with direct
+	assert.Equal(t, "", dl.ProxyForURL("https://vkvideo.ru/video-123_456", ""))
+	assert.Equal(t, "", dl.ProxyForURL("https://rutube.ru/video/abc/", ""))
+
+	// 3. Vimeo uses Vimeo proxy
+	assert.Equal(t, "http://vimeo-proxy:3128", dl.ProxyForURL("https://vimeo.com/76979871", ""))
+
+	// 4. Unknown domain falls back to global proxy
+	assert.Equal(t, "http://default-proxy:8080", dl.ProxyForURL("https://example.com/video.mp4", ""))
+
+	// 5. Per-feed proxy override takes precedence over everything
+	assert.Equal(t, "http://custom-feed-proxy:9090", dl.ProxyForURL("https://youtube.com/watch?v=123", "http://custom-feed-proxy:9090"))
+	assert.Equal(t, "", dl.ProxyForURL("https://youtube.com/watch?v=123", "direct"))
+}
+
+func TestBuildArgsDirectProxyBypassesGlobalProxy(t *testing.T) {
+	dl := &YoutubeDl{proxy: "http://default-proxy:8080", proxies: map[string]string{"vkvideo": "direct"}}
+	feedCfg := &feed.Config{Format: model.FormatAudio, Quality: model.QualityHigh}
+
+	providerDirect := dl.buildArgs(feedCfg, &model.Episode{VideoURL: "https://vkvideo.ru/video-1_2"}, "/tmp/out.mp3")
+	assert.NotContains(t, providerDirect, "http://default-proxy:8080")
+	assert.NotContains(t, providerDirect, "--proxy")
+
+	feedCfg.Proxy = "direct"
+	feedDirect := dl.buildArgs(feedCfg, &model.Episode{VideoURL: "https://youtube.com/watch?v=123"}, "/tmp/out.mp3")
+	assert.NotContains(t, feedDirect, "http://default-proxy:8080")
+	assert.NotContains(t, feedDirect, "--proxy")
+}

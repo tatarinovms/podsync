@@ -193,3 +193,23 @@ func TestBuildXML_PrivateFeed(t *testing.T) {
 	xmlStr3 := FormatXML(out3, &feed3)
 	assert.NotContains(t, xmlStr3, "<itunes:block>")
 }
+
+func TestBuildXML_PodcastChapters(t *testing.T) {
+	feed := model.Feed{
+		Episodes: []*model.Episode{
+			{
+				ID:          "ep1",
+				Status:      model.EpisodeDownloaded,
+				Title:       "Episode 1",
+				ChaptersURL: "http://localhost/show/ep1.chapters.json",
+			},
+		},
+	}
+	cfg := Config{ID: "show"}
+	out, err := Build(context.Background(), &feed, &cfg, "http://localhost/")
+	require.NoError(t, err)
+
+	xmlStr := FormatXML(out, &feed)
+	assert.Contains(t, xmlStr, "xmlns:podcast=\"https://podcastindex.org/namespace/1.0\"")
+	assert.Contains(t, xmlStr, "<podcast:chapters url=\"http://localhost/show/ep1.chapters.json\" type=\"application/json+chapters\"/>")
+}

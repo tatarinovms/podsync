@@ -137,6 +137,87 @@ func (s *Server) handlePersonalFeeds(w http.ResponseWriter, r *http.Request) {
 			s.writeError(w, 405, "method not allowed")
 			return
 		}
+	} else if len(parts) == 2 && parts[1] == "quick-add" {
+		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			w.Header().Set("Allow", "GET, POST")
+			s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		id := parts[0]
+		authed := false
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if token == "" {
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
+				token = strings.TrimSpace(authHeader[7:])
+			} else {
+				token = r.Header.Get("X-Quick-Add-Token")
+			}
+		}
+
+		if token != "" && s.personal.ValidateQuickAddToken(id, token) {
+			authed = true
+		} else if s.isRequestAuthenticated(r) {
+			authed = true
+		}
+
+		if !authed {
+			s.writeError(w, http.StatusUnauthorized, "invalid or missing quick-add authorization token")
+			return
+		}
+
+		var targetURL, title, format, quality string
+		targetURL = strings.TrimSpace(r.URL.Query().Get("url"))
+		title = strings.TrimSpace(r.URL.Query().Get("title"))
+		format = strings.TrimSpace(r.URL.Query().Get("format"))
+		quality = strings.TrimSpace(r.URL.Query().Get("quality"))
+
+		if r.Method == http.MethodPost && r.Body != nil && r.ContentLength > 0 {
+			var req struct {
+				URL     string `json:"url"`
+				Title   string `json:"title"`
+				Format  string `json:"format"`
+				Quality string `json:"quality"`
+			}
+			if e := decodePersonal(w, r, &req); e == nil {
+				if req.URL != "" {
+					targetURL = req.URL
+				}
+				if req.Title != "" {
+					title = req.Title
+				}
+				if req.Format != "" {
+					format = req.Format
+				}
+				if req.Quality != "" {
+					quality = req.Quality
+				}
+			}
+		}
+
+		if targetURL == "" {
+			s.writeError(w, http.StatusBadRequest, "url parameter is required")
+			return
+		}
+
+		res, err := s.personal.AddURL(r.Context(), id, targetURL, title, format, quality, 0)
+		if err != nil {
+			s.personalError(w, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":     "queued",
+			"feed_id":    id,
+			"episode_id": res.ID,
+			"title":      res.Title,
+			"message":    "Episode queued for background download",
+		})
+		return
 	} else if len(parts) == 2 && parts[1] == "upload" {
 		if r.Method != http.MethodPost {
 			s.writeError(w, 405, "method not allowed")

@@ -150,6 +150,7 @@
                                 <p id="personal-description" class="text-muted mb-0"></p>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-outline-primary btn-sm" type="button" onclick="openQuickAddModal(personalCurrentID)"><i aria-hidden="true" class="bi bi-phone me-1"></i>1-Click Share</button>
                                 <button class="btn btn-light btn-sm" type="button" onclick="personalEdit(personalCurrentID)"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
                                 <button id="personal-rss" class="btn btn-brand btn-sm" type="button" onclick="showSubscription(personalCurrentID)"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                                 <button class="btn btn-outline-danger btn-sm" type="button" onclick="personalDeleteFeed()"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button>
@@ -630,9 +631,37 @@
                                 <div class="card-body">
                                     <form id="downloader-settings-form" onsubmit="saveDownloaderSettings(event)">
                                         <div class="mb-3">
-                                            <label class="form-label small fw-semibold" for="dl-proxy">HTTP / SOCKS5 Proxy</label>
+                                            <label class="form-label small fw-semibold" for="dl-proxy">Default HTTP / SOCKS5 Proxy</label>
                                             <input type="text" id="dl-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080 or http://user:pass@host:port">
-                                            <div class="form-text small">Passed directly to yt-dlp via <code>--proxy</code>.</div>
+                                            <div class="form-text small">Global fallback proxy passed directly to yt-dlp via <code>--proxy</code>.</div>
+                                        </div>
+
+                                        <div class="border rounded p-3 mb-3 bg-body-tertiary">
+                                            <div class="d-flex align-items-center gap-2 mb-2">
+                                                <i aria-hidden="true" class="bi bi-diagram-3 text-primary"></i>
+                                                <span class="small fw-semibold">Selective Proxy Routing (Per-Provider)</span>
+                                            </div>
+                                            <div class="form-text small mb-2">Route specific video hosts through individual proxies (e.g. SOCKS5/Xray for YouTube, direct for VK Video/Rutube).</div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-sm-6">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-youtube"><i aria-hidden="true" class="bi bi-youtube text-danger me-1"></i>YouTube Proxy</label>
+                                                    <input type="text" id="dl-proxy-youtube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080">
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vkvideo"><i aria-hidden="true" class="bi bi-camera-video text-primary me-1"></i>VK Video Proxy</label>
+                                                    <input type="text" id="dl-proxy-vkvideo" class="form-control form-control-sm font-monospace" placeholder="direct or http://...">
+                                                </div>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-sm-6">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-rutube"><i aria-hidden="true" class="bi bi-play-circle text-success me-1"></i>Rutube Proxy</label>
+                                                    <input type="text" id="dl-proxy-rutube" class="form-control form-control-sm font-monospace" placeholder="direct or http://...">
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vimeo"><i aria-hidden="true" class="bi bi-broadcast text-info me-1"></i>Vimeo / Soundcloud Proxy</label>
+                                                    <input type="text" id="dl-proxy-vimeo" class="form-control form-control-sm font-monospace" placeholder="socks5://...">
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div class="mb-3">
@@ -1366,6 +1395,22 @@
                                         <input type="number" id="fs-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
                                     </div>
                                 </div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-sm-6">
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="fs-ignore-live">
+                                            <label class="form-check-label small fw-semibold" for="fs-ignore-live">Ignore Live Streams &amp; Premieres</label>
+                                            <div class="form-text small">Skip active live streams and scheduled upcoming broadcasts to avoid breaking download queue.</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="fs-normalize-audio">
+                                            <label class="form-check-label small fw-semibold" for="fs-normalize-audio">Normalize Audio (EBU R128)</label>
+                                            <div class="form-text small">Apply <code>loudnorm=I=-16:TP=-1.5:LRA=11</code> filter (Apple Podcasts / Spotify standard).</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- 4. Custom RSS Overrides -->
@@ -1421,6 +1466,11 @@
 
                             <!-- 5. Advanced -->
                             <div class="tab-pane fade" id="fs-tab-advanced">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold" for="fs-proxy">Feed Proxy URL</label>
+                                    <input type="text" id="fs-proxy" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080 or direct">
+                                    <div class="form-text small">Overrides global downloader proxy for this specific feed. Set to <code>direct</code> to bypass proxies.</div>
+                                </div>
                                 <div class="mb-3">
                                     <label class="form-label small fw-semibold" for="fs-filename-template">Filename Template</label>
                                     <input type="text" id="fs-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
@@ -1787,6 +1837,22 @@
                                             <input type="number" id="new-feed-max-age" class="form-control form-control-sm" min="0" placeholder="e.g. 30">
                                         </div>
                                     </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-sm-6">
+                                            <div class="form-check form-switch mt-2">
+                                                <input class="form-check-input" type="checkbox" id="new-feed-ignore-live">
+                                                <label class="form-check-label small fw-semibold" for="new-feed-ignore-live">Ignore Live Streams &amp; Premieres</label>
+                                                <div class="form-text small">Skip active live streams and scheduled upcoming broadcasts.</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <div class="form-check form-switch mt-2">
+                                                <input class="form-check-input" type="checkbox" id="new-feed-normalize-audio">
+                                                <label class="form-check-label small fw-semibold" for="new-feed-normalize-audio">Normalize Audio (EBU R128)</label>
+                                                <div class="form-text small">Apply standard <code>loudnorm</code> filter (-16 LUFS) for audio.</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- 4. Custom RSS Overrides -->
@@ -1835,6 +1901,11 @@
 
                                 <!-- 5. Advanced -->
                                 <div class="tab-pane fade" id="af-tab-advanced">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold" for="new-feed-proxy">Feed Proxy URL</label>
+                                        <input type="text" id="new-feed-proxy" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080 or direct">
+                                        <div class="form-text small">Optional proxy override for this feed. Set to <code>direct</code> to bypass global proxy.</div>
+                                    </div>
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold" for="new-feed-filename-template">Filename Template</label>
                                         <input type="text" id="new-feed-filename-template" class="form-control form-control-sm font-monospace" placeholder="e.g. {{pub_date}}_{{title}}_{{id}}">
@@ -2001,6 +2072,175 @@
             <div class="d-flex">
                 <div class="toast-body" id="toast-message">Link copied to clipboard!</div>
                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Add / iOS Shortcuts Modal -->
+    <div class="modal fade" id="quickAddModal" tabindex="-1" aria-labelledby="quickAddModal-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow">
+                <div class="modal-header border-bottom">
+                    <h5 class="modal-title fw-bold mb-0 d-flex align-items-center gap-2" id="quickAddModal-title">
+                        <i aria-hidden="true" class="bi bi-phone text-primary"></i> 1-Click Share &amp; iOS Shortcuts
+                    </h5>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeModal('quickAddModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-4">
+                        Send videos and podcasts directly to your personal feed in 1 click from iOS Share Sheet, browser bookmarklet, or webhook URL without sharing master admin credentials.
+                    </p>
+
+                    <!-- Feed Scoped Token & Endpoint -->
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold" for="quick-add-endpoint-url">Quick-Add Endpoint URL</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" id="quick-add-endpoint-url" class="form-control font-monospace" readonly>
+                            <button class="btn btn-outline-secondary" type="button" onclick="copyElementText('quick-add-endpoint-url')" title="Copy URL">
+                                <i aria-hidden="true" class="bi bi-clipboard me-1"></i>Copy
+                            </button>
+                        </div>
+                        <div class="form-text small mt-1">Accepts <code>POST</code> and <code>GET</code> requests with parameter <code>url=&lt;video_link&gt;</code>. Scoped only to this personal feed.</div>
+                    </div>
+
+                    <!-- iOS Shortcut Setup -->
+                    <div class="card p-3 mb-4 bg-body-tertiary border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i aria-hidden="true" class="bi bi-apple fs-5"></i>
+                            <h6 class="fw-bold mb-0">iOS Shortcuts (iPhone / iPad)</h6>
+                        </div>
+                        <p class="small text-muted mb-2">
+                            To create an iOS Shortcut in 30 seconds:
+                        </p>
+                        <ol class="small text-muted mb-3 ps-3">
+                            <li>Open the <strong>Shortcuts</strong> app on iOS and tap <strong>+</strong> (New Shortcut).</li>
+                            <li>Turn on <strong>Show in Share Sheet</strong> in Shortcut Details.</li>
+                            <li>Add action: <strong>Get URLs from Shortcut Input</strong>.</li>
+                            <li>Add action: <strong>Get Contents of URL</strong>:
+                                <ul>
+                                    <li>URL: <code id="quick-add-shortcut-base-url">...</code> + <em>Shortcut Input</em></li>
+                                    <li>Method: <strong>POST</strong></li>
+                                </ul>
+                            </li>
+                            <li>Now tap <strong>Share</strong> in YouTube, VK, or Safari &rarr; select your Shortcut!</li>
+                        </ol>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-brand" onclick="copyShortcutSetupUrl()">
+                                <i aria-hidden="true" class="bi bi-link-45deg me-1"></i>Copy Quick-Add URL for iOS Shortcut
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Browser Bookmarklet -->
+                    <div class="card p-3 mb-4 bg-body-tertiary border">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i aria-hidden="true" class="bi bi-bookmark-star fs-5 text-warning"></i>
+                            <h6 class="fw-bold mb-0">Browser Bookmarklet (Desktop / Laptop)</h6>
+                        </div>
+                        <p class="small text-muted mb-2">
+                            Drag this button to your browser Bookmarks Bar, or copy the JavaScript snippet:
+                        </p>
+                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                            <a id="quick-add-bookmarklet-link" href="#" class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="alert('Drag this button to your Bookmarks Bar to install it!'); return false;">
+                                <i aria-hidden="true" class="bi bi-bookmark-plus me-1"></i>+ Add to Podsync
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyBookmarkletCode()">
+                                <i aria-hidden="true" class="bi bi-code-slash me-1"></i>Copy JS Bookmarklet Code
+                            </button>
+                        </div>
+                        <div class="form-text small">Clicking the bookmarklet on any YouTube or VK Video page instantly sends it to your podcast.</div>
+                    </div>
+
+                    <!-- Direct Quick-Test Form -->
+                    <div class="card p-3 bg-body-tertiary border">
+                        <h6 class="fw-bold mb-2 small"><i aria-hidden="true" class="bi bi-send-check text-success me-1"></i>Test Quick-Add Now</h6>
+                        <div class="input-group input-group-sm">
+                            <input type="url" id="quick-add-test-url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                            <button class="btn btn-brand" type="button" id="btn-quick-add-test" onclick="sendQuickAddTest()">
+                                <i aria-hidden="true" class="bi bi-send me-1"></i>Send to Feed
+                            </button>
+                        </div>
+                        <div id="quick-add-test-feedback" class="small mt-2 d-none"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('quickAddModal')">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Catppuccin Audio Mini-Player with Chapters & Timecode Checking -->
+    <div id="stickyAudioPlayer" class="sticky-audio-player d-none">
+        <audio id="sticky-audio-elem" preload="none"></audio>
+        
+        <!-- Chapters Popover -->
+        <div id="sticky-chapters-popover" class="sticky-chapters-popover shadow-lg d-none">
+            <div class="d-flex justify-content-between align-items-center p-2 border-bottom">
+                <span class="small fw-bold"><i aria-hidden="true" class="bi bi-bookmark-check me-1 text-primary"></i>Chapters / Timestamps</span>
+                <button type="button" class="btn-close btn-sm" onclick="toggleChaptersPopover(false)"></button>
+            </div>
+            <div id="sticky-chapters-list" class="sticky-chapters-list p-1">
+                <div class="text-muted small p-3 text-center">No chapters found for this episode</div>
+            </div>
+        </div>
+
+        <div class="container-fluid px-3 py-2">
+            <div class="row align-items-center g-2">
+                <!-- Track & Format Info -->
+                <div class="col-12 col-md-4 d-flex align-items-center gap-2 min-w-0">
+                    <div class="player-cover-icon d-flex align-items-center justify-content-center flex-shrink-0">
+                        <i aria-hidden="true" class="bi bi-soundwave text-primary fs-4"></i>
+                    </div>
+                    <div class="min-w-0 flex-grow-1">
+                        <div class="d-flex align-items-center gap-1">
+                            <span id="player-title" class="fw-bold small text-truncate d-block" title="">Select an episode</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                            <span id="player-codec-badge" class="badge player-pill">MP3</span>
+                            <span id="player-bitrate-badge" class="badge player-pill text-teal">-- kbps</span>
+                            <span id="player-norm-badge" class="badge player-pill text-success d-none"><i class="bi bi-check2"></i> R128</span>
+                            <span id="player-feed-badge" class="text-muted smaller text-truncate"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playback Controls & Progress Bar -->
+                <div class="col-12 col-md-5">
+                    <div class="d-flex justify-content-center align-items-center gap-3 mb-1">
+                        <button type="button" class="btn btn-sm btn-link text-body p-0 player-ctrl" onclick="playerSeekRelative(-15)" title="Rewind 15 seconds">
+                            <i class="bi bi-arrow-counterclockwise fs-5"></i><span class="smaller">15</span>
+                        </button>
+                        <button type="button" class="btn btn-brand rounded-circle player-play-btn" id="player-play-btn" onclick="togglePlayerPlay()" title="Play / Pause">
+                            <i id="player-play-icon" class="bi bi-play-fill fs-5"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-link text-body p-0 player-ctrl" onclick="playerSeekRelative(30)" title="Forward 30 seconds">
+                            <i class="bi bi-arrow-clockwise fs-5"></i><span class="smaller">30</span>
+                        </button>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span id="player-current-time" class="smaller font-monospace text-muted">00:00</span>
+                        <input type="range" class="form-range flex-grow-1 player-seek-bar" id="player-progress" min="0" max="100" value="0" step="0.1" oninput="onPlayerProgressInput(this.value)">
+                        <span id="player-duration" class="smaller font-monospace text-muted">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Speed, Chapters, Volume, Close -->
+                <div class="col-12 col-md-3 d-flex align-items-center justify-content-md-end gap-2 flex-wrap">
+                    <button type="button" id="player-chapters-btn" class="btn btn-sm btn-light position-relative" onclick="toggleChaptersPopover()" title="Show Chapters">
+                        <i aria-hidden="true" class="bi bi-list-ol me-1"></i>Chapters
+                        <span id="player-chapters-count" class="badge bg-secondary ms-1">0</span>
+                    </button>
+                    <select id="player-speed" class="form-select form-select-sm player-speed-select" onchange="setPlayerSpeed(this.value)" title="Playback Speed">
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1.0x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="1.75">1.75x</option>
+                        <option value="2">2.0x</option>
+                    </select>
+                    <button type="button" class="btn-close ms-2" aria-label="Close Player" onclick="closeStickyPlayer()"></button>
+                </div>
             </div>
         </div>
     </div>

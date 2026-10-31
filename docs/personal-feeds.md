@@ -59,6 +59,14 @@ Clicking **Subscribe** opens the unified subscription modal:
 
 ---
 
+### 1-Click Share & iOS Shortcuts / Browser Bookmarklet
+Each personal feed includes a dedicated **Quick-Add Token** allowing one-click video and audio submission without exposing the master administrator password:
+- **iOS Shortcuts Integration**: Add videos directly from the iOS Share Sheet in YouTube, VK, or Safari by sending a request to `/api/v1/personal-feeds/{id}/quick-add?token={token}&url={url}`.
+- **Browser Bookmarklet**: Drag the 1-click bookmarklet to your browser bar to queue videos from any tab.
+- **Modal Generator**: In the Web UI under Personal Feeds, click **1-Click Share / iOS Shortcuts** to view your endpoint URL, copy shortcut instructions, or test direct submission.
+
+---
+
 ## 3. REST API Reference (`/api/v1/personal-feeds`)
 
 All endpoints require administrator authentication (Basic Auth or session cookie).
@@ -71,6 +79,7 @@ All endpoints require administrator authentication (Basic Auth or session cookie
 | `PATCH` | `/api/v1/personal-feeds/{id}` | `{"title": "...", "description": "...", "cover_art": "...", "playlist_sort": "asc", "private_feed": true}` | Partially updates feed settings. |
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query params | Deletes feed and unmounts RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | None | Returns list of episode objects. |
+| `POST`, `GET` | `/api/v1/personal-feeds/{id}/quick-add?token=...&url=...` | Query param or JSON body | 1-Click lightweight ingestion (iOS Shortcuts & Bookmarklet) using feed-scoped token. Returns 202 Accepted. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Adds episode from URL or local file path with quality selection. |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`, `quality`, `max_height`) | Uploads media file (up to 4 GiB) with quality selection. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Copies episode to another feed (shared file). |

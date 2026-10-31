@@ -129,9 +129,10 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Allow public access to login API and assets
+		// Allow public access to login API, status, and quick-add endpoints (which validate scoped token)
 		path := r.URL.Path
-		if path == "/api/v1/auth/login" || path == "/api/v1/auth/status" {
+		isQuickAdd := strings.HasPrefix(path, "/api/v1/personal-feeds/") && strings.HasSuffix(path, "/quick-add")
+		if path == "/api/v1/auth/login" || path == "/api/v1/auth/status" || isQuickAdd {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -201,4 +202,17 @@ func (s *Server) checkCredentials(username, password string) bool {
 	}
 
 	return username == expectedUser && password == expectedPass
+}
+
+func (s *Server) isRequestAuthenticated(r *http.Request) bool {
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if _, ok := s.sessions.ValidateToken(cookie.Value); ok {
+			return true
+		}
+	}
+	username, password, hasBasic := r.BasicAuth()
+	if hasBasic {
+		return s.checkCredentials(username, password)
+	}
+	return false
 }

@@ -3,6 +3,7 @@ package personal
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -74,7 +75,8 @@ func New(ctx context.Context, store db.PersonalStorage, files fs.Storage, proces
 		var existing Feed
 		if err := tx.Get("feed/personal", &existing); errors.Is(err, model.ErrNotFound) {
 			now := time.Now().UTC()
-			f := &Feed{ID: "personal", Type: "personal", Title: "My Feed", Format: model.FormatAudio, PlaylistSort: model.SortingDesc, CreatedAt: now, UpdatedAt: now}
+			tok, _ := newID()
+			f := &Feed{ID: "personal", Type: "personal", Title: "My Feed", Format: model.FormatAudio, PlaylistSort: model.SortingDesc, QuickAddToken: tok, CreatedAt: now, UpdatedAt: now}
 			if err := tx.Put("feed/personal", f); err != nil {
 				return err
 			}
@@ -127,10 +129,58 @@ func (s *Service) listLocked() ([]*Feed, error) {
 	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
 	return result, err
 }
-func (s *Service) List() ([]*Feed, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.listLocked() }
+func (s *Service) ensureQuickAddTokensLocked() error {
+	var missing []string
+	if err := s.store.PersonalView(func(tx db.PersonalTx) error {
+		return tx.Walk("feed/", func(_ string, data []byte) error {
+			var f Feed
+			if err := json.Unmarshal(data, &f); err != nil {
+				return err
+			}
+			if f.QuickAddToken == "" {
+				missing = append(missing, f.ID)
+			}
+			return nil
+		})
+	}); err != nil || len(missing) == 0 {
+		return err
+	}
+	return s.store.PersonalUpdate(func(tx db.PersonalTx) error {
+		for _, id := range missing {
+			var f Feed
+			if err := tx.Get("feed/"+id, &f); err != nil {
+				return err
+			}
+			if f.QuickAddToken != "" {
+				continue
+			}
+			token, err := newID()
+			if err != nil {
+				return err
+			}
+			f.QuickAddToken = token
+			if err := tx.Put("feed/"+id, &f); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Service) List() ([]*Feed, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureQuickAddTokensLocked(); err != nil {
+		return nil, err
+	}
+	return s.listLocked()
+}
 func (s *Service) Get(id string) (*Detail, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.ensureQuickAddTokensLocked(); err != nil {
+		return nil, err
+	}
 	return s.detailLocked(id)
 }
 func (s *Service) detailLocked(id string) (*Detail, error) {
@@ -218,7 +268,8 @@ func validateURL(raw string) error {
 func (s *Service) Create(ctx context.Context, p Patch, reserved map[string]bool) (*Feed, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	f := &Feed{Type: "personal", Format: "universal", PlaylistSort: model.SortingDesc, CreatedAt: time.Now().UTC()}
+	tok, _ := newID()
+	f := &Feed{Type: "personal", Format: "universal", PlaylistSort: model.SortingDesc, QuickAddToken: tok, CreatedAt: time.Now().UTC()}
 	if err := apply(f, p); err != nil {
 		return nil, err
 	}
@@ -839,4 +890,21 @@ func (s *Service) process(ctx context.Context, id string) error {
 		_ = s.files.Delete(context.Background(), media.Path)
 	}
 	return errors.Join(processErr, err)
+}
+
+func (s *Service) ValidateQuickAddToken(feedID, token string) bool {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureQuickAddTokensLocked(); err != nil {
+		return false
+	}
+	d, err := s.detailLocked(feedID)
+	if err != nil || d == nil || d.Feed == nil {
+		return false
+	}
+	return d.Feed.QuickAddToken != "" && subtle.ConstantTimeCompare([]byte(d.Feed.QuickAddToken), []byte(token)) == 1
 }

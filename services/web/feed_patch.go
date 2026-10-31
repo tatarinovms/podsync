@@ -41,12 +41,19 @@ func (u *FeedConfigUpdate) WithCurrent(f *feed.Config) (*FeedConfigUpdate, error
 		return &copy, nil
 	}
 	type plain FeedConfigUpdate
+	ignoreLive := f.IgnoreLive
+	normalizeAudio := f.NormalizeAudio
 	merged := plain{
 		PageSize: f.PageSize, CronSchedule: f.CronSchedule,
 		Quality: string(f.Quality), Format: string(f.Format), MaxHeight: f.MaxHeight,
 		PlaylistSort: string(f.PlaylistSort), OPML: f.OPML, PrivateFeed: f.PrivateFeed,
+		IgnoreLive: &ignoreLive, NormalizeAudio: &normalizeAudio,
 		Filters: f.Filters, Custom: f.Custom, YouTubeDLArgs: f.YouTubeDLArgs,
 		FilenameTemplate: f.FilenameTemplate,
+	}
+	if f.Proxy != "" {
+		proxyCopy := f.Proxy
+		merged.Proxy = &proxyCopy
 	}
 	if f.Clean != nil {
 		merged.KeepLast = f.Clean.KeepLast

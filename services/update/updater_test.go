@@ -3,6 +3,7 @@ package update
 import (
 	"bytes"
 	"context"
+	"io"
 	"fmt"
 	"testing"
 	"time"
@@ -14,7 +15,17 @@ import (
 	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
+	"github.com/mxpv/podsync/pkg/ytdl"
 )
+
+type liveSkippingDownloader struct{}
+
+func (liveSkippingDownloader) Download(context.Context, *feed.Config, *model.Episode) (io.ReadCloser, error) {
+	return nil, ytdl.ErrLiveStreamSkipped
+}
+func (liveSkippingDownloader) PlaylistMetadata(context.Context, string) (ytdl.PlaylistMetadata, error) {
+	return ytdl.PlaylistMetadata{}, nil
+}
 
 func TestUpdater_Cleanup_RetainsNewestByDate(t *testing.T) {
 	ctx := context.Background()
@@ -160,4 +171,41 @@ func TestUpdater_FetchEpisodes_SortsByPubDate(t *testing.T) {
 	require.Len(t, fetched, 2)
 	assert.Equal(t, "ep_new", fetched[0].ID, "Newest episode must come first")
 	assert.Equal(t, "ep_mid", fetched[1].ID, "Second newest episode must come second")
+}
+
+func TestUpdaterPublishesPodcastingChapters(t *testing.T) {
+	ctx := context.Background()
+	storage, err := fs.NewLocal(t.TempDir(), false, false)
+	require.NoError(t, err)
+	mgr, err := NewUpdater(nil, nil, "https://podsync.example", nil, nil, storage)
+	require.NoError(t, err)
+	episode := &model.Episode{ID: "../../provider-id", Description: "00:00 Intro\n01:10 Main topic"}
+	require.NoError(t, mgr.writeChapterDocuments(ctx, "feed", []*model.Episode{episode}))
+	require.Len(t, episode.Chapters, 2)
+	require.Equal(t, "https://podsync.example/"+chapterObjectName("feed", episode.ID), episode.ChaptersURL)
+	chapterFile, err := storage.Open(chapterObjectName("feed", episode.ID))
+	require.NoError(t, err)
+	defer chapterFile.Close()
+	contents, err := io.ReadAll(chapterFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(contents), `"version": "1.2.0"`)
+}
+
+func TestUpdaterDoesNotMarkSkippedLiveEpisodeAsError(t *testing.T) {
+	ctx := context.Background()
+	database, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	defer database.Close()
+	storage, err := fs.NewLocal(t.TempDir(), false, false)
+	require.NoError(t, err)
+	config := &feed.Config{ID: "feed", Format: model.FormatAudio, IgnoreLive: true}
+	episode := &model.Episode{ID: "live", Title: "Live", Status: model.EpisodeNew}
+	require.NoError(t, database.AddFeed(ctx, config.ID, &model.Feed{ID: config.ID, Episodes: []*model.Episode{episode}}))
+	mgr, err := NewUpdater(map[string]*feed.Config{config.ID: config}, nil, "https://podsync.example", liveSkippingDownloader{}, database, storage)
+	require.NoError(t, err)
+	require.NoError(t, mgr.downloadEpisodes(ctx, config, []*model.Episode{episode}))
+	updated, err := database.GetEpisode(ctx, config.ID, episode.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.EpisodeCleaned, updated.Status)
+	assert.Empty(t, updated.Error)
 }

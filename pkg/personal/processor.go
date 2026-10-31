@@ -106,11 +106,12 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 				quality = model.QualityHigh
 			}
 			cfg := &feed.Config{
-				ID:            m.ID,
-				Format:        m.Format,
-				Quality:       quality,
-				MaxHeight:     m.MaxHeight,
-				YouTubeDLArgs: []string{"--no-playlist"},
+				ID:             m.ID,
+				Format:         m.Format,
+				Quality:        quality,
+				MaxHeight:      m.MaxHeight,
+				NormalizeAudio: true,
+				YouTubeDLArgs:  []string{"--no-playlist"},
 			}
 			if m.Format == model.FormatVideo {
 				cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
@@ -133,11 +134,12 @@ func (p *MediaProcessor) Process(ctx context.Context, m *Media) (io.ReadCloser, 
 					quality = model.QualityHigh
 				}
 				cfg := &feed.Config{
-					ID:            m.ID,
-					Format:        m.Format,
-					Quality:       quality,
-					MaxHeight:     m.MaxHeight,
-					YouTubeDLArgs: []string{"--no-playlist"},
+					ID:             m.ID,
+					Format:         m.Format,
+					Quality:        quality,
+					MaxHeight:      m.MaxHeight,
+					NormalizeAudio: true,
+					YouTubeDLArgs:  []string{"--no-playlist"},
 				}
 				if m.Format == model.FormatVideo {
 					cfg.YouTubeDLArgs = append(cfg.YouTubeDLArgs, "--remux-video", "mp4")
@@ -301,9 +303,9 @@ func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input s
 			args = append(args, "-vf", scaleFilter)
 		}
 		if quality == model.QualityLow {
-			args = append(args, "-crf", "28", "-preset", "fast", "-c:a", "aac", "-b:a", "64k")
+			args = append(args, "-crf", "28", "-preset", "fast", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "64k")
 		} else {
-			args = append(args, "-crf", "23", "-preset", "medium", "-c:a", "aac", "-b:a", "128k")
+			args = append(args, "-crf", "23", "-preset", "medium", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "128k")
 		}
 		args = append(args, "-movflags", "+faststart", "-f", "mp4", output)
 		cmd = exec.CommandContext(ctx, "ffmpeg", args...)
@@ -313,7 +315,7 @@ func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input s
 		if quality == model.QualityLow {
 			bitrate = "96k"
 		}
-		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-vn", "-c:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", output)
+		cmd = exec.CommandContext(ctx, "ffmpeg", "-y", "-i", input, "-vn", "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "libmp3lame", "-b:a", bitrate, "-f", "mp3", output)
 	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("media conversion failed (%w): %s", err, string(out))
@@ -341,12 +343,6 @@ func (p *MediaProcessor) convertFile(ctx context.Context, m *Media, dir, input s
 			}
 		}
 	}
-
-	fi, err := os.Stat(output)
-	if err != nil {
-		return nil, err
-	}
-	m.Size = fi.Size()
 
 	f, err := os.Open(output)
 	if err != nil {

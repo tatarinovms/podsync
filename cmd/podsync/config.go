@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -372,6 +373,46 @@ func (c *Config) applyEnv() {
 	}
 	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_CUSTOM_BINARY"); ok {
 		c.Downloader.CustomBinary = val
+	}
+
+	// Per-provider proxy environment variables
+	if c.Downloader.Proxies == nil {
+		c.Downloader.Proxies = make(map[string]string)
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_YOUTUBE"); ok {
+		c.Downloader.Proxies["youtube"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_VK"); ok {
+		c.Downloader.Proxies["vkvideo"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_VKVIDEO"); ok {
+		c.Downloader.Proxies["vkvideo"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_RUTUBE"); ok {
+		c.Downloader.Proxies["rutube"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_VIMEO"); ok {
+		c.Downloader.Proxies["vimeo"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXY_SOUNDCLOUD"); ok {
+		c.Downloader.Proxies["soundcloud"] = val
+	}
+	if val, ok := os.LookupEnv("PODSYNC_DOWNLOADER_PROXIES"); ok && val != "" {
+		trimmed := strings.TrimSpace(val)
+		if strings.HasPrefix(trimmed, "{") {
+			var m map[string]string
+			if err := json.Unmarshal([]byte(trimmed), &m); err == nil {
+				for k, v := range m {
+					c.Downloader.Proxies[strings.ToLower(k)] = v
+				}
+			}
+		} else {
+			for _, part := range strings.Split(trimmed, ",") {
+				if kv := strings.SplitN(strings.TrimSpace(part), "=", 2); len(kv) == 2 {
+					c.Downloader.Proxies[strings.ToLower(strings.TrimSpace(kv[0]))] = strings.TrimSpace(kv[1])
+				}
+			}
+		}
 	}
 
 	// Admin panel environment variables

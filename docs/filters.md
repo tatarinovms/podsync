@@ -136,3 +136,43 @@ not_title = "(?i)^(shorts?:|clip:)"
 - `not_title` and `not_description` are **exclude** filters: the episode is skipped if it matches.
 - Duration and age filters always exclude episodes outside the specified range.
 - When multiple filters are set, **all** must be satisfied (AND logic). Use regex alternation (`a|b`) for OR logic within a single filter field.
+
+---
+
+## Feed-Level Processing & Stream Filters
+
+Beyond regex filters, Podsync provides feed-level flags under `[feeds.<id>]`:
+
+### Ignore Live Streams & Premieres (`ignore_live`)
+
+Avoid breaking the download queue when creators schedule upcoming broadcasts or host active livestreams:
+
+```toml
+[feeds.my_feed]
+url = "https://www.youtube.com/@channel/videos"
+# Automatically skip active livestreams and upcoming premieres
+ignore_live = true
+```
+
+### Loudness Normalization (`normalize_audio`)
+
+Level episode audio across different sources to Apple Podcasts & Spotify industry standard (`-16 LUFS`, `-1.5 dB TP`, `11 LRA`):
+
+```toml
+[feeds.my_feed]
+url = "https://www.youtube.com/@channel/videos"
+format = "audio"
+# Enable EBU R128 loudness normalization
+normalize_audio = true
+```
+
+### Per-Feed Proxy Override (`proxy`)
+
+Route individual feeds through dedicated proxies, or set `direct` to bypass global proxies:
+
+```toml
+[feeds.vk_feed]
+url = "https://vkvideo.ru/@channel"
+# Direct connection for local platforms when global SOCKS5 proxy is enabled
+proxy = "direct"
+```

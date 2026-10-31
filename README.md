@@ -37,6 +37,12 @@ This fork extends the original `mxpv/podsync` with powerful modern capabilities:
 - **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
 - **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
 - **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, security, tokens, downloaders, and audiobooks.
+- **Selective Proxy Routing (Per-Provider & Per-Feed)**: Support for `[downloader.proxies]` map and `PODSYNC_DOWNLOADER_PROXY_*` env vars. Route YouTube through foreign SOCKS5/Xray proxies while keeping VK Video, Rutube, and local services direct (or through separate proxies), with per-feed `proxy` overrides.
+- **Audio Loudness Normalization (EBU R128)**: Volume leveling via `normalize_audio = true` (`loudnorm=I=-16:TP=-1.5:LRA=11`) adhering to Apple Podcasts and Spotify loudness standards for regular podcast feeds and personal feeds.
+- **Native Chapters & Podcasting 2.0 Chapters**: Automatic description timecodes parsing into Podcasting 2.0 `<podcast:chapters>` JSON document specification and embedded ID3/MP4 chapter marks via `--embed-chapters`.
+- **Live Stream & Premiere Filter**: Skip upcoming premieres and active live streams with `ignore_live = true`, preventing broken download queues on YouTube and VK Video.
+- **1-Click Share & iOS Shortcuts (Personal Feeds)**: Lightweight `POST|GET /api/v1/personal-feeds/{id}/quick-add` endpoint with dedicated feed-scoped tokens, iOS Shortcuts Share Sheet action, and draggable browser bookmarklet.
+- **Sticky Catppuccin Mini-Player in Web Admin**: Bottom-docked player with bitrate and codec inspection, fast -15s/+30s seeking, playback speed control, and clickable chapter timecode navigation.
 
 ## Features
 

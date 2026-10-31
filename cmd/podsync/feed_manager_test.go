@@ -1132,3 +1132,65 @@ func TestDownloaderConfigWriteFailurePreservesMemory(t *testing.T) {
 	require.Error(t, mgr.UpdateDownloaderConfig(context.Background(), &web.DownloaderConfigUpdate{Timeout: &timeout}))
 	assert.Equal(t, 60, mgr.cfg.Downloader.Timeout)
 }
+
+func TestUpdateFeedWithLiveAudioAndProxy(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	initialTOML := `
+[feeds.show]
+url = "https://youtube.com/channel/abc"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(initialTOML), 0644))
+
+	f := &feed.Config{ID: "show", URL: "https://youtube.com/channel/abc"}
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg:        &Config{Feeds: map[string]*feed.Config{"show": f}},
+		feeds:      map[string]*feed.Config{"show": f},
+		updates:    make(chan *feed.Config, 1),
+	}
+
+	ignoreLive := true
+	normalizeAudio := true
+	proxy := "socks5://127.0.0.1:1080"
+
+	require.NoError(t, mgr.UpdateFeed(context.Background(), "show", &web.FeedConfigUpdate{
+		IgnoreLive:     &ignoreLive,
+		NormalizeAudio: &normalizeAudio,
+		Proxy:          &proxy,
+	}))
+
+	updated := mgr.feeds["show"]
+	assert.True(t, updated.IgnoreLive)
+	assert.True(t, updated.NormalizeAudio)
+	assert.Equal(t, "socks5://127.0.0.1:1080", updated.Proxy)
+
+	stored, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(stored), "ignore_live = true")
+	assert.Contains(t, string(stored), "normalize_audio = true")
+	assert.Contains(t, string(stored), `proxy = "socks5://127.0.0.1:1080"`)
+}
+
+func TestUpdateDownloaderConfigWithProxies(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("[downloader]\ntimeout = 10\n"), 0644))
+
+	mgr := &AppFeedManager{
+		configPath: configPath,
+		cfg:        &Config{Downloader: ytdl.Config{Timeout: 10}},
+	}
+
+	proxies := map[string]string{
+		"youtube": "socks5://127.0.0.1:1080",
+		"vkvideo": "direct",
+	}
+	require.NoError(t, mgr.UpdateDownloaderConfig(context.Background(), &web.DownloaderConfigUpdate{
+		Proxies: &proxies,
+	}))
+
+	assert.Equal(t, proxies, mgr.cfg.Downloader.Proxies)
+	stored, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(stored), `youtube = "socks5://127.0.0.1:1080"`)
+	assert.Contains(t, string(stored), `vkvideo = "direct"`)
+}

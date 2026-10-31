@@ -64,6 +64,12 @@ type Config struct {
 	FilenameTemplate string `toml:"filename_template" json:"filename_template,omitempty"`
 	// AudiobookDir is an optional custom directory path for local audiobook feeds
 	AudiobookDir string `toml:"audiobook_dir" json:"audiobook_dir,omitempty"`
+	// IgnoreLive drops upcoming premieres and active live streams from being downloaded
+	IgnoreLive bool `toml:"ignore_live" json:"ignore_live,omitempty"`
+	// NormalizeAudio normalizes episode loudness to EBU R128 podcast standard (-16 LUFS)
+	NormalizeAudio bool `toml:"normalize_audio" json:"normalize_audio,omitempty"`
+	// Proxy overrides the downloader proxy for this feed (use "direct" to bypass global proxy)
+	Proxy string `toml:"proxy" json:"proxy,omitempty"`
 }
 
 type CustomFormat struct {

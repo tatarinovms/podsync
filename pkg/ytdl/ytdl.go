@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	ErrTooManyRequests = errors.New(http.StatusText(http.StatusTooManyRequests))
-	ErrBotDetection    = errors.New("YouTube requires authentication: sign in to confirm you are not a bot (configure cookies)")
+	ErrTooManyRequests   = errors.New(http.StatusText(http.StatusTooManyRequests))
+	ErrBotDetection      = errors.New("YouTube requires authentication: sign in to confirm you are not a bot (configure cookies)")
+	ErrLiveStreamSkipped = errors.New("live stream or upcoming premiere skipped")
 )
 
 // CleanErrorMessage extracts meaningful human-readable diagnostic message from yt-dlp/ffmpeg combined output.
@@ -112,8 +113,10 @@ type Config struct {
 	CookiesFile string `toml:"cookies_file"`
 	// CookiesFromBrowser specifies browser to extract cookies from (e.g. "chrome", "firefox", "safari")
 	CookiesFromBrowser string `toml:"cookies_from_browser"`
-	// Proxy URL to pass to yt-dlp via --proxy
+	// Proxy URL to pass to yt-dlp via --proxy (global fallback)
 	Proxy string `toml:"proxy"`
+	// Proxies specifies proxy mappings per provider or domain (e.g. "youtube": "socks5://...", "rutube": "direct")
+	Proxies map[string]string `toml:"proxies" json:"proxies,omitempty"`
 	// Language specifies preferred audio/content language (e.g. "ru", "en")
 	Language string `toml:"language" json:"language,omitempty"`
 }
@@ -125,6 +128,7 @@ type YoutubeDl struct {
 	cookiesFile        string
 	cookiesFromBrowser string
 	proxy              string
+	proxies            map[string]string
 	language           string
 	selfUpdate         bool
 	binaryMu           sync.RWMutex // Protects binary during self-update (exclusive write lock)
@@ -161,12 +165,18 @@ func New(ctx context.Context, cfg Config) (*YoutubeDl, error) {
 
 	log.Debugf("download timeout: %d min(s)", int(timeout.Minutes()))
 
+	proxiesCopy := make(map[string]string)
+	for k, v := range cfg.Proxies {
+		proxiesCopy[strings.ToLower(k)] = v
+	}
+
 	ytdl := &YoutubeDl{
 		path:               path,
 		timeout:            timeout,
 		cookiesFile:        cfg.CookiesFile,
 		cookiesFromBrowser: cfg.CookiesFromBrowser,
 		proxy:              cfg.Proxy,
+		proxies:            proxiesCopy,
 		language:           cfg.Language,
 		selfUpdate:         cfg.SelfUpdate,
 	}
@@ -258,7 +268,7 @@ func (dl *YoutubeDl) PlaylistMetadata(ctx context.Context, url string) (metadata
 		"-q",            // quiet mode
 		"--no-warnings", // suppress warnings
 	}
-	args = dl.appendCommonArgs(args)
+	args = dl.appendCommonArgsForURL(args, url)
 	args = append(args, url)
 
 	output, err := dl.exec(ctx, args...)
@@ -318,6 +328,9 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 		if strings.Contains(output, "Sign in to confirm you") || strings.Contains(output, "confirm you’re not a bot") {
 			return nil, ErrBotDetection
 		}
+		if feedConfig != nil && feedConfig.IgnoreLive && strings.Contains(strings.ToLower(output), "does not pass filter") {
+			return nil, ErrLiveStreamSkipped
+		}
 
 		return nil, errors.New(cleanMsg)
 	}
@@ -365,14 +378,97 @@ func hasArg(args []string, name string) bool {
 	return false
 }
 
+func isDirectProxy(proxy string) bool {
+	proxy = strings.TrimSpace(proxy)
+	return strings.EqualFold(proxy, "direct") || strings.EqualFold(proxy, "none")
+}
+
+// proxyForURL returns a proxy and whether a direct route was explicitly set.
+// The boolean preserves the distinction between no proxy and a requested bypass
+// of the global proxy.
+func (dl *YoutubeDl) proxyForURL(rawURL string, feedProxy string) (string, bool) {
+	feedProxy = strings.TrimSpace(feedProxy)
+	if feedProxy != "" {
+		if isDirectProxy(feedProxy) {
+			return "", true
+		}
+		return feedProxy, false
+	}
+
+	if dl == nil {
+		return "", false
+	}
+
+	dl.cfgMu.RLock()
+	defer dl.cfgMu.RUnlock()
+
+	if len(dl.proxies) > 0 && rawURL != "" {
+		lowerURL := strings.ToLower(rawURL)
+		var matchedProxy string
+		var matched bool
+
+		if strings.Contains(lowerURL, "youtube.com") || strings.Contains(lowerURL, "youtu.be") {
+			if p, ok := dl.proxies["youtube"]; ok {
+				matchedProxy, matched = p, true
+			}
+		} else if strings.Contains(lowerURL, "vk.com") || strings.Contains(lowerURL, "vkvideo.ru") {
+			if p, ok := dl.proxies["vkvideo"]; ok {
+				matchedProxy, matched = p, true
+			} else if p, ok := dl.proxies["vk"]; ok {
+				matchedProxy, matched = p, true
+			}
+		} else if strings.Contains(lowerURL, "rutube.ru") {
+			if p, ok := dl.proxies["rutube"]; ok {
+				matchedProxy, matched = p, true
+			}
+		} else if strings.Contains(lowerURL, "vimeo.com") {
+			if p, ok := dl.proxies["vimeo"]; ok {
+				matchedProxy, matched = p, true
+			}
+		} else if strings.Contains(lowerURL, "soundcloud.com") {
+			if p, ok := dl.proxies["soundcloud"]; ok {
+				matchedProxy, matched = p, true
+			}
+		}
+
+		if !matched {
+			for k, p := range dl.proxies {
+				if strings.Contains(lowerURL, strings.ToLower(k)) {
+					matchedProxy, matched = p, true
+					break
+				}
+			}
+		}
+
+		if matched {
+			trimmed := strings.TrimSpace(matchedProxy)
+			if isDirectProxy(trimmed) {
+				return "", true
+			}
+			return trimmed, false
+		}
+	}
+
+	return dl.proxy, false
+}
+
+// ProxyForURL resolves the applicable proxy for a given media URL and feed configuration.
+func (dl *YoutubeDl) ProxyForURL(rawURL string, feedProxy string) string {
+	proxy, _ := dl.proxyForURL(rawURL, feedProxy)
+	return proxy
+}
+
 func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
+	return dl.appendCommonArgsForURL(args, "")
+}
+
+func (dl *YoutubeDl) appendCommonArgsForURL(args []string, url string, skipProxy ...bool) []string {
 	if dl == nil {
 		return args
 	}
 	dl.cfgMu.RLock()
 	cookiesFile := dl.cookiesFile
 	cookiesFromBrowser := dl.cookiesFromBrowser
-	proxy := dl.proxy
 	dl.cfgMu.RUnlock()
 
 	if cookiesFile != "" {
@@ -389,9 +485,12 @@ func (dl *YoutubeDl) appendCommonArgs(args []string) []string {
 		}
 	}
 
-	if proxy != "" {
-		if !hasArg(args, "--proxy") {
-			args = append(args, "--proxy", proxy)
+	if len(skipProxy) == 0 || !skipProxy[0] {
+		proxy := dl.ProxyForURL(url, "")
+		if proxy != "" {
+			if !hasArg(args, "--proxy") {
+				args = append(args, "--proxy", proxy)
+			}
 		}
 	}
 
@@ -466,6 +565,20 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 		args = append(args, "--audio-format", feedConfig.CustomFormat.Extension, "--format", feedConfig.CustomFormat.YouTubeDLFormat)
 	}
 
+	// Filter out live streams and upcoming broadcasts if configured
+	if feedConfig != nil && feedConfig.IgnoreLive {
+		if !hasArg(args, "--match-filters") && !hasArg(args, "--match-filter") {
+			args = append(args, "--match-filters", "!is_live & live_status !=? 'is_upcoming' & live_status !=? 'is_live'")
+		}
+	}
+
+	// Normalize loudness according to podcast EBU R128 standard (-16 LUFS)
+	if feedConfig != nil && feedConfig.NormalizeAudio && feedConfig.Format == model.FormatAudio {
+		if !hasArg(feedConfig.YouTubeDLArgs, "--postprocessor-args") {
+			args = append(args, "--postprocessor-args", "ExtractAudio:-af loudnorm=I=-16:TP=-1.5:LRA=11")
+		}
+	}
+
 	if lang != "" && !hasArg(feedConfig.YouTubeDLArgs, "--extractor-args") {
 		args = append(args, "--extractor-args", fmt.Sprintf("youtube:lang=%s", lang))
 	}
@@ -473,9 +586,24 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 	// Insert additional per-feed youtube-dl arguments
 	args = append(args, feedConfig.YouTubeDLArgs...)
 
-	// Insert global downloader options (cookies, proxy, js-runtimes)
+	// Embed native chapter markers into MP3/M4A/MP4
+	if dl != nil && !hasArg(args, "--embed-chapters") && !hasArg(args, "--no-embed-chapters") {
+		args = append(args, "--embed-chapters")
+	}
+
+	// Resolve proxy for this episode URL and feed
+	feedProxy := ""
+	if feedConfig != nil {
+		feedProxy = feedConfig.Proxy
+	}
+	resolvedProxy, forceDirect := dl.proxyForURL(episode.VideoURL, feedProxy)
+	if resolvedProxy != "" && !hasArg(args, "--proxy") {
+		args = append(args, "--proxy", resolvedProxy)
+	}
+
+	// Insert global downloader options (cookies, js-runtimes)
 	if dl != nil {
-		args = dl.appendCommonArgs(args)
+		args = dl.appendCommonArgsForURL(args, episode.VideoURL, forceDirect)
 	}
 
 	args = append(args, "--output", outputFilePath, episode.VideoURL)
@@ -485,6 +613,10 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 func (dl *YoutubeDl) GetConfig() Config {
 	dl.cfgMu.RLock()
 	defer dl.cfgMu.RUnlock()
+	proxiesCopy := make(map[string]string, len(dl.proxies))
+	for k, v := range dl.proxies {
+		proxiesCopy[k] = v
+	}
 	return Config{
 		SelfUpdate:         dl.selfUpdate,
 		Timeout:            int(dl.timeout.Minutes()),
@@ -492,6 +624,7 @@ func (dl *YoutubeDl) GetConfig() Config {
 		CookiesFile:        dl.cookiesFile,
 		CookiesFromBrowser: dl.cookiesFromBrowser,
 		Proxy:              dl.proxy,
+		Proxies:            proxiesCopy,
 		Language:           dl.language,
 	}
 }
@@ -506,6 +639,12 @@ func (dl *YoutubeDl) UpdateConfig(cfg Config) {
 	dl.cookiesFile = cfg.CookiesFile
 	dl.cookiesFromBrowser = cfg.CookiesFromBrowser
 	dl.proxy = cfg.Proxy
+	if cfg.Proxies != nil {
+		dl.proxies = make(map[string]string, len(cfg.Proxies))
+		for k, v := range cfg.Proxies {
+			dl.proxies[strings.ToLower(k)] = v
+		}
+	}
 	dl.language = cfg.Language
 }
 
@@ -527,6 +666,15 @@ func (dl *YoutubeDl) SetProxy(proxy string) {
 	dl.proxy = proxy
 }
 
+func (dl *YoutubeDl) SetProxies(proxies map[string]string) {
+	dl.cfgMu.Lock()
+	defer dl.cfgMu.Unlock()
+	dl.proxies = make(map[string]string, len(proxies))
+	for k, v := range proxies {
+		dl.proxies[strings.ToLower(k)] = v
+	}
+}
+
 func (dl *YoutubeDl) GetBinaryPath() string {
 	dl.cfgMu.RLock()
 	defer dl.cfgMu.RUnlock()
@@ -546,7 +694,7 @@ func (dl *YoutubeDl) TestURL(ctx context.Context, testURL string) (string, error
 		"--no-download",
 		"--no-warnings",
 	}
-	args = dl.appendCommonArgs(args)
+	args = dl.appendCommonArgsForURL(args, testURL)
 	args = append(args, testURL)
 
 	output, err := dl.exec(ctx, args...)

@@ -29,6 +29,15 @@ const (
 	SortingAsc  = Sorting("asc")
 )
 
+// Chapter represents an episode chapter according to Podcasting 2.0 Chapters JSON spec
+type Chapter struct {
+	StartTime float64 `json:"startTime"` // in seconds
+	Title     string  `json:"title"`
+	EndTime   float64 `json:"endTime,omitempty"`
+	URL       string  `json:"url,omitempty"`
+	Image     string  `json:"img,omitempty"`
+}
+
 type Episode struct {
 	// ID of episode
 	ID          string        `json:"id"`
@@ -46,6 +55,8 @@ type Episode struct {
 	Status      EpisodeStatus `json:"status"` // Disk status
 	Error       string        `json:"error,omitempty"`
 	ErrorAt     *time.Time    `json:"error_at,omitempty"`
+	ChaptersURL string        `json:"chapters_url,omitempty"`
+	Chapters    []*Chapter    `json:"chapters,omitempty"`
 }
 
 type Feed struct {
@@ -74,10 +85,10 @@ type Feed struct {
 
 // FeedStats represents aggregated statistics for a feed
 type FeedStats struct {
-	EpisodeCount    int   `json:"episode_count"`
-	DownloadedCount int   `json:"downloaded_count"`
-	ErrorCount      int   `json:"error_count"`
-	TotalSize       int64 `json:"total_size"`
+	EpisodeCount    int   `json:\"episode_count\"`
+	DownloadedCount int   `json:\"downloaded_count\"`
+	ErrorCount      int   `json:\"error_count\"`
+	TotalSize       int64 `json:\"total_size\"`
 }
 
 type EpisodeStatus string

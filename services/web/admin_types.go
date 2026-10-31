@@ -66,6 +66,9 @@ type FeedSummary struct {
 	PocketCastsURL  string       `json:"pocketcasts_url"`
 	OvercastURL     string       `json:"overcast_url"`
 	PrivateFeed     bool         `json:"private_feed"`
+	IgnoreLive      bool         `json:"ignore_live,omitempty"`
+	NormalizeAudio  bool         `json:"normalize_audio,omitempty"`
+	Proxy           string       `json:"proxy,omitempty"`
 	Config          *feed.Config `json:"config,omitempty"`
 }
 
@@ -81,6 +84,9 @@ type FeedConfigUpdate struct {
 	PlaylistSort     string       `json:"playlist_sort"`
 	OPML             *bool        `json:"opml,omitempty"`
 	PrivateFeed      bool         `json:"private_feed"`
+	IgnoreLive       *bool        `json:"ignore_live,omitempty"`
+	NormalizeAudio   *bool        `json:"normalize_audio,omitempty"`
+	Proxy            *string      `json:"proxy,omitempty"`
 	KeepLast         int          `json:"keep_last"`
 	Language         string       `json:"language,omitempty"`
 	Redownload       bool         `json:"redownload,omitempty"`
@@ -136,32 +142,34 @@ type TokenInfo struct {
 
 // DownloaderConfigInfo contains current yt-dlp / downloader settings and cookie status
 type DownloaderConfigInfo struct {
-	Timeout            int    `json:"timeout"`
-	SelfUpdate         bool   `json:"self_update"`
-	CustomBinary       string `json:"custom_binary"`
-	CookiesFile        string `json:"cookies_file"`
-	CookiesFromBrowser string `json:"cookies_from_browser"`
-	Proxy              string `json:"proxy"`
-	Language           string `json:"language,omitempty"`
-	HasCookiesFile     bool   `json:"has_cookies_file"`
-	CookiesFileSize    int64  `json:"cookies_file_size"`
-	CookiesFileLines   int    `json:"cookies_file_lines"`
-	CookiesLastMod     string `json:"cookies_last_modified"`
-	BinaryPath         string `json:"binary_path"`
-	BinaryVersion      string `json:"binary_version"`
-	FFmpegPath         string `json:"ffmpeg_path,omitempty"`
-	FFmpegVersion      string `json:"ffmpeg_version,omitempty"`
+	Timeout            int               `json:"timeout"`
+	SelfUpdate         bool              `json:"self_update"`
+	CustomBinary       string            `json:"custom_binary"`
+	CookiesFile        string            `json:"cookies_file"`
+	CookiesFromBrowser string            `json:"cookies_from_browser"`
+	Proxy              string            `json:"proxy"`
+	Proxies            map[string]string `json:"proxies,omitempty"`
+	Language           string            `json:"language,omitempty"`
+	HasCookiesFile     bool              `json:"has_cookies_file"`
+	CookiesFileSize    int64             `json:"cookies_file_size"`
+	CookiesFileLines   int               `json:"cookies_file_lines"`
+	CookiesLastMod     string            `json:"cookies_last_modified"`
+	BinaryPath         string            `json:"binary_path"`
+	BinaryVersion      string            `json:"binary_version"`
+	FFmpegPath         string            `json:"ffmpeg_path,omitempty"`
+	FFmpegVersion      string            `json:"ffmpeg_version,omitempty"`
 }
 
 // DownloaderConfigUpdate contains fields to update downloader settings
 type DownloaderConfigUpdate struct {
-	Timeout            *int    `json:"timeout"`
-	SelfUpdate         *bool   `json:"self_update"`
-	CustomBinary       *string `json:"custom_binary"`
-	CookiesFile        *string `json:"cookies_file"`
-	CookiesFromBrowser *string `json:"cookies_from_browser"`
-	Proxy              *string `json:"proxy"`
-	Language           *string `json:"language,omitempty"`
+	Timeout            *int               `json:"timeout"`
+	SelfUpdate         *bool              `json:"self_update"`
+	CustomBinary       *string            `json:"custom_binary"`
+	CookiesFile        *string            `json:"cookies_file"`
+	CookiesFromBrowser *string            `json:"cookies_from_browser"`
+	Proxy              *string            `json:"proxy"`
+	Proxies            *map[string]string `json:"proxies,omitempty"`
+	Language           *string            `json:"language,omitempty"`
 }
 
 // NetworkConfigInfo contains outbound DNS settings for provider API requests.

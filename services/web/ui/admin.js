@@ -203,6 +203,157 @@
             toastEl.show();
         }
 
+        let quickAddEndpoint = '';
+        function copyElementText(id) {
+            const el = document.getElementById(id);
+            if (el) copyToClipboard(el.value || el.textContent || '');
+        }
+        function openQuickAddModal(feedID) {
+            const feed = personalFeeds.find(item => item.id === feedID);
+            if (!feed?.quick_add_token) {
+                showToast('Quick-Add token is unavailable. Refresh the feed and try again.');
+                return;
+            }
+            quickAddEndpoint = `${window.location.origin}/api/v1/personal-feeds/${encodeURIComponent(feedID)}/quick-add?token=${encodeURIComponent(feed.quick_add_token)}`;
+            document.getElementById('quick-add-endpoint-url').value = quickAddEndpoint;
+            document.getElementById('quick-add-shortcut-base-url').textContent = quickAddEndpoint + '&url=';
+            const bookmarklet = `javascript:(()=>{const u=${JSON.stringify(quickAddEndpoint)}+'&url='+encodeURIComponent(location.href);window.open(u,'_blank','noopener')})()`;
+            const link = document.getElementById('quick-add-bookmarklet-link');
+            link.href = bookmarklet;
+            link.onclick = null;
+            document.getElementById('quick-add-test-url').value = '';
+            const feedback = document.getElementById('quick-add-test-feedback');
+            feedback.className = 'small mt-2 d-none';
+            feedback.textContent = '';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal')).show();
+        }
+        function copyShortcutSetupUrl() { copyToClipboard(quickAddEndpoint); }
+        function copyBookmarkletCode() {
+            const link = document.getElementById('quick-add-bookmarklet-link');
+            copyToClipboard(link?.href || '');
+        }
+        async function sendQuickAddTest() {
+            const input = document.getElementById('quick-add-test-url');
+            const button = document.getElementById('btn-quick-add-test');
+            const feedback = document.getElementById('quick-add-test-feedback');
+            let target;
+            try { target = new URL(input.value.trim()); } catch (_) { target = null; }
+            if (!quickAddEndpoint || !target || !['http:', 'https:'].includes(target.protocol)) {
+                feedback.textContent = 'Enter a valid HTTP or HTTPS media URL.';
+                feedback.className = 'small mt-2 text-danger';
+                return;
+            }
+            button.disabled = true;
+            try {
+                const response = await fetch(quickAddEndpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: target.href})});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Quick-Add request failed');
+                feedback.textContent = data.message || 'Episode queued for download.';
+                feedback.className = 'small mt-2 text-success';
+            } catch (error) {
+                feedback.textContent = error.message || 'Quick-Add request failed.';
+                feedback.className = 'small mt-2 text-danger';
+            } finally { button.disabled = false; }
+        }
+
+        let playerEpisode = null;
+        let playerChapters = [];
+        function playerTime(seconds) {
+            seconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const rest = seconds % 60;
+            return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}` : `${minutes}:${String(rest).padStart(2, '0')}`;
+        }
+        function updatePlayerClock() {
+            const audio = document.getElementById('sticky-audio-elem');
+            const progress = document.getElementById('player-progress');
+            document.getElementById('player-current-time').textContent = playerTime(audio.currentTime);
+            document.getElementById('player-duration').textContent = playerTime(audio.duration || playerEpisode?.duration || 0);
+            progress.max = String(audio.duration || playerEpisode?.duration || 0);
+            progress.value = String(audio.currentTime || 0);
+        }
+        function updatePlayerPlayIcon() {
+            const audio = document.getElementById('sticky-audio-elem');
+            const icon = document.getElementById('player-play-icon');
+            icon.className = audio.paused ? 'bi bi-play-fill fs-5' : 'bi bi-pause-fill fs-5';
+        }
+        function playerSeekRelative(seconds) {
+            const audio = document.getElementById('sticky-audio-elem');
+            audio.currentTime = Math.max(0, Math.min(audio.duration || Infinity, audio.currentTime + seconds));
+        }
+        function onPlayerProgressInput(value) {
+            document.getElementById('sticky-audio-elem').currentTime = Number(value) || 0;
+        }
+        function togglePlayerPlay() {
+            const audio = document.getElementById('sticky-audio-elem');
+            if (audio.paused) audio.play().catch(() => showToast('Playback could not be started.'));
+            else audio.pause();
+        }
+        function setPlayerSpeed(value) { document.getElementById('sticky-audio-elem').playbackRate = Number(value) || 1; }
+        function closeStickyPlayer() {
+            const audio = document.getElementById('sticky-audio-elem');
+            audio.pause(); audio.removeAttribute('src'); audio.load();
+            document.getElementById('stickyAudioPlayer').classList.add('d-none');
+            toggleChaptersPopover(false);
+        }
+        function renderPlayerChapters() {
+            const list = document.getElementById('sticky-chapters-list');
+            document.getElementById('player-chapters-count').textContent = String(playerChapters.length);
+            document.getElementById('player-chapters-btn').disabled = !playerChapters.length;
+            list.innerHTML = playerChapters.length ? playerChapters.map(chapter =>
+                `<button type="button" class="list-group-item list-group-item-action border-0 rounded small" data-player-chapter-start="${Number(chapter.startTime) || 0}"><span class="font-monospace text-primary me-2">${playerTime(Number(chapter.startTime))}</span>${escapeHtml(chapter.title || 'Chapter')}</button>`
+            ).join('') : '<div class="text-muted small p-3 text-center">No chapters found for this episode</div>';
+        }
+        function toggleChaptersPopover(force) {
+            const popover = document.getElementById('sticky-chapters-popover');
+            const show = typeof force === 'boolean' ? force : popover.classList.contains('d-none');
+            popover.classList.toggle('d-none', !show);
+        }
+        async function loadPlayerChapters(episode) {
+            playerChapters = Array.isArray(episode.chapters) ? episode.chapters : [];
+            renderPlayerChapters();
+            if (playerChapters.length || !episode.chapters_url) return;
+            try {
+                const response = await fetch(episode.chapters_url, {credentials: 'same-origin'});
+                const data = await response.json();
+                if (!response.ok || !Array.isArray(data.chapters)) throw new Error('Invalid chapter document');
+                playerChapters = data.chapters.filter(chapter => Number.isFinite(Number(chapter.startTime)) && chapter.title);
+                renderPlayerChapters();
+            } catch (_) { renderPlayerChapters(); }
+        }
+        function onPlayEpisodeBtn(button) {
+            let episode;
+            try { episode = JSON.parse(button.dataset.playerEpisode || '{}'); } catch (_) { return; }
+            const mediaURL = safeUrl(episode.media_url || '');
+            if (!mediaURL) return;
+            playerEpisode = episode;
+            const audio = document.getElementById('sticky-audio-elem');
+            audio.pause(); audio.src = mediaURL; audio.playbackRate = Number(document.getElementById('player-speed').value) || 1;
+            document.getElementById('stickyAudioPlayer').classList.remove('d-none');
+            document.getElementById('player-title').textContent = episode.title || episode.id || 'Untitled episode';
+            document.getElementById('player-title').title = episode.title || episode.id || '';
+            document.getElementById('player-feed-badge').textContent = episode.feed_title || '';
+            const extension = ((episode.format || mediaURL.split('?')[0].split('.').pop() || 'audio') + '').toUpperCase();
+            document.getElementById('player-codec-badge').textContent = extension;
+            const bitrate = episode.duration > 0 && episode.size > 0 ? Math.round((episode.size * 8) / episode.duration / 1000) : 0;
+            document.getElementById('player-bitrate-badge').textContent = bitrate ? `${bitrate} kbps` : '-- kbps';
+            document.getElementById('player-norm-badge').classList.toggle('d-none', !episode.normalize_audio);
+            audio.load(); updatePlayerClock(); updatePlayerPlayIcon(); toggleChaptersPopover(false); loadPlayerChapters(episode);
+            audio.play().catch(() => updatePlayerPlayIcon());
+        }
+        document.getElementById('sticky-audio-elem').addEventListener('timeupdate', updatePlayerClock);
+        document.getElementById('sticky-audio-elem').addEventListener('loadedmetadata', updatePlayerClock);
+        document.getElementById('sticky-audio-elem').addEventListener('play', updatePlayerPlayIcon);
+        document.getElementById('sticky-audio-elem').addEventListener('pause', updatePlayerPlayIcon);
+        document.getElementById('sticky-audio-elem').addEventListener('ended', updatePlayerPlayIcon);
+        document.getElementById('sticky-chapters-list').addEventListener('click', event => {
+            const chapter = event.target.closest('[data-player-chapter-start]');
+            if (!chapter) return;
+            document.getElementById('sticky-audio-elem').currentTime = Number(chapter.dataset.playerChapterStart) || 0;
+            toggleChaptersPopover(false);
+        });
+
         function closeModal(modalId) {
             const el = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
             if (!el) return;
@@ -1087,6 +1238,12 @@
             document.getElementById('fs-keep-last').value = clean.keep_last !== undefined ? clean.keep_last : (feed.keep_last || 0);
 
             // Filters
+            const ignLive = document.getElementById('fs-ignore-live');
+            if (ignLive) ignLive.checked = !!clean.ignore_live;
+            const normAudio = document.getElementById('fs-normalize-audio');
+            if (normAudio) normAudio.checked = !!clean.normalize_audio;
+            const proxyEl = document.getElementById('fs-proxy');
+            if (proxyEl) proxyEl.value = clean.proxy || '';
             document.getElementById('fs-filter-title').value = filters.title || '';
             document.getElementById('fs-filter-not-title').value = filters.not_title || '';
             document.getElementById('fs-filter-desc').value = filters.description || '';
@@ -1320,6 +1477,9 @@
                 keep_last: isAudiobook ? 0 : (parseInt(document.getElementById('fs-keep-last').value) || 0),
                 language: document.getElementById('fs-custom-lang').value.trim(),
                 redownload: isAudiobook ? false : (document.getElementById('fs-redownload') ? document.getElementById('fs-redownload').checked : false),
+                ignore_live: document.getElementById('fs-ignore-live') ? document.getElementById('fs-ignore-live').checked : false,
+                normalize_audio: document.getElementById('fs-normalize-audio') ? document.getElementById('fs-normalize-audio').checked : false,
+                proxy: document.getElementById('fs-proxy') ? document.getElementById('fs-proxy').value.trim() : '',
                 filters: isAudiobook ? {} : {
                     title: document.getElementById('fs-filter-title').value.trim(),
                     not_title: document.getElementById('fs-filter-not-title').value.trim(),
@@ -1661,6 +1821,9 @@
                 private_feed: document.getElementById('new-feed-private-feed').checked,
                 keep_last: parseInt(document.getElementById('new-feed-keeplast').value, 10) || 0,
                 language: document.getElementById('new-feed-custom-lang').value.trim(),
+                ignore_live: document.getElementById('new-feed-ignore-live') ? document.getElementById('new-feed-ignore-live').checked : false,
+                normalize_audio: document.getElementById('new-feed-normalize-audio') ? document.getElementById('new-feed-normalize-audio').checked : false,
+                proxy: document.getElementById('new-feed-proxy') ? document.getElementById('new-feed-proxy').value.trim() : '',
                 filters: {
                     title: document.getElementById('new-feed-filter-title').value.trim(),
                     not_title: document.getElementById('new-feed-filter-nottitle').value.trim(),
@@ -1849,7 +2012,22 @@
                 let actions = '';
                 if (ep.status === 'downloaded') {
                     badge = `<span class="badge bg-success">${isAudiobook ? 'Available' : 'Downloaded'}</span>`;
-                    if (ep.media_url) actions += `<a href="${safeUrl(ep.media_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm" title="Play downloaded media"><i aria-hidden="true" class="bi bi-play-fill"></i> Play</a>`;
+                    if (ep.media_url) {
+                        const epDataStr = escapeHtml(JSON.stringify({
+                            id: ep.id,
+                            title: ep.title || ep.id,
+                            feed_title: title,
+                            media_url: safeUrl(ep.media_url),
+                            duration: ep.duration || 0,
+                            size: ep.size || 0,
+                            format: ep.format || '',
+                            chapters_url: ep.chapters_url || '',
+                            chapters: ep.chapters || [],
+                            description: ep.description || ''
+                        }));
+                        actions += `<button type="button" class="btn btn-outline-primary btn-sm" data-player-episode='${epDataStr}' onclick="onPlayEpisodeBtn(this)" title="Play in sticky mini-player"><i aria-hidden="true" class="bi bi-play-fill"></i> Play</button>`;
+                        actions += `<a href="${safeUrl(ep.media_url)}" download class="btn btn-outline-secondary btn-sm" title="Direct download"><i aria-hidden="true" class="bi bi-download"></i></a>`;
+                    }
                 } else if (ep.status === 'new') {
                     badge = '<span class="badge bg-primary">Pending</span>';
                     size = 'Not downloaded';
@@ -2264,6 +2442,15 @@
 
             document.getElementById('dl-timeout').value = downloaderConfig.timeout || 10;
             document.getElementById('dl-proxy').value = downloaderConfig.proxy || '';
+            const proxies = downloaderConfig.proxies || {};
+            const ytProxyEl = document.getElementById('dl-proxy-youtube');
+            if (ytProxyEl) ytProxyEl.value = proxies.youtube || '';
+            const vkProxyEl = document.getElementById('dl-proxy-vkvideo');
+            if (vkProxyEl) vkProxyEl.value = proxies.vkvideo || proxies.vk || '';
+            const rtProxyEl = document.getElementById('dl-proxy-rutube');
+            if (rtProxyEl) rtProxyEl.value = proxies.rutube || '';
+            const vmProxyEl = document.getElementById('dl-proxy-vimeo');
+            if (vmProxyEl) vmProxyEl.value = proxies.vimeo || proxies.soundcloud || '';
             document.getElementById('dl-language').value = downloaderConfig.language || '';
             document.getElementById('dl-custom-binary').value = downloaderConfig.custom_binary || '';
             document.getElementById('dl-self-update').checked = !!downloaderConfig.self_update;
@@ -2349,6 +2536,16 @@
             const customBinary = document.getElementById('dl-custom-binary').value.trim();
             const selfUpdate = document.getElementById('dl-self-update').checked;
 
+            const proxies = {};
+            const ytProxy = document.getElementById('dl-proxy-youtube')?.value.trim();
+            if (ytProxy) proxies.youtube = ytProxy;
+            const vkProxy = document.getElementById('dl-proxy-vkvideo')?.value.trim();
+            if (vkProxy) proxies.vkvideo = vkProxy;
+            const rtProxy = document.getElementById('dl-proxy-rutube')?.value.trim();
+            if (rtProxy) proxies.rutube = rtProxy;
+            const vmProxy = document.getElementById('dl-proxy-vimeo')?.value.trim();
+            if (vmProxy) proxies.vimeo = vmProxy;
+
             const browser = document.getElementById('dl-browser-select').value;
             const profile = document.getElementById('dl-browser-profile').value.trim();
             let browserVal = browser;
@@ -2363,6 +2560,7 @@
                     body: JSON.stringify({
                         timeout: timeout,
                         proxy: proxy,
+                        proxies: proxies,
                         language: language,
                         custom_binary: customBinary,
                         self_update: selfUpdate,
@@ -3838,6 +4036,7 @@
                     </div>
                     <div class="feed-card-bottom">
                         <button class="btn btn-light" type="button" onclick="personalOpen('${escapeHtml(f.id)}')">Open</button>
+                        <button class="btn btn-light" type="button" onclick="openQuickAddModal('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
                         <button class="btn btn-light" type="button" onclick="showSubscription('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                         <button class="btn btn-light" type="button" onclick="personalEdit('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
                     </div>
@@ -3896,10 +4095,27 @@
                         container.innerHTML = data.episodes.length ? data.episodes.map(ep => {
                             const url = safeUrl(ep.media_url || '');
                             const isVid = (ep.media_type && ep.media_type.startsWith('video/')) || ep.format === 'video';
+                            const epDataStr = escapeHtml(JSON.stringify({
+                                id: ep.id,
+                                title: ep.title || ep.id,
+                                feed_title: (data.feed && data.feed.title) || 'Personal Feed',
+                                media_url: url,
+                                duration: ep.duration || 0,
+                                size: ep.size || 0,
+                                format: ep.format || 'audio',
+                                description: ep.description || ''
+                            }));
                             const player = ep.status === 'downloaded' && url
                                 ? (isVid
                                     ? `<video controls preload="none" class="w-100 rounded mt-2" style="max-height: 240px; background: var(--ctp-crust);" src="${url}"></video>`
-                                    : `<audio controls preload="none" class="w-100 mt-2" src="${url}"></audio>`)
+                                    : `<div class="mt-2 d-flex align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-player-episode='${epDataStr}' onclick="onPlayEpisodeBtn(this)">
+                                            <i aria-hidden="true" class="bi bi-play-fill me-1"></i>Play in Mini-Player
+                                        </button>
+                                        <a href="${url}" download class="btn btn-sm btn-outline-secondary" title="Download audio file">
+                                            <i aria-hidden="true" class="bi bi-download"></i>
+                                        </a>
+                                       </div>`)
                                 : '';
                             let actions = `<button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="rename" data-personal-id="${escapeHtml(ep.id)}" data-personal-title="${escapeHtml(ep.title || '')}"><i aria-hidden="true" class="bi bi-pencil me-1"></i>Rename</button>
 <button type="button" class="btn btn-outline-secondary btn-sm" data-personal-action="move" data-personal-id="${escapeHtml(ep.id)}"><i aria-hidden="true" class="bi bi-arrows-move me-1"></i>Move</button>

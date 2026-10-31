@@ -374,5 +374,31 @@ func FormatXML(podcast *itunes.Podcast, f *model.Feed) string {
 		re := regexp.MustCompile(`<itunes:order>(\d+)</itunes:order>`)
 		raw = re.ReplaceAllString(raw, "<itunes:order>$1</itunes:order>\n\t<itunes:episode>$1</itunes:episode>")
 	}
+
+	hasChapters := false
+	if f != nil {
+		for _, ep := range f.Episodes {
+			if ep.ChaptersURL != "" {
+				hasChapters = true
+				break
+			}
+		}
+	}
+
+	if hasChapters {
+		if !strings.Contains(raw, "xmlns:podcast=") {
+			raw = strings.Replace(raw, "<rss ", "<rss xmlns:podcast=\"https://podcastindex.org/namespace/1.0\" ", 1)
+		}
+		for _, ep := range f.Episodes {
+			if ep.ChaptersURL != "" {
+				chapterTag := fmt.Sprintf("\n\t\t<podcast:chapters url=%q type=\"application/json+chapters\"/>", ep.ChaptersURL)
+				target := fmt.Sprintf("<guid>%s</guid>", ep.ID)
+				if strings.Contains(raw, target) {
+					raw = strings.Replace(raw, target, target+chapterTag, 1)
+				}
+			}
+		}
+	}
+
 	return raw
 }

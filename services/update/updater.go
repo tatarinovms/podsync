@@ -3,11 +3,14 @@ package update
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -203,6 +206,9 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	}
 
 	log.Debugf("received %d episode(s) for %q", len(result.Episodes), result.Title)
+	if err := u.writeChapterDocuments(ctx, feedConfig.ID, result.Episodes); err != nil {
+		return errors.Wrap(err, "failed to generate podcast chapters")
+	}
 
 	episodeSet := make(map[string]struct{})
 	if err := u.db.WalkEpisodes(ctx, feedConfig.ID, func(episode *model.Episode) error {
@@ -225,6 +231,9 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	// removing episodes that are no longer available in the feed and not downloaded or cleaned
 	for id := range episodeSet {
 		log.Infof("removing episode %q", id)
+		if err := u.fs.Delete(ctx, chapterObjectName(feedConfig.ID, id)); err != nil && !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to delete episode chapters")
+		}
 		err := u.db.DeleteEpisode(feedConfig.ID, id)
 		if err != nil {
 			return err
@@ -232,6 +241,40 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	}
 
 	log.Debug("successfully saved updates to storage")
+	return nil
+}
+
+func chapterObjectName(feedID, episodeID string) string {
+	sum := sha256.Sum256([]byte(episodeID))
+	return fmt.Sprintf("%s/chapters/%s.json", feedID, hex.EncodeToString(sum[:]))
+}
+
+// writeChapterDocuments publishes Podcasting 2.0 chapter documents. The
+// hashed filename prevents a provider-supplied episode ID from escaping its
+// feed directory.
+func (u *Manager) writeChapterDocuments(ctx context.Context, feedID string, episodes []*model.Episode) error {
+	if u.fs == nil {
+		return errors.New("storage is not configured")
+	}
+	for _, episode := range episodes {
+		if len(episode.Chapters) == 0 {
+			episode.Chapters = feed.ParseChaptersFromDescription(episode.Description)
+		}
+		if len(episode.Chapters) < 2 {
+			episode.Chapters = nil
+			episode.ChaptersURL = ""
+			continue
+		}
+		data, err := feed.GenerateChaptersJSON(episode.Chapters)
+		if err != nil {
+			return err
+		}
+		name := chapterObjectName(feedID, episode.ID)
+		if _, err := u.fs.Create(ctx, name, bytes.NewReader(data)); err != nil {
+			return errors.Wrapf(err, "failed to write %s", name)
+		}
+		episode.ChaptersURL = strings.TrimRight(u.hostname, "/") + "/" + name
+	}
 	return nil
 }
 
@@ -345,6 +388,18 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 			tempFile, err = u.downloader.Download(ctx, feedConfig, episode)
 		}
 		if err != nil {
+			if err == ytdl.ErrLiveStreamSkipped {
+				logger.Info("skipping live stream or upcoming premiere")
+				if err := u.db.UpdateEpisode(feedID, episode.ID, func(ep *model.Episode) error {
+					ep.Status = model.EpisodeCleaned
+					ep.Error = ""
+					ep.ErrorAt = nil
+					return nil
+				}); err != nil {
+					return err
+				}
+				continue
+			}
 			// YouTube might block host with HTTP Error 429: Too Many Requests
 			// We still need to generate XML, so just stop sending download requests and
 			// retry next time
@@ -542,6 +597,9 @@ func (u *Manager) cleanup(ctx context.Context, feedConfig *feed.Config) error {
 		log.Infof("deleting %s", path)
 		if err := u.fs.Delete(ctx, path); err != nil {
 			result = multierror.Append(result, errors.Wrapf(err, "failed to delete: %s", path))
+		}
+		if err := u.fs.Delete(ctx, chapterObjectName(feedID, episode.ID)); err != nil && !os.IsNotExist(err) {
+			result = multierror.Append(result, errors.Wrapf(err, "failed to delete chapters for: %s", episode.ID))
 		}
 
 		if err := u.db.UpdateEpisode(feedID, episode.ID, func(episode *model.Episode) error {

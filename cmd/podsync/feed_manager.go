@@ -568,16 +568,19 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 	m.mu.RUnlock()
 
 	summary := web.FeedSummary{
-		ID:           f.ID,
-		URL:          f.URL,
-		Format:       string(f.Format),
-		Quality:      string(f.Quality),
-		PageSize:     f.PageSize,
-		CronSchedule: f.CronSchedule,
-		UpdatePeriod: f.UpdatePeriod.String(),
-		PrivateFeed:  f.PrivateFeed,
-		Updating:     updating,
-		Config:       f,
+		ID:             f.ID,
+		URL:            f.URL,
+		Format:         string(f.Format),
+		Quality:        string(f.Quality),
+		PageSize:       f.PageSize,
+		CronSchedule:   f.CronSchedule,
+		UpdatePeriod:   f.UpdatePeriod.String(),
+		PrivateFeed:    f.PrivateFeed,
+		IgnoreLive:     f.IgnoreLive,
+		NormalizeAudio: f.NormalizeAudio,
+		Proxy:          f.Proxy,
+		Updating:       updating,
+		Config:         f,
 	}
 
 	// Try to get enriched metadata from DB
@@ -1393,6 +1396,15 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		f.OPML = update.OPML
 	}
 	f.PrivateFeed = update.PrivateFeed
+	if update.IgnoreLive != nil {
+		f.IgnoreLive = *update.IgnoreLive
+	}
+	if update.NormalizeAudio != nil {
+		f.NormalizeAudio = *update.NormalizeAudio
+	}
+	if update.Proxy != nil {
+		f.Proxy = strings.TrimSpace(*update.Proxy)
+	}
 
 	if update.KeepLast > 0 {
 		f.Clean = &feed.Cleanup{KeepLast: update.KeepLast}
@@ -1562,6 +1574,21 @@ func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
 		tree.Set(prefix+".private_feed", true)
 	} else {
 		tree.Delete(prefix + ".private_feed")
+	}
+	if f.IgnoreLive {
+		tree.Set(prefix+".ignore_live", true)
+	} else {
+		tree.Delete(prefix + ".ignore_live")
+	}
+	if f.NormalizeAudio {
+		tree.Set(prefix+".normalize_audio", true)
+	} else {
+		tree.Delete(prefix + ".normalize_audio")
+	}
+	if f.Proxy != "" {
+		tree.Set(prefix+".proxy", f.Proxy)
+	} else {
+		tree.Delete(prefix + ".proxy")
 	}
 	if f.Clean != nil && f.Clean.KeepLast > 0 {
 		tree.Set(prefix+".clean.keep_last", int64(f.Clean.KeepLast))
@@ -1763,6 +1790,7 @@ func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.Download
 		CookiesFile:        dlCfg.CookiesFile,
 		CookiesFromBrowser: dlCfg.CookiesFromBrowser,
 		Proxy:              dlCfg.Proxy,
+		Proxies:            dlCfg.Proxies,
 		Language:           dlCfg.Language,
 		HasCookiesFile:     hasCookies,
 		CookiesFileSize:    cookiesSize,
@@ -1799,6 +1827,9 @@ func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web
 	}
 	if update.Proxy != nil {
 		cfgCopy.Proxy = *update.Proxy
+	}
+	if update.Proxies != nil {
+		cfgCopy.Proxies = *update.Proxies
 	}
 	if update.Language != nil {
 		cfgCopy.Language = strings.TrimSpace(*update.Language)
@@ -2087,6 +2118,17 @@ func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
 		tree.Set("downloader.proxy", cfg.Proxy)
 	} else {
 		tree.Delete("downloader.proxy")
+	}
+	if len(cfg.Proxies) > 0 {
+		for k, v := range cfg.Proxies {
+			if v != "" {
+				tree.Set("downloader.proxies."+k, v)
+			} else {
+				tree.Delete("downloader.proxies." + k)
+			}
+		}
+	} else {
+		tree.Delete("downloader.proxies")
 	}
 	if cfg.Language != "" {
 		tree.Set("downloader.language", cfg.Language)

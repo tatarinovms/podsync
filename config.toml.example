@@ -157,6 +157,15 @@ vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Al
   # When set to true, podcasts indexers such as iTunes or Google Podcasts will not index this podcast
   private_feed = true
 
+  # When set to true, upcoming premieres and active live streams are skipped
+  ignore_live = true
+
+  # When set to true, audio loudness is normalized to EBU R128 podcast standard (-16 LUFS)
+  normalize_audio = true
+
+  # Optional per-feed proxy override (use "direct" to bypass global proxy)
+  # proxy = "socks5://127.0.0.1:1080"
+
   # Optional post-episode download hooks
   # Execute commands after each episode is downloaded
   # Available environment variables: EPISODE_FILE, FEED_NAME, EPISODE_TITLE
@@ -210,3 +219,16 @@ vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Al
 # No cron is required: use Update after adding/removing chapters or editing tags.
 [audiobooks]
   dir = "/app/data/audiobooks"
+
+# Downloader (yt-dlp) options and proxy routing
+[downloader]
+  timeout = 15 # in minutes
+  # Global proxy fallback (leave empty for direct connection)
+  # proxy = "socks5://127.0.0.1:1080"
+
+  # Selective proxy routing per provider or domain
+  # Useful when YouTube needs a foreign SOCKS5/HTTP proxy, while VK Video or Rutube connect directly
+  [downloader.proxies]
+  youtube = "socks5://127.0.0.1:1080"
+  vkvideo = "direct"
+  rutube = "direct"

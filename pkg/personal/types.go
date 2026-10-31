@@ -20,8 +20,9 @@ type Feed struct {
 	CoverArt     string        `json:"cover_art"`
 	Format       model.Format  `json:"format"`
 	PlaylistSort model.Sorting `json:"playlist_sort"`
-	PrivateFeed  bool          `json:"private_feed"`
-	CreatedAt    time.Time     `json:"created_at"`
+	PrivateFeed   bool          `json:"private_feed"`
+	QuickAddToken string        `json:"quick_add_token,omitempty"`
+	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt    time.Time     `json:"updated_at"`
 	FeedURL      string        `json:"feed_url"`
 	EpisodeCount int           `json:"episode_count"`

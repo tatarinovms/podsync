@@ -355,6 +355,18 @@ func (s *Server) getToolDefinitions() []Tool {
 						Type:        "string",
 						Description: "Optional preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos",
 					},
+					"ignore_live": {
+						Type:        "boolean",
+						Description: "Optional flag to ignore live streams and upcoming premieres",
+					},
+					"normalize_audio": {
+						Type:        "boolean",
+						Description: "Optional flag to normalize loudness to EBU R128 podcast standard (-16 LUFS)",
+					},
+					"proxy": {
+						Type:        "string",
+						Description: "Optional proxy URL override for this specific feed (or 'direct' to bypass global proxy)",
+					},
 				},
 				Required: []string{"feed_id"},
 			},
@@ -461,6 +473,10 @@ func (s *Server) getToolDefinitions() []Tool {
 					"language": {
 						Type:        "string",
 						Description: "Preferred audio/content language code (e.g. 'ru', 'en') for multi-language videos and YouTube dubbing",
+					},
+					"proxies": {
+						Type:        "object",
+						Description: "Map of provider or domain names to proxy URLs (e.g. {'youtube': 'socks5://127.0.0.1:1080', 'vkvideo': 'direct'})",
 					},
 				},
 			},
@@ -1301,6 +1317,15 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 		}
 		if rawProxy, ok := args["proxy"].(string); ok {
 			update.Proxy = &rawProxy
+		}
+		if rawProxies, ok := args["proxies"].(map[string]interface{}); ok {
+			pm := make(map[string]string)
+			for k, v := range rawProxies {
+				if s, ok := v.(string); ok {
+					pm[k] = s
+				}
+			}
+			update.Proxies = &pm
 		}
 		if rawBrowser, ok := args["cookies_from_browser"].(string); ok {
 			update.CookiesFromBrowser = &rawBrowser

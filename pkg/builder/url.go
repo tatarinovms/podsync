@@ -14,6 +14,9 @@ import (
 
 func ParseURL(link string) (model.Info, error) {
 	link = strings.TrimSpace(link)
+	if link == "" {
+		return model.Info{}, errors.New("empty URL")
+	}
 	if strings.HasPrefix(link, "audiobook://") || strings.HasPrefix(link, "local://") {
 		kind, id, err := parseAudiobookURL(link)
 		if err != nil {

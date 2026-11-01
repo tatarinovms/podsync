@@ -105,6 +105,25 @@ type CoverUploadResult struct {
 	Filename string `json:"filename"`
 }
 
+// BackupInfo is the non-sensitive manifest summary shown before restore.
+type BackupInfo struct {
+	SchemaVersion   int       `json:"schema_version"`
+	PodsyncVersion  string    `json:"podsync_version"`
+	CreatedAt       time.Time `json:"created_at"`
+	IncludesSecrets bool      `json:"includes_secrets"`
+	Counts          struct {
+		Feeds          int `json:"feeds"`
+		PersonalFeeds  int `json:"personal_feeds"`
+		AudiobookFeeds int `json:"audiobook_feeds"`
+		CustomCovers   int `json:"custom_covers"`
+	} `json:"counts"`
+}
+
+type BackupRestoreOptions struct {
+	PreservePaths  bool
+	RestoreSecrets bool
+}
+
 type SystemStats struct {
 	Version    string    `json:"version"`
 	Commit     string    `json:"commit"`
@@ -373,4 +392,7 @@ type AdminManager interface {
 	SaveAudiobookFile(bookDir string, filename string, r io.Reader) error
 	DeleteAudiobookDir(ctx context.Context, dirName string) error
 	SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*CoverUploadResult, error)
+	CreateSystemBackup(ctx context.Context, includeSecrets bool, w io.Writer) (*BackupInfo, error)
+	InspectSystemBackup(ctx context.Context, r io.Reader) (*BackupInfo, error)
+	RestoreSystemBackup(ctx context.Context, r io.Reader, opts BackupRestoreOptions) (*BackupInfo, error)
 }

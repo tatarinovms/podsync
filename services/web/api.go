@@ -69,6 +69,9 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	mux.Handle("/api/v1/tokens", s.authMiddleware(http.HandlerFunc(s.handleTokens)))
 	mux.Handle("/api/v1/system/update", s.authMiddleware(http.HandlerFunc(s.handlePodsyncUpdate)))
+	mux.Handle("/api/v1/system/backup/export", s.authMiddleware(http.HandlerFunc(s.handleSystemBackupExport)))
+	mux.Handle("/api/v1/system/backup/inspect", s.authMiddleware(http.HandlerFunc(s.handleSystemBackupInspect)))
+	mux.Handle("/api/v1/system/backup/restore", s.authMiddleware(http.HandlerFunc(s.handleSystemBackupRestore)))
 	mux.Handle("/api/v1/system", s.authMiddleware(http.HandlerFunc(s.handleSystem)))
 	mux.Handle("/api/v1/system/errors", s.authMiddleware(http.HandlerFunc(s.handleSystemErrors)))
 	mux.Handle("/api/v1/system/recent", s.authMiddleware(http.HandlerFunc(s.handleSystemRecent)))
@@ -90,6 +93,81 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.Handle("/api/v1/audiobooks/config", s.authMiddleware(http.HandlerFunc(s.handleAudiobookConfig)))
 	mux.Handle("/api/v1/covers/upload", s.authMiddleware(http.HandlerFunc(s.handleCoverUpload)))
 	mux.Handle("/api/v1/feeds/preview", s.authMiddleware(http.HandlerFunc(s.handleFeedPreview)))
+}
+
+const maxBackupUploadSize = 512 << 20
+
+func (s *Server) handleSystemBackupExport(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	includeSecrets := r.URL.Query().Get("include_secrets") != "false"
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="podsync-backup-%s.tar.gz"`, time.Now().UTC().Format("20060102-150405")))
+	if _, err := s.adminMgr.CreateSystemBackup(r.Context(), includeSecrets, w); err != nil {
+		log.WithError(err).Error("backup export failed")
+	}
+}
+
+func (s *Server) backupUpload(w http.ResponseWriter, r *http.Request) (multipart.File, *multipart.FileHeader, error) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBackupUploadSize)
+	if err := r.ParseMultipartForm(maxBackupUploadSize); err != nil {
+		return nil, nil, err
+	}
+	return r.FormFile("file")
+}
+
+func (s *Server) handleSystemBackupInspect(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	f, _, err := s.backupUpload(w, r)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "backup file is required and must be under 512 MiB")
+		return
+	}
+	defer f.Close()
+	info, err := s.adminMgr.InspectSystemBackup(r.Context(), f)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, info)
+}
+
+func (s *Server) handleSystemBackupRestore(w http.ResponseWriter, r *http.Request) {
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	f, _, err := s.backupUpload(w, r)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, "backup file is required and must be under 512 MiB")
+		return
+	}
+	defer f.Close()
+	preserve := r.FormValue("preserve_paths") != "false"
+	secrets := r.FormValue("restore_secrets") != "false"
+	info, err := s.adminMgr.RestoreSystemBackup(r.Context(), f, BackupRestoreOptions{PreservePaths: preserve, RestoreSecrets: secrets})
+	if err != nil {
+		s.writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, info)
 }
 
 func cleanToken(providerStr, tok string) string {

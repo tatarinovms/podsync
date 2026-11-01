@@ -1032,16 +1032,16 @@
             document.getElementById('qr-feed-title').innerText = title;
             document.getElementById('qr-feed-url').innerText = url;
             
-            const canvas = document.getElementById('qr-canvas');
+            const container = document.getElementById('qr-canvas');
             if (!qrInstance) {
-                qrInstance = new QRious({
-                    element: canvas,
-                    size: 220,
-                    value: url,
-                    level: 'M'
+                qrInstance = new QRCode(container, {
+                    text: url,
+                    width: 220,
+                    height: 220,
+                    correctLevel: QRCode.CorrectLevel.M
                 });
             } else {
-                qrInstance.set({ value: url });
+                qrInstance.makeCode(url);
             }
 
             const modal = new bootstrap.Modal(document.getElementById('qrModal'));
@@ -2375,6 +2375,56 @@
                 showToast(`Podsync update failed: ${err.message}`);
                 button.innerHTML = '<i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync';
                 loadPodsyncUpdate();
+            }
+        }
+
+        function downloadSystemBackup() {
+            const includeSecrets = document.getElementById('backup-include-secrets')?.checked !== false;
+            window.location.assign(`/api/v1/system/backup/export?include_secrets=${includeSecrets}`);
+        }
+
+        let selectedSystemBackup = null;
+        async function inspectSystemBackup(input) {
+            const file = input?.files?.[0];
+            const preview = document.getElementById('backup-preview');
+            const restore = document.getElementById('btn-restore-backup');
+            selectedSystemBackup = null;
+            restore.disabled = true;
+            if (!file) { preview.classList.add('d-none'); return; }
+            preview.classList.remove('d-none');
+            preview.textContent = 'Inspecting backup…';
+            try {
+                const form = new FormData(); form.append('file', file);
+                const res = await fetch('/api/v1/system/backup/inspect', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Backup inspection failed');
+                selectedSystemBackup = file;
+                const counts = data.counts || {};
+                preview.innerHTML = `<strong>Ready to restore</strong><br>Created: ${escapeHtml(data.created_at || 'unknown')} · Podsync ${escapeHtml(data.podsync_version || 'unknown')}<br>Feeds: ${counts.feeds || 0} · Personal: ${counts.personal_feeds || 0} · Audiobooks: ${counts.audiobook_feeds || 0} · Covers: ${counts.custom_covers || 0}<br>Secrets: ${data.includes_secrets ? 'included' : 'not included'}`;
+                restore.disabled = false;
+            } catch (err) {
+                preview.textContent = `Cannot use this backup: ${err.message}`;
+            }
+        }
+
+        async function restoreSystemBackup() {
+            if (!selectedSystemBackup) return;
+            if (!confirm('Restore this backup? Current feed and download state will be replaced.')) return;
+            const button = document.getElementById('btn-restore-backup');
+            button.disabled = true;
+            try {
+                const form = new FormData();
+                form.append('file', selectedSystemBackup);
+                form.append('preserve_paths', String(document.getElementById('backup-preserve-paths')?.checked !== false));
+                form.append('restore_secrets', 'true');
+                const res = await fetch('/api/v1/system/backup/restore', { method: 'POST', body: form });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Restore failed');
+                showToast('Backup restored. Reloading the dashboard…');
+                setTimeout(() => window.location.reload(), 800);
+            } catch (err) {
+                showToast(`Backup restore failed: ${err.message}`);
+                button.disabled = false;
             }
         }
 

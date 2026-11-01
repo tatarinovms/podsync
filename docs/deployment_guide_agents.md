@@ -289,7 +289,7 @@ Once Podsync is running (either as systemd service or via Docker), AI agents can
 
 With updated binaries, `podsync --mcp` probes
 `http://localhost:<server.port>/health/ready` and relays JSON-RPC to `POST /mcp`
-using `[server.admin]` Basic Auth when the daemon is ready. All 32 tools, including
+using `[server.admin]` Basic Auth when the daemon is ready. All 34 tools, including
 personal-feed tools, are available through this connection. For a complete library,
 call both `list_feeds` and `list_personal_feeds`. Local auto-proxy uses plain HTTP
 on the configured port; use the remote connection for HTTPS or a different host.

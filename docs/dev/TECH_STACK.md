@@ -75,7 +75,7 @@ Embedded directly within the Go binary (`//go:embed ui/*` from `services/web/ui/
 | **CSS Framework** | Bootstrap | 5.3.3 | Responsive grid layout, modals, dropdowns, and collapse utilities |
 | **Icon Set** | Bootstrap Icons | 1.11.3 | SVG iconography across admin console and action buttons |
 | **Color Theme** | Catppuccin | Mocha & Latte | Pastel dark and light themes implemented via CSS variables (`--ctp-*`) |
-| **QR Generator** | QRious | 4.0.2 | Zero-dependency client-side QR code generator for smartphone subscriptions |
+| **QR Generator** | QRCode.js (qrcodejs) | 1.0.0 | Locally bundled MIT-licensed QR generator for smartphone subscriptions; does not delay the console on a CDN request |
 
 ### UI Design System & Button Standards
 - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).

@@ -286,6 +286,16 @@ func (m *mockAdminManager) SaveCoverImage(ctx context.Context, feedID string, fi
 	}, nil
 }
 
+func (m *mockAdminManager) CreateSystemBackup(ctx context.Context, includeSecrets bool, w io.Writer) (*web.BackupInfo, error) {
+	return &web.BackupInfo{}, nil
+}
+func (m *mockAdminManager) InspectSystemBackup(ctx context.Context, r io.Reader) (*web.BackupInfo, error) {
+	return &web.BackupInfo{}, nil
+}
+func (m *mockAdminManager) RestoreSystemBackup(ctx context.Context, r io.Reader, opts web.BackupRestoreOptions) (*web.BackupInfo, error) {
+	return &web.BackupInfo{}, nil
+}
+
 func setupTestServer() (*Server, *mockAdminManager) {
 	mockMgr := &mockAdminManager{
 		feeds: []web.FeedSummary{
@@ -828,6 +838,9 @@ var adminManagerMCPExposure = map[string]struct {
 	"SaveAudiobookFile":      {Reason: "Multipart file upload is available only through the authenticated web admin."},
 	"DeleteAudiobookDir":     {Tool: "delete_audiobook_dir"},
 	"SaveCoverImage":         {Reason: "Multipart cover upload is available only through the authenticated web admin."},
+	"CreateSystemBackup":     {Tool: "create_system_backup"},
+	"InspectSystemBackup":    {Tool: "get_backup_info"},
+	"RestoreSystemBackup":    {Reason: "Destructive restore requires the authenticated web admin confirmation flow."},
 }
 
 func TestAdminManagerMCPCoverage(t *testing.T) {

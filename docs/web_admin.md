@@ -184,6 +184,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Server Uptime**: How long the Podsync daemon has been running.
   - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
   - **Podsync Updates**: Checks the latest GitHub Release. On a supported native Linux or macOS installation, **Update Podsync** downloads the matching release archive, verifies its SHA-256 from `checksums.txt`, replaces the executable, and restarts the process. The button is disabled for Docker deployments; follow the Compose update commands in the deployment guide instead.
+  - **Backup & Restore**: Downloads a portable `podsync-backup-YYYYMMDD-HHMMSS.tar.gz` containing `config.toml`, a consistent Badger backup stream, custom covers, optional `cookies.txt`, and a checksum manifest. Downloaded episodes are never included. Selecting an archive verifies checksums and shows its feed counts before restore. Keep the target server paths and port when migrating between Docker, NAS, and bare-metal deployments.
 
 ### 7. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
@@ -218,6 +219,9 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `/api/v1/system/update` | `GET`, `POST` | Check the latest GitHub Release or install it and restart a native Podsync process |
+| `/api/v1/system/backup/export` | `GET` | Stream a full `.tar.gz` backup. `include_secrets=false` excludes tokens, the admin password, proxy credentials, and `cookies.txt`. |
+| `/api/v1/system/backup/inspect` | `POST` | Inspect a multipart `file` upload (maximum 512 MiB) and verify its manifest and SHA-256 checksums. |
+| `/api/v1/system/backup/restore` | `POST` | Restore a validated multipart `file`; `preserve_paths=true` is the default and retains target storage paths and port. |
 | `/api/v1/feeds` | `GET` | List all configured feeds with stats |
 | `/api/v1/feeds` | `POST` | Add a new feed |
 | `/api/v1/feeds/status` | `GET` | Lightweight in-memory feed status (state: idle, queued, running; last_error, update times) |

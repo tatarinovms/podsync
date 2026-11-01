@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -788,6 +789,19 @@ func (s *Server) getToolDefinitions() []Tool {
 				Required: []string{"dir_name"},
 			},
 		},
+		{
+			Name: "create_system_backup", Description: "Create a portable Podsync .tar.gz backup without downloaded media and save it to a server path",
+			InputSchema: InputSchema{Type: "object", Properties: map[string]PropertyDef{
+				"path":            {Type: "string", Description: "Destination .tar.gz path on the Podsync server"},
+				"include_secrets": {Type: "boolean", Description: "Include API keys, admin password, proxy credentials and cookies.txt (default true)"},
+			}, Required: []string{"path"}},
+		},
+		{
+			Name: "get_backup_info", Description: "Validate and inspect a Podsync backup archive without restoring it",
+			InputSchema: InputSchema{Type: "object", Properties: map[string]PropertyDef{
+				"path": {Type: "string", Description: "Existing .tar.gz path on the Podsync server"},
+			}, Required: []string{"path"}},
+		},
 	}
 }
 
@@ -797,6 +811,48 @@ func (s *Server) callTool(ctx context.Context, name string, args map[string]inte
 	}
 
 	switch name {
+	case "create_system_backup":
+		path, ok := args["path"].(string)
+		if !ok || strings.TrimSpace(path) == "" {
+			return CallToolResult{}, fmt.Errorf("path parameter is required")
+		}
+		includeSecrets := true
+		if value, ok := args["include_secrets"].(bool); ok {
+			includeSecrets = value
+		}
+		out, err := os.OpenFile(strings.TrimSpace(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		info, err := s.mgr.CreateSystemBackup(ctx, includeSecrets, out)
+		closeErr := out.Close()
+		if err != nil {
+			_ = os.Remove(path)
+			return CallToolResult{}, err
+		}
+		if closeErr != nil {
+			return CallToolResult{}, closeErr
+		}
+		data, _ := json.MarshalIndent(map[string]interface{}{"path": path, "backup": info}, "", "  ")
+		return CallToolResult{Content: []ContentItem{{Type: "text", Text: string(data)}}}, nil
+
+	case "get_backup_info":
+		path, ok := args["path"].(string)
+		if !ok || strings.TrimSpace(path) == "" {
+			return CallToolResult{}, fmt.Errorf("path parameter is required")
+		}
+		in, err := os.Open(strings.TrimSpace(path))
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		defer in.Close()
+		info, err := s.mgr.InspectSystemBackup(ctx, in)
+		if err != nil {
+			return CallToolResult{}, err
+		}
+		data, _ := json.MarshalIndent(info, "", "  ")
+		return CallToolResult{Content: []ContentItem{{Type: "text", Text: string(data)}}}, nil
+
 	case "list_personal_feeds":
 		if s.personal == nil {
 			return CallToolResult{}, fmt.Errorf("personal feeds service is not enabled")

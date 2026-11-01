@@ -37,6 +37,22 @@ const feedTypeFilter = Object.assign(makeDummy('feed-type-filter'), { value: 'al
 const feedsCount = Object.assign(makeDummy('feeds-count'), { innerText: '' });
 const filterInfo = makeDummy('feeds-filter-info');
 const alertBanner = makeDummy('feeds-connection-alert');
+const qrCanvas = makeDummy('qr-canvas');
+const qrFeedTitle = makeDummy('qr-feed-title');
+const qrFeedURL = makeDummy('qr-feed-url');
+const qrCalls = [];
+
+class QRCodeMock {
+    constructor(element, options) {
+        this.element = element;
+        this.options = options;
+        qrCalls.push({ type: 'create', element, options });
+    }
+    makeCode(value) {
+        qrCalls.push({ type: 'update', value });
+    }
+}
+QRCodeMock.CorrectLevel = { M: 0 };
 
 const document = {
     documentElement: { setAttribute(){} },
@@ -47,6 +63,9 @@ const document = {
         if (id === 'feeds-count') return feedsCount;
         if (id === 'feeds-filter-info') return filterInfo;
         if (id === 'feeds-connection-alert') return alertBanner;
+        if (id === 'qr-canvas') return qrCanvas;
+        if (id === 'qr-feed-title') return qrFeedTitle;
+        if (id === 'qr-feed-url') return qrFeedURL;
         return makeDummy(id);
     },
     createElement(tag) { return makeDummy(tag); },
@@ -57,7 +76,8 @@ const document = {
 const context = {
     document,
     window: { location: { href: 'http://localhost/admin/' } },
-    bootstrap: { Toast: class{}, Modal: class{} },
+    bootstrap: { Toast: class{}, Modal: class { show(){} } },
+    QRCode: QRCodeMock,
     URL,
     console,
     setInterval(){ return 1; },
@@ -99,6 +119,22 @@ assert.equal(vm.runInContext(`providerProxyValue('youtube')`, context), 'socks5:
 vm.runInContext(`toggleProviderProxyInput('youtube', true)`, context);
 assert.equal(vm.runInContext(`providerProxyValue('youtube')`, context), 'direct');
 document.getElementById = originalGetElementById;
+
+// QR generation uses the locally bundled MIT QRCode.js, with no CDN request.
+vm.runInContext(`showQRCode('Test feed', 'https://podsync.local/test.xml')`, context);
+assert.equal(qrCalls.length, 1);
+assert.equal(qrCalls[0].type, 'create');
+assert.equal(qrCalls[0].element, qrCanvas);
+assert.equal(qrCalls[0].options.text, 'https://podsync.local/test.xml');
+assert.equal(qrCalls[0].options.correctLevel, QRCodeMock.CorrectLevel.M);
+vm.runInContext(`showQRCode('Updated feed', 'https://podsync.local/updated.xml')`, context);
+assert.deepEqual(qrCalls[1], { type: 'update', value: 'https://podsync.local/updated.xml' });
+const adminHTML = fs.readFileSync(require('path').join(__dirname, 'ui/index.html'), 'utf8');
+assert(adminHTML.includes('./qrcode.min.js?v=1'), 'Missing local QRCode.js asset');
+assert(!adminHTML.includes('qrious'), 'QRious CDN reference remains in the admin UI');
+assert(fs.existsSync(require('path').join(__dirname, 'ui/qrcodejs.LICENSE')), 'Missing bundled QRCode.js license');
+assert(adminHTML.includes('./favicon.ico?v=1'), 'Missing local favicon reference');
+assert(fs.existsSync(require('path').join(__dirname, 'ui/favicon.ico')), 'Missing bundled favicon');
 
 // Test 1: Empty library
 vm.runInContext('allFeeds = []; renderFeeds([]);', context);

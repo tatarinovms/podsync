@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -17,6 +18,20 @@ import (
 )
 
 var testCtx = context.TODO()
+
+func TestBadgerBackupRoundTrip(t *testing.T) {
+	database, err := NewBadger(&Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	f := getFeed()
+	require.NoError(t, database.AddFeed(testCtx, f.ID, f))
+	var snapshot bytes.Buffer
+	require.NoError(t, database.ExportBackup(&snapshot))
+	require.NoError(t, database.RestoreBackup(bytes.NewReader(snapshot.Bytes())))
+	restored, err := database.GetFeed(testCtx, f.ID)
+	require.NoError(t, err)
+	assert.Equal(t, f.ID, restored.ID)
+}
 
 func TestFeedStatsConcurrentEpisodeUpdates(t *testing.T) {
 	database, err := NewBadger(&Config{Dir: t.TempDir()})

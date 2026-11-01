@@ -30,7 +30,7 @@ The MCP server operates in two interchangeable modes:
 ```
 
 1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output.
-   - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 32 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
+   - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 34 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
    - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote SSE Mode** instead.
    - **Standalone Mode**: If no daemon is listening on `localhost:<server.port>`, the CLI opens the database directly in standalone mode.
 2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
@@ -39,7 +39,7 @@ The MCP server operates in two interchangeable modes:
 
 ## 2. Tools Reference
 
-The MCP server provides 32 specialized tools:
+The MCP server provides 34 specialized tools:
 
 For a complete library inventory, call both `list_feeds` (channels and audiobooks)
 and `list_personal_feeds` (curated personal feeds). An empty result from one does
@@ -55,6 +55,8 @@ not mean the entire library is empty.
 | **`get_podsync_update`** | `{}` | Check the latest GitHub Release and whether this native installation can install it. |
 | **`update_podsync`** | `{}` | Install the latest verified GitHub Release and restart a native Podsync process. Docker deployments return an unavailable status. |
 | **`get_system_logs`** | `level` *(opt)*, `search` *(opt)*, `feed_id` *(opt)*, `limit` *(opt, def: 50)* | Fetch recent system log entries from in-memory ring buffer, filterable by severity or query. |
+| **`create_system_backup`** | `path` *(req)*, `include_secrets` *(opt, def: true)* | Write a portable `.tar.gz` backup to a server path. It includes config, a consistent Badger stream and covers, but never downloaded media. |
+| **`get_backup_info`** | `path` *(req)* | Validate and inspect a backup manifest without changing the running instance. |
 
 ### Feed Management
 | Tool Name | Arguments | Description |

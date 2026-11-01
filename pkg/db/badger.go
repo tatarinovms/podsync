@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 
@@ -43,6 +44,7 @@ type Badger struct {
 }
 
 var _ Storage = (*Badger)(nil)
+var _ BackupStorage = (*Badger)(nil)
 
 func NewBadger(config *Config) (*Badger, error) {
 	var (
@@ -167,6 +169,36 @@ func (b *Badger) Close() error {
 	b.closed = true
 	log.Debug("closing database")
 	return b.db.Close()
+}
+
+// ExportBackup writes Badger's transactionally-consistent backup stream. It
+// deliberately does not copy the live Badger directory, which could include a
+// lock file or partially-written value log.
+func (b *Badger) ExportBackup(w io.Writer) error {
+	b.lifecycleMu.RLock()
+	defer b.lifecycleMu.RUnlock()
+	if b.closed {
+		return errors.New("database is closed")
+	}
+	_, err := b.db.Backup(w, 0)
+	return err
+}
+
+// RestoreBackup replaces all keys with a Badger native backup stream.
+// Callers must stop writers before calling it.
+func (b *Badger) RestoreBackup(r io.Reader) error {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
+	if b.closed {
+		return errors.New("database is closed")
+	}
+	if err := b.db.DropAll(); err != nil {
+		return err
+	}
+	if err := b.db.Load(r, 256); err != nil {
+		return err
+	}
+	return b.initActiveJobsIndex()
 }
 
 func (b *Badger) Version() (int, error) {

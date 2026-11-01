@@ -433,3 +433,32 @@ func (c *HTTPClientManager) DeleteAudiobookDir(ctx context.Context, dirName stri
 func (c *HTTPClientManager) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*web.CoverUploadResult, error) {
 	return nil, fmt.Errorf("remote cover save not implemented in proxy")
 }
+
+func (c *HTTPClientManager) CreateSystemBackup(ctx context.Context, includeSecrets bool, w io.Writer) (*web.BackupInfo, error) {
+	path := "/api/v1/system/backup/export?include_secrets=" + fmt.Sprintf("%t", includeSecrets)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("backup export returned HTTP %d", resp.StatusCode)
+	}
+	_, err = io.Copy(w, resp.Body)
+	return &web.BackupInfo{}, err
+}
+
+func (c *HTTPClientManager) InspectSystemBackup(ctx context.Context, r io.Reader) (*web.BackupInfo, error) {
+	return nil, fmt.Errorf("backup inspection over the stdio proxy is unavailable; connect to the daemon MCP endpoint")
+}
+
+func (c *HTTPClientManager) RestoreSystemBackup(ctx context.Context, r io.Reader, opts web.BackupRestoreOptions) (*web.BackupInfo, error) {
+	return nil, fmt.Errorf("backup restore over the stdio proxy is unavailable; connect to the daemon MCP endpoint")
+}

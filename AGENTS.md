@@ -52,7 +52,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── jobqueue/             # Persistent disk-backed job queue with crash recovery and concurrency control
 │   ├── logbuffer/            # Thread-safe in-memory circular ring buffer for real-time logs
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
-│   │   ├── server.go         # 32 MCP tools, resources (podsync://*), and diagnostic prompts
+│   │   ├── server.go         # 34 MCP tools, resources (podsync://*), and diagnostic prompts
 │   │   └── proxy.go          # JSON-RPC relay to /mcp and web.AdminManager REST client
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
 │   ├── selfupdate/           # Verified native binary update from GitHub Releases
@@ -218,7 +218,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 5. Model Context Protocol (MCP) (`pkg/mcp/`)
 
-Podsync exposes 32 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
+Podsync exposes 34 MCP tools. `update_feed_config` applies only supplied fields, preserving omitted settings; audiobook feeds do not use cron schedules:
 - `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
 - `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`
 - `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
@@ -226,11 +226,12 @@ Podsync exposes 32 MCP tools. `update_feed_config` applies only supplied fields,
 - `get_system_stats`, `get_podsync_update`, `update_podsync`, `get_tokens`, `update_tokens`, `delete_tokens`
 - `get_downloader_config`, `update_downloader_config`, `get_network_config`, `update_network_config`, `test_downloader`
 - `get_system_logs`
+- `create_system_backup`, `get_backup_info`
 
 Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE** (`/mcp` and `/mcp/sse`).
 
 When a local daemon is ready, stdio relays JSON-RPC directly to `POST /mcp` with
-Basic Auth. All 32 tools, including personal feeds, resources and prompts are
+Basic Auth. All 34 tools, including personal feeds, resources and prompts are
 served by that daemon. Set the MCP server version from the binary build version
 before serving; proxied initialization preserves the daemon's version.
 

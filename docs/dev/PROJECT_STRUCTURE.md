@@ -87,7 +87,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`buffer.go`**: Thread-safe circular ring buffer capturing system log entries for live querying and real-time frontend streaming.
 
 ### 2.9 `pkg/mcp/` (Model Context Protocol)
-- **`server.go`**: Implements the MCP protocol server exposing 32 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
+- **`server.go`**: Implements the MCP protocol server exposing 34 tools, resources (`podsync://feeds`, `podsync://system`, `podsync://tokens`), and prompt handlers.
 - **`proxy.go`**: `HTTPClientManager` that relays stdio JSON-RPC to a running instance's `POST /mcp` endpoint and provides a REST client for `web.AdminManager`.
 - **`sse.go`**: SSE transport implementation for MCP clients.
 

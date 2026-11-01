@@ -20,7 +20,7 @@ This skill provides comprehensive instructions for AI agents on how to monitor, 
 
 ## MCP Connection and Library Scope
 
-- In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 32 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
+- In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 34 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
 - `initialize` reports the serving binary's build version in `serverInfo.version` (`dev` if unspecified). In proxy mode this is the daemon's version, which may differ from the stdio client's version.
 - For a complete library inventory, call both `list_feeds` and `list_personal_feeds`. The first lists channel feeds and audiobooks; personal feeds have a separate tool. An empty result from either tool does not mean the entire library is empty.
 - Older stdio clients can report `personal feeds service is not enabled` while direct HTTP MCP works. Compare `tools/list` and `list_personal_feeds` through authenticated `POST /mcp` before concluding that personal feeds are absent. Updating and restarting the stdio client enables the relay; update the daemon as well to correct an older hardcoded `serverInfo.version`.
@@ -255,6 +255,17 @@ When connected to Podsync's MCP server (`podsync --mcp`, `POST /mcp`, or `/mcp/s
 - **Purpose**: Downloads the matching latest GitHub Release, verifies its SHA-256 checksum, replaces the native Podsync binary, and restarts the process.
 - **Arguments**: None `{}`.
 - **When to use**: Only after the user asks to install the current Podsync release. It is unavailable for Docker deployments.
+
+### 33. `create_system_backup`
+- **Purpose**: Creates a portable `.tar.gz` system backup at a specified server path. It contains configuration, a consistent Badger stream, custom covers, and optionally secrets, but never downloaded episode media.
+- **Arguments**:
+  - `path` *(string, required)*: Destination archive path on the Podsync server.
+  - `include_secrets` *(boolean, optional, default: true)*: Include API keys, the admin password, proxy credentials, and `cookies.txt`.
+
+### 34. `get_backup_info`
+- **Purpose**: Validates a backup archive and returns its manifest, including creation date, Podsync version, feed counts, cover count, and secret-inclusion status. It never changes server state.
+- **Arguments**:
+  - `path` *(string, required)*: Existing archive path on the Podsync server.
 
 ## MCP Resources
 

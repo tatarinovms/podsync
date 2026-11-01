@@ -1,4 +1,4 @@
-# Podsync (Fork)
+# Podsync
 
 <p align="center">
   <img src="docs/img/logo.png" alt="Podsync" width="400">
@@ -8,62 +8,121 @@
   <b>English</b> | <a href="README_RU.md">Русский</a>
 </p>
 
-Podsync is a versatile, lightweight podcast generator service that turns **YouTube**, **Rutube**, **VK Video**, **Vimeo**, **SoundCloud**, and **Local Audiobooks** into standard podcast RSS feeds.
+[![Latest Release](https://img.shields.io/github/v/release/tatarinovms/podsync?display_name=tag&sort=semver)](https://github.com/tatarinovms/podsync/releases/latest)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-tatarinovms%2Fpodsync-2496ED?logo=docker&logoColor=white)](https://github.com/tatarinovms/podsync/pkgs/container/podsync)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/tatarinovms/podsync)](go.mod)
+[![License](https://img.shields.io/github/license/tatarinovms/podsync)](LICENSE)
 
-Podcast applications provide superior content delivery: automatic download of new episodes in the background, position remembering and resume, synchronization between devices, and offline listening. Podsync brings this seamless experience to video platforms and your personal audio collection.
+[Key Features](#key-features) • [Quick Start](#quick-start) • [Configuration](#configuration) • [Web Admin & API](#web-admin-console--rest-api) • [MCP Server](#model-context-protocol-mcp-server) • [Documentation](#documentation)
 
----
+Podsync is a lightweight podcast generator that turns video, audio, local audiobook folders, and existing podcast RSS feeds into standards-compliant podcast feeds. Podcast apps download new episodes in the background, remember listening positions, synchronize devices, and support offline playback.
 
-## Fork Features
+This fork extends the original `mxpv/podsync` with the features described below.
 
-This fork extends the original `mxpv/podsync` with powerful modern capabilities:
+## Key Features
 
-- **Podcast RSS Mirroring & Live Preview**: Mirror any existing third-party podcast RSS feed (`http://`, `https://`, `*.xml`) with direct HTTP media streaming straight to disk without intermediate `/tmp` buffer or RAM spikes. Features a live metadata preview card (artwork, episode count, size) and segmented **Download Scope** (`All episodes`, `Last 10`, `Last 25`, `Last 50`) that automatically syncs with `page_size` and `keep_last`, clamping episode ingestion so huge podcast archives won't exhaust your storage.
-- **Smart Feed ID Transliteration & Validation**: Automatic real-time transliteration of Cyrillic (Russian, Ukrainian, Belarusian) and diacritic text into clean Latin slugs on typing and pasting (`Клан Бобров` → `KLAN_BOBROV`, `ДТКД` → `DTKD`, `Война и мир` → `voyna-i-mir`). Features instant visual validation with Catppuccin Red highlight (`is-invalid`), dynamic live RSS URL preview (`/CLANBEAVER.xml`), and strict server-side regex enforcement (`^[a-zA-Z0-9_-]+$`).
-- **Responsive Mobile Navigation Drawer**: Optimized mobile layout for smartphones (`<= 767px`) with a sliding overlay navigation drawer, auto-closing on route navigation, backdrop tap, or Escape key, with cleanly isolated toggle controls.
-- **Personal Feeds (Персональные ленты)**: Create custom, manually curated RSS podcast feeds directly in the Web Admin under **LIBRARY → Personal feeds** (with unified display on the main **Podcasts** tab with the `Personal` filter badge). Add individual videos from YouTube, VK Video, Rutube, direct HTTP/HTTPS media URLs, or upload local media files (up to 4 GiB) with automatic `ffmpeg` transcoding (Audio to MP3, Video to MP4). Features format and quality/resolution controls (Audio: High/Low, Video: 480p, 720p HD, 1080p Full HD...), inline episode renaming with instant RSS rebuild, copying between feeds with shared media reference counting, moving episodes (preserving GUID), and safe confirmed deletion. See [Personal Feeds Guide](./docs/personal-feeds.md).
-- **Local Audiobooks & Directory Auto-Discovery**: Convert local folders of audiobooks (`.mp3`, `.m4b`, `.m4a`, `.aac`, `.ogg`) into Podcast 2.0 serial RSS feeds (`<itunes:type>serial</itunes:type>`, `<itunes:episode>N</itunes:episode>`). Features natural numeric track sorting (`01`, `02`, ..., `10`), automatic ID3/APIC cover art and metadata extraction, 1-click folder auto-discovery import, and direct file uploads in the Web UI. Active Audiobook Podcast Feeds render in the exact same clean `.feed-grid` / `.feed-card` design as regular podcasts.
-- **Rutube Support**: Native support for Rutube channels, playlists, user profiles, and individual videos (`rutube.ru/channel/...`, `rutube.ru/plst/...`, `rutube.ru/u/...`, `rutube.ru/video/...`) powered by `yt-dlp` with zero API keys required.
-- **VK Video Support**: Convert VK Video channels, public communities, users, and playlists into podcast feeds (`vkvideo.ru`, `vk.com`, `vk.ru`).
-- **Web Admin Console (`/admin`)**: Built-in responsive web dashboard with sidebar navigation (Podcasts, Audiobooks, Activity, API keys, Downloader, System & storage, MCP server), list and grid views, dedicated podcast detail page with chapters/episodes, search, sorting, status badges, audio playback link, episode retry, and direct **Delete podcast** button in the header. Features custom cover art upload with live preview, ready-to-use RSS links, 1-click clipboard copy, QR codes for instant smartphone subscribing, and deep-links for Apple Podcasts / Pocket Casts / Overcast. See [Web Admin Guide](./docs/web_admin.md).
-- **Brute-Force Protection & Security Settings**: Sliding-window rate limiter protecting web login and HTTP Basic Auth from brute-force attacks, configurable via Web UI, environment variables, or `config.toml` (max failed attempts, observation window, lockout duration).
-- **Real-Time In-Memory System Logs**: Built-in log console in the web admin with live auto-refresh (2s polling), search/filter by keyword, level filtering (DEBUG, INFO, WARN, ERROR), dynamic on-the-fly log level switching, and 1-click log download.
-- **Downloader & Dependency Diagnostics**: Live status and version detection for both `yt-dlp` and `ffmpeg`, Netscape `cookies.txt` management (upload/view/clear, extract from browser) to bypass YouTube bot checks, HTTP/SOCKS5 proxy configuration, and live URL extraction test.
-- **Verified Native Updates**: The System tab checks the latest GitHub Release and can install its matching archive on supported Linux or macOS hosts after SHA-256 verification, then restart Podsync. Docker deployments use the Compose update commands in the deployment guide.
-- **Smart Token Extraction**: Paste the entire OAuth redirect URL when adding VK API tokens — Podsync automatically parses out the access token.
-- **Accurate Disk Usage & Active Episodes**: Card metrics accurately reflect only active (downloaded) episodes and their true disk footprint, while cleaned/purged episodes are clearly distinguished in episode inspection.
-- **Catppuccin Mocha & Latte Themes**: Strict Catppuccin color scheme in the web console with seamless dark/light switching, custom pastel status badges, and smooth animations. Keyboard-operated selection controls, associated form labels, responsive filters and larger mobile touch targets support accessible administration.
-- **Model Context Protocol (MCP) Server**: Built-in MCP server with 32 tools for AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) with stdio and SSE transport, pre-configured agent skill ([`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md)), and 1-click config generator. See [MCP Guide](./docs/mcp.md).
-- **Configurable `filename_template`**: Customize media filenames and RSS enclosure paths (e.g. `{{id}}`, `{{title}}`, `{{pub_date}}`).
-- **One-Time Filename Migration**: CLI tool (`--migrate-filenames`, `--migrate-filenames-dry-run`) to rename existing downloaded media to match a new template.
-- **Extended Environment Variables**: Full support for containerized deployments with environment overrides for admin, security, tokens, downloaders, and audiobooks.
-- **Selective Proxy Routing (Per-Provider & Per-Feed)**: Support for `[downloader.proxies]` map and `PODSYNC_DOWNLOADER_PROXY_*` env vars. The Admin's Direct connection switches default to enabled; turn one off to set a dedicated proxy for that provider. Per-feed `proxy` overrides remain available.
-- **Audio Loudness Normalization (EBU R128)**: Volume leveling via `normalize_audio = true` (`loudnorm=I=-16:TP=-1.5:LRA=11`) adhering to Apple Podcasts and Spotify loudness standards for regular podcast feeds and personal feeds.
-- **Native Chapters & Podcasting 2.0 Chapters**: Automatic description timecodes parsing into Podcasting 2.0 `<podcast:chapters>` JSON document specification and embedded ID3/MP4 chapter marks via `--embed-chapters`.
-- **Live Stream & Premiere Filter**: Skip upcoming premieres and active live streams with `ignore_live = true`, preventing broken download queues on YouTube and VK Video.
-- **1-Click Share & iOS Shortcuts (Personal Feeds)**: Lightweight `POST|GET /api/v1/personal-feeds/{id}/quick-add` endpoint with dedicated feed-scoped tokens, iOS Shortcuts Share Sheet action, and draggable browser bookmarklet.
-- **Sticky Catppuccin Mini-Player in Web Admin**: Bottom-docked player with bitrate and codec inspection, fast -15s/+30s seeking, playback speed control, and clickable chapter timecode navigation.
+### 1. Multi-Platform Sources & RSS Mirroring
 
-## Features
+- Create standard podcast RSS feeds from **YouTube, Rutube, VK Video, Vimeo, SoundCloud**, local audiobooks, and third-party Podcast RSS feeds. Rutube supports channels, playlists, user profiles, and individual videos without API keys; VK Video supports `vkvideo.ru`, `vk.com`, and `vk.ru` channels, communities, users, and playlists.
+- Mirror any `http://`, `https://`, or `*.xml` podcast RSS feed with a live metadata preview (artwork, episode count, and size) and direct HTTP-to-disk media streaming, without intermediate `/tmp` buffering or RAM spikes.
+- Choose a Download Scope of **All episodes**, **Last 10**, **Last 25**, or **Last 50**. It synchronizes with `page_size` and `keep_last` to clamp large archives before they exhaust storage.
+- Configure video or audio format, quality profile, maximum video height, cron updates, custom artwork with live preview, category, language, OPML export, automatic cleanup of the last *X* episodes, API-key rotation, and post-download hooks/webhooks. Podsync runs on Windows, macOS, Linux, Docker, ARM (`arm64`, `armv7`), and `x86_64`.
 
-- Works with YouTube, Rutube, VK Video, Vimeo, SoundCloud, local Audiobooks, and third-party Podcast RSS mirrors.
-- Supports feeds configuration: video/audio, quality profile, max video height ceiling, and download scope limits.
-- mp3 encoding with ffmpeg.
-- Direct-to-disk streaming downloads avoiding `/tmp` storage exhaustion.
-- Podcast 2.0 Serial feed specifications for audiobooks with chapter tracking and embedded/external artwork.
-- Update scheduler supports cron expressions.
-- Episode filtering (match by title regex, duration min/max, max age).
-- Feed customizations (custom artwork upload with live preview, category, language, etc.).
-- OPML export.
-- Automatic episode cleanup (keep last X episodes).
-- Configurable hooks for custom integrations and post-download workflows.
-- In-memory real-time log viewer with dynamic log levels.
-- Built-in brute-force protection and login rate limiting.
-- Runs on Windows, macOS, Linux, and Docker.
-- Supports ARM (arm64, armv7) and x86_64 architectures.
-- Supports API keys rotation for quota management.
+### 2. Personal Feeds & 1-Click Ingest
 
-## Dependencies
+- Create curated feeds in **Library → Personal feeds**; they also appear in the main Podcasts view with the Personal filter. Add YouTube, VK Video, Rutube, direct HTTP/HTTPS media URLs, or local uploads up to **4 GiB**.
+- `ffmpeg` automatically transcodes audio to MP3 and video to MP4. Choose High or Low audio quality, or video resolution (480p, 720p HD, 1080p Full HD, and more), rename an episode with immediate RSS rebuild, copy it with shared-media reference counting, move it while preserving its GUID, or safely delete it. See the [Personal Feeds Guide](./docs/personal-feeds.md).
+- Use `POST` or `GET /api/v1/personal-feeds/{id}/quick-add` with a feed-scoped token from iOS Shortcuts, the iOS Share Sheet, or a browser bookmarklet.
+
+### 3. Local Audiobooks (Podcast 2.0 Serial)
+
+- Discover audiobook folders containing `.mp3`, `.m4b`, `.m4a`, `.aac`, or `.ogg`, import them in one click, or upload files directly in Web Admin.
+- Generate Podcast 2.0 serial feeds with `<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`, natural numeric track sorting (`01`, `02`, …, `10`), and automatic metadata plus embedded ID3/APIC cover-art extraction.
+
+### 4. Audio Mastering & Podcasting 2.0
+
+- Encode MP3 with `ffmpeg` and normalize audio with EBU R128 using `normalize_audio = true` and `loudnorm=I=-16:TP=-1.5:LRA=11`, compatible with Apple Podcasts and Spotify.
+- Parse description timecodes into Podcasting 2.0 `<podcast:chapters>` JSON and embed ID3/MP4 chapters with `--embed-chapters`.
+- Filter live streams and upcoming premieres with `ignore_live = true`; also filter episodes by title regex, duration bounds, and maximum age.
+- Customize media paths with `filename_template` (`{{id}}`, `{{title}}`, `{{pub_date}}`) and rename existing files with `--migrate-filenames` or `--migrate-filenames-dry-run`.
+
+### 5. Catppuccin Web Admin Console (`/admin`)
+
+- Manage the library through a responsive console with Mocha and Latte themes, an accessible mobile navigation drawer, list and grid views, search, sorting, retry actions, cover uploads, and accurate downloaded-episode disk metrics.
+- Use the bottom-docked mini-player for codec and bitrate inspection, -15/+30 second seeking, playback-speed changes, and chapter navigation. Share a feed with QR codes, clipboard links, and Apple Podcasts, Pocket Casts, or Overcast deep links.
+- Each podcast has a dedicated detail page with chapters and episodes, status badges, playback and download links, retries, and direct deletion.
+- Feed IDs transliterate Cyrillic (Russian, Ukrainian, and Belarusian) and diacritics into validated Latin slugs with a live RSS URL preview. The console also provides two-second real-time log polling, log search and levels, downloadable logs, configurable brute-force protection, and SHA-256-verified native self-updates.
+
+### 6. Anti-Blocking, Selective Proxy & Network
+
+- Route traffic through global or per-provider `[downloader.proxies]` HTTP/SOCKS5 proxies, override the proxy per feed, and keep providers on direct connections by default. `PODSYNC_DOWNLOADER_PROXY_*` environment variables are supported.
+- Manage Netscape `cookies.txt`, extract cookies from a local browser, and run a live yt-dlp URL test to diagnose bot checks and age gates. Configure `dns_servers` for provider APIs and RSS metadata while yt-dlp keeps using system DNS.
+- Paste a complete VK OAuth redirect URL and Podsync extracts the access token automatically.
+- Export a full system `.tar.gz` backup of configuration, a consistent Badger snapshot, and custom covers, then inspect and restore it from Web Admin, CLI, or MCP. Downloaded media is excluded.
+
+## Quick Start
+
+### Docker Compose (Recommended)
+
+```yaml
+services:
+  podsync:
+    container_name: podsync
+    build: .
+    image: ghcr.io/tatarinovms/podsync:latest
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    volumes:
+      - ./data:/app/data/
+      - ./db:/app/db/
+      - ./config.toml:/app/config.toml
+```
+
+```bash
+docker compose up -d
+```
+
+### Docker CLI
+
+Pull and run prebuilt container image:
+
+```bash
+docker run \
+    -p 8080:8080 \
+    -v $(pwd)/data:/app/data/ \
+    -v $(pwd)/db:/app/db/ \
+    -v $(pwd)/config.toml:/app/config.toml \
+    ghcr.io/tatarinovms/podsync:latest
+```
+
+Or build locally:
+```bash
+make docker
+```
+
+The build context excludes Git history, documentation, agent skills, local
+configuration, databases, and downloaded media. `make docker` passes the version
+and commit as build arguments. With `docker build`, set `--build-arg TAG=...` and
+`--build-arg COMMIT=...` to supply metadata; defaults are `dev` and `unknown`.
+
+### Prebuilt Binaries
+
+Download the archive for your OS and CPU architecture from [GitHub Releases](https://github.com/tatarinovms/podsync/releases). For architecture detection and installation commands, use the [Deployment & Setup Guide](./docs/deployment_guide_agents.md).
+
+### Build from Source
+
+```bash
+make
+./bin/podsync --config config.toml
+
+# Optional CLI flags:
+# ./bin/podsync --config config.toml --admin     # Force enable web admin console (/admin)
+# ./bin/podsync --config config.toml --no-admin  # Force disable web admin console (/admin)
+# ./bin/podsync --config config.toml --mcp       # Run as MCP server over stdio for AI assistants
+```
+
+### Dependencies
 
 If you are running Podsync as a binary (e.g. not via Docker), make sure the following dependencies are installed on your system: `yt-dlp`, `ffmpeg`, and `go` (if building from source).
 
@@ -80,28 +139,28 @@ sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o
 sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
-## Documentation
+### One-Time Filename Migration
 
-- [Developer documentation](./docs/dev/README.md)
-- [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
-- [Web Admin Console Guide](./docs/web_admin.md)
-- [Audiobooks Guide](./docs/audiobooks.md)
-- [Model Context Protocol (MCP) Guide](./docs/mcp.md)
-- [How to get VK API token](./docs/how_to_get_vk_token.md)
-- [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
-- [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
-- [Podsync on Synology NAS Guide](./docs/how_to_setup_podsync_on_synology_nas.md)
-- [Podsync on QNAP NAS Guide](./docs/how_to_setup_podsync_on_qnap_nas.md)
-- [Schedule updates with cron](./docs/cron.md)
-- [Filter episodes with regex](./docs/filters.md)
+If you changed `filename_template` and want to migrate already-downloaded files:
 
-### Access tokens
+```bash
+./bin/podsync --config config.toml --migrate-filenames
+```
 
-To query YouTube, Vimeo, or VK Video APIs you need an API token (Rutube requires no API token):
+Preview only (no writes):
 
-- [How to get VK API token](./docs/how_to_get_vk_token.md) *(Podsync automatically extracts the token if you paste the entire callback URL)*
-- [How to get YouTube API key](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
-- [Generate an access token for Vimeo](https://developer.vimeo.com/api/guides/start#generate-access-token)
+```bash
+./bin/podsync --config config.toml --migrate-filenames --migrate-filenames-dry-run
+```
+
+### Headless Backup & Restore
+
+```bash
+./bin/podsync --config config.toml --export-backup ./podsync-backup.tar.gz
+./bin/podsync --config config.toml --restore-backup ./podsync-backup.tar.gz --preserve-paths
+```
+
+The archive excludes downloaded media. Restore preserves the target server's storage paths and port by default.
 
 ## Configuration
 
@@ -193,11 +252,10 @@ mounts, file uploads, and updates.
 
 ## Web Admin Console & REST API
 
-Podsync includes a built-in web management console accessible at `/admin`. See the [Web Admin Console Guide](./docs/web_admin.md) for full instructions and screenshots.
+Podsync provides a built-in management console at `/admin`. It uses browser session cookies and supports HTTP Basic Auth (`-u username:password`) for admin API access. See the [Web Admin Console Guide](./docs/web_admin.md) for instructions and screenshots.
 
-### REST API Endpoints
-
-All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and browser session cookies:
+<details>
+<summary><strong>View All REST API Endpoints (50+ routes)</strong></summary>
 
 | Method | Endpoint | Description |
 |---|---|---|
@@ -261,10 +319,15 @@ All admin endpoints support **HTTP Basic Auth** (`-u username:password`) and bro
 | `GET` | `/api/v1/network` | Get custom DNS servers for provider API and RSS metadata requests |
 | `POST` | `/api/v1/network` | Update custom DNS servers; use `{"dns_servers":["1.1.1.1","9.9.9.9"]}` or an empty list for system DNS |
 | `GET` | `/api/v1/mcp/config` | Fetch MCP connection parameters for agents |
+| `GET` | `/api/v1/system/backup/export` | Download a full backup; set `include_secrets=false` to exclude credentials and cookies |
+| `POST` | `/api/v1/system/backup/inspect` | Validate an uploaded backup (maximum 512 MiB) and return its manifest summary |
+| `POST` | `/api/v1/system/backup/restore` | Restore an uploaded backup; `preserve_paths=true` keeps this server's storage paths and port |
+
+</details>
 
 ## Model Context Protocol (MCP) Server
 
-Podsync includes a built-in **MCP Server** with 32 tools that allows AI coding assistants (**OpenCode**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health.
+Podsync includes a built-in **MCP Server** with 34 tools that allows AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health. The Web Admin Console provides a one-click MCP configuration generator.
 
 An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). See the [MCP Guide](./docs/mcp.md) for full details and setup instructions.
 
@@ -272,7 +335,7 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
 - **Feed Management**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`
 - **Personal Feeds**: `list_personal_feeds`, `get_personal_feed`, `create_personal_feed`, `add_personal_episode`, `delete_personal_episode`, `rename_personal_episode`
 - **Audiobooks**: `list_audiobook_dirs`, `import_audiobook`, `delete_audiobook_dir`
-- **System & Logs**: `get_system_stats`, `get_podsync_update`, `update_podsync`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`
+- **System & Logs**: `get_system_stats`, `get_podsync_update`, `update_podsync`, `get_sync_status`, `get_recent_downloads`, `get_download_errors`, `get_system_logs`, `create_system_backup`, `get_backup_info`
 - **Downloader, Network & Diagnostics**: `get_downloader_config`, `update_downloader_config`, `get_network_config`, `update_network_config`, `test_downloader`
 - **Tokens**: `get_tokens`, `update_tokens`, `delete_tokens`
 
@@ -284,93 +347,43 @@ An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.
   *(Automatically relays JSON-RPC to the running instance's `POST /mcp`, including personal-feed tools, or operates standalone with the local database).*
 - **HTTP / SSE Mode**: Available at `/mcp` and `/mcp/sse` when the web server is running.
 
-Both connection modes provide all 32 tools. For a complete library inventory,
+Both connection modes provide all 34 tools. For a complete library inventory,
 call `list_feeds` for channels and audiobooks and `list_personal_feeds` for curated
 personal feeds. In proxy mode, `serverInfo.version` reports the daemon's build
 version. See [MCP troubleshooting](./docs/mcp.md#troubleshooting-older-stdio-clients)
 if an older stdio client reports that personal feeds are unavailable.
 
-## How to run
+## Documentation
 
-### Download prebuilt binary:
+### User & Admin Guides
 
-Download precompiled release archives for your OS/architecture from [GitHub Releases](https://github.com/tatarinovms/podsync/releases):
+- [Web Admin Console Guide](./docs/web_admin.md)
+- [Personal Feeds Guide](./docs/personal-feeds.md)
+- [Audiobooks Guide](./docs/audiobooks.md)
+- [Episode filters](./docs/filters.md)
+- [Schedule updates with cron](./docs/cron.md)
+- [Filename templates and migration](#configuration)
 
-```bash
-# Automated download script for Linux (x86_64 / arm64)
-curl -sSL https://raw.githubusercontent.com/tatarinovms/podsync/main/docs/deployment_guide_agents.md
-```
+### Platform Tokens
 
-### Build from source:
+- [How to get VK API token](./docs/how_to_get_vk_token.md) *(pasting the complete callback URL extracts the token automatically)*
+- [How to get YouTube API Key](./docs/how_to_get_youtube_api_key.md)
+- [How to get Vimeo API token](./docs/how_to_get_vimeo_token.md)
+- [YouTube API key tutorial](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
+- [Generate a Vimeo access token](https://developer.vimeo.com/api/guides/start#generate-access-token)
 
-```bash
-make
-./bin/podsync --config config.toml
+### NAS & Deployment
 
-# Optional CLI flags:
-# ./bin/podsync --config config.toml --admin     # Force enable web admin console (/admin)
-# ./bin/podsync --config config.toml --no-admin  # Force disable web admin console (/admin)
-# ./bin/podsync --config config.toml --mcp       # Run as MCP server over stdio for AI assistants
-```
+- [Podsync on Synology NAS](./docs/how_to_setup_podsync_on_synology_nas.md)
+- [Podsync on QNAP NAS](./docs/how_to_setup_podsync_on_qnap_nas.md)
+- [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
 
-### One-time filename migration
+### AI & Developers
 
-If you changed `filename_template` and want to migrate already-downloaded files:
-
-```bash
-./bin/podsync --config config.toml --migrate-filenames
-```
-
-Preview only (no writes):
-
-```bash
-./bin/podsync --config config.toml --migrate-filenames --migrate-filenames-dry-run
-```
-
-### Run via Docker:
-
-Pull and run prebuilt container image:
-
-```bash
-docker run \
-    -p 8080:8080 \
-    -v $(pwd)/data:/app/data/ \
-    -v $(pwd)/db:/app/db/ \
-    -v $(pwd)/config.toml:/app/config.toml \
-    ghcr.io/tatarinovms/podsync:latest
-```
-
-Or build locally:
-```bash
-make docker
-```
-
-The build context excludes Git history, documentation, agent skills, local
-configuration, databases, and downloaded media. `make docker` passes the version
-and commit as build arguments. With `docker build`, set `--build-arg TAG=...` and
-`--build-arg COMMIT=...` to supply metadata; defaults are `dev` and `unknown`.
-
-### Run via Docker Compose:
-
-```yaml
-services:
-  podsync:
-    container_name: podsync
-    build: .
-    image: ghcr.io/tatarinovms/podsync:latest
-    restart: unless-stopped
-    ports:
-      - 8080:8080
-    volumes:
-      - ./data:/app/data/
-      - ./db:/app/db/
-      - ./config.toml:/app/config.toml
-```
-
-```bash
-docker compose up -d
-```
+- [MCP Guide](./docs/mcp.md)
+- [Developer documentation](./docs/dev/README.md)
+- [Agent skill definition](./.agents/skills/podsync/SKILL.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see [LICENSE](LICENSE).

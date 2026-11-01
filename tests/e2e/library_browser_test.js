@@ -9,7 +9,7 @@ const os = require('node:os');
 const screenshots = fs.mkdtempSync(path.join(os.tmpdir(), 'podsync-ui-'));
 const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';
-    if (!['index.html', 'admin.js', 'admin.css', 'theme.js', 'select.js'].includes(file)) { res.writeHead(404).end(); return; }
+    if (!['index.html', 'admin.js', 'admin.css', 'theme.js', 'select.js', 'qrcode.min.js', 'favicon.ico'].includes(file)) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
     res.end(fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'web', 'ui', file)));
 });
@@ -27,7 +27,6 @@ const cdnFiles = Object.fromEntries([
  ['bootstrap-icons@1.11.3', 'font/bootstrap-icons.css'],
  ['bootstrap-icons@1.11.3', 'font/fonts/bootstrap-icons.woff2'],
  ['bootstrap-icons@1.11.3', 'font/fonts/bootstrap-icons.woff'],
- ['qrious@4.0.2', 'dist/qrious.min.js'],
 ].map(([pkg, file]) => ['/npm/'+pkg+'/'+file, require.resolve(pkg.split('@')[0]+'/'+file)]));
 await page.route('https://cdn.jsdelivr.net/**', route => {
  const file = cdnFiles[new URL(route.request().url()).pathname];

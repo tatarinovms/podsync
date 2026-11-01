@@ -36,6 +36,9 @@ type Opts struct {
 	Headless               bool   `long:"headless"`
 	MigrateFilenames       bool   `long:"migrate-filenames" description:"Migrate existing downloaded filenames to current filename_template and exit"`
 	MigrateFilenamesDryRun bool   `long:"migrate-filenames-dry-run" description:"Preview filename migration without writing changes (requires --migrate-filenames)"`
+	ExportBackup           string `long:"export-backup" value-name:"PATH" description:"Export a full system backup (.tar.gz) and exit"`
+	RestoreBackup          string `long:"restore-backup" value-name:"PATH" description:"Restore a full system backup (.tar.gz) and exit"`
+	PreservePaths          bool   `long:"preserve-paths" default:"true" description:"Preserve this server's storage paths and port while restoring a backup"`
 	Admin                  bool   `long:"admin" description:"Force enable web admin console (/admin) regardless of configuration"`
 	NoAdmin                bool   `long:"no-admin" description:"Force disable web admin console (/admin) regardless of configuration"`
 	MCP                    bool   `long:"mcp" description:"Run as MCP (Model Context Protocol) server over stdio"`
@@ -96,6 +99,9 @@ func main() {
 	}
 	if opts.MigrateFilenamesDryRun && !opts.MigrateFilenames {
 		log.Fatal("--migrate-filenames-dry-run requires --migrate-filenames")
+	}
+	if opts.ExportBackup != "" && opts.RestoreBackup != "" {
+		log.Fatal("cannot specify both --export-backup and --restore-backup")
 	}
 
 	if !opts.NoBanner {
@@ -177,6 +183,13 @@ func main() {
 	}
 	if err != nil {
 		log.WithError(err).Fatal("failed to open storage")
+	}
+
+	if opts.ExportBackup != "" || opts.RestoreBackup != "" {
+		if err := runBackupCLI(ctx, opts, cfg, database, version); err != nil {
+			log.WithError(err).Fatal("backup command failed")
+		}
+		return
 	}
 
 	if opts.MigrateFilenames {
@@ -289,6 +302,7 @@ func main() {
 	)
 
 	feedManager.queue = personalQueue
+	feedManager.SetPersonalFeeds(personalFeeds)
 	if executable, err := os.Executable(); err != nil {
 		log.WithError(err).Warn("Podsync self-update is unavailable")
 	} else {

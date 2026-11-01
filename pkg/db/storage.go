@@ -2,9 +2,17 @@ package db
 
 import (
 	"context"
+	"io"
 
 	"github.com/mxpv/podsync/pkg/model"
 )
+
+// BackupStorage is implemented by stores that can create and restore a
+// consistent database snapshot without exposing their on-disk files.
+type BackupStorage interface {
+	ExportBackup(w io.Writer) error
+	RestoreBackup(r io.Reader) error
+}
 
 type Version int
 

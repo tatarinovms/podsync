@@ -499,6 +499,16 @@ func (m *mockDownloaderAdminMgr) SaveCoverImage(ctx context.Context, feedID stri
 	}, nil
 }
 
+func (m *mockDownloaderAdminMgr) CreateSystemBackup(ctx context.Context, includeSecrets bool, w io.Writer) (*BackupInfo, error) {
+	return &BackupInfo{}, nil
+}
+func (m *mockDownloaderAdminMgr) InspectSystemBackup(ctx context.Context, r io.Reader) (*BackupInfo, error) {
+	return &BackupInfo{}, nil
+}
+func (m *mockDownloaderAdminMgr) RestoreSystemBackup(ctx context.Context, r io.Reader, opts BackupRestoreOptions) (*BackupInfo, error) {
+	return &BackupInfo{}, nil
+}
+
 func TestDownloaderEndpoints(t *testing.T) {
 	cfg := Config{
 		Port: 8080,
@@ -879,7 +889,7 @@ func TestAudiobookUploadTooLarge(t *testing.T) {
 
 func TestAdminAssets(t *testing.T) {
 	srv := New(Config{Admin: AdminConfig{Enabled: true, Username: "admin", Password: "password"}}, &mockFileSystem{}, nil)
-	for _, path := range []string{"/admin/", "/admin/admin.css", "/admin/theme.js", "/admin/admin.js"} {
+	for _, path := range []string{"/admin/", "/admin/admin.css", "/admin/theme.js", "/admin/admin.js", "/admin/qrcode.min.js", "/admin/favicon.ico"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.SetBasicAuth("admin", "password")
 		rec := httptest.NewRecorder()

@@ -2444,13 +2444,27 @@
             document.getElementById('dl-proxy').value = downloaderConfig.proxy || '';
             const proxies = downloaderConfig.proxies || {};
             const ytProxyEl = document.getElementById('dl-proxy-youtube');
-            if (ytProxyEl) ytProxyEl.value = proxies.youtube || '';
+            if (ytProxyEl) {
+                ytProxyEl.value = proxies.youtube || '';
+                setProviderProxyInputState('youtube', !proxies.youtube || proxies.youtube.trim().toLowerCase() === 'direct');
+            }
             const vkProxyEl = document.getElementById('dl-proxy-vkvideo');
-            if (vkProxyEl) vkProxyEl.value = proxies.vkvideo || proxies.vk || '';
+            if (vkProxyEl) {
+                const proxy = proxies.vkvideo || proxies.vk || '';
+                vkProxyEl.value = proxy;
+                setProviderProxyInputState('vkvideo', !proxy || proxy.trim().toLowerCase() === 'direct');
+            }
             const rtProxyEl = document.getElementById('dl-proxy-rutube');
-            if (rtProxyEl) rtProxyEl.value = proxies.rutube || '';
+            if (rtProxyEl) {
+                rtProxyEl.value = proxies.rutube || '';
+                setProviderProxyInputState('rutube', !proxies.rutube || proxies.rutube.trim().toLowerCase() === 'direct');
+            }
             const vmProxyEl = document.getElementById('dl-proxy-vimeo');
-            if (vmProxyEl) vmProxyEl.value = proxies.vimeo || proxies.soundcloud || '';
+            if (vmProxyEl) {
+                const proxy = proxies.vimeo || proxies.soundcloud || '';
+                vmProxyEl.value = proxy;
+                setProviderProxyInputState('vimeo', !proxy || proxy.trim().toLowerCase() === 'direct');
+            }
             document.getElementById('dl-language').value = downloaderConfig.language || '';
             document.getElementById('dl-custom-binary').value = downloaderConfig.custom_binary || '';
             document.getElementById('dl-self-update').checked = !!downloaderConfig.self_update;
@@ -2528,6 +2542,26 @@
             }
         }
 
+        function setProviderProxyInputState(provider, isDirect) {
+            const input = document.getElementById(`dl-proxy-${provider}`);
+            const toggle = document.getElementById(`dl-proxy-${provider}-direct`);
+            if (!input || !toggle) return;
+            toggle.checked = isDirect;
+            input.disabled = isDirect;
+            input.setAttribute('aria-disabled', String(isDirect));
+        }
+
+        function toggleProviderProxyInput(provider, isDirect) {
+            setProviderProxyInputState(provider, isDirect);
+        }
+
+        function providerProxyValue(provider) {
+            const input = document.getElementById(`dl-proxy-${provider}`);
+            const directToggle = document.getElementById(`dl-proxy-${provider}-direct`);
+            if (!input || !directToggle) return '';
+            return directToggle.checked ? 'direct' : input.value.trim();
+        }
+
         async function saveDownloaderSettings(e) {
             e.preventDefault();
             const timeout = parseInt(document.getElementById('dl-timeout').value, 10) || 10;
@@ -2537,14 +2571,17 @@
             const selfUpdate = document.getElementById('dl-self-update').checked;
 
             const proxies = {};
-            const ytProxy = document.getElementById('dl-proxy-youtube')?.value.trim();
+            const ytProxy = providerProxyValue('youtube');
             if (ytProxy) proxies.youtube = ytProxy;
-            const vkProxy = document.getElementById('dl-proxy-vkvideo')?.value.trim();
+            const vkProxy = providerProxyValue('vkvideo');
             if (vkProxy) proxies.vkvideo = vkProxy;
-            const rtProxy = document.getElementById('dl-proxy-rutube')?.value.trim();
+            const rtProxy = providerProxyValue('rutube');
             if (rtProxy) proxies.rutube = rtProxy;
-            const vmProxy = document.getElementById('dl-proxy-vimeo')?.value.trim();
-            if (vmProxy) proxies.vimeo = vmProxy;
+            const vmProxy = providerProxyValue('vimeo');
+            if (vmProxy) {
+                proxies.vimeo = vmProxy;
+                proxies.soundcloud = vmProxy;
+            }
 
             const browser = document.getElementById('dl-browser-select').value;
             const profile = document.getElementById('dl-browser-profile').value.trim();

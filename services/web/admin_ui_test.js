@@ -72,6 +72,34 @@ vm.createContext(context);
 const code = fs.readFileSync(require('path').join(__dirname, 'ui/admin.js'), 'utf8').replaceAll('checkAuth();', 'void 0;');
 vm.runInContext(code, context);
 
+// Per-provider direct routing disables its proxy URL and preserves the URL when
+// switching back to a dedicated proxy.
+const originalGetElementById = document.getElementById;
+const downloaderElements = new Map();
+document.getElementById = id => {
+    if (!downloaderElements.has(id)) {
+        downloaderElements.set(id, Object.assign(makeDummy(id), {value: '', checked: false, disabled: false}));
+    }
+    return downloaderElements.get(id);
+};
+vm.runInContext(`downloaderConfig = {
+    timeout: 15,
+    proxies: {youtube: 'socks5://127.0.0.1:1080', vkvideo: 'direct'}
+}; renderDownloaderConfig();`, context);
+assert.equal(downloaderElements.get('dl-proxy-youtube-direct').checked, false);
+assert.equal(downloaderElements.get('dl-proxy-youtube').disabled, false);
+assert.equal(downloaderElements.get('dl-proxy-vkvideo-direct').checked, true);
+assert.equal(downloaderElements.get('dl-proxy-vkvideo').disabled, true);
+assert.equal(downloaderElements.get('dl-proxy-rutube-direct').checked, true);
+vm.runInContext(`toggleProviderProxyInput('youtube', true)`, context);
+assert.equal(downloaderElements.get('dl-proxy-youtube').disabled, true);
+vm.runInContext(`toggleProviderProxyInput('youtube', false)`, context);
+assert.equal(downloaderElements.get('dl-proxy-youtube').value, 'socks5://127.0.0.1:1080');
+assert.equal(vm.runInContext(`providerProxyValue('youtube')`, context), 'socks5://127.0.0.1:1080');
+vm.runInContext(`toggleProviderProxyInput('youtube', true)`, context);
+assert.equal(vm.runInContext(`providerProxyValue('youtube')`, context), 'direct');
+document.getElementById = originalGetElementById;
+
 // Test 1: Empty library
 vm.runInContext('allFeeds = []; renderFeeds([]);', context);
 assert(html.includes('No configured podcasts'), 'Empty library state failed');

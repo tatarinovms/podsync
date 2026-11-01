@@ -190,7 +190,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Bypassing Bot Verification**: Overcomes the `Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication` error.
   - **Netscape Cookies (`cookies.txt`)**: Paste or upload exported browser cookies directly into the web UI. Stored automatically in `data/cookies.txt`.
   - **Cookies from Browser**: On local desktop installations, select your installed browser (Chrome, Firefox, Safari, Brave, Edge) to automatically extract session cookies.
-  - **HTTP/SOCKS5 Proxy**: Configure custom proxy routing (`--proxy`) for yt-dlp traffic.
+  - **HTTP/SOCKS5 Proxy**: Configure a global yt-dlp proxy or a dedicated proxy per provider. Each provider's **Direct connection** switch is on by default; turn it off to enable that provider's proxy URL field.
   - **Engine Options**: Configure download timeouts and 24h automatic self-update.
   - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
 

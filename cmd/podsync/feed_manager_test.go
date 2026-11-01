@@ -134,6 +134,7 @@ func TestFeedUpdateStatusFollowsQueueAndRun(t *testing.T) {
 type mockFeedManagerDB struct {
 	mu                sync.RWMutex
 	episodes          map[string]map[string]*model.Episode
+	feedStats         map[string]*model.FeedStats
 	walkEpisodesCount int
 }
 
@@ -159,7 +160,11 @@ func (m *mockFeedManagerDB) GetFeed(_ context.Context, _ string) (*model.Feed, e
 func (m *mockFeedManagerDB) GetFeedMetadata(_ context.Context, _ string) (*model.Feed, error) {
 	return nil, nil
 }
-func (m *mockFeedManagerDB) GetFeedStats(_ context.Context, _ string) (*model.FeedStats, error) {
+func (m *mockFeedManagerDB) GetFeedStats(_ context.Context, feedID string) (*model.FeedStats, error) {
+	if stats := m.feedStats[feedID]; stats != nil {
+		copy := *stats
+		return &copy, nil
+	}
 	return nil, nil
 }
 func (m *mockFeedManagerDB) WalkFeeds(_ context.Context, _ func(feed *model.Feed) error) error {
@@ -598,12 +603,45 @@ func TestGetFeedDetail_AudiobookDynamicScan(t *testing.T) {
 		db: mockDB,
 	}
 
+	list, err := mgr.ListFeeds(context.Background())
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, 2, list[0].EpisodeCount)
+	assert.Equal(t, 2, list[0].DownloadedCount)
+	assert.Equal(t, int64(len("mp3 content 1")+len("mp3 content 2")), list[0].TotalSize)
+
 	summary, episodes, err := mgr.GetFeedDetail(context.Background(), "dune_book")
 	require.NoError(t, err)
 	assert.Equal(t, 2, summary.EpisodeCount)
 	require.Len(t, episodes, 2)
 	assert.Equal(t, "01_intro.mp3", episodes[0].ID)
 	assert.Equal(t, "02_chapter.mp3", episodes[1].ID)
+}
+
+func TestListFeedsRecountsZeroStoredStats(t *testing.T) {
+	mockDB := &mockFeedManagerDB{
+		episodes: map[string]map[string]*model.Episode{
+			"show": {
+				"downloaded": {ID: "downloaded", Status: model.EpisodeDownloaded, Size: 1024},
+				"pending":    {ID: "pending", Status: model.EpisodeNew},
+				"failed":     {ID: "failed", Status: model.EpisodeError},
+			},
+		},
+		feedStats: map[string]*model.FeedStats{"show": {}},
+	}
+	mgr := &AppFeedManager{
+		db:    mockDB,
+		feeds: map[string]*feed.Config{"show": {ID: "show", URL: "https://youtube.com/channel/test"}},
+	}
+
+	feeds, err := mgr.ListFeeds(context.Background())
+	require.NoError(t, err)
+	require.Len(t, feeds, 1)
+	assert.Equal(t, 3, feeds[0].EpisodeCount)
+	assert.Equal(t, 1, feeds[0].DownloadedCount)
+	assert.Equal(t, 1, feeds[0].ErrorCount)
+	assert.Equal(t, int64(1024), feeds[0].TotalSize)
+	assert.Equal(t, 1, mockDB.walkEpisodesCount)
 }
 
 func TestAudiobookUpdatesWithoutCron(t *testing.T) {

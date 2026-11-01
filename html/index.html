@@ -641,25 +641,41 @@
                                                 <i aria-hidden="true" class="bi bi-diagram-3 text-primary"></i>
                                                 <span class="small fw-semibold">Selective Proxy Routing (Per-Provider)</span>
                                             </div>
-                                            <div class="form-text small mb-2">Route specific video hosts through individual proxies (e.g. SOCKS5/Xray for YouTube, direct for VK Video/Rutube).</div>
+                                            <div class="form-text small mb-2">Each provider connects directly by default. Turn off Direct connection to enter a dedicated proxy URL.</div>
                                             <div class="row g-2 mb-2">
                                                 <div class="col-sm-6">
-                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-youtube"><i aria-hidden="true" class="bi bi-youtube text-danger me-1"></i>YouTube Proxy</label>
-                                                    <input type="text" id="dl-proxy-youtube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-youtube"><i aria-hidden="true" class="bi bi-youtube text-danger me-1"></i>YouTube</label>
+                                                    <div class="form-check form-switch mb-1">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="dl-proxy-youtube-direct" checked aria-controls="dl-proxy-youtube" onchange="toggleProviderProxyInput('youtube', this.checked)">
+                                                        <label class="form-check-label smaller" for="dl-proxy-youtube-direct">Direct connection</label>
+                                                    </div>
+                                                    <input type="text" id="dl-proxy-youtube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="YouTube proxy URL" disabled>
                                                 </div>
                                                 <div class="col-sm-6">
-                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vkvideo"><i aria-hidden="true" class="bi bi-camera-video text-primary me-1"></i>VK Video Proxy</label>
-                                                    <input type="text" id="dl-proxy-vkvideo" class="form-control form-control-sm font-monospace" placeholder="direct or http://...">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vkvideo"><i aria-hidden="true" class="bi bi-camera-video text-primary me-1"></i>VK Video</label>
+                                                    <div class="form-check form-switch mb-1">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="dl-proxy-vkvideo-direct" checked aria-controls="dl-proxy-vkvideo" onchange="toggleProviderProxyInput('vkvideo', this.checked)">
+                                                        <label class="form-check-label smaller" for="dl-proxy-vkvideo-direct">Direct connection</label>
+                                                    </div>
+                                                    <input type="text" id="dl-proxy-vkvideo" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="VK Video proxy URL" disabled>
                                                 </div>
                                             </div>
                                             <div class="row g-2">
                                                 <div class="col-sm-6">
-                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-rutube"><i aria-hidden="true" class="bi bi-play-circle text-success me-1"></i>Rutube Proxy</label>
-                                                    <input type="text" id="dl-proxy-rutube" class="form-control form-control-sm font-monospace" placeholder="direct or http://...">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-rutube"><i aria-hidden="true" class="bi bi-play-circle text-success me-1"></i>Rutube</label>
+                                                    <div class="form-check form-switch mb-1">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="dl-proxy-rutube-direct" checked aria-controls="dl-proxy-rutube" onchange="toggleProviderProxyInput('rutube', this.checked)">
+                                                        <label class="form-check-label smaller" for="dl-proxy-rutube-direct">Direct connection</label>
+                                                    </div>
+                                                    <input type="text" id="dl-proxy-rutube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="Rutube proxy URL" disabled>
                                                 </div>
                                                 <div class="col-sm-6">
-                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vimeo"><i aria-hidden="true" class="bi bi-broadcast text-info me-1"></i>Vimeo / Soundcloud Proxy</label>
-                                                    <input type="text" id="dl-proxy-vimeo" class="form-control form-control-sm font-monospace" placeholder="socks5://...">
+                                                    <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vimeo"><i aria-hidden="true" class="bi bi-broadcast text-info me-1"></i>Vimeo / SoundCloud</label>
+                                                    <div class="form-check form-switch mb-1">
+                                                        <input class="form-check-input" type="checkbox" role="switch" id="dl-proxy-vimeo-direct" checked aria-controls="dl-proxy-vimeo" onchange="toggleProviderProxyInput('vimeo', this.checked)">
+                                                        <label class="form-check-label smaller" for="dl-proxy-vimeo-direct">Direct connection</label>
+                                                    </div>
+                                                    <input type="text" id="dl-proxy-vimeo" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="Vimeo and SoundCloud proxy URL" disabled>
                                                 </div>
                                             </div>
                                         </div>
@@ -2239,7 +2255,9 @@
                         <option value="1.75">1.75x</option>
                         <option value="2">2.0x</option>
                     </select>
-                    <button type="button" class="btn-close ms-2" aria-label="Close Player" onclick="closeStickyPlayer()"></button>
+                    <button type="button" class="btn btn-secondary btn-sm player-close-btn" onclick="closeStickyPlayer()">
+                        <i aria-hidden="true" class="bi bi-x-lg me-1"></i>Close player
+                    </button>
                 </div>
             </div>
         </div>

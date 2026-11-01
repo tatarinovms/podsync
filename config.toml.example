@@ -226,9 +226,7 @@ vkvideo = "VK_ACCESS_TOKEN" # VK Video Access Token (requires 'video' scope). Al
   # Global proxy fallback (leave empty for direct connection)
   # proxy = "socks5://127.0.0.1:1080"
 
-  # Selective proxy routing per provider or domain
-  # Useful when YouTube needs a foreign SOCKS5/HTTP proxy, while VK Video or Rutube connect directly
-  [downloader.proxies]
-  youtube = "socks5://127.0.0.1:1080"
-  vkvideo = "direct"
-  rutube = "direct"
+  # Selective proxy routing per provider or domain. Providers connect directly by default.
+  # Uncomment the table and add only providers that need their own SOCKS5/HTTP proxy.
+  # [downloader.proxies]
+  # youtube = "socks5://127.0.0.1:1080"

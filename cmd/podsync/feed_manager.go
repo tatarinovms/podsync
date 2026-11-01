@@ -913,21 +913,25 @@ func (m *AppFeedManager) invalidateStats(id string) {
 
 func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int, int, int, int64) {
 	m.statsMu.RLock()
-	if s, ok := m.statsCache[f.ID]; ok && time.Since(s.updatedAt) < 15*time.Second {
-		m.statsMu.RUnlock()
-		return s.episodeCount, s.downloadedCount, s.errorCount, s.totalSize
-	}
+	cached, ok := m.statsCache[f.ID]
 	m.statsMu.RUnlock()
+	if ok && cached.episodeCount > 0 && time.Since(cached.updatedAt) < 15*time.Second {
+		return cached.episodeCount, cached.downloadedCount, cached.errorCount, cached.totalSize
+	}
 
 	var epCount, dlCount, errCount int
 	var totalSize int64
 	if m.db != nil {
+		needsRecount := true
 		if stats, err := m.db.GetFeedStats(ctx, f.ID); err == nil && stats != nil {
 			epCount = stats.EpisodeCount
 			dlCount = stats.DownloadedCount
 			errCount = stats.ErrorCount
 			totalSize = stats.TotalSize
-		} else {
+			needsRecount = epCount == 0
+		}
+		if needsRecount {
+			epCount, dlCount, errCount, totalSize = 0, 0, 0, 0
 			_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
 				epCount++
 				switch ep.Status {
@@ -939,6 +943,31 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 				}
 				return nil
 			})
+		}
+	}
+	// Audiobooks can be available from the mounted folder before their first
+	// update is persisted in Badger. Keep their library card in sync with the
+	// detail view, which already discovers chapters from disk in that case.
+	if epCount == 0 && isAudiobookFeed(f) {
+		m.mu.RLock()
+		audiobooksDir := ""
+		if m.cfg != nil {
+			audiobooksDir = m.cfg.Audiobooks.Dir
+		}
+		m.mu.RUnlock()
+		if audiobookBuilder, err := builder.NewAudiobookBuilder(audiobooksDir); err == nil {
+			if book, err := audiobookBuilder.Build(ctx, f); err == nil && book != nil {
+				for _, ep := range book.Episodes {
+					epCount++
+					switch ep.Status {
+					case model.EpisodeDownloaded:
+						dlCount++
+						totalSize += ep.Size
+					case model.EpisodeError:
+						errCount++
+					}
+				}
+			}
 		}
 	}
 

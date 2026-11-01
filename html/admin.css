@@ -501,6 +501,57 @@
             color: var(--text-muted) !important;
         }
 
+        /* Numbered setup sections keep related controls scannable. */
+        .settings-step {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.55rem;
+            height: 1.55rem;
+            margin-right: .5rem;
+            border-radius: 50%;
+            background-color: rgba(var(--ctp-mauve-rgb), .16);
+            border: 1px solid rgba(var(--ctp-mauve-rgb), .35);
+            color: var(--text-accent);
+            font-size: .75rem;
+            font-weight: 700;
+            vertical-align: text-bottom;
+        }
+        .settings-subsection {
+            padding: 0 0 1rem;
+            margin: 0 0 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .settings-subsection-heading {
+            display: flex;
+            align-items: flex-start;
+            gap: .65rem;
+            margin-bottom: .75rem;
+        }
+        .settings-subsection-number {
+            flex: 0 0 auto;
+            padding: .12rem .42rem;
+            border-radius: 5px;
+            background-color: var(--ctp-surface0);
+            color: var(--text-accent);
+            font-size: .72rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+        .settings-subsection-title {
+            display: block;
+            color: var(--ctp-text);
+            font-size: .82rem;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .settings-subsection-heading p {
+            margin: .12rem 0 0;
+            color: var(--text-muted);
+            font-size: .75rem;
+            line-height: 1.35;
+        }
+
         .feed-cover {
             width: 80px;
             height: 80px;

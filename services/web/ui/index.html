@@ -88,9 +88,9 @@
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-logs"><i aria-hidden="true" class="bi bi-activity"></i> Activity <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button></li>
                     <li class="nav-section" role="presentation">SETTINGS</li>
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-tokens"><i aria-hidden="true" class="bi bi-key"></i> API keys</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-downloader"><i aria-hidden="true" class="bi bi-cloud-arrow-down"></i> Downloader</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System &amp; storage</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-mcp"><i aria-hidden="true" class="bi bi-robot"></i> MCP server</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-downloader"><i aria-hidden="true" class="bi bi-cloud-arrow-down"></i> Download &amp; network</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System &amp; access</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-mcp"><i aria-hidden="true" class="bi bi-robot"></i> MCP &amp; integrations</button></li>
                 </ul>
                 <div class="sidebar-note"><i aria-hidden="true" class="bi bi-broadcast"></i><span>Your media.<br>Your own feed.</span></div>
             </aside>
@@ -505,8 +505,8 @@
                         <div class="card-body p-4">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                                 <div>
-                                    <h4 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-cloud-arrow-down me-2"></i>Downloader &amp; Cookies Configuration</h4>
-                                    <p class="mb-0 opacity-75">Configure yt-dlp downloader engine, cookies (to bypass YouTube bot checks and age-gates), and proxy settings.</p>
+                                    <h4 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-cloud-arrow-down me-2"></i>Download setup</h4>
+                                    <p class="mb-0 opacity-75">Set up access, routing, download behaviour, and verify the configured connection.</p>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm" id="dl-status-badge">
@@ -537,7 +537,7 @@
                         <div class="col-lg-7">
                             <div class="card h-100 shadow-sm">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-cookie me-2 text-warning"></i>YouTube &amp; yt-dlp Cookies</h6>
+                                    <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">1</span><i aria-hidden="true" class="bi bi-cookie me-2 text-warning"></i>Access &amp; cookies</h6>
                                     <div class="d-flex align-items-center gap-2">
                                         <span id="cookies-status-indicator" class="badge bg-secondary">Checking...</span>
                                     </div>
@@ -622,7 +622,7 @@
                             <!-- Downloader Options -->
                             <div class="card shadow-sm mb-4">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-sliders me-2 text-primary"></i>Downloader Options</h6>
+                                    <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">2</span><i aria-hidden="true" class="bi bi-sliders me-2 text-primary"></i>Download routing &amp; behaviour</h6>
                                     <div class="d-flex align-items-center gap-2 small">
                                         <span class="badge bg-body-secondary text-body" id="dl-engine-pill">yt-dlp: -</span>
                                         <span class="badge bg-body-secondary text-body" id="dl-ffmpeg-pill">ffmpeg: -</span>
@@ -630,13 +630,22 @@
                                 </div>
                                 <div class="card-body">
                                     <form id="downloader-settings-form" onsubmit="saveDownloaderSettings(event)">
-                                        <div class="mb-3">
+                                        <section class="settings-subsection" aria-labelledby="dl-routing-title">
+                                            <div class="settings-subsection-heading">
+                                                <span class="settings-subsection-number">2.1</span>
+                                                <div><span class="settings-subsection-title" id="dl-routing-title">Default route</span><p>Use one proxy for all downloads, or leave it empty.</p></div>
+                                            </div>
                                             <label class="form-label small fw-semibold" for="dl-proxy">Default HTTP / SOCKS5 Proxy</label>
                                             <input type="text" id="dl-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080 or http://user:pass@host:port">
                                             <div class="form-text small">Global fallback proxy passed directly to yt-dlp via <code>--proxy</code>.</div>
-                                        </div>
+                                        </section>
 
-                                        <div class="border rounded p-3 mb-3 bg-body-tertiary">
+                                        <section class="settings-subsection" aria-labelledby="dl-provider-routes-title">
+                                            <div class="settings-subsection-heading">
+                                                <span class="settings-subsection-number">2.2</span>
+                                                <div><span class="settings-subsection-title" id="dl-provider-routes-title">Provider routes</span><p>Override the default route for individual providers when needed.</p></div>
+                                            </div>
+                                        <div class="border rounded p-3 bg-body-tertiary">
                                             <div class="d-flex align-items-center gap-2 mb-2">
                                                 <i aria-hidden="true" class="bi bi-diagram-3 text-primary"></i>
                                                 <span class="small fw-semibold">Selective Proxy Routing (Per-Provider)</span>
@@ -679,12 +688,16 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        </section>
 
-                                        <div class="mb-3">
+                                        <section class="settings-subsection mb-3" aria-labelledby="dl-behaviour-title">
+                                            <div class="settings-subsection-heading">
+                                                <span class="settings-subsection-number">2.3</span>
+                                                <div><span class="settings-subsection-title" id="dl-behaviour-title">Download behaviour</span><p>Choose language, timeout, and yt-dlp maintenance options.</p></div>
+                                            </div>
                                             <label class="form-label small fw-semibold" for="dl-language">Preferred Audio / Content Language</label>
                                             <input type="text" id="dl-language" class="form-control form-control-sm" placeholder="e.g. ru, en, de (optional)">
                                             <div class="form-text small">Default audio track language for multi-audio videos (YouTube dubbing). Passed to yt-dlp. Overridden by per-feed language if set.</div>
-                                        </div>
 
                                         <div class="row g-2 mb-3">
                                             <div class="col-sm-6">
@@ -701,6 +714,7 @@
                                             <input class="form-check-input" type="checkbox" id="dl-self-update">
                                             <label class="form-check-label small fw-semibold" for="dl-self-update">Enable 24h Automatic Self-Update (yt-dlp)</label>
                                         </div>
+                                        </section>
 
                                         <div class="d-flex justify-content-end">
                                             <button type="submit" class="btn btn-brand btn-sm">
@@ -713,7 +727,7 @@
 
                             <div class="card shadow-sm mb-4">
                                 <div class="card-header bg-transparent py-3">
-                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-router me-2 text-primary"></i>Network DNS</h6>
+                                    <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">3</span><i aria-hidden="true" class="bi bi-router me-2 text-primary"></i>Name resolution</h6>
                                 </div>
                                 <div class="card-body">
                                     <form onsubmit="saveNetworkSettings(event)">
@@ -732,7 +746,7 @@
                             <!-- Live Connectivity & Bot Verification Test Card -->
                             <div class="card shadow-sm">
                                 <div class="card-header bg-transparent py-3">
-                                    <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-patch-check me-2 text-success"></i>Verify yt-dlp &amp; Cookies</h6>
+                                    <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">4</span><i aria-hidden="true" class="bi bi-patch-check me-2 text-success"></i>Verify setup</h6>
                                 </div>
                                 <div class="card-body">
                                     <p class="small text-muted mb-3">Run a live extraction with yt-dlp using your configured cookies and proxy to ensure YouTube bot detection is bypassed.</p>

@@ -4,9 +4,18 @@ import (
 	"embed"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"strings"
 )
+
+func init() {
+	_ = mime.AddExtensionType(".js", "application/javascript; charset=utf-8")
+	_ = mime.AddExtensionType(".css", "text/css; charset=utf-8")
+	_ = mime.AddExtensionType(".woff2", "font/woff2")
+	_ = mime.AddExtensionType(".woff", "font/woff")
+	_ = mime.AddExtensionType(".svg", "image/svg+xml")
+}
 
 //go:embed ui/*
 var adminContent embed.FS
@@ -39,6 +48,9 @@ func (s *Server) adminUIHandler() http.Handler {
 			stat, _ := f.Stat()
 			if stat != nil && !stat.IsDir() {
 				if seeker, ok := f.(io.ReadSeeker); ok {
+					if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") || strings.HasSuffix(path, ".woff2") || strings.HasSuffix(path, ".woff") {
+						w.Header().Set("Cache-Control", "public, max-age=604800")
+					}
 					http.ServeContent(w, r, path, stat.ModTime(), seeker)
 					return
 				}

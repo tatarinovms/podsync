@@ -9,9 +9,20 @@ const os = require('node:os');
 const screenshots = fs.mkdtempSync(path.join(os.tmpdir(), 'podsync-ui-'));
 const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';
-    if (!['index.html', 'admin.js', 'admin.css', 'theme.js', 'select.js', 'qrcode.min.js', 'favicon.ico'].includes(file)) { res.writeHead(404).end(); return; }
-    res.setHeader('Content-Type', file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html');
-    res.end(fs.readFileSync(path.join(__dirname, '..', '..', 'services', 'web', 'ui', file)));
+    const filePath = path.join(__dirname, '..', '..', 'services', 'web', 'ui', file);
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) { res.writeHead(404).end(); return; }
+    const ext = path.extname(file);
+    const contentTypes = {
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.html': 'text/html',
+        '.woff2': 'font/woff2',
+        '.woff': 'font/woff',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+    };
+    res.setHeader('Content-Type', contentTypes[ext] || 'application/octet-stream');
+    res.end(fs.readFileSync(filePath));
 });
 (async()=>{
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

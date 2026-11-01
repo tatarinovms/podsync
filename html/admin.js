@@ -122,7 +122,13 @@
         let feedsFetchSeq = 0;
         let statusFetchSeq = 0;
         let pollFailureCount = 0;
-        const toastEl = new bootstrap.Toast(document.getElementById('app-toast'), { delay: 2500 });
+        let toastEl = null;
+        try {
+            if (typeof bootstrap !== "undefined" && bootstrap.Toast) {
+                const toastNode = document.getElementById("app-toast");
+                if (toastNode) toastEl = new bootstrap.Toast(toastNode, { delay: 2500 });
+            }
+        } catch (_) {}
 
         function escapeHtml(str) {
             if (!str) return '';
@@ -199,8 +205,15 @@
         }
 
         function showToast(msg) {
-            document.getElementById('toast-message').innerText = msg;
-            toastEl.show();
+            const msgEl = document.getElementById("toast-message");
+            if (msgEl) msgEl.innerText = msg;
+            if (!toastEl && typeof bootstrap !== "undefined" && bootstrap.Toast) {
+                const toastNode = document.getElementById("app-toast");
+                if (toastNode) {
+                    try { toastEl = new bootstrap.Toast(toastNode, { delay: 2500 }); } catch (_) {}
+                }
+            }
+            if (toastEl) toastEl.show();
         }
 
         let quickAddEndpoint = '';

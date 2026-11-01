@@ -38,7 +38,8 @@ type Opts struct {
 	MigrateFilenamesDryRun bool   `long:"migrate-filenames-dry-run" description:"Preview filename migration without writing changes (requires --migrate-filenames)"`
 	ExportBackup           string `long:"export-backup" value-name:"PATH" description:"Export a full system backup (.tar.gz) and exit"`
 	RestoreBackup          string `long:"restore-backup" value-name:"PATH" description:"Restore a full system backup (.tar.gz) and exit"`
-	PreservePaths          bool   `long:"preserve-paths" default:"true" description:"Preserve this server's storage paths and port while restoring a backup"`
+	PreservePaths          bool   `long:"preserve-paths" description:"Preserve this server's storage paths and port while restoring a backup (default)"`
+	NoPreservePaths        bool   `long:"no-preserve-paths" description:"Replace this server's storage paths and port while restoring a backup"`
 	Admin                  bool   `long:"admin" description:"Force enable web admin console (/admin) regardless of configuration"`
 	NoAdmin                bool   `long:"no-admin" description:"Force disable web admin console (/admin) regardless of configuration"`
 	MCP                    bool   `long:"mcp" description:"Run as MCP (Model Context Protocol) server over stdio"`
@@ -102,6 +103,9 @@ func main() {
 	}
 	if opts.ExportBackup != "" && opts.RestoreBackup != "" {
 		log.Fatal("cannot specify both --export-backup and --restore-backup")
+	}
+	if opts.PreservePaths && opts.NoPreservePaths {
+		log.Fatal("cannot specify both --preserve-paths and --no-preserve-paths")
 	}
 
 	if !opts.NoBanner {

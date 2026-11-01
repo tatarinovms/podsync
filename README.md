@@ -160,6 +160,8 @@ Preview only (no writes):
 ./bin/podsync --config config.toml --restore-backup ./podsync-backup.tar.gz --preserve-paths
 ```
 
+Storage paths and the listening port are preserved by default during CLI restores. Use `--no-preserve-paths` only when the backup's paths and port should replace those on the target server.
+
 The archive excludes downloaded media. Restore preserves the target server's storage paths and port by default.
 
 ## Configuration

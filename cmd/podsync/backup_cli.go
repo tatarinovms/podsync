@@ -56,7 +56,10 @@ func runBackupCLI(ctx context.Context, opts Opts, cfg *Config, database *db.Badg
 		return err
 	}
 	defer in.Close()
-	result, err := backup.Restore(ctx, in, backup.RestoreOptions{ConfigPath: opts.ConfigPath, CoversDir: covers, CookiesPath: cookies, PreserveStoragePaths: opts.PreservePaths, RestoreSecrets: true, RestoreDatabase: true, RestoreCovers: true, RestoreCookies: true, RestoreDatabaseStream: database.RestoreBackup})
+	// Cross-server restores keep the target's mount paths and port unless the
+	// caller explicitly requests a complete configuration replacement.
+	preservePaths := !opts.NoPreservePaths
+	result, err := backup.Restore(ctx, in, backup.RestoreOptions{ConfigPath: opts.ConfigPath, CoversDir: covers, CookiesPath: cookies, PreserveStoragePaths: preservePaths, RestoreSecrets: true, RestoreDatabase: true, RestoreCovers: true, RestoreCookies: true, RestoreDatabaseStream: database.RestoreBackup})
 	if err != nil {
 		return err
 	}

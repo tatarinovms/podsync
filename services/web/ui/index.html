@@ -2106,7 +2106,7 @@
 
     <!-- Modal: Change Password -->
     <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordTitle">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow">
                 <div class="modal-header">
                     <h6 class="modal-title fw-bold" id="changePasswordTitle"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Change Password</h6>
@@ -2117,16 +2117,26 @@
                         <div id="pw-error-alert" class="alert alert-danger py-1 px-2 small d-none mb-3"></div>
                         <div class="mb-3">
                             <label for="input-old-pw" class="form-label small fw-semibold">Current Password</label>
-                            <input type="password" class="form-control form-control-sm" id="input-old-pw" required autocomplete="current-password">
+                            <div class="input-group">
+                                <input type="password" class="form-control form-control-sm" id="input-old-pw" required autocomplete="current-password">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('input-old-pw', this)" title="Show/Hide password" aria-label="Show or hide current password"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="input-new-pw" class="form-label small fw-semibold">New Password</label>
-                            <input type="password" class="form-control form-control-sm" id="input-new-pw" required autocomplete="new-password" minlength="4">
+                            <div class="input-group">
+                                <input type="password" class="form-control form-control-sm font-monospace" id="input-new-pw" required autocomplete="new-password" minlength="4">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('input-new-pw', this)" title="Show/Hide password" aria-label="Show or hide new password"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="generateAdminPassword()" title="Generate secure password"><i aria-hidden="true" class="bi bi-magic me-1"></i>Generate</button>
+                            </div>
                             <div class="form-text small">Minimum 4 characters.</div>
                         </div>
                         <div class="mb-2">
                             <label for="input-confirm-pw" class="form-label small fw-semibold">Confirm New Password</label>
-                            <input type="password" class="form-control form-control-sm" id="input-confirm-pw" required autocomplete="new-password">
+                            <div class="input-group">
+                                <input type="password" class="form-control form-control-sm font-monospace" id="input-confirm-pw" required autocomplete="new-password">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('input-confirm-pw', this)" title="Show/Hide password" aria-label="Show or hide confirm password"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">

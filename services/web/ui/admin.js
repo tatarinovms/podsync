@@ -506,6 +506,7 @@
                 // Close modal
                 closeModal('changePasswordModal');
                 document.getElementById('changePasswordForm').reset();
+                resetChangePasswordVisibility();
 
                 showToast('Password updated successfully!');
             } catch (err) {
@@ -515,6 +516,68 @@
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i aria-hidden="true" class="bi bi-check-lg me-1"></i>Update Password';
             }
+        }
+
+        function resetChangePasswordVisibility() {
+            const modal = document.getElementById('changePasswordModal');
+            if (!modal) return;
+            const inputs = ['input-old-pw', 'input-new-pw', 'input-confirm-pw'];
+            inputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.type = 'password';
+            });
+            modal.querySelectorAll('button[onclick*="togglePasswordVisibility"]').forEach(b => {
+                b.innerHTML = '<i aria-hidden="true" class="bi bi-eye"></i>';
+            });
+        }
+
+        function generateAdminPassword() {
+            const lower = 'abcdefghijklmnopqrstuvwxyz';
+            const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const digits = '0123456789';
+            const symbols = '!@#$%^&*()-_=+';
+            const all = lower + upper + digits + symbols;
+
+            let pwd = '';
+            let valid = false;
+            for (let attempt = 0; attempt < 50 && !valid; attempt++) {
+                const values = new Uint32Array(20);
+                window.crypto.getRandomValues(values);
+                pwd = '';
+                for (let i = 0; i < 20; i++) {
+                    pwd += all[values[i] % all.length];
+                }
+                const hasLower = /[a-z]/.test(pwd);
+                const hasUpper = /[A-Z]/.test(pwd);
+                const hasDigit = /[0-9]/.test(pwd);
+                const hasSymbol = /[!@#$%^&*()_+= -]/.test(pwd);
+                if (hasLower && hasUpper && hasDigit && hasSymbol) {
+                    valid = true;
+                }
+            }
+
+            const newPw = document.getElementById('input-new-pw');
+            const confirmPw = document.getElementById('input-confirm-pw');
+            if (newPw) {
+                newPw.value = pwd;
+                newPw.type = 'text';
+            }
+            if (confirmPw) {
+                confirmPw.value = pwd;
+                confirmPw.type = 'text';
+            }
+
+            const modal = document.getElementById('changePasswordModal');
+            if (modal) {
+                modal.querySelectorAll('button[onclick*="input-new-pw"], button[onclick*="input-confirm-pw"]').forEach(b => {
+                    b.innerHTML = '<i aria-hidden="true" class="bi bi-eye-slash"></i>';
+                });
+            }
+
+            const errAlert = document.getElementById('pw-error-alert');
+            if (errAlert) errAlert.classList.add('d-none');
+
+            copyToClipboard(pwd, 'Generated secure password and copied to clipboard!');
         }
 
         async function submitSecuritySettings(e) {
@@ -1007,19 +1070,19 @@
             copyToClipboard(url);
         }
 
-        function copyToClipboard(text) {
+        function copyToClipboard(text, msg = "Link copied to clipboard!") {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(() => {
-                    showToast("Link copied to clipboard!");
+                    showToast(msg);
                 }).catch(() => {
-                    fallbackCopyText(text);
+                    fallbackCopyText(text, msg);
                 });
             } else {
-                fallbackCopyText(text);
+                fallbackCopyText(text, msg);
             }
         }
 
-        function fallbackCopyText(text) {
+        function fallbackCopyText(text, msg = "Link copied to clipboard!") {
             try {
                 const input = document.createElement('textarea');
                 input.value = text;
@@ -1032,12 +1095,12 @@
                 const successful = document.execCommand('copy');
                 document.body.removeChild(input);
                 if (successful) {
-                    showToast("Link copied to clipboard!");
+                    showToast(msg);
                 } else {
-                    prompt("Copy link:", text);
+                    if (typeof prompt === "function") prompt(msg || "Copy:", text);
                 }
             } catch (err) {
-                prompt("Copy link:", text);
+                if (typeof prompt === "function") prompt(msg || "Copy:", text);
             }
         }
 
@@ -3859,6 +3922,14 @@
         document.getElementById('securitySettingsModal')?.addEventListener('show.bs.modal', () => {
             loadAuthSecurity();
             const errAlert = document.getElementById('sec-settings-error');
+            if (errAlert) errAlert.classList.add('d-none');
+        });
+
+        document.getElementById('changePasswordModal')?.addEventListener('hidden.bs.modal', () => {
+            const form = document.getElementById('changePasswordForm');
+            if (form) form.reset();
+            resetChangePasswordVisibility();
+            const errAlert = document.getElementById('pw-error-alert');
             if (errAlert) errAlert.classList.add('d-none');
         });
 

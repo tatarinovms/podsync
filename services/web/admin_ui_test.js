@@ -41,6 +41,11 @@ const qrCanvas = makeDummy('qr-canvas');
 const qrFeedTitle = makeDummy('qr-feed-title');
 const qrFeedURL = makeDummy('qr-feed-url');
 const qrCalls = [];
+const dummyCache = new Map();
+function getOrCreateDummy(id) {
+    if (!dummyCache.has(id)) dummyCache.set(id, makeDummy(id));
+    return dummyCache.get(id);
+}
 
 class QRCodeMock {
     constructor(element, options) {
@@ -66,25 +71,27 @@ const document = {
         if (id === 'qr-canvas') return qrCanvas;
         if (id === 'qr-feed-title') return qrFeedTitle;
         if (id === 'qr-feed-url') return qrFeedURL;
-        return makeDummy(id);
+        return getOrCreateDummy(id);
     },
     createElement(tag) { return makeDummy(tag); },
     addEventListener(){},
     querySelectorAll(){ return []; }
 };
 
+const crypto = require('crypto');
 const context = {
     document,
-    window: { location: { href: 'http://localhost/admin/' } },
+    window: { location: { href: 'http://localhost/admin/' }, crypto: crypto.webcrypto },
     bootstrap: { Toast: class{}, Modal: class { show(){} } },
     QRCode: QRCodeMock,
     URL,
+    Uint32Array,
     console,
     setInterval(){ return 1; },
     clearInterval(){},
     setTimeout(){},
     fetch(){},
-    navigator: {},
+    navigator: { clipboard: { writeText: async () => {} } },
     localStorage: { getItem(){ return 'mocha'; }, setItem(){} }
 };
 
@@ -192,6 +199,33 @@ assert.equal(typeof context.retryAllErrorsForFeed, "function", "retryAllErrorsFo
 assert.equal(typeof context.saveNetworkSettings, "function", "Network DNS settings save handler must be available");
 assert.equal(typeof context.loadPodsyncUpdate, "function", "Podsync update status loader must be available");
 assert.equal(typeof context.updatePodsync, "function", "Podsync update action must be available");
+
+// Test 6: Change password generator and visibility reset
+const newPwEl = document.getElementById('input-new-pw');
+const confirmPwEl = document.getElementById('input-confirm-pw');
+newPwEl.value = '';
+newPwEl.type = 'password';
+confirmPwEl.value = '';
+confirmPwEl.type = 'password';
+
+assert.equal(typeof context.generateAdminPassword, 'function', 'generateAdminPassword must be defined');
+assert.equal(typeof context.resetChangePasswordVisibility, 'function', 'resetChangePasswordVisibility must be defined');
+context.generateAdminPassword();
+
+assert.equal(newPwEl.value.length, 20, 'Generated password length should be 20');
+assert.equal(newPwEl.value, confirmPwEl.value, 'New and Confirm password values must match');
+assert.equal(newPwEl.type, 'text', 'New password field should be revealed after generation');
+assert.equal(confirmPwEl.type, 'text', 'Confirm password field should be revealed after generation');
+assert(/[a-z]/.test(newPwEl.value), 'Password must contain lowercase');
+assert(/[A-Z]/.test(newPwEl.value), 'Password must contain uppercase');
+assert(/[0-9]/.test(newPwEl.value), 'Password must contain digits');
+assert(/[!@#$%^&*()_+= -]/.test(newPwEl.value), 'Password must contain symbols');
+
+context.resetChangePasswordVisibility();
+assert.equal(newPwEl.type, 'password', 'Password type should reset to password');
+assert.equal(confirmPwEl.type, 'password', 'Confirm password type should reset to password');
+
+console.log('Password generator and visibility tests passed!');
 
 console.log('UI search, filter, and rendering tests passed!');
 

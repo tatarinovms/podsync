@@ -167,6 +167,11 @@ Follow conventional commit prefixes:
    git push origin refs/tags/vX.Y.Z
    ```
 
+GoReleaser publishes native archives as
+`Podsync_<version>_<OS>_<arch>` (for example,
+`Podsync_2.23.8_Linux_x86_64.tar.gz`). Keep this exact format: the built-in
+native updater selects an archive by that name before verifying its checksum.
+
 ---
 
 ## 5. Docker Build & Deployment

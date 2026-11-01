@@ -360,6 +360,7 @@ if an older stdio client reports that personal feeds are unavailable.
 ### User & Admin Guides
 
 - [Web Admin Console Guide](./docs/web_admin.md)
+- [Monitoring with Uptime Kuma](./docs/monitoring_uptime_kuma.md)
 - [Personal Feeds Guide](./docs/personal-feeds.md)
 - [Audiobooks Guide](./docs/audiobooks.md)
 - [Episode filters](./docs/filters.md)

@@ -354,6 +354,7 @@ Podsync содержит встроенный **MCP Server** с 34 инстру�
 ### Руководства для пользователя и администратора
 
 - [Руководство по Web Admin](./docs/ru/web_admin.md)
+- [Мониторинг в Uptime Kuma](./docs/ru/monitoring_uptime_kuma.md)
 - [Руководство по персональным лентам](./docs/ru/personal-feeds.md)
 - [Руководство по аудиокнигам](./docs/ru/audiobooks.md)
 - [Фильтрация эпизодов](./docs/ru/filters.md)

@@ -185,7 +185,7 @@ The context excludes `.git/`, documentation, agent configuration, local
 credentials, databases, downloaded media, and build artifacts. To include version
 metadata, use `make docker` or pass `--build-arg TAG=...` and
 `--build-arg COMMIT=...` to `docker build`. The Docker defaults are `dev` and
-`unknown`; release/nightly workflows pass their tag and commit explicitly.
+`unknown`; release workflows pass their tag and commit explicitly.
 
 ### 5.2 Running with Docker Compose
 ```bash

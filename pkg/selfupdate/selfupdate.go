@@ -203,8 +203,15 @@ func releaseFiles(rel release, platform platform) (releaseAsset, releaseAsset, e
 	if platform.os != "linux" && platform.os != "darwin" {
 		return releaseAsset{}, releaseAsset{}, fmt.Errorf("automatic updates are unavailable on %s", platform.os)
 	}
-	arch, ok := map[string]string{"amd64": "x86_64", "386": "i386", "arm64": "arm64"}[platform.arch]
-	if !ok {
+	var arch string
+	switch {
+	case platform.os == "darwin" && platform.arch == "arm64":
+		arch = "arm64"
+	case platform.os == "linux" && platform.arch == "amd64":
+		arch = "x86_64"
+	case platform.os == "linux" && platform.arch == "arm64":
+		arch = "arm64"
+	default:
 		return releaseAsset{}, releaseAsset{}, fmt.Errorf("no release archive is available for %s/%s", platform.os, platform.arch)
 	}
 	osTitle := platform.os

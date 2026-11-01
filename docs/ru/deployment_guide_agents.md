@@ -64,7 +64,6 @@ ARCH=$(uname -m)
 case "$ARCH" in
   x86_64) GORELEASER_ARCH="x86_64" ;;
   aarch64|arm64) GORELEASER_ARCH="arm64" ;;
-  armv7l|armhf) GORELEASER_ARCH="armv7" ;;
   *) echo "Неподдерживаемая архитектура: $ARCH" && exit 1 ;;
 esac
 
@@ -392,7 +391,6 @@ ARCH=$(uname -m)
 case "$ARCH" in
   x86_64) GORELEASER_ARCH="x86_64" ;;
   aarch64|arm64) GORELEASER_ARCH="arm64" ;;
-  armv7l|armhf) GORELEASER_ARCH="armv7" ;;
   *) echo "Неподдерживаемая архитектура: $ARCH" && exit 1 ;;
 esac
 

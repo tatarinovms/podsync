@@ -264,10 +264,18 @@ services:
       - ./data:/app/data/
       - ./db:/app/db/
       - ./config.toml:/app/config.toml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     # environment:
     #   - PODSYNC_VKVIDEO_API_KEY=YOUR_VK_TOKEN
     #   - PODSYNC_YOUTUBE_API_KEY=YOUR_YOUTUBE_API_KEY
 ```
+
+> **Container Health Monitoring**: The `healthcheck:` block targets `/health/ready`. With this stanza, `docker ps`, Portainer, Synology Container Manager, and Uptime Kuma automatically display a green `(healthy)` indicator once the service and database are ready.
 
 ### Step 2.4: Launch Container
 ```bash

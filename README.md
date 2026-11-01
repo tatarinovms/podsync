@@ -77,6 +77,12 @@ services:
       - ./data:/app/data/
       - ./db:/app/db/
       - ./config.toml:/app/config.toml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 ```
 
 ```bash

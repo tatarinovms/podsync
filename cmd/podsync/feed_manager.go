@@ -914,11 +914,21 @@ func (m *AppFeedManager) invalidateStats(id string) {
 	m.statsMu.Unlock()
 }
 
+func isCachedStatsValid(stats *feedStats) bool {
+	if stats == nil || stats.episodeCount <= 0 || stats.totalSize < 0 {
+		return false
+	}
+	if stats.downloadedCount == 0 && stats.totalSize > 0 {
+		return false
+	}
+	return true
+}
+
 func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int, int, int, int64) {
 	m.statsMu.RLock()
 	cached, ok := m.statsCache[f.ID]
 	m.statsMu.RUnlock()
-	if ok && cached.episodeCount > 0 && time.Since(cached.updatedAt) < 15*time.Second {
+	if ok && time.Since(cached.updatedAt) < 15*time.Second && isCachedStatsValid(&cached) {
 		return cached.episodeCount, cached.downloadedCount, cached.errorCount, cached.totalSize
 	}
 
@@ -931,21 +941,28 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 			dlCount = stats.DownloadedCount
 			errCount = stats.ErrorCount
 			totalSize = stats.TotalSize
-			needsRecount = epCount == 0
+			needsRecount = epCount == 0 || (dlCount == 0 && totalSize > 0) || totalSize < 0
 		}
 		if needsRecount {
-			epCount, dlCount, errCount, totalSize = 0, 0, 0, 0
+			walkEpCount, walkDlCount, walkErrCount := 0, 0, 0
+			var walkTotalSize int64
 			_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
-				epCount++
+				walkEpCount++
 				switch ep.Status {
 				case model.EpisodeDownloaded:
-					dlCount++
-					totalSize += ep.Size
+					walkDlCount++
+					walkTotalSize += ep.Size
 				case model.EpisodeError:
-					errCount++
+					walkErrCount++
 				}
 				return nil
 			})
+			if walkEpCount > 0 {
+				epCount = walkEpCount
+				dlCount = walkDlCount
+				errCount = walkErrCount
+				totalSize = walkTotalSize
+			}
 		}
 	}
 	// Audiobooks can be available from the mounted folder before their first

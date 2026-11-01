@@ -290,14 +290,27 @@ func adjustStats(stats *model.FeedStats, ep *model.Episode, delta int) {
 	}
 }
 
+func isStatsValid(stats *model.FeedStats) bool {
+	if stats == nil || stats.EpisodeCount <= 0 || stats.TotalSize < 0 {
+		return false
+	}
+	if stats.DownloadedCount == 0 && stats.TotalSize > 0 {
+		return false
+	}
+	return true
+}
+
 func (b *Badger) feedStats(ctx context.Context, txn *badger.Txn, feedID string) (*model.FeedStats, error) {
 	stats := &model.FeedStats{}
 	if err := b.getObj(txn, b.getKey(statsPath, feedID), stats); err == nil {
-		return stats, nil
+		if isStatsValid(stats) {
+			return stats, nil
+		}
 	} else if err != model.ErrNotFound {
 		return nil, err
 	}
-	// Legacy databases have no stats yet. Rebuild in the mutation's snapshot.
+	// Legacy or desynchronized databases: rebuild in the mutation's snapshot.
+	stats = &model.FeedStats{}
 	err := b.walkEpisodes(ctx, txn, feedID, func(ep *model.Episode) error {
 		adjustStats(stats, ep, 1)
 		return nil
@@ -357,8 +370,10 @@ func (b *Badger) GetFeedStats(ctx context.Context, feedID string) (*model.FeedSt
 	found := false
 	err := b.db.View(func(txn *badger.Txn) error {
 		if err := b.getObj(txn, statsKey, &stats); err == nil {
-			found = true
-			return nil
+			if isStatsValid(&stats) {
+				found = true
+				return nil
+			}
 		} else if err != model.ErrNotFound {
 			return err
 		}
@@ -371,7 +386,7 @@ func (b *Badger) GetFeedStats(ctx context.Context, feedID string) (*model.FeedSt
 		return &stats, nil
 	}
 
-	// Compute on the fly if missing (self-healing for legacy database records)
+	// Compute on the fly if missing or desynchronized (self-healing)
 	err = b.update(ctx, func(txn *badger.Txn) error {
 		current, err := b.feedStats(ctx, txn, feedID)
 		if err != nil {

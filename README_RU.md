@@ -62,7 +62,19 @@ Podsync — лёгкий генератор подкастов, который �
 
 ## Быстрый старт
 
-### Docker Compose (рекомендуется)
+### Готовый бинарный релиз (рекомендуется)
+
+1. Откройте [последний релиз Podsync на GitHub](https://github.com/tatarinovms/podsync/releases/latest) и скачайте архив для своей ОС и архитектуры: `Linux_x86_64`, `Linux_arm64`, `Darwin_arm64` (macOS на Apple Silicon) или `Windows_x86_64`. Для Linux и macOS нужен `.tar.gz`, для Windows — `.zip`.
+2. Распакуйте архив в отдельную папку. Скопируйте [пример конфигурации](./config.toml.example) в `config.toml` рядом с исполняемым файлом и настройте пути, адрес сервера и нужные ленты.
+3. Установите `yt-dlp` и `ffmpeg` (см. [Системные зависимости](#системные-зависимости)), затем запустите Podsync из этой папки:
+
+```bash
+./podsync --config config.toml
+```
+
+В Windows запустите `./podsync.exe --config config.toml` в PowerShell. Исходный код и Go для этого способа не требуются. Подробные команды для Linux приведены в [руководстве по развёртыванию](./docs/ru/deployment_guide_agents.md).
+
+### Docker Compose
 
 ```yaml
 services:
@@ -111,10 +123,6 @@ make docker
 задавайте `--build-arg TAG=...` и `--build-arg COMMIT=...`; значения по умолчанию —
 `dev` и `unknown`.
 
-### Готовые бинарные сборки
-
-Скачайте архив для вашей ОС и архитектуры процессора со страницы [GitHub Releases](https://github.com/tatarinovms/podsync/releases). Команды с определением архитектуры и установкой приведены в [руководстве по развёртыванию](./docs/ru/deployment_guide_agents.md).
-
 ### Сборка из исходников
 
 ```bash
@@ -133,7 +141,8 @@ make
 
 На macOS:
 ```bash
-brew install yt-dlp ffmpeg go
+brew install yt-dlp ffmpeg
+# Для сборки из исходников дополнительно установите Go: brew install go
 ```
 
 На Ubuntu/Debian:
@@ -375,10 +384,8 @@ Podsync содержит встроенный **MCP Server** с 34 инстру�
 - [Руководство по ключу YouTube API](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
 - [Создание access token Vimeo](https://developer.vimeo.com/api/guides/start#generate-access-token)
 
-### NAS и развёртывание
+### Развёртывание
 
-- [Podsync на Synology NAS](./docs/ru/how_to_setup_podsync_on_synology_nas.md)
-- [Podsync на QNAP NAS](./docs/ru/how_to_setup_podsync_on_qnap_nas.md)
 - [Руководство по развёртыванию для агентов](./docs/ru/deployment_guide_agents.md)
 
 ### AI и разработка

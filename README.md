@@ -62,7 +62,19 @@ This fork extends the original `mxpv/podsync` with the features described below.
 
 ## Quick Start
 
-### Docker Compose (Recommended)
+### Prebuilt Binary (Recommended)
+
+1. Open the [latest Podsync release on GitHub](https://github.com/tatarinovms/podsync/releases/latest) and download the archive matching your OS and CPU: `Linux_x86_64`, `Linux_arm64`, `Darwin_arm64` (Apple Silicon macOS), or `Windows_x86_64`. Choose `.tar.gz` for Linux/macOS or `.zip` for Windows.
+2. Extract it into its own directory. Copy the [sample configuration](./config.toml.example) to `config.toml` beside the executable, then set your paths, server address, and feeds.
+3. Install `yt-dlp` and `ffmpeg` (see [Dependencies](#dependencies)), then run Podsync from that directory:
+
+```bash
+./podsync --config config.toml
+```
+
+On Windows, run `./podsync.exe --config config.toml` in PowerShell. This method does not require the source code or Go. For detailed Linux installation commands, see the [Deployment & Setup Guide](./docs/deployment_guide_agents.md).
+
+### Docker Compose
 
 ```yaml
 services:
@@ -112,10 +124,6 @@ configuration, databases, and downloaded media. `make docker` passes the version
 and commit as build arguments. With `docker build`, set `--build-arg TAG=...` and
 `--build-arg COMMIT=...` to supply metadata; defaults are `dev` and `unknown`.
 
-### Prebuilt Binaries
-
-Download the archive for your OS and CPU architecture from [GitHub Releases](https://github.com/tatarinovms/podsync/releases). For architecture detection and installation commands, use the [Deployment & Setup Guide](./docs/deployment_guide_agents.md).
-
 ### Build from Source
 
 ```bash
@@ -134,7 +142,8 @@ If you are running Podsync as a binary (e.g. not via Docker), make sure the foll
 
 On macOS:
 ```bash
-brew install yt-dlp ffmpeg go
+brew install yt-dlp ffmpeg
+# For source builds, also install Go: brew install go
 ```
 
 On Ubuntu/Debian:
@@ -381,10 +390,8 @@ if an older stdio client reports that personal feeds are unavailable.
 - [YouTube API key tutorial](https://elfsight.com/blog/2016/12/how-to-get-youtube-api-key-tutorial/)
 - [Generate a Vimeo access token](https://developer.vimeo.com/api/guides/start#generate-access-token)
 
-### NAS & Deployment
+### Deployment
 
-- [Podsync on Synology NAS](./docs/how_to_setup_podsync_on_synology_nas.md)
-- [Podsync on QNAP NAS](./docs/how_to_setup_podsync_on_qnap_nas.md)
 - [Deployment & Setup Guide for Agents (OpenCode, Hermes)](./docs/deployment_guide_agents.md)
 
 ### AI & Developers

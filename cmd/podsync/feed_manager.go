@@ -1577,7 +1577,30 @@ func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.
 		m.mu.RUnlock()
 		return err
 	}
+
+	oldKeepLast := 0
+	if oldFeed.Clean != nil {
+		oldKeepLast = oldFeed.Clean.KeepLast
+	}
+	newKeepLast := 0
+	if f.Clean != nil {
+		newKeepLast = f.Clean.KeepLast
+	}
+	limitsChanged := (oldFeed.PageSize != f.PageSize) || (oldKeepLast != newKeepLast)
+
 	m.mu.RUnlock()
+
+	// If limits or redownload changed while an update is actively downloading,
+	// cancel the in-flight worker immediately so it stops downloading unwanted episodes.
+	if limitsChanged || shouldRedownload {
+		m.mu.RLock()
+		isUpdating := m.runningUpdates != nil && m.runningUpdates[id]
+		m.mu.RUnlock()
+		if isUpdating {
+			log.WithField("feed_id", id).Info("feed settings changed during active update; canceling in-flight download")
+			m.CancelFeedUpdate(id)
+		}
+	}
 
 	// Persist config to disk without holding m.mu
 	if err := m.saveFeedToConfig(f); err != nil {

@@ -1285,3 +1285,63 @@ func TestDeleteFeed_CancelsActiveUpdate(t *testing.T) {
 	assert.Empty(t, mgr.updateWaiters)
 	mgr.mu.RUnlock()
 }
+
+func TestUpdateFeed_CancelsActiveUpdateOnLimitsChange(t *testing.T) {
+	mockDB := &mockFeedManagerDB{
+		episodes: make(map[string]map[string]*model.Episode),
+	}
+	dataDir := t.TempDir()
+	storage, err := fs.NewLocal(dataDir, false, false)
+	require.NoError(t, err)
+
+	mgr := &AppFeedManager{
+		feeds: map[string]*feed.Config{
+			"feed_limit": {
+				ID:       "feed_limit",
+				URL:      "https://youtube.com/channel/test",
+				Format:   model.FormatAudio,
+				PageSize: 10,
+				Clean:    &feed.Cleanup{KeepLast: 10},
+			},
+		},
+		db:             mockDB,
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		updateCancels:  make(map[string]context.CancelFunc),
+		updateWaiters:  make(map[string]chan struct{}),
+		feedErrors:     make(map[string]feedErrorEntry),
+		storage:        storage,
+		updates:        make(chan *feed.Config, 10),
+	}
+
+	// 1. Start active update
+	updateCtx, _, started := mgr.TryStartFeedUpdateWithCancel(context.Background(), "feed_limit", time.Hour)
+	require.True(t, started)
+
+	workerExited := make(chan struct{})
+	go func() {
+		defer close(workerExited)
+		<-updateCtx.Done()
+		mgr.MarkFeedUpdateFinished("feed_limit")
+	}()
+
+	// 2. Change PageSize from 10 to 3
+	newSize := 3
+	err = mgr.UpdateFeed(context.Background(), "feed_limit", &web.FeedConfigUpdate{
+		PageSize: newSize,
+		KeepLast: 3,
+	})
+	require.NoError(t, err)
+
+	// Worker MUST have been canceled!
+	select {
+	case <-workerExited:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not exit in time after UpdateFeed limits change")
+	}
+
+	mgr.mu.RLock()
+	assert.Equal(t, 3, mgr.feeds["feed_limit"].PageSize)
+	assert.Equal(t, 3, mgr.feeds["feed_limit"].Clean.KeepLast)
+	mgr.mu.RUnlock()
+}

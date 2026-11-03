@@ -8,7 +8,7 @@
     <link rel="icon" href="./favicon.ico?v=1" sizes="32x32" type="image/x-icon">
     <link href="./bootstrap.min.css?v=5.3.3" rel="stylesheet">
     <link href="./bootstrap-icons.min.css?v=1.11.3" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=14">
+    <link rel="stylesheet" href="./admin.css?v=15">
 </head>
 <body>
 
@@ -1680,7 +1680,7 @@
                         <h5 class="modal-title fw-bold mb-0" id="addFeedModal-title">
                             <i aria-hidden="true" class="bi bi-plus-circle text-primary me-2"></i>Add Podcast
                         </h5>
-                        <div class="text-muted small mt-1">Configure source URL, download format, schedule, and feed options</div>
+                        <div class="text-muted small mt-1">Supports YouTube, VK Video, Rutube, Apple Podcasts, Vimeo, and custom RSS</div>
                     </div>
                     <button type="button" class="btn-close" onclick="closeModal(this.closest('.modal'))" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
@@ -1690,12 +1690,12 @@
                             <div role="alert" id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
                             <div class="row g-2">
                                 <div class="col-md-7">
-                                    <label class="form-label small fw-semibold" for="new-feed-url">Source URL (YouTube / VK Video / Rutube / Apple Podcasts / RSS Feed) <span class="text-danger">*</span></label>
+                                    <label class="form-label small fw-semibold" for="new-feed-url">Source URL <span class="text-danger">*</span></label>
                                     <div class="input-group input-group-sm">
                                         <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="handleFeedUrlInput(this.value)" aria-describedby="new-feed-url-help">
                                         <button class="btn btn-outline-secondary" type="button" id="btn-preview-feed" onclick="triggerFeedPreview()" title="Fetch feed info"><i aria-hidden="true" class="bi bi-search"></i></button>
                                     </div>
-                                    <div class="form-text small" id="new-feed-url-help">Paste a channel, playlist, Apple Podcasts, or ready-made RSS link for local mirroring.</div>
+                                    <div class="form-text small" id="new-feed-url-help">Channel, playlist, show, or RSS link for local mirroring.</div>
                                 </div>
                                 <div class="col-md-5">
                                     <label class="form-label small fw-semibold" for="new-feed-id">Feed ID (URL slug) <span class="text-danger">*</span></label>
@@ -2367,7 +2367,7 @@
     <script src="./qrcode.min.js?v=1"></script>
 
     <script src="./select.js?v=1"></script>
-    <script src="./admin.js?v=14"></script>
+    <script src="./admin.js?v=15"></script>
 
 </body>
 </html>

@@ -37,6 +37,7 @@ func (s *Server) adminUIHandler() http.Handler {
 			}
 			defer f.Close()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			_, _ = io.Copy(w, f)
 			return
 		}
@@ -48,8 +49,10 @@ func (s *Server) adminUIHandler() http.Handler {
 			stat, _ := f.Stat()
 			if stat != nil && !stat.IsDir() {
 				if seeker, ok := f.(io.ReadSeeker); ok {
-					if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") || strings.HasSuffix(path, ".woff2") || strings.HasSuffix(path, ".woff") {
-						w.Header().Set("Cache-Control", "public, max-age=604800")
+					if strings.HasSuffix(path, ".woff2") || strings.HasSuffix(path, ".woff") {
+						w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+					} else if strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") {
+						w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 					}
 					http.ServeContent(w, r, path, stat.ModTime(), seeker)
 					return

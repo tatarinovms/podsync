@@ -209,3 +209,47 @@ func TestUpdaterDoesNotMarkSkippedLiveEpisodeAsError(t *testing.T) {
 	assert.Equal(t, model.EpisodeCleaned, updated.Status)
 	assert.Empty(t, updated.Error)
 }
+
+type cancelingDownloader struct{}
+
+func (cancelingDownloader) Download(ctx context.Context, _ *feed.Config, _ *model.Episode) (io.ReadCloser, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (cancelingDownloader) PlaylistMetadata(_ context.Context, _ string) (ytdl.PlaylistMetadata, error) {
+	return ytdl.PlaylistMetadata{}, nil
+}
+
+func TestUpdater_ContextCancellationStopsDownload(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	database, err := db.NewBadger(&db.Config{Dir: t.TempDir()})
+	require.NoError(t, err)
+	defer database.Close()
+	storage, err := fs.NewLocal(t.TempDir(), false, false)
+	require.NoError(t, err)
+
+	config := &feed.Config{ID: "feed_cancel", Format: model.FormatAudio}
+	episodes := []*model.Episode{
+		{ID: "ep1", Title: "Ep 1", Status: model.EpisodeNew},
+		{ID: "ep2", Title: "Ep 2", Status: model.EpisodeNew},
+	}
+	require.NoError(t, database.AddFeed(ctx, config.ID, &model.Feed{ID: config.ID, Episodes: episodes}))
+
+	mgr, err := NewUpdater(map[string]*feed.Config{config.ID: config}, nil, "https://podsync.example", cancelingDownloader{}, database, storage)
+	require.NoError(t, err)
+
+	// Cancel in goroutine after 50ms
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	err = mgr.downloadEpisodes(ctx, config, episodes)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	// Episodes should NOT be marked as EpisodeError!
+	ep1, err := database.GetEpisode(context.Background(), config.ID, "ep1")
+	require.NoError(t, err)
+	assert.Equal(t, model.EpisodeNew, ep1.Status)
+}

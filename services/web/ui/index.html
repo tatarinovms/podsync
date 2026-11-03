@@ -1724,15 +1724,22 @@
                                 </div>
                                 <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                                     <span class="small text-muted fw-semibold"><i class="bi bi-cloud-arrow-down me-1"></i>Download Scope:</span>
-                                    <div class="btn-group btn-group-sm" role="group" id="rss-scope-group">
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-all" value="all" onchange="setRssScope('all')">
-                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-all">All episodes</label>
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-10" value="10" onchange="setRssScope(10)">
-                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-10">Last 10</label>
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-25" value="25" onchange="setRssScope(25)" checked>
-                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-25">Last 25</label>
-                                        <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-50" value="50" onchange="setRssScope(50)">
-                                        <label class="btn btn-outline-secondary btn-xs" for="rss-scope-50">Last 50</label>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap" id="rss-scope-container">
+                                        <div class="btn-group btn-group-sm" role="group" id="rss-scope-group">
+                                            <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-all" value="all" onchange="setRssScope('all')">
+                                            <label class="btn btn-outline-secondary btn-xs" for="rss-scope-all">All</label>
+                                            <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-10" value="10" onchange="setRssScope(10)">
+                                            <label class="btn btn-outline-secondary btn-xs" for="rss-scope-10">Last 10</label>
+                                            <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-25" value="25" onchange="setRssScope(25)" checked>
+                                            <label class="btn btn-outline-secondary btn-xs" for="rss-scope-25">Last 25</label>
+                                            <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-50" value="50" onchange="setRssScope(50)">
+                                            <label class="btn btn-outline-secondary btn-xs" for="rss-scope-50">Last 50</label>
+                                            <input type="radio" class="btn-check" name="rss-scope" id="rss-scope-custom" value="custom" onchange="focusRssCustomScope()">
+                                            <label class="btn btn-outline-secondary btn-xs" for="rss-scope-custom">Custom</label>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1" id="rss-scope-custom-wrap">
+                                            <input type="number" id="rss-scope-custom-input" class="form-control form-control-sm py-0 px-2" style="width: 80px; height: 26px; font-size: 0.8rem;" min="1" max="5000" placeholder="Count" onfocus="focusRssCustomScope()" oninput="onRssCustomScopeInput(this.value)">
+                                        </div>
                                     </div>
                                 </div>
                             </div>

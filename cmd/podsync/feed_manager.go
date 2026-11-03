@@ -74,6 +74,8 @@ type AppFeedManager struct {
 	feedErrors     map[string]feedErrorEntry
 	queuedUpdates  map[string]int
 	runningUpdates map[string]bool
+	updateCancels  map[string]context.CancelFunc
+	updateWaiters  map[string]chan struct{}
 	coverCache     sync.Map
 	statsMu        sync.RWMutex
 	statsCache     map[string]feedStats
@@ -134,6 +136,8 @@ func NewAppFeedManager(
 		feedErrors:     make(map[string]feedErrorEntry),
 		queuedUpdates:  make(map[string]int),
 		runningUpdates: make(map[string]bool),
+		updateCancels:  make(map[string]context.CancelFunc),
+		updateWaiters:  make(map[string]chan struct{}),
 		statsCache:     make(map[string]feedStats),
 	}
 	mgr.MountAllAudiobooks()
@@ -733,6 +737,14 @@ func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) erro
 }
 
 func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
+	// 1. Immediately cancel active update worker and wait for it to stop cleanly
+	m.CancelFeedUpdate(id)
+
+	// 2. Cancel and remove any jobs in job queue
+	if m.queue != nil {
+		_ = m.queue.CancelFeed(ctx, id)
+	}
+
 	m.configWriteMu.Lock()
 	defer m.configWriteMu.Unlock()
 
@@ -768,6 +780,13 @@ func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles 
 
 	// Remove from map
 	delete(m.feeds, id)
+	delete(m.queuedUpdates, id)
+	delete(m.runningUpdates, id)
+	delete(m.updateCancels, id)
+	if doneCh, ok := m.updateWaiters[id]; ok {
+		close(doneCh)
+		delete(m.updateWaiters, id)
+	}
 	if m.cfg != nil {
 		delete(m.cfg.Feeds, id)
 	}
@@ -1065,6 +1084,35 @@ func (m *AppFeedManager) MarkFeedUpdateStarted(id string) {
 	m.runningUpdates[id] = true
 }
 
+func (m *AppFeedManager) TryStartFeedUpdateWithCancel(parentCtx context.Context, id string, timeout time.Duration) (context.Context, context.CancelFunc, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.runningUpdates != nil && m.runningUpdates[id] {
+		return nil, nil, false
+	}
+	if m.queuedUpdates[id] > 0 {
+		m.queuedUpdates[id]--
+	}
+	if m.runningUpdates == nil {
+		m.runningUpdates = make(map[string]bool)
+	}
+	m.runningUpdates[id] = true
+
+	if m.updateCancels == nil {
+		m.updateCancels = make(map[string]context.CancelFunc)
+	}
+	if m.updateWaiters == nil {
+		m.updateWaiters = make(map[string]chan struct{})
+	}
+
+	updateCtx, cancel := context.WithTimeout(parentCtx, timeout)
+	m.updateCancels[id] = cancel
+	doneCh := make(chan struct{})
+	m.updateWaiters[id] = doneCh
+
+	return updateCtx, cancel, true
+}
+
 func (m *AppFeedManager) TryStartFeedUpdate(id string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1081,9 +1129,35 @@ func (m *AppFeedManager) TryStartFeedUpdate(id string) bool {
 	return true
 }
 
+func (m *AppFeedManager) CancelFeedUpdate(id string) {
+	m.mu.Lock()
+	cancel, hasCancel := m.updateCancels[id]
+	doneCh, hasDone := m.updateWaiters[id]
+	if hasCancel && cancel != nil {
+		log.WithField("feed_id", id).Info("canceling active feed update worker")
+		cancel()
+	}
+	m.mu.Unlock()
+
+	if hasDone && doneCh != nil {
+		log.WithField("feed_id", id).Info("waiting for canceled feed update worker to stop...")
+		select {
+		case <-doneCh:
+			log.WithField("feed_id", id).Info("feed update worker stopped successfully")
+		case <-time.After(5 * time.Second):
+			log.WithField("feed_id", id).Warn("timed out waiting for canceled update worker to stop")
+		}
+	}
+}
+
 func (m *AppFeedManager) MarkFeedUpdateFinished(id string) {
 	m.mu.Lock()
 	delete(m.runningUpdates, id)
+	delete(m.updateCancels, id)
+	if doneCh, ok := m.updateWaiters[id]; ok {
+		close(doneCh)
+		delete(m.updateWaiters, id)
+	}
 	m.mu.Unlock()
 	m.coverCache.Delete(id)
 	m.invalidateStats(id)

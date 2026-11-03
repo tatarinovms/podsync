@@ -596,6 +596,27 @@ func (q *JobQueue) RecoverStaleRunning(ctx context.Context, maxRunningDuration t
 	return recovered, nil
 }
 
+// CancelFeed removes and deletes all stored jobs for feedID from the queue and storage.
+func (q *JobQueue) CancelFeed(ctx context.Context, feedID string) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var toDelete []string
+	_ = q.db.WalkJobs(ctx, func(j *model.UpdateJob) error {
+		if j.FeedID == feedID {
+			toDelete = append(toDelete, j.ID)
+		}
+		return nil
+	})
+
+	for _, id := range toDelete {
+		if err := q.db.DeleteJob(ctx, id); err != nil {
+			log.WithError(err).Warnf("failed to delete job %q for feed %q", id, feedID)
+		}
+	}
+	return nil
+}
+
 // CalculateBackoff determines retry delay according to attempts:
 // 1m -> 5m -> 15m -> 1h -> 6h (standard)
 // 30m -> 1h -> 2h -> 6h (for HTTP 429 rate limits)

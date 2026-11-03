@@ -704,3 +704,32 @@ func BenchmarkClaimNextJob(b *testing.B) {
 		}
 	}
 }
+
+func TestJobQueue_CancelFeed(t *testing.T) {
+	q, _ := setupTestQueue(t)
+	ctx := context.Background()
+
+	// 1. Enqueue job for feed_del
+	job, created, err := q.EnqueueUpdate(ctx, "feed_del")
+	require.NoError(t, err)
+	assert.True(t, created)
+	require.NotNil(t, job)
+
+	// Verify active
+	active, err := q.GetActiveJobForFeed(ctx, "feed_del")
+	require.NoError(t, err)
+	assert.NotNil(t, active)
+
+	// 2. Cancel feed
+	err = q.CancelFeed(ctx, "feed_del")
+	require.NoError(t, err)
+
+	// Verify job is completely removed
+	active, err = q.GetActiveJobForFeed(ctx, "feed_del")
+	require.NoError(t, err)
+	assert.Nil(t, active)
+
+	stored, err := q.GetJob(ctx, job.ID)
+	assert.Equal(t, model.ErrNotFound, err)
+	assert.Nil(t, stored)
+}

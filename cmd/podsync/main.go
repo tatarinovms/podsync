@@ -386,7 +386,8 @@ func main() {
 					}
 				}
 
-				if !feedManager.TryStartFeedUpdate(_feed.ID) {
+				updateCtx, updateCancel, started := feedManager.TryStartFeedUpdateWithCancel(ctx, _feed.ID, 2*time.Hour)
+				if !started {
 					log.WithField("feed_id", _feed.ID).Debug("feed update already in progress by another worker, yielding job back to queue")
 					if currentJobID != "" && feedManager.JobQueue() != nil {
 						_ = feedManager.JobQueue().YieldJob(ctx, currentJobID, currentClaimToken, 15*time.Second)
@@ -394,7 +395,6 @@ func main() {
 					continue
 				}
 				log.WithFields(log.Fields{"worker_id": workerID, "feed_id": _feed.ID}).Debug("worker started feed update")
-				updateCtx, updateCancel := context.WithTimeout(ctx, 2*time.Hour)
 				var err error
 				if strings.HasPrefix(_feed.URL, "personal://") {
 					err = personalFeeds.Update(updateCtx, _feed.ID)
@@ -402,6 +402,13 @@ func main() {
 					err = manager.Update(updateCtx, _feed)
 				}
 				updateCancel()
+
+				if feedManager.GetFeedConfig(_feed.ID) == nil {
+					log.WithField("feed_id", _feed.ID).Info("feed was deleted during update; skipping post-update actions")
+					feedManager.MarkFeedUpdateFinished(_feed.ID)
+					continue
+				}
+
 				if err != nil {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 					feedManager.RecordFeedUpdateError(_feed.ID, err)

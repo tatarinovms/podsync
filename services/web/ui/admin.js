@@ -952,7 +952,7 @@
                         <li><button class="dropdown-item" id="btn-update-${escapeHtml(feed.id)}" ${actionAttrs('update', feed.id)} ${isUpdating ? 'disabled' : ''}>${isUpdating ? 'Updating…' : (isBook ? 'Scan chapters' : 'Update now')}</button></li>
                         <li><button class="dropdown-item" ${actionAttrs('settings', feed.id)}>Settings</button></li>
                         <li><button class="dropdown-item" ${actionAttrs('logs', feed.id)}>View activity</button></li>
-                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('delete-feed', feed.id)}>${isBook ? 'Remove audiobook' : 'Delete podcast'}</button></li>
+                        <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" ${actionAttrs('delete-feed', feed.id)}>${isUpdating ? '<i aria-hidden="true" class="bi bi-stop-circle me-1"></i>Stop &amp; delete podcast' : (isBook ? 'Remove audiobook' : 'Delete podcast')}</button></li>
                     </ul></div>
                 </div>
                 <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.downloaded_count ?? 0} ${countLabel}</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
@@ -985,6 +985,10 @@
                     el.setAttribute('data-feed-id', feed.id);
                 }
                 if (el.getAttribute('data-render-key') !== key) {
+                    if (el.querySelector('.dropdown-menu.show')) {
+                        // Do not overwrite innerHTML while user has dropdown menu open
+                        continue;
+                    }
                     el.innerHTML = renderFeedCardHTML(feed);
                     el.setAttribute('data-render-key', key);
                 }
@@ -1616,7 +1620,14 @@
         }
 
         async function deleteFeed(feedId) {
-            if (!confirm(`Are you sure you want to delete podcast "${feedId}"?`)) return;
+            const isUpdating = updatingFeeds.has(feedId);
+            let confirmMsg;
+            if (isUpdating) {
+                confirmMsg = `Подкаст "${feedId}" сейчас скачивается. Загрузка будет немедленно прервана, а файлы удалены.\n\nВы уверены, что хотите удалить подкаст?`;
+            } else {
+                confirmMsg = `Are you sure you want to delete podcast "${feedId}"?`;
+            }
+            if (!confirm(confirmMsg)) return;
             const deleteFiles = confirm(`Also delete downloaded media files for podcast "${feedId}" from disk?`);
 
             try {
@@ -1716,11 +1727,17 @@
                     }
 
                     // Synchronize scope with current checked radio or default to 25
-                    const checkedScope = document.querySelector('input[name="rss-scope"]:checked');
-                    if (checkedScope) {
-                        setRssScope(checkedScope.value);
+                    const customRadio = document.getElementById('rss-scope-custom');
+                    const customInput = document.getElementById('rss-scope-custom-input');
+                    if (customRadio && customRadio.checked && customInput && customInput.value) {
+                        setRssScope(customInput.value);
                     } else {
-                        setRssScope(25);
+                        const checkedScope = document.querySelector('input[name="rss-scope"]:checked');
+                        if (checkedScope) {
+                            setRssScope(checkedScope.value);
+                        } else {
+                            setRssScope(25);
+                        }
                     }
                 } else {
                     previewCard.classList.add('d-none');
@@ -1730,19 +1747,53 @@
             }
         }
 
+        function focusRssCustomScope() {
+            const radio = document.getElementById('rss-scope-custom');
+            if (radio) radio.checked = true;
+            const input = document.getElementById('rss-scope-custom-input');
+            if (input) {
+                input.focus();
+                const count = parseInt(input.value, 10);
+                if (!isNaN(count) && count > 0) {
+                    setRssScope(count);
+                }
+            }
+        }
+
+        function onRssCustomScopeInput(val) {
+            const radio = document.getElementById('rss-scope-custom');
+            if (radio) radio.checked = true;
+            const count = parseInt(val, 10);
+            if (!isNaN(count) && count > 0) {
+                setRssScope(count);
+            }
+        }
+
         function setRssScope(scope) {
             const pageSizeEl = document.getElementById('new-feed-pagesize');
             const keepLastEl = document.getElementById('new-feed-keeplast');
+            const customInput = document.getElementById('rss-scope-custom-input');
+            const customRadio = document.getElementById('rss-scope-custom');
+
             if (scope === 'all') {
                 if (pageSizeEl) pageSizeEl.value = '0';
                 if (keepLastEl) keepLastEl.value = '0';
+                if (customInput) customInput.value = '';
+                const radio = document.getElementById('rss-scope-all');
+                if (radio) radio.checked = true;
             } else {
                 const count = parseInt(scope, 10) || 25;
                 if (pageSizeEl) pageSizeEl.value = count;
                 if (keepLastEl) keepLastEl.value = count;
+                if (count === 10 || count === 25 || count === 50) {
+                    const radio = document.getElementById(`rss-scope-${count}`);
+                    if (radio) radio.checked = true;
+                    if (customInput && scope !== 'custom') customInput.value = '';
+                } else {
+                    if (customRadio) customRadio.checked = true;
+                    if (customInput && customInput.value !== String(count)) customInput.value = count;
+                }
             }
-            const radio = document.getElementById(`rss-scope-${scope}`);
-            if (radio) radio.checked = true;
         }
 
         function suggestFeedId(url) {
@@ -4455,7 +4506,12 @@
         function personalDeleteFeed() { personalConfirmDelete(''); }
         function personalConfirmDelete(episodeID) {
             personalDeleteAction = {feedID:personalCurrentID,episodeID};
-            document.getElementById('personal-delete-text').textContent = episodeID ? 'Remove this episode from the feed?' : 'Delete feed and all its episodes? Its RSS subscription will stop working.';
+            const isUpdating = updatingFeeds.has(personalCurrentID);
+            let text = episodeID ? 'Remove this episode from the feed?' : 'Delete feed and all its episodes? Its RSS subscription will stop working.';
+            if (!episodeID && isUpdating) {
+                text = 'Подкаст сейчас скачивается. Загрузка будет немедленно прервана, а файлы удалены.\n\nУдалить подкаст и все его эпизоды?';
+            }
+            document.getElementById('personal-delete-text').textContent = text;
             document.getElementById('personal-delete-files').checked = true;
             personalError(null, 'personal-delete-error');
             bootstrap.Modal.getOrCreateInstance(document.getElementById('personalDeleteModal')).show();

@@ -115,6 +115,12 @@ func (u *Manager) SetFeedConfig(id string, cfg *feed.Config) {
 	}
 }
 
+func (u *Manager) GetFeedConfig(id string) *feed.Config {
+	u.feedsMu.RLock()
+	defer u.feedsMu.RUnlock()
+	return u.feeds[id]
+}
+
 func (u *Manager) Update(ctx context.Context, feedConfig *feed.Config) error {
 	log.WithFields(log.Fields{
 		"feed_id": feedConfig.ID,
@@ -136,6 +142,10 @@ func (u *Manager) Update(ctx context.Context, feedConfig *feed.Config) error {
 		log.WithError(opmlErr).Warn("initial opml build failed")
 	}
 
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	// Fetch episodes for download
 	episodesToDownload, err := u.fetchEpisodes(ctx, feedConfig)
 	if err != nil {
@@ -143,12 +153,24 @@ func (u *Manager) Update(ctx context.Context, feedConfig *feed.Config) error {
 	}
 
 	if err := u.downloadEpisodes(ctx, feedConfig, episodesToDownload); err != nil {
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+			return ctx.Err()
+		}
 		if err == ytdl.ErrTooManyRequests {
 			_ = u.buildXML(ctx, feedConfig)
 			_ = u.buildOPML(ctx)
 			return err
 		}
 		return errors.Wrap(err, "download failed")
+	}
+
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	// Dynamically use latest config in case user updated settings during download!
+	if latest := u.GetFeedConfig(feedConfig.ID); latest != nil {
+		feedConfig = latest
 	}
 
 	if err := u.cleanup(ctx, feedConfig); err != nil {
@@ -348,6 +370,25 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 	// Download pending episodes
 
 	for idx, episode := range downloadList {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		// Dynamically check if feed configuration was updated or removed during downloading
+		currentCfg := u.GetFeedConfig(feedID)
+		if currentCfg == nil {
+			log.WithField("feed_id", feedID).Info("feed configuration was removed during download; stopping")
+			return context.Canceled
+		}
+		if currentCfg.PageSize > 0 && downloaded >= currentCfg.PageSize {
+			log.WithFields(log.Fields{
+				"feed_id":    feedID,
+				"downloaded": downloaded,
+				"page_size":  currentCfg.PageSize,
+			}).Info("stopping download loop: reached updated page_size limit")
+			break
+		}
+
 		var (
 			logger      = log.WithFields(log.Fields{"feed_id": feedID, "index": idx, "episode_id": episode.ID})
 			episodeName = feed.EpisodeName(feedConfig, episode)
@@ -388,6 +429,10 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 			tempFile, err = u.downloader.Download(ctx, feedConfig, episode)
 		}
 		if err != nil {
+			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+				logger.Info("download canceled")
+				return ctx.Err()
+			}
 			if err == ytdl.ErrLiveStreamSkipped {
 				logger.Info("skipping live stream or upcoming premiere")
 				if err := u.db.UpdateEpisode(feedID, episode.ID, func(ep *model.Episode) error {
@@ -450,6 +495,10 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 		fileSize, err := u.fs.Create(ctx, fmt.Sprintf("%s/%s", feedID, episodeName), tempFile)
 		tempFile.Close()
 		if err != nil {
+			if errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, context.Canceled) {
+				logger.Info("file copy canceled")
+				return ctx.Err()
+			}
 			logger.WithError(err).Error("failed to copy file")
 			return err
 		}

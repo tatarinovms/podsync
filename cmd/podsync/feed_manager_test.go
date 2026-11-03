@@ -1232,3 +1232,56 @@ func TestUpdateDownloaderConfigWithProxies(t *testing.T) {
 	assert.Contains(t, string(stored), `youtube = "socks5://127.0.0.1:1080"`)
 	assert.Contains(t, string(stored), `vkvideo = "direct"`)
 }
+
+func TestDeleteFeed_CancelsActiveUpdate(t *testing.T) {
+	mockDB := &mockFeedManagerDB{
+		episodes: make(map[string]map[string]*model.Episode),
+	}
+	dataDir := t.TempDir()
+	storage, err := fs.NewLocal(dataDir, false, false)
+	require.NoError(t, err)
+
+	mgr := &AppFeedManager{
+		feeds: map[string]*feed.Config{
+			"feed_active": {ID: "feed_active", URL: "https://youtube.com/channel/test", Format: model.FormatAudio},
+		},
+		db:             mockDB,
+		queuedUpdates:  make(map[string]int),
+		runningUpdates: make(map[string]bool),
+		updateCancels:  make(map[string]context.CancelFunc),
+		updateWaiters:  make(map[string]chan struct{}),
+		feedErrors:     make(map[string]feedErrorEntry),
+		storage:        storage,
+	}
+
+	// Start update with cancel
+	updateCtx, _, started := mgr.TryStartFeedUpdateWithCancel(context.Background(), "feed_active", time.Hour)
+	require.True(t, started)
+	assert.True(t, mgr.runningUpdates["feed_active"])
+
+	workerExited := make(chan struct{})
+	go func() {
+		defer close(workerExited)
+		// Worker simulates blocking on network until canceled
+		<-updateCtx.Done()
+		mgr.MarkFeedUpdateFinished("feed_active")
+	}()
+
+	// DeleteFeed must cancel the update worker, wait for it, and complete
+	deleteCtx := context.Background()
+	err = mgr.DeleteFeed(deleteCtx, "feed_active", false)
+	require.NoError(t, err)
+
+	select {
+	case <-workerExited:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not exit in time after DeleteFeed")
+	}
+
+	mgr.mu.RLock()
+	assert.False(t, mgr.runningUpdates["feed_active"])
+	assert.Nil(t, mgr.feeds["feed_active"])
+	assert.Empty(t, mgr.updateCancels)
+	assert.Empty(t, mgr.updateWaiters)
+	mgr.mu.RUnlock()
+}

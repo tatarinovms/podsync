@@ -1512,16 +1512,25 @@ func (s *Server) handleFeedPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if info.Provider == model.ProviderRSS {
-		rssBuilder := builder.NewRSSBuilder()
-		meta, err := rssBuilder.FetchFeed(r.Context(), rawURL)
-		if err != nil {
-			s.writeError(w, http.StatusBadRequest, "failed to fetch RSS feed: "+err.Error())
+	if info.Provider == model.ProviderRSS || info.Provider == model.ProviderApplePodcasts {
+		var (
+			meta     *builder.ParsedRSSMetadata
+			fetchErr error
+		)
+		if info.Provider == model.ProviderApplePodcasts {
+			appleBuilder := builder.NewApplePodcastsBuilderWithHTTPClient(s.getHTTPClient())
+			meta, fetchErr = appleBuilder.FetchFeed(r.Context(), rawURL)
+		} else {
+			rssBuilder := builder.NewRSSBuilderWithHTTPClient(s.getHTTPClient())
+			meta, fetchErr = rssBuilder.FetchFeed(r.Context(), rawURL)
+		}
+		if fetchErr != nil {
+			s.writeError(w, http.StatusBadRequest, "failed to fetch podcast feed: "+fetchErr.Error())
 			return
 		}
 
 		s.writeJSON(w, http.StatusOK, FeedPreviewResponse{
-			Provider:      string(model.ProviderRSS),
+			Provider:      string(info.Provider),
 			Title:         meta.Title,
 			Description:   meta.Description,
 			Author:        meta.Author,

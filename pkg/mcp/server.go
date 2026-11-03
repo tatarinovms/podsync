@@ -229,13 +229,13 @@ func (s *Server) getToolDefinitions() []Tool {
 		},
 		{
 			Name:        "add_feed",
-			Description: "Add a new podcast feed (e.g., YouTube channel/playlist, VK Video group, Vimeo)",
+			Description: "Add a new podcast feed (e.g., YouTube channel/playlist, VK Video group, Vimeo, Apple Podcasts, or RSS feed)",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertyDef{
 					"url": {
 						Type:        "string",
-						Description: "URL of the channel, group, playlist, or user",
+						Description: "URL of the channel, group, playlist, user, Apple Podcasts show, or RSS feed",
 					},
 					"format": {
 						Type:        "string",

@@ -105,6 +105,19 @@ func ParseURL(link string) (model.Info, error) {
 		return info, nil
 	}
 
+	if strings.HasSuffix(parsed.Host, "podcasts.apple.com") || strings.HasSuffix(parsed.Host, "itunes.apple.com") {
+		kind, id, err := parseApplePodcastsURL(parsed)
+		if err != nil {
+			return model.Info{}, err
+		}
+
+		info.Provider = model.ProviderApplePodcasts
+		info.LinkType = kind
+		info.ItemID = id
+
+		return info, nil
+	}
+
 	return parseRSSURL(link, parsed)
 }
 

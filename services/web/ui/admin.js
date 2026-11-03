@@ -1670,18 +1670,30 @@
                 }
 
                 const data = await res.json();
-                if (data.provider === 'rss') {
+                const isRssOrApple = data.provider === 'rss' || data.provider === 'apple';
+                if (isRssOrApple) {
                     previewCard.classList.remove('d-none');
+                    const badgeEl = document.getElementById('rss-preview-badge');
+                    if (badgeEl) {
+                        if (data.provider === 'apple') {
+                            badgeEl.innerHTML = '<i class="bi bi-apple me-1"></i>Apple Podcasts';
+                            badgeEl.className = 'badge bg-dark text-white border border-secondary';
+                        } else {
+                            badgeEl.innerHTML = 'RSS Mirror';
+                            badgeEl.className = 'badge bg-primary text-white';
+                        }
+                    }
                     document.getElementById('rss-preview-title').textContent = data.title || 'Podcast Feed';
                     document.getElementById('rss-preview-author').textContent = data.author || '';
                     document.getElementById('rss-preview-episodes').textContent = data.total_episodes || '0';
                     document.getElementById('rss-preview-size').textContent = formatBytes(data.total_bytes);
 
                     const artEl = document.getElementById('rss-preview-art');
+                    const fallbackIcon = data.provider === 'apple' ? 'bi bi-apple' : 'bi bi-rss';
                     if (data.cover_art) {
-                        artEl.innerHTML = `<img src="${safeUrl(data.cover_art)}" class="w-100 h-100 object-fit-cover" alt="" onerror="this.parentElement.innerHTML='<i class=\"bi bi-rss fs-3\"></i>'">`;
+                        artEl.innerHTML = `<img src="${safeUrl(data.cover_art)}" class="w-100 h-100 object-fit-cover" alt="" onerror="this.parentElement.innerHTML='<i class=\"${fallbackIcon} fs-3\"></i>'">`;
                     } else {
-                        artEl.innerHTML = `<i class="bi bi-rss fs-3"></i>`;
+                        artEl.innerHTML = `<i class="${fallbackIcon} fs-3"></i>`;
                     }
 
 
@@ -1745,7 +1757,9 @@
                 const parts = path.split('/');
                 let slug = parts[parts.length - 1] || '';
                 slug = slug.replace(/\.(xml|rss|atom)$/i, '');
-                if (slug.toLowerCase() === 'feed' || slug.toLowerCase() === 'rss' || slug.toLowerCase() === 'podcast') {
+                if (slug.match(/^id\d+$/i) && parts.length > 1) {
+                    slug = parts[parts.length - 2];
+                } else if (slug.toLowerCase() === 'feed' || slug.toLowerCase() === 'rss' || slug.toLowerCase() === 'podcast') {
                     if (parts.length > 1) {
                         slug = parts[parts.length - 2];
                     } else {
@@ -4053,7 +4067,7 @@
             const cover = document.getElementById('detail-cover');
             if (cover) cover.innerHTML = feed.cover_art && safeUrl(feed.cover_art)
                 ? `<img src="${safeUrl(feed.cover_art)}" alt="" onerror="this.style.display='none'">`
-                : `<i aria-hidden="true" class="bi ${feed.provider === 'audiobook' ? 'bi-book' : 'bi-broadcast'}"></i>`;
+                : `<i aria-hidden="true" class="bi ${feed.provider === 'audiobook' ? 'bi-book' : (feed.provider === 'apple' ? 'bi-apple' : 'bi-broadcast')}"></i>`;
         }
 
         function showFeedSection(section, load = true) {

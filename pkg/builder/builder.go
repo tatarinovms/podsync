@@ -36,6 +36,8 @@ func NewWithHTTPClient(ctx context.Context, provider model.Provider, key string,
 		return NewAudiobookBuilder("")
 	case model.ProviderRSS:
 		return NewRSSBuilderWithHTTPClient(client), nil
+	case model.ProviderApplePodcasts:
+		return NewApplePodcastsBuilderWithHTTPClient(client), nil
 	default:
 		return nil, errors.Errorf("unsupported provider %q", provider)
 	}

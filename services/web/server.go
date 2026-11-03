@@ -28,6 +28,18 @@ type Server struct {
 	adminUpdateMu sync.Mutex
 	mcpHandler    http.Handler
 	rateLimiter   *LoginRateLimiter
+	httpClient    *http.Client
+}
+
+func (s *Server) SetHTTPClient(client *http.Client) {
+	s.httpClient = client
+}
+
+func (s *Server) getHTTPClient() *http.Client {
+	if s.httpClient != nil {
+		return s.httpClient
+	}
+	return &http.Client{Timeout: 30 * time.Second}
 }
 
 type Config struct {

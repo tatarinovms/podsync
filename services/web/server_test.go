@@ -1096,6 +1096,92 @@ func TestFeedPreviewEndpoint(t *testing.T) {
 	assert.Equal(t, int64(1000000), resp.TotalBytes)
 }
 
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestFeedPreview_ApplePodcasts(t *testing.T) {
+	const rssXML = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Podlodka Podcast</title>
+    <description>Weekly IT show</description>
+    <itunes:author>Podlodka Crew</itunes:author>
+    <itunes:image href="https://example.com/podlodka.jpg"/>
+    <item>
+      <title>Episode 1</title>
+      <enclosure url="https://example.com/audio.mp3" length="50000000" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>`
+
+	mockClient := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Host, "itunes.apple.com") {
+				respBody := `{
+					"resultCount": 1,
+					"results": [
+						{
+							"collectionName": "Podlodka Podcast",
+							"artistName": "Podlodka Crew",
+							"feedUrl": "https://feeds.example.com/podlodka.rss"
+						}
+					]
+				}`
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(respBody)),
+				}, nil
+			}
+			if strings.Contains(req.URL.Host, "feeds.example.com") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/rss+xml; charset=utf-8"}},
+					Body:       io.NopCloser(strings.NewReader(rssXML)),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader("not found")),
+			}, nil
+		}),
+	}
+
+	mgr := &mockDownloaderAdminMgr{}
+	srv := New(Config{
+		Port: 8080,
+		Admin: AdminConfig{
+			Enabled:  true,
+			Username: "admin",
+			Password: "pass",
+		},
+	}, &mockFileSystem{}, nil)
+	srv.SetAdminManager(mgr)
+	srv.SetHTTPClient(mockClient)
+
+	body := `{"url":"https://podcasts.apple.com/ru/podcast/podlodka-podcast/id1209828744"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/feeds/preview", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "pass")
+
+	w := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp FeedPreviewResponse
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "apple", resp.Provider)
+	assert.Equal(t, "Podlodka Podcast", resp.Title)
+	assert.Equal(t, "Podlodka Crew", resp.Author)
+	assert.Equal(t, "https://example.com/podlodka.jpg", resp.CoverArt)
+	assert.Equal(t, 1, resp.TotalEpisodes)
+	assert.Equal(t, int64(50000000), resp.TotalBytes)
+}
+
 func TestFeedIDValidation(t *testing.T) {
 	mgr := &mockDownloaderAdminMgr{}
 	srv := New(Config{

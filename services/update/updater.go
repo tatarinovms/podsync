@@ -178,7 +178,7 @@ func (u *Manager) updateFeed(ctx context.Context, feedConfig *feed.Config) error
 	var key string
 	if keyProvider, ok := u.keys[info.Provider]; ok {
 		key = keyProvider.Get()
-	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud && info.Provider != model.ProviderAudiobook && info.Provider != model.ProviderRSS {
+	} else if info.Provider != model.ProviderRutube && info.Provider != model.ProviderSoundcloud && info.Provider != model.ProviderAudiobook && info.Provider != model.ProviderRSS && info.Provider != model.ProviderApplePodcasts {
 		return errors.Errorf("key provider %q not loaded", info.Provider)
 	}
 
@@ -382,7 +382,7 @@ func (u *Manager) downloadEpisodes(ctx context.Context, feedConfig *feed.Config,
 
 		logger.Infof("! downloading episode %s", episode.VideoURL)
 		var tempFile io.ReadCloser
-		if info, pErr := builder.ParseURL(feedConfig.URL); pErr == nil && info.Provider == model.ProviderRSS {
+		if info, pErr := builder.ParseURL(feedConfig.URL); pErr == nil && (info.Provider == model.ProviderRSS || info.Provider == model.ProviderApplePodcasts) {
 			tempFile, err = u.downloadDirectHTTP(ctx, episode)
 		} else {
 			tempFile, err = u.downloader.Download(ctx, feedConfig, episode)

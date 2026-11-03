@@ -191,7 +191,7 @@ func Build(_ctx context.Context, feed *model.Feed, cfg *Config, hostname string)
 			default:
 				enclosureType = itunes.MP3
 			}
-		case model.ProviderRSS:
+		case model.ProviderRSS, model.ProviderApplePodcasts:
 			ext := strings.ToLower(filepath.Ext(episodeName))
 			switch ext {
 			case ".m4a", ".m4b":

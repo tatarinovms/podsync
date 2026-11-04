@@ -8,7 +8,7 @@
     <link rel="icon" href="./favicon.ico?v=1" sizes="32x32" type="image/x-icon">
     <link href="./bootstrap.min.css?v=5.3.3" rel="stylesheet">
     <link href="./bootstrap-icons.min.css?v=1.11.3" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=15">
+    <link rel="stylesheet" href="./admin.css?v=16">
 </head>
 <body>
 
@@ -93,7 +93,7 @@
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System &amp; access</button></li>
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-mcp"><i aria-hidden="true" class="bi bi-robot"></i> MCP &amp; integrations</button></li>
                 </ul>
-                <div class="sidebar-note"><i aria-hidden="true" class="bi bi-broadcast"></i><span>Your media.<br>Your own feed.</span></div>
+                
             </aside>
 
             <!-- Tab Content -->
@@ -102,7 +102,7 @@
                 <!-- 1. Feeds Tab -->
                 <div class="tab-pane fade show active" id="tab-feeds">
                     <header class="library-heading">
-                        <div><div class="eyebrow">YOUR LIBRARY</div><h1>Podcasts</h1><p class="text-muted mb-0">Your subscriptions, ready when you are.</p></div>
+                        <div><h1>Podcasts</h1></div>
                         <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Add podcast</button>
                     </header>
                     <div class="library-toolbar">
@@ -135,7 +135,7 @@
                 <section class="tab-pane fade" id="tab-personal" aria-label="Personal feeds">
                     <div id="personal-main-view">
                         <header class="library-heading">
-                            <div><div class="eyebrow">YOUR LIBRARY</div><h1>Personal Feeds</h1><p class="text-muted mb-0">Curate individual videos, audio, and files into custom podcast feeds.</p></div>
+                            <div><h1>Personal Feeds</h1></div>
                             <button class="btn btn-brand" type="button" onclick="personalEdit()"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Create feed</button>
                         </header>
                         <div id="personal-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
@@ -151,7 +151,7 @@
                                 <p id="personal-description" class="text-muted mb-0"></p>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <button class="btn btn-outline-primary btn-sm" type="button" onclick="openQuickAddModal(personalCurrentID)"><i aria-hidden="true" class="bi bi-phone me-1"></i>1-Click Share</button>
+                                <button class="btn btn-outline-primary btn-sm btn-quick-add" type="button" onclick="openQuickAddModal(personalCurrentID)" title="Quick-Add / iOS Shortcuts"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
                                 <button class="btn btn-light btn-sm" type="button" onclick="personalEdit(personalCurrentID)"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
                                 <button id="personal-rss" class="btn btn-brand btn-sm" type="button" onclick="showSubscription(personalCurrentID)"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                                 <button class="btn btn-outline-danger btn-sm" type="button" onclick="personalDeleteFeed()"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button>
@@ -566,8 +566,8 @@
 
                     <div class="row g-4 mb-4">
                         <!-- Cookies.txt Management Card -->
-                        <div class="col-lg-7">
-                            <div class="card h-100 shadow-sm">
+                        <div class="col-lg-7 align-self-start">
+                            <div class="card shadow-sm">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                                     <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">1</span><i aria-hidden="true" class="bi bi-cookie me-2 text-warning"></i>Access &amp; cookies</h6>
                                     <div class="d-flex align-items-center gap-2">
@@ -607,7 +607,7 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <textarea id="dl-cookies-content" class="form-control font-monospace small" rows="8" placeholder="# Netscape HTTP Cookie File&#10;# Export using 'Get cookies.txt LOCALLY' extension from your browser&#10;.youtube.com	TRUE	/	TRUE	1799999999	LOGIN_INFO	..."></textarea>
+                                        <textarea id="dl-cookies-content" class="form-control font-monospace small" rows="5" placeholder="# Netscape HTTP Cookie File&#10;# Export using 'Get cookies.txt LOCALLY' extension from your browser&#10;.youtube.com	TRUE	/	TRUE	1799999999	LOGIN_INFO	..."></textarea>
                                         <div class="form-text small">
                                             Paste your exported cookies or upload a <code>cookies.txt</code> file. Recommended extension: <a href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies" target="_blank" class="text-decoration-none">Exporting YouTube Cookies (yt-dlp wiki)</a>.
                                         </div>
@@ -1688,8 +1688,8 @@
                     <form id="add-feed-form">
                         <div class="p-3 border-bottom bg-body-tertiary">
                             <div role="alert" id="add-feed-error" class="alert alert-danger d-none py-2 small mb-3"></div>
-                            <div class="row g-2">
-                                <div class="col-md-7">
+                            <div class="row g-3 align-items-start">
+                                <div class="col-md-7 d-flex flex-column">
                                     <label class="form-label small fw-semibold" for="new-feed-url">Source URL <span class="text-danger">*</span></label>
                                     <div class="input-group input-group-sm">
                                         <input type="url" id="new-feed-url" class="form-control" required placeholder="https://vkvideo.ru/@clanbeaver" oninput="handleFeedUrlInput(this.value)" aria-describedby="new-feed-url-help">
@@ -1697,7 +1697,7 @@
                                     </div>
                                     <div class="form-text small" id="new-feed-url-help">Channel, playlist, show, or RSS link for local mirroring.</div>
                                 </div>
-                                <div class="col-md-5">
+                                <div class="col-md-5 d-flex flex-column">
                                     <label class="form-label small fw-semibold" for="new-feed-id">Feed ID (URL slug) <span class="text-danger">*</span></label>
                                     <input type="text" id="new-feed-id" class="form-control form-control-sm font-monospace" required placeholder="CLANBEAVER" pattern="[a-zA-Z0-9_-]+" autocomplete="off" aria-describedby="new-feed-id-help new-feed-id-feedback">
                                     <div class="invalid-feedback small" id="new-feed-id-feedback">Only English letters (A-Z, a-z), numbers, dashes (-), and underscores (_) are allowed.</div>
@@ -2367,7 +2367,7 @@
     <script src="./qrcode.min.js?v=1"></script>
 
     <script src="./select.js?v=1"></script>
-    <script src="./admin.js?v=15"></script>
+    <script src="./admin.js?v=16"></script>
 
 </body>
 </html>

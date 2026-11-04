@@ -931,7 +931,7 @@
             if (isPersonal) {
                 return `<article class="card feed-card h-100">
                 <div class="feed-card-top">
-                    <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div></div>
+                    <div class="feed-art" role="button" tabindex="0" ${actionAttrs('personal-open', feed.id)} title="Open ${escapeHtml(title)}">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div></div>
                     <div class="flex-grow-1 min-w-0"><a class="feed-card-title" href="#personal/${encodeURIComponent(feed.id)}" ${actionAttrs('personal-open', feed.id)} title="${escapeHtml(title)}">${escapeHtml(title)}</a><div class="feed-card-author text-truncate">${escapeHtml(feed.id)}.xml</div></div>
                     <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
                         <li><button class="dropdown-item" ${actionAttrs('personal-open', feed.id)}>Open</button></li>
@@ -940,13 +940,13 @@
                     </ul></div>
                 </div>
                 <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.episode_count ?? feed.downloaded_count ?? 0} ${countLabel}</span><span class="badge bg-secondary-subtle text-secondary border">Universal</span><span class="feed-provider">Personal</span></div>
-                <div class="feed-card-bottom"><span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span><button class="btn btn-light" ${actionAttrs('personal-open', feed.id)}>Open</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
+                <div class="feed-card-bottom"><span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span><div class="feed-card-actions"><button class="btn btn-light feed-btn" type="button" onclick="openQuickAddModal('${escapeHtml(feed.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button><button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
             </article>`;
             }
 
             return `<article class="card feed-card h-100">
                 <div class="feed-card-top">
-                    <div class="feed-art">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}">${escapeHtml(title.trim()[0] || 'P')}</div></div>
+                    <div class="feed-art" role="button" tabindex="0" ${actionAttrs('episodes', feed.id)} title="Open ${escapeHtml(title)}">${feed.cover_art && safeUrl(feed.cover_art) ? `<img src="${safeUrl(feed.cover_art)}" class="feed-cover" alt="" loading="lazy" onerror="handleCoverError(this)">` : ''}<div class="feed-cover-placeholder ${feed.cover_art && safeUrl(feed.cover_art) ? 'd-none' : ''}">${escapeHtml(title.trim()[0] || 'P')}</div></div>
                     <div class="flex-grow-1 min-w-0"><a class="feed-card-title" href="#feed/${encodeURIComponent(feed.id)}/episodes" title="${escapeHtml(title)}">${escapeHtml(title)}</a><div class="feed-card-author text-truncate">${escapeHtml(isValidAuthor(feed.author) ? feed.author : feed.provider || 'Podcast')}</div></div>
                     <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
                         <li><button class="dropdown-item" id="btn-update-${escapeHtml(feed.id)}" ${actionAttrs('update', feed.id)} ${isUpdating ? 'disabled' : ''}>${isUpdating ? 'Updating…' : (isBook ? 'Scan chapters' : 'Update now')}</button></li>
@@ -956,7 +956,7 @@
                     </ul></div>
                 </div>
                 <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.downloaded_count ?? 0} ${countLabel}</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
-                <div class="feed-card-bottom">${state}<button class="btn btn-light" ${actionAttrs('episodes', feed.id)}>${isBook ? 'Chapters' : 'Open'}</button><button class="btn btn-light" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div>
+                <div class="feed-card-bottom">${state}<div class="feed-card-actions">${isBook ? `<button class="btn btn-light feed-btn" ${actionAttrs('episodes', feed.id)}><i aria-hidden="true" class="bi bi-music-note-list me-1"></i>Chapters</button>` : ''}<button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
             </article>`;
         }
 
@@ -4258,11 +4258,16 @@
                     : `<div class="feed-cover-placeholder d-flex align-items-center justify-content-center"><i aria-hidden="true" class="bi bi-bookmark-heart"></i></div>`;
                 return `<article class="card feed-card h-100">
                     <div class="feed-card-top">
-                        <div class="feed-art">${coverArt}</div>
+                        <div class="feed-art" role="button" tabindex="0" onclick="personalOpen('${escapeHtml(f.id)}')" title="Open ${escapeHtml(f.title)}">${coverArt}</div>
                         <div class="flex-grow-1 min-w-0">
                             <a class="feed-card-title" href="javascript:void(0)" onclick="personalOpen('${escapeHtml(f.id)}')">${escapeHtml(f.title)}</a>
                             <div class="feed-card-author text-truncate">${escapeHtml(f.id)}.xml</div>
                         </div>
+                        <div class="dropdown feed-overflow"><button class="btn" data-bs-toggle="dropdown" aria-label="Actions for ${escapeHtml(f.title)}"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end">
+                            <li><button class="dropdown-item" onclick="personalOpen('${escapeHtml(f.id)}')">Open</button></li>
+                            <li><button class="dropdown-item" onclick="personalEdit('${escapeHtml(f.id)}')">Settings</button></li>
+                            <li><hr class="dropdown-divider"></li><li><button class="dropdown-item text-danger" onclick="personalDeleteFeed('${escapeHtml(f.id)}')">Delete feed</button></li>
+                        </ul></div>
                     </div>
                     ${f.description ? `<p class="text-muted small mb-0 feed-card-description" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHtml(f.description)}</p>` : ''}
                     <div class="feed-card-meta">
@@ -4271,10 +4276,11 @@
                         <span class="feed-provider">Personal</span>
                     </div>
                     <div class="feed-card-bottom">
-                        <button class="btn btn-light" type="button" onclick="personalOpen('${escapeHtml(f.id)}')">Open</button>
-                        <button class="btn btn-light" type="button" onclick="openQuickAddModal('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
-                        <button class="btn btn-light" type="button" onclick="showSubscription('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
-                        <button class="btn btn-light" type="button" onclick="personalEdit('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
+                        <span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span>
+                        <div class="feed-card-actions">
+                            <button class="btn btn-light feed-btn" type="button" onclick="openQuickAddModal('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
+                            <button class="btn btn-light feed-btn" type="button" onclick="showSubscription('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
+                        </div>
                     </div>
                 </article>`;
             }).join('');

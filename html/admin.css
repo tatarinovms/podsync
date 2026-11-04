@@ -1044,7 +1044,8 @@
 .feed-card { display: flex; flex-direction: column; gap: 20px; width: 100%; min-width: 0; max-width: 100%; padding: 22px; border-radius: var(--library-radius); border: 1px solid var(--card-border); background: var(--ctp-mantle); box-shadow: none; transform: none; transition: border-color .15s ease; }
 .feed-card:hover { border-color: var(--ctp-overlay0); box-shadow: none; transform: none; }
 .feed-card-top { display: flex; align-items: flex-start; gap: 16px; }
-.feed-art { width: 64px; height: 64px; flex-shrink: 0; position: relative; }
+.feed-art { width: 64px; height: 64px; flex-shrink: 0; position: relative; cursor: pointer; transition: opacity .15s ease, transform .15s ease; }
+.feed-art:hover { opacity: .88; transform: scale(1.02); }
 .feed-art .feed-cover, .feed-art .feed-cover-placeholder { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; }
 .feed-art .feed-cover-placeholder { background: rgba(var(--ctp-mauve-rgb), .12); color: var(--text-accent); font-size: 1.5rem; box-shadow: none; }
 .feed-card-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 1rem; line-height: 1.45; font-weight: 650; color: var(--ctp-text); text-decoration: none; margin: 0 0 4px; overflow-wrap: anywhere; }
@@ -1058,9 +1059,83 @@
 .feed-state.error { color: var(--text-danger); }
 button.feed-state { border: 0; background: transparent; padding: 0; min-height: var(--control-min-size); text-align: left; }
 .feed-provider { margin-left: auto; font-size: .7rem; color: var(--text-muted); }
-.feed-card-bottom { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--card-border); }
-.feed-card-bottom .btn { font-size: .8rem; padding: 7px 12px; }
-.feed-card-bottom .feed-state { margin-right: auto; }
+.feed-card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid rgba(var(--ctp-surface1-rgb, 69, 71, 90), 0.35);
+    min-height: 48px;
+}
+.feed-card-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+.feed-card-bottom .btn,
+.feed-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    border: 1px solid var(--card-border) !important;
+    background: var(--ctp-surface0) !important;
+    color: var(--ctp-text) !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+.feed-card-bottom .btn:hover,
+.feed-btn:hover {
+    background: var(--ctp-surface1) !important;
+    border-color: var(--ctp-overlay0) !important;
+    color: var(--text-accent) !important;
+}
+.feed-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    height: 32px;
+    margin: 0;
+    padding: 0 4px;
+    color: var(--text-muted);
+    border-radius: 6px;
+    white-space: nowrap;
+}
+button.feed-state {
+    border: 0;
+    background: transparent;
+    min-height: 32px;
+    height: 32px;
+    cursor: pointer;
+}
+.feed-overflow > .btn {
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    color: var(--text-muted) !important;
+    border: 0 !important;
+    background: transparent !important;
+}
+.feed-overflow > .btn:hover {
+    background: var(--ctp-surface0) !important;
+    color: var(--ctp-text) !important;
+}
 .feed-grid[data-view="list"] { grid-template-columns: 1fr; gap: 10px; }
 .feed-grid[data-view="list"] .feed-card { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(150px, .5fr) minmax(240px, auto); align-items: center; gap: 20px; padding: 16px 20px; }
 .feed-grid[data-view="list"] .feed-card-bottom { margin: 0; padding: 0; border: 0; }
@@ -1319,4 +1394,40 @@ label .text-danger { color: var(--text-danger) !important; }
 }
 body.has-sticky-player {
     padding-bottom: 76px;
+}
+
+
+/* Add Feed Modal alignment & inputs */
+#addFeedModal .form-label {
+    min-height: 20px;
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+#addFeedModal .input-group-sm > .form-control,
+#addFeedModal .form-control-sm {
+    min-height: 38px;
+    height: 38px;
+    font-size: .875rem;
+}
+#addFeedModal .input-group-sm > .btn {
+    min-height: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+#addFeedModal .form-text {
+    min-height: 20px;
+    margin-top: 4px;
+}
+
+
+.btn-quick-add {
+    font-size: 0.75rem !important;
+    padding: 3px 8px !important;
+    white-space: nowrap;
+}
+#dl-cookies-content {
+    max-height: 220px;
+    resize: vertical;
 }

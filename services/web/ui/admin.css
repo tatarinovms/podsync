@@ -1431,3 +1431,22 @@ body.has-sticky-player {
     max-height: 220px;
     resize: vertical;
 }
+
+
+/* Collapsible sections */
+[data-bs-toggle="collapse"] {
+    cursor: pointer;
+    user-select: none;
+}
+[data-bs-toggle="collapse"] .transition-transform {
+    transition: transform 0.2s ease-in-out;
+}
+[data-bs-toggle="collapse"][aria-expanded="true"] .collapse-icon {
+    transform: rotate(180deg);
+}
+[data-bs-toggle="collapse"][aria-expanded="true"] .collapse-label-show {
+    display: none;
+}
+[data-bs-toggle="collapse"][aria-expanded="false"] .collapse-label-hide {
+    display: none;
+}

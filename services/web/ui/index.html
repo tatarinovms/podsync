@@ -8,7 +8,7 @@
     <link rel="icon" href="./favicon.ico?v=1" sizes="32x32" type="image/x-icon">
     <link href="./bootstrap.min.css?v=5.3.3" rel="stylesheet">
     <link href="./bootstrap-icons.min.css?v=1.11.3" rel="stylesheet">
-    <link rel="stylesheet" href="./admin.css?v=16">
+    <link rel="stylesheet" href="./admin.css?v=17">
 </head>
 <body>
 
@@ -964,10 +964,26 @@
 
                     <!-- Available Tools Reference -->
                     <div class="card shadow-sm">
-                        <div class="card-header bg-transparent py-3">
-                            <h6 class="mb-0 fw-bold"><i aria-hidden="true" class="bi bi-tools me-2 text-primary"></i>Exposed MCP Tools &amp; Actions</h6>
+                        <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between"
+                             role="button"
+                             data-bs-toggle="collapse"
+                             data-bs-target="#mcp-tools-collapse"
+                             aria-expanded="false"
+                             aria-controls="mcp-tools-collapse"
+                             style="cursor: pointer; user-select: none;">
+                            <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
+                                <i aria-hidden="true" class="bi bi-tools text-primary"></i>
+                                <span>Exposed MCP Tools &amp; Actions</span>
+                                <span class="badge bg-secondary-subtle text-secondary border ms-1">57 tools</span>
+                            </h6>
+                            <div class="d-flex align-items-center gap-2 text-muted small">
+                                <span class="collapse-label-show">Show</span>
+                                <span class="collapse-label-hide">Hide</span>
+                                <i class="bi bi-chevron-down collapse-icon transition-transform" aria-hidden="true"></i>
+                            </div>
                         </div>
-                        <div class="table-responsive">
+                        <div class="collapse" id="mcp-tools-collapse">
+                            <div class="table-responsive border-top">
                             <table class="table table-hover align-middle mb-0 small">
                                 <thead class="table-light">
                                     <tr>
@@ -1152,6 +1168,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <!-- 6. Logs Tab -->
                 <div class="tab-pane fade" id="tab-logs">
@@ -2367,7 +2384,7 @@
     <script src="./qrcode.min.js?v=1"></script>
 
     <script src="./select.js?v=1"></script>
-    <script src="./admin.js?v=16"></script>
+    <script src="./admin.js?v=17"></script>
 
 </body>
 </html>

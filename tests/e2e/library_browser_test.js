@@ -47,6 +47,9 @@ async function screenshot(name, fullPage = true) {
  await page.waitForTimeout(350);
  await page.screenshot({path:path.join(screenshots,name),fullPage});
 }
+async function openFeedCard(card) {
+ await card.locator('.feed-card-title').click();
+}
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const feeds=['The Curious Mind','История без границ','Design Notes','Наука в деталях','Slow Conversations','Глава за главой'].map((title,i)=>({id:'podcast-'+i,title,author:['Alex Morgan','Лекторий','Studio North','Научный клуб','Sunday Radio','Аудиокнига'][i],provider:i===5?'audiobook':i%2?'rutube':'youtube',url:i===5?'audiobook://book':'https://youtube.com/@test',feed_url:'http://localhost:8080/podcast-'+i+'.xml',apple_url:'podcast://test',pocketcasts_url:'https://pocketcasts.com/follow/http://localhost:8080/podcast-'+i+'.xml',overcast_url:'overcast://test',cover_art:origin+'/test-cover-'+i+'.svg',downloaded_count:12+i*3,episode_count:100,total_size:(i+1)*234567890,updating:i===2,error_count:i===3?2:0,last_update:'2026-10-20T10:00:00Z',config:{format:'audio',quality:'high',cron_schedule:'@every 12h',custom:{title,author:'Author'},clean:{keep_last:50}}}));
 const episodes=Array.from({length:103},(_,i)=>({id:'episode-'+i,title:'Episode '+(i+1)+' — A closer look at the world',status:i===2?'error':'downloaded',duration:2000,size:12345678,media_url:'/audio/test.mp3',pub_date:'2026-10-20T10:00:00Z',error:i===2?'Source unavailable':undefined}));
@@ -93,6 +96,7 @@ assert.equal(await page.locator('.feed-card').count(), 6);
 assert.deepEqual(await page.locator('#main-content > .tab-pane').evaluateAll(es=>es.map(e=>e.id)), ['tab-feeds','tab-personal','tab-audiobooks','tab-tokens','tab-system','tab-downloader','tab-mcp','tab-logs','episodesModal']);
 await screenshot('mocha-desktop.png', true);
 await assertAccessible('Mocha library');
+assert.equal(await page.locator('.view-switch .btn').evaluateAll(elements=>elements.every(el=>Math.round(el.getBoundingClientRect().height)===35)),true,'Desktop view buttons use the 35px compact height');
 // A shared combobox keeps selection, focus and keyboard behavior consistent.
 const typeCombo=page.locator('#feed-type-filter [role="combobox"]');
 await typeCombo.focus();
@@ -147,9 +151,10 @@ assert.equal(await page.locator('.feed-card').count(),1);
 await page.locator('[data-status="all"]').click();
 await page.locator('#feed-search').fill('Curious');
 assert.equal(await page.locator('.feed-card').count(),1);
-await page.locator('.feed-card').getByRole('button',{name:'Open',exact:true}).click();
+await openFeedCard(page.locator('.feed-card'));
 await page.waitForSelector('#episodes-list .list-group-item');
 assert.equal(await page.locator('#episodes-list .list-group-item').count(),40);
+assert.equal(await page.locator('#episodesModal .btn-sm').evaluateAll(elements=>elements.filter(el=>el.getBoundingClientRect().height>0).every(el=>Math.round(el.getBoundingClientRect().height)===35)),true,'Desktop text and icon-only episode actions use the same 35px height');
 assert.equal(await page.locator('.modal.show').count(),0);
 assert(page.url().endsWith('#feed/podcast-0/episodes'));
 await page.locator('#episodes-next').click();
@@ -237,7 +242,7 @@ await page.getByRole('button',{name:'Back to library',exact:true}).click();
 await page.evaluate(()=>toggleTheme());
 assert.equal(await page.locator('html').getAttribute('data-theme'),'latte');
 await assertAccessible('Latte library');
-await page.locator('.feed-card').filter({hasText:'The Curious Mind'}).getByRole('button',{name:'Open',exact:true}).click();
+await openFeedCard(page.locator('.feed-card').filter({hasText:'The Curious Mind'}));
 await page.waitForSelector('#episodes-list .list-group-item');
 await assertAccessible('Latte episodes and status badges');
 await page.locator('[data-section="settings"]').click();
@@ -270,10 +275,16 @@ for (const width of [280,320,390,576,768,951]) {
   await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
   assert.equal(await page.locator('.app-sidebar').isVisible(),true);
   await page.getByRole('button',{name:'Toggle navigation',exact:true}).click();
-  const smallButtons=await page.locator('button').evaluateAll(elements=>elements.filter(el=>{
+  const smallButtons=await page.locator('button, a.btn, label.btn').evaluateAll(elements=>elements.filter(el=>{
    const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(el).visibility!=='hidden'&&(r.width<44||r.height<44);
   }).map(el=>el.outerHTML));
   assert.deepEqual(smallButtons,[],`Small library targets at ${width}px`);
+  if(width===320){
+   await page.getByRole('button',{name:'Library actions',exact:true}).click();
+   const dropdownSizes=await page.locator('.library-filters .dropdown-menu.show .dropdown-item').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().height));
+   assert(dropdownSizes.length>0&&dropdownSizes.every(height=>height>=44),'Mobile dropdown actions use at least 44px height');
+   await page.keyboard.press('Escape');
+  }
  }
  for(const id of ['feed-type-filter','feed-sort']) {
   assert.equal(await page.locator('#'+id+' .select-value').evaluate(el=>el.scrollWidth<=el.clientWidth),true,`Clipped filter ${id} at ${width}px`);
@@ -338,7 +349,7 @@ await page.locator('#feed-search').fill('');
 const card=page.locator('#feeds-container .feed-card').nth(30);
 await card.scrollIntoViewIfNeeded();
 const scrollBefore=await page.evaluate(()=>scrollY);
-await card.getByRole('button',{name:'Open',exact:true}).click();
+await openFeedCard(card);
 await page.waitForSelector('#episodes-list .list-group-item');
 await page.getByRole('button',{name:'Back to library',exact:true}).click();
 await page.waitForFunction(()=>Math.abs(scrollY-libraryScroll)<2);

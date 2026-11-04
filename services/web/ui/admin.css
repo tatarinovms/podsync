@@ -297,6 +297,7 @@
             display: inline-flex;
             align-items: center !important;
             justify-content: center !important;
+            min-height: var(--control-compact-size);
             line-height: 1.5 !important;
             vertical-align: middle;
             border-radius: 8px;
@@ -1223,7 +1224,16 @@ button.feed-state {
     .btn, .btn-xs, .btn-close, button.feed-state, .select-trigger, .select-option { min-height: var(--control-touch-size); }
     .btn-close { min-width: var(--control-touch-size); }
     .feed-card .btn, .feed-card .dropdown-item, .view-switch .btn { min-height: var(--control-touch-size); }
-    .feed-overflow > .btn { min-width: 44px; }
+    .feed-card-bottom .btn, .feed-btn, .feed-overflow > .btn {
+        height: var(--control-touch-size) !important;
+        min-height: var(--control-touch-size) !important;
+    }
+    .feed-overflow > .btn { min-width: var(--control-touch-size); }
+    .dropdown-menu .dropdown-item {
+        display: flex;
+        align-items: center;
+        min-height: var(--control-touch-size);
+    }
     .feed-detail-heading { flex-wrap: wrap; gap: 16px; }
     .feed-detail-heading > .flex-grow-1 { flex-basis: calc(100% - 90px); }
     .detail-cover { width: 64px; height: 64px; border-radius: 14px; }
@@ -1415,6 +1425,14 @@ body.has-sticky-player {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+@media (max-width: 767px) {
+    #addFeedModal .input-group-sm > .form-control,
+    #addFeedModal .form-control-sm,
+    #addFeedModal .input-group-sm > .btn {
+        min-height: var(--control-touch-size);
+        height: var(--control-touch-size);
+    }
 }
 #addFeedModal .form-text {
     min-height: 20px;

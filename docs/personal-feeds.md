@@ -62,7 +62,7 @@ Clicking **Subscribe** opens the unified subscription modal:
 ### Firefox Podsync Share Extension
 `extensions/podsync-firefox-1.0.4.zip` packages a Firefox WebExtension that adds the active browser tab to a selected personal feed. Configure the Podsync API URL and your local administrator credentials in the extension; they remain in Firefox extension-local storage and are sent only to that Podsync server.
 
-For development, load the unpacked extension from `about:debugging#/runtime/this-firefox`. For permanent installation, submit the ZIP to AMO using **On your own**, download Mozilla's signed `.xpi`, and install that file through Firefox Add-ons Manager. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
+Install the [signed `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), configure the Podsync API URL ending in `/api/v1` and the Web Admin credentials, then select a Personal Feed. For development, load the unpacked extension from `about:debugging#/runtime/this-firefox`. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
 
 ---
 

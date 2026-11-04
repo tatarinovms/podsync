@@ -63,7 +63,7 @@
 ### Расширение Firefox Podsync Share
 `extensions/podsync-firefox-1.0.4.zip` содержит Firefox WebExtension, которое добавляет текущую вкладку браузера в выбранную персональную ленту. Укажите в расширении URL API Podsync и локальные учётные данные администратора: они сохраняются только в локальном хранилище расширения Firefox и передаются лишь указанному серверу Podsync.
 
-Для разработки загрузите распакованное расширение через `about:debugging#/runtime/this-firefox`. Для постоянной установки отправьте ZIP в AMO, выбрав **On your own**, скачайте подписанный Mozilla `.xpi` и установите этот файл через менеджер дополнений Firefox. См. [`extensions/podsync-firefox/README.md`](../../extensions/podsync-firefox/README.md).
+Установите [подписанный `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), укажите URL API Podsync с `/api/v1` и данные входа в Web Admin, затем выберите Personal Feed. Для разработки загрузите распакованное расширение через `about:debugging#/runtime/this-firefox`. См. [`extensions/podsync-firefox/README.md`](../../extensions/podsync-firefox/README.md).
 
 ---
 

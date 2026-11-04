@@ -13,7 +13,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/tatarinovms/podsync)](go.mod)
 [![License](https://img.shields.io/github/license/tatarinovms/podsync)](LICENSE)
 
-[Ключевые возможности](#ключевые-возможности) • [Быстрый старт](#быстрый-старт) • [Конфигурация](#конфигурация) • [Web Admin и REST API](#веб-панель-администратора-и-rest-api) • [MCP Server](#сервер-model-context-protocol-mcp) • [Документация](#документация)
+[Ключевые возможности](#ключевые-возможности) • [Расширение Firefox](#расширение-firefox) • [Быстрый старт](#быстрый-старт) • [Конфигурация](#конфигурация) • [Web Admin и REST API](#веб-панель-администратора-и-rest-api) • [MCP Server](#сервер-model-context-protocol-mcp) • [Документация](#документация)
 
 Podsync — лёгкий генератор подкастов, который превращает видео, аудио, локальные папки аудиокниг и готовые Podcast RSS в стандартные podcast-ленты. Подкаст-приложения скачивают новые эпизоды в фоне, помнят позицию прослушивания, синхронизируют устройства и поддерживают офлайн-воспроизведение.
 
@@ -59,6 +59,17 @@ Podsync — лёгкий генератор подкастов, который �
 - Управляйте Netscape `cookies.txt`, извлекайте куки из локального браузера и запускайте живой тест URL через yt-dlp для диагностики bot-check и age-gate. Настраивайте `dns_servers` для API провайдеров и RSS-метаданных; yt-dlp продолжает использовать системный DNS.
 - Вставьте полный URL редиректа VK OAuth — Podsync автоматически извлечёт access token.
 - Экспортируйте полный системный `.tar.gz` бэкап конфигурации, согласованного снимка Badger и пользовательских обложек; его можно проверить и восстановить из Web Admin, CLI или MCP. Скачанные медиафайлы не включаются.
+
+## Расширение Firefox
+
+[Скачайте подписанное расширение Podsync Share (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), откройте скачанный файл в Firefox и подтвердите установку.
+
+Откройте **Podsync Share → Connection settings** и укажите:
+
+- **Podsync API URL**: публичный адрес Podsync с `/api/v1`, например `https://rssreader.example.com/api/v1`.
+- **Admin username** и **Admin password**: те же данные, которыми вы входите в Web Admin.
+
+Нажмите **Save and load feeds**, выберите Personal Feed и откройте страницу YouTube, VK Video или Rutube. Нажмите **Add current tab**, выберите MP3-аудио или MP4-видео и качество, затем подтвердите отправку. После принятия ссылки панель расширения закроется.
 
 ## Быстрый старт
 

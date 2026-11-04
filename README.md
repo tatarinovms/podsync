@@ -13,7 +13,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/tatarinovms/podsync)](go.mod)
 [![License](https://img.shields.io/github/license/tatarinovms/podsync)](LICENSE)
 
-[Key Features](#key-features) • [Quick Start](#quick-start) • [Configuration](#configuration) • [Web Admin & API](#web-admin-console--rest-api) • [MCP Server](#model-context-protocol-mcp-server) • [Documentation](#documentation)
+[Key Features](#key-features) • [Firefox Extension](#firefox-extension) • [Quick Start](#quick-start) • [Configuration](#configuration) • [Web Admin & API](#web-admin-console--rest-api) • [MCP Server](#model-context-protocol-mcp-server) • [Documentation](#documentation)
 
 Podsync is a lightweight podcast generator that turns video, audio, local audiobook folders, and existing podcast RSS feeds into standards-compliant podcast feeds. Podcast apps download new episodes in the background, remember listening positions, synchronize devices, and support offline playback.
 
@@ -59,6 +59,17 @@ This fork extends the original `mxpv/podsync` with the features described below.
 - Manage Netscape `cookies.txt`, extract cookies from a local browser, and run a live yt-dlp URL test to diagnose bot checks and age gates. Configure `dns_servers` for provider APIs and RSS metadata while yt-dlp keeps using system DNS.
 - Paste a complete VK OAuth redirect URL and Podsync extracts the access token automatically.
 - Export a full system `.tar.gz` backup of configuration, a consistent Badger snapshot, and custom covers, then inspect and restore it from Web Admin, CLI, or MCP. Downloaded media is excluded.
+
+## Firefox Extension
+
+[Download the signed Podsync Share extension (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), open the downloaded file in Firefox, and approve the installation.
+
+Open **Podsync Share → Connection settings** and enter:
+
+- **Podsync API URL**: the public Podsync address followed by `/api/v1`, for example `https://rssreader.example.com/api/v1`.
+- **Admin username** and **Admin password**: the same credentials used to sign in to Web Admin.
+
+Select **Save and load feeds**, choose a Personal Feed, then open a YouTube, VK Video, or Rutube page. Select **Add current tab**, choose MP3 audio or MP4 video and its quality, and confirm. The extension closes after Podsync accepts the link.
 
 ## Quick Start
 

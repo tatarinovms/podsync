@@ -60,11 +60,10 @@
 
 ---
 
-### Добавление в 1 клик (iOS Быстрые команды / Bookmarklet)
-Каждая персональная лента генерирует специализированный **Quick-Add Token**, позволяющий отправлять ссылки в ленту в один клик без раскрытия мастер-пароля администратора:
-- **Интеграция с iOS Shortcuts (Быстрые команды)**: Отправка роликов напрямую через стандартное меню «Поделиться» (Share Sheet) в YouTube, VK Video или Safari на адрес `/api/v1/personal-feeds/{id}/quick-add?token={token}&url={url}`.
-- **Браузерный Bookmarklet**: Перетащите кнопку букмарклета на панель закладок для мгновенного добавления любого открытого видео.
-- **Генератор в веб-интерфейсе**: В панели управления нажмите **«1-Click Share / iOS Shortcuts»** рядом с фидом для получения готовой ссылки, шортката и тестирования.
+### Расширение Firefox Podsync Share
+`extensions/podsync-firefox-1.0.4.zip` содержит Firefox WebExtension, которое добавляет текущую вкладку браузера в выбранную персональную ленту. Укажите в расширении URL API Podsync и локальные учётные данные администратора: они сохраняются только в локальном хранилище расширения Firefox и передаются лишь указанному серверу Podsync.
+
+Для разработки загрузите распакованное расширение через `about:debugging#/runtime/this-firefox`. Для постоянной установки отправьте ZIP в AMO, выбрав **On your own**, скачайте подписанный Mozilla `.xpi` и установите этот файл через менеджер дополнений Firefox. См. [`extensions/podsync-firefox/README.md`](../../extensions/podsync-firefox/README.md).
 
 ---
 
@@ -80,7 +79,6 @@
 | `PATCH` | `/api/v1/personal-feeds/{id}` | `{"title": "...", "description": "...", "cover_art": "...", "playlist_sort": "asc", "private_feed": true}` | Частичное обновление настроек. |
 | `DELETE` | `/api/v1/personal-feeds/{id}?confirm=true&delete_files=true` | Query-параметры | Удаление ленты и RSS. |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | Нет | Список эпизодов ленты. |
-| `POST`, `GET` | `/api/v1/personal-feeds/{id}/quick-add?token=...&url=...` | Query-параметр или JSON-тело | Облегченное добавление ссылок в 1 клик (iOS Быстрые команды / Bookmarklet) по токену ленты. Возвращает 202 Accepted. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | `{"url": "...", "file_path": "...", "title": "...", "format": "audio", "quality": "high", "max_height": 720}` | Добавление эпизода по ссылке или пути к файлу с выбором качества. |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart form (`file`, `title`, `format`, `quality`, `max_height`) | Загрузка медиафайла (до 4 ГиБ) с выбором качества. |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | `{"target_feed_id": "personal-..."}` | Копирование эпизода в другую ленту. |

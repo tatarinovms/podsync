@@ -1440,11 +1440,6 @@ body.has-sticky-player {
 }
 
 
-.btn-quick-add {
-    font-size: 0.75rem !important;
-    padding: 3px 8px !important;
-    white-space: nowrap;
-}
 #dl-cookies-content {
     max-height: 220px;
     resize: vertical;

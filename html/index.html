@@ -151,7 +151,6 @@
                                 <p id="personal-description" class="text-muted mb-0"></p>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <button class="btn btn-outline-primary btn-sm btn-quick-add" type="button" onclick="openQuickAddModal(personalCurrentID)" title="Quick-Add / iOS Shortcuts"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
                                 <button class="btn btn-light btn-sm" type="button" onclick="personalEdit(personalCurrentID)"><i aria-hidden="true" class="bi bi-gear me-1"></i>Settings</button>
                                 <button id="personal-rss" class="btn btn-brand btn-sm" type="button" onclick="showSubscription(personalCurrentID)"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                                 <button class="btn btn-outline-danger btn-sm" type="button" onclick="personalDeleteFeed()"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button>
@@ -2178,100 +2177,6 @@
             <div class="d-flex">
                 <div class="toast-body" id="toast-message">Link copied to clipboard!</div>
                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Add / iOS Shortcuts Modal -->
-    <div class="modal fade" id="quickAddModal" tabindex="-1" aria-labelledby="quickAddModal-title" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content shadow">
-                <div class="modal-header border-bottom">
-                    <h5 class="modal-title fw-bold mb-0 d-flex align-items-center gap-2" id="quickAddModal-title">
-                        <i aria-hidden="true" class="bi bi-phone text-primary"></i> 1-Click Share &amp; iOS Shortcuts
-                    </h5>
-                    <button type="button" class="btn-close" aria-label="Close" onclick="closeModal('quickAddModal')"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
-                </div>
-                <div class="modal-body p-4">
-                    <p class="text-muted small mb-4">
-                        Send videos and podcasts directly to your personal feed in 1 click from iOS Share Sheet, browser bookmarklet, or webhook URL without sharing master admin credentials.
-                    </p>
-
-                    <!-- Feed Scoped Token & Endpoint -->
-                    <div class="mb-4">
-                        <label class="form-label small fw-semibold" for="quick-add-endpoint-url">Quick-Add Endpoint URL</label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="quick-add-endpoint-url" class="form-control font-monospace" readonly>
-                            <button class="btn btn-outline-secondary" type="button" onclick="copyElementText('quick-add-endpoint-url')" title="Copy URL">
-                                <i aria-hidden="true" class="bi bi-clipboard me-1"></i>Copy
-                            </button>
-                        </div>
-                        <div class="form-text small mt-1">Accepts <code>POST</code> and <code>GET</code> requests with parameter <code>url=&lt;video_link&gt;</code>. Scoped only to this personal feed.</div>
-                    </div>
-
-                    <!-- iOS Shortcut Setup -->
-                    <div class="card p-3 mb-4 bg-body-tertiary border">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <i aria-hidden="true" class="bi bi-apple fs-5"></i>
-                            <h6 class="fw-bold mb-0">iOS Shortcuts (iPhone / iPad)</h6>
-                        </div>
-                        <p class="small text-muted mb-2">
-                            To create an iOS Shortcut in 30 seconds:
-                        </p>
-                        <ol class="small text-muted mb-3 ps-3">
-                            <li>Open the <strong>Shortcuts</strong> app on iOS and tap <strong>+</strong> (New Shortcut).</li>
-                            <li>Turn on <strong>Show in Share Sheet</strong> in Shortcut Details.</li>
-                            <li>Add action: <strong>Get URLs from Shortcut Input</strong>.</li>
-                            <li>Add action: <strong>Get Contents of URL</strong>:
-                                <ul>
-                                    <li>URL: <code id="quick-add-shortcut-base-url">...</code> + <em>Shortcut Input</em></li>
-                                    <li>Method: <strong>POST</strong></li>
-                                </ul>
-                            </li>
-                            <li>Now tap <strong>Share</strong> in YouTube, VK, or Safari &rarr; select your Shortcut!</li>
-                        </ol>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-brand" onclick="copyShortcutSetupUrl()">
-                                <i aria-hidden="true" class="bi bi-link-45deg me-1"></i>Copy Quick-Add URL for iOS Shortcut
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Browser Bookmarklet -->
-                    <div class="card p-3 mb-4 bg-body-tertiary border">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <i aria-hidden="true" class="bi bi-bookmark-star fs-5 text-warning"></i>
-                            <h6 class="fw-bold mb-0">Browser Bookmarklet (Desktop / Laptop)</h6>
-                        </div>
-                        <p class="small text-muted mb-2">
-                            Drag this button to your browser Bookmarks Bar, or copy the JavaScript snippet:
-                        </p>
-                        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                            <a id="quick-add-bookmarklet-link" href="#" class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="alert('Drag this button to your Bookmarks Bar to install it!'); return false;">
-                                <i aria-hidden="true" class="bi bi-bookmark-plus me-1"></i>+ Add to Podsync
-                            </a>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyBookmarkletCode()">
-                                <i aria-hidden="true" class="bi bi-code-slash me-1"></i>Copy JS Bookmarklet Code
-                            </button>
-                        </div>
-                        <div class="form-text small">Clicking the bookmarklet on any YouTube or VK Video page instantly sends it to your podcast.</div>
-                    </div>
-
-                    <!-- Direct Quick-Test Form -->
-                    <div class="card p-3 bg-body-tertiary border">
-                        <h6 class="fw-bold mb-2 small"><i aria-hidden="true" class="bi bi-send-check text-success me-1"></i>Test Quick-Add Now</h6>
-                        <div class="input-group input-group-sm">
-                            <input type="url" id="quick-add-test-url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
-                            <button class="btn btn-brand" type="button" id="btn-quick-add-test" onclick="sendQuickAddTest()">
-                                <i aria-hidden="true" class="bi bi-send me-1"></i>Send to Feed
-                            </button>
-                        </div>
-                        <div id="quick-add-test-feedback" class="small mt-2 d-none"></div>
-                    </div>
-                </div>
-                <div class="modal-footer border-top">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('quickAddModal')">Close</button>
-                </div>
             </div>
         </div>
     </div>

@@ -216,59 +216,6 @@
             if (toastEl) toastEl.show();
         }
 
-        let quickAddEndpoint = '';
-        function copyElementText(id) {
-            const el = document.getElementById(id);
-            if (el) copyToClipboard(el.value || el.textContent || '');
-        }
-        function openQuickAddModal(feedID) {
-            const feed = personalFeeds.find(item => item.id === feedID);
-            if (!feed?.quick_add_token) {
-                showToast('Quick-Add token is unavailable. Refresh the feed and try again.');
-                return;
-            }
-            quickAddEndpoint = `${window.location.origin}/api/v1/personal-feeds/${encodeURIComponent(feedID)}/quick-add?token=${encodeURIComponent(feed.quick_add_token)}`;
-            document.getElementById('quick-add-endpoint-url').value = quickAddEndpoint;
-            document.getElementById('quick-add-shortcut-base-url').textContent = quickAddEndpoint + '&url=';
-            const bookmarklet = `javascript:(()=>{const u=${JSON.stringify(quickAddEndpoint)}+'&url='+encodeURIComponent(location.href);window.open(u,'_blank','noopener')})()`;
-            const link = document.getElementById('quick-add-bookmarklet-link');
-            link.href = bookmarklet;
-            link.onclick = null;
-            document.getElementById('quick-add-test-url').value = '';
-            const feedback = document.getElementById('quick-add-test-feedback');
-            feedback.className = 'small mt-2 d-none';
-            feedback.textContent = '';
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('quickAddModal')).show();
-        }
-        function copyShortcutSetupUrl() { copyToClipboard(quickAddEndpoint); }
-        function copyBookmarkletCode() {
-            const link = document.getElementById('quick-add-bookmarklet-link');
-            copyToClipboard(link?.href || '');
-        }
-        async function sendQuickAddTest() {
-            const input = document.getElementById('quick-add-test-url');
-            const button = document.getElementById('btn-quick-add-test');
-            const feedback = document.getElementById('quick-add-test-feedback');
-            let target;
-            try { target = new URL(input.value.trim()); } catch (_) { target = null; }
-            if (!quickAddEndpoint || !target || !['http:', 'https:'].includes(target.protocol)) {
-                feedback.textContent = 'Enter a valid HTTP or HTTPS media URL.';
-                feedback.className = 'small mt-2 text-danger';
-                return;
-            }
-            button.disabled = true;
-            try {
-                const response = await fetch(quickAddEndpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: target.href})});
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Quick-Add request failed');
-                feedback.textContent = data.message || 'Episode queued for download.';
-                feedback.className = 'small mt-2 text-success';
-            } catch (error) {
-                feedback.textContent = error.message || 'Quick-Add request failed.';
-                feedback.className = 'small mt-2 text-danger';
-            } finally { button.disabled = false; }
-        }
-
         let playerEpisode = null;
         let playerChapters = [];
         function playerTime(seconds) {
@@ -940,7 +887,7 @@
                     </ul></div>
                 </div>
                 <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.episode_count ?? feed.downloaded_count ?? 0} ${countLabel}</span><span class="badge bg-secondary-subtle text-secondary border">Universal</span><span class="feed-provider">Personal</span></div>
-                <div class="feed-card-bottom"><span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span><div class="feed-card-actions"><button class="btn btn-light feed-btn" type="button" onclick="openQuickAddModal('${escapeHtml(feed.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button><button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
+                <div class="feed-card-bottom"><span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span><div class="feed-card-actions"><button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
             </article>`;
             }
 
@@ -4278,7 +4225,6 @@
                     <div class="feed-card-bottom">
                         <span class="feed-state"><i aria-hidden="true" class="bi bi-check2-circle"></i>Ready</span>
                         <div class="feed-card-actions">
-                            <button class="btn btn-light feed-btn" type="button" onclick="openQuickAddModal('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-phone me-1"></i>Quick-Add</button>
                             <button class="btn btn-light feed-btn" type="button" onclick="showSubscription('${escapeHtml(f.id)}')"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button>
                         </div>
                     </div>

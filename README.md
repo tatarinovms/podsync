@@ -32,7 +32,7 @@ This fork extends the original `mxpv/podsync` with the features described below.
 
 - Create curated feeds in **Library → Personal feeds**; they also appear in the main Podcasts view with the Personal filter. Add YouTube, VK Video, Rutube, direct HTTP/HTTPS media URLs, or local uploads up to **4 GiB**.
 - `ffmpeg` automatically transcodes audio to MP3 and video to MP4. Choose High or Low audio quality, or video resolution (480p, 720p HD, 1080p Full HD, and more), rename an episode with immediate RSS rebuild, copy it with shared-media reference counting, move it while preserving its GUID, or safely delete it. See the [Personal Feeds Guide](./docs/personal-feeds.md).
-- Use `POST` or `GET /api/v1/personal-feeds/{id}/quick-add` with a feed-scoped token from iOS Shortcuts, the iOS Share Sheet, or a browser bookmarklet.
+- Use the Firefox Podsync Share extension to add the active browser tab to a selected personal feed.
 
 ### 3. Local Audiobooks (Podcast 2.0 Serial)
 

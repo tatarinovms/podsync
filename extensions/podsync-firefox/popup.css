@@ -1,0 +1,20 @@
+:root { color-scheme: light dark; font: 14px/1.45 system-ui, sans-serif; }
+body { margin: 0; min-width: 320px; }
+main { padding: 16px; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 16px; margin: 16px 0 0; }
+header p { color: #666; margin: 3px 0 16px; }
+form { display: grid; gap: 8px; }
+label { font-weight: 600; }
+input, select, button { box-sizing: border-box; font: inherit; min-height: 36px; padding: 6px 8px; width: 100%; }
+button { border: 0; border-radius: 6px; background: #8839ef; color: #fff; cursor: pointer; font-weight: 600; }
+button:disabled { cursor: wait; opacity: .6; }
+.hidden { display: none; }
+.actions { display: flex; gap: 8px; margin-top: 4px; }
+.actions button { width: 50%; }
+button.secondary { background: #6c7086; }
+#status { min-height: 20px; margin: 12px 0; }
+#status.error { color: #d20f39; }
+#status.success { color: #40a02b; }
+details { border-top: 1px solid #ccc; padding-top: 12px; }
+summary { cursor: pointer; font-weight: 600; margin-bottom: 12px; }

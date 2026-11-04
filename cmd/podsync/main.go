@@ -403,7 +403,10 @@ func main() {
 				}
 				updateCancel()
 
-				if feedManager.GetFeedConfig(_feed.ID) == nil {
+				// Personal feeds are stored separately from the regular feed config map.
+				// Do not mistake them for a deleted feed, otherwise their queue job
+				// remains running and later personal-media submissions never start.
+				if !strings.HasPrefix(_feed.URL, "personal://") && feedManager.GetFeedConfig(_feed.ID) == nil {
 					log.WithField("feed_id", _feed.ID).Info("feed was deleted during update; skipping post-update actions")
 					feedManager.MarkFeedUpdateFinished(_feed.ID)
 					continue

@@ -13,7 +13,7 @@ Podsync includes a built-in **Personal Feeds** engine that allows users to creat
   - Direct access via the **Personal feeds** tab in the sidebar.
   - Personal feeds are also displayed on the main **Podcasts** tab with a **Personal** provider badge and a dedicated `Personal` option in the **All types** filter dropdown.
 - **Multiple Ingestion Methods**:
-  1. **Video & Audio Platforms**: Add episodes from YouTube, VK Video, Rutube, Vimeo, SoundCloud URLs.
+  1. **Supported Video Platforms**: Add individual episodes from YouTube, VK Video, and Rutube URLs.
   2. **Direct Media Links**: Download and transcode direct HTTP/HTTPS links (e.g. `https://example.com/audio.mp3`, `podcast.ogg`, `video.mp4`).
   3. **Local Server Files (`file_path`)**: Import media files directly from the server's local filesystem via REST API or MCP.
   4. **Direct File Upload**: Upload local audio/video files up to 4 GiB via the web console or multipart API.
@@ -40,12 +40,12 @@ Podsync includes a built-in **Personal Feeds** engine that allows users to creat
 
 ### Adding Episodes
 Open any personal feed to access the episode management toolbar:
-1. **From Link or Server Path**: Paste a video/audio URL (YouTube, VK, Rutube, direct MP3/MP4 link) or a local server file path, set an optional custom title and format override, and click **Add episode**.
+1. **From Link or Server Path**: Paste a video/audio URL (YouTube, VK Video, Rutube, direct MP3/MP4 link) or a local server file path, set an optional title, choose Audio or Video, and select quality. Maximum resolution is shown only for Video.
 2. **From Local File Upload**: Select an audio or video file from your computer (up to 4 GiB), specify an optional title, and click **Upload & add**. Upload progress is tracked in real-time.
 
 ### Episode Actions
 Each episode card provides:
-- **Audio / Video Player**: Integrated HTML5 player for immediate in-browser playback.
+- **Audio / Video Player**: Play media in the browser; audio uses the bottom-docked mini-player with -15/+30 second seeking, playback speed, codec/bitrate details, and chapters when available.
 - **Move**: Transfers the episode to another personal feed while retaining its GUID.
 - **Copy**: Clones the episode to another personal feed with a new GUID, sharing the same physical media file.
 - **Retry**: Resubmits a failed download/transcoding job to the queue.
@@ -60,9 +60,9 @@ Clicking **Subscribe** opens the unified subscription modal:
 ---
 
 ### Firefox Podsync Share Extension
-`extensions/podsync-firefox-1.0.4.zip` packages a Firefox WebExtension that adds the active browser tab to a selected personal feed. Configure the Podsync API URL and your local administrator credentials in the extension; they remain in Firefox extension-local storage and are sent only to that Podsync server.
+Install the [signed `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi) and approve the Firefox prompt. Open **Connection settings**, enter the public Podsync URL ending in `/api/v1` and the same administrator credentials used for Web Admin, then click **Save and load feeds**.
 
-Install the [signed `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), configure the Podsync API URL ending in `/api/v1` and the Web Admin credentials, then select a Personal Feed. For development, load the unpacked extension from `about:debugging#/runtime/this-firefox`. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
+The extension accepts only YouTube, VK Video, and Rutube pages. Select the target Personal Feed, choose MP3 Audio or MP4 Video and quality; maximum resolution appears only for Video. The popup closes after Podsync accepts the link. Credentials remain in Firefox extension-local storage and are sent only to the configured Podsync server. For development, load the unpacked source from `about:debugging#/runtime/this-firefox`. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
 
 ---
 

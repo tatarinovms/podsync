@@ -452,6 +452,30 @@ docker compose logs --tail=20 podsync
 curl -I http://localhost:8080/health/ready
 ```
 
+### 4.3: Переносимый бэкап и восстановление
+
+Для интерактивной миграции используйте карточку **System → Backup & Restore**:
+экспортируйте архив, проверьте его на целевом сервере, оставьте включённым
+**Preserve current server storage paths & port** и запустите восстановление.
+Архив содержит конфигурацию, согласованный поток Badger, пользовательские
+обложки и опционально секреты, но никогда не содержит скачанные эпизоды.
+
+На нативном сервере без Web Admin остановите службу, чтобы освободить Badger:
+
+```bash
+sudo systemctl stop podsync
+sudo -u podsync /opt/podsync/bin/podsync --config /etc/podsync/config.toml --export-backup /var/lib/podsync/podsync-backup.tar.gz
+
+# На целевом сервере пути хранилища и порт сохраняются по умолчанию.
+sudo -u podsync /opt/podsync/bin/podsync --config /etc/podsync/config.toml --restore-backup /var/lib/podsync/podsync-backup.tar.gz
+sudo systemctl start podsync
+```
+
+Используйте `--no-preserve-paths`, только если исходные пути и порт из архива
+действительно подходят целевому серверу. MCP-инструменты
+`create_system_backup` и `get_backup_info` создают и проверяют серверные архивы;
+восстановление выполняется через Web Admin, REST или CLI.
+
 ---
 
 ## 5. Чек-лист операций для AI-агентов
@@ -464,4 +488,5 @@ curl -I http://localhost:8080/health/ready
 | **Добавление нового канала** | MCP-инструмент `add_feed` (автоматически обновляет `config.toml`) |
 | **Принудительное обновление** | MCP-инструмент `update_feed(feed_id)` |
 | **Повтор ошибки эпизода** | MCP-инструмент `retry_episode(feed_id, episode_id)` |
+| **Создание или проверка бэкапа** | Web Admin или MCP-инструменты `create_system_backup` / `get_backup_info` |
 | **Обход защиты YouTube** | Загрузка Netscape `cookies.txt` через веб-панель или `PODSYNC_DOWNLOADER_COOKIES_FILE` |

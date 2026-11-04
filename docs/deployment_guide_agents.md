@@ -481,6 +481,31 @@ sudo cp bin/podsync /opt/podsync/bin/podsync
 sudo systemctl start podsync
 ```
 
+### 4.4: Portable Backup & Restore
+
+The **System → Backup & Restore** card is preferred for interactive migrations:
+export the archive, inspect it on the target, keep **Preserve current server
+storage paths & port** enabled, and restore. The archive contains configuration,
+a consistent Badger stream, custom covers, and optional secrets, but never
+downloaded episode media.
+
+For a headless native installation, stop the service so it does not hold the
+Badger lock, then run:
+
+```bash
+sudo systemctl stop podsync
+sudo -u podsync /opt/podsync/bin/podsync --config /etc/podsync/config.toml --export-backup /var/lib/podsync/podsync-backup.tar.gz
+
+# On the target server; storage paths and port are preserved by default.
+sudo -u podsync /opt/podsync/bin/podsync --config /etc/podsync/config.toml --restore-backup /var/lib/podsync/podsync-backup.tar.gz
+sudo systemctl start podsync
+```
+
+Use `--no-preserve-paths` only when the archive's original storage locations
+and port are intentionally valid on the target. MCP can create and inspect
+server-side archives with `create_system_backup` and `get_backup_info`; restore
+is deliberately performed through Web Admin, REST, or CLI.
+
 ## 5. Operational Checklist for AI Agents
 
 When an agent needs to perform tasks on Podsync:
@@ -493,4 +518,5 @@ When an agent needs to perform tasks on Podsync:
 | **Add a new podcast channel** | MCP tool `add_feed` (auto-updates `config.toml`) |
 | **Trigger immediate sync** | MCP tool `update_feed(feed_id)` |
 | **Retry failed episode** | MCP tool `retry_episode(feed_id, episode_id)` |
+| **Create or inspect backup** | Web Admin, or MCP tools `create_system_backup` / `get_backup_info` |
 | **Bypass YouTube bot verification**| Upload Netscape `cookies.txt` via Admin UI or `PODSYNC_DOWNLOADER_COOKIES_FILE` |

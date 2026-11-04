@@ -8,13 +8,14 @@ This document details the architectural principles, component structure, data fl
 
 ## 1. High-Level Architecture
 
-Podsync operates as a self-hosted content pipeline that transforms external video and audio sources (YouTube, Rutube, VK Video, Vimeo, SoundCloud) as well as local directory audiobook collections into podcast feeds compatible with Apple Podcasts, Pocket Casts, Overcast, AntennaPod, and any RSS reader.
+Podsync operates as a self-hosted content pipeline that transforms external video and audio sources (YouTube, Rutube, VK Video, Vimeo, SoundCloud), existing RSS feeds, Apple Podcasts pages, personal media collections, and local audiobook directories into podcast feeds compatible with Apple Podcasts, Pocket Casts, Overcast, AntennaPod, and any RSS reader.
 
 ```mermaid
 flowchart TD
     subgraph Clients["Clients & Ingestion"]
         PApps["Podcast Clients\n(Apple, Pocket Casts, Overcast)"]
         AdminUser["Admin User\n(Browser / Web UI)"]
+        Firefox["Firefox Extension\n(Podsync Share)"]
         AIAgents["AI Agents\n(Claude, Cursor, Antigravity)"]
     end
 
@@ -22,9 +23,10 @@ flowchart TD
         WebServer["Web Server & REST API\n(:8080 /admin, /api/v1)"]
         MCPServer["MCP Server\n(Stdio & SSE /mcp)"]
         PersonalService["Personal Feeds Service\n(pkg/personal)"]
+        BackupService["Backup & Restore\n(pkg/backup)"]
         FeedMgr["AppFeedManager\n(In-Memory State & Coordination)"]
         CronSched["Cron Scheduler\n(robfig/cron/v3)"]
-        UpdateQueue["Update Queue\n(Buffered Channel)"]
+        UpdateQueue["Persistent Job Queue\n(pkg/jobqueue)"]
         UpdateMgr["Update Manager\n(services/update)"]
         
         subgraph Builders["Content Builders (pkg/builder)"]
@@ -32,6 +34,7 @@ flowchart TD
             VKBuilder["VK Video Builder\n(VK API v5.199)"]
             RUBuilder["Rutube Builder\n(yt-dlp)"]
             ABBuilder["Audiobook Builder\n(ID3 / APIC tags)"]
+            RSSBuilder["RSS / Apple Podcasts"]
             OtherBuilders["Vimeo / SoundCloud"]
         end
         
@@ -49,6 +52,7 @@ flowchart TD
     end
 
     AdminUser -->|HTTP / Basic Auth| WebServer
+    Firefox -->|Personal Feed REST API| WebServer
     AIAgents -->|MCP Stdio / SSE| MCPServer
     PApps -->|GET /feed_id.xml| WebServer
     PApps -->|GET /feed_id/media.mp3| Storage
@@ -56,6 +60,7 @@ flowchart TD
     WebServer <--> FeedMgr
     MCPServer <--> FeedMgr
     WebServer <--> PersonalService
+    WebServer <--> BackupService
     MCPServer <--> PersonalService
     PersonalService --> BadgerDB
     PersonalService --> Storage
@@ -70,6 +75,7 @@ flowchart TD
     VKBuilder --> VKAPI
     RUBuilder --> WebMedia
     ABBuilder --> LocalBooks
+    RSSBuilder --> WebMedia
     
     UpdateMgr --> YTDLP
     YTDLP --> Storage
@@ -94,6 +100,8 @@ Platform-specific metadata parsers implementing the `builder.Builder` interface:
 - **`youtube.go`**: Queries YouTube Data API v3 for channel/playlist uploads, tracks episode IDs, titles, descriptions, and durations.
 - **`vkvideo.go`**: Interfaces with VK API v`5.199`, converts community handles (`@name`) to negative owner IDs (`-196446247`), excludes live streams/premieres, and formats playable links.
 - **`rutube.go`**: Queries Rutube video lists via native `yt-dlp` scraping without requiring third-party API tokens.
+- **`rss.go`**: Parses existing podcast RSS metadata and episodes for feed preview and mirroring.
+- **`apple.go`**: Resolves `podcasts.apple.com` and `itunes.apple.com` show pages through the iTunes Lookup API, with page metadata fallback, then hands the discovered RSS URL to the regular RSS pipeline.
 - **`audiobook.go`**: Local directory crawler. Automatically scans MP3/M4A/FLAC/OGG files, sorts chapters naturally, extracts album/artist/title ID3 tags, and extracts embedded APIC cover art via `ffmpeg`.
 
 ### 2.3 Downloader Engine (`pkg/ytdl/`)
@@ -116,6 +124,16 @@ Core service orchestrating manually curated, universal podcast feeds:
 - **Reference-Counted Media Pool**: Uploaded and downloaded files live in a shared directory (`_personal/{media_id}/`). Copying an episode to another feed creates a new membership GUID without duplicating the file on disk. Files are only deleted when the reference counter reaches zero and deletion was confirmed.
 - **Ingestion Pipeline**: Ingests direct media URLs, platform links (YouTube, VK Video, Rutube), local server file paths (`file_path`), and multipart file uploads (up to 4 GiB) with automatic `ffmpeg` transcoding. Supports audio quality (`high`/`low`) and video max height (`480`, `720`, `1080`, `1440`, `2160`, `0`) controls.
 - **State Isolation**: Operates inside an independent BadgerDB transactional namespace (`podsync/personal/v1/`), preventing collisions with `config.toml` channels.
+
+### 2.7 Backup, Recovery & Native Updates (`pkg/backup/`, `pkg/selfupdate/`)
+- Portable `.tar.gz` backups contain a manifest, checksums, `config.toml`, a transactionally consistent Badger stream, custom covers, and optional secrets. Downloaded episode media is intentionally excluded.
+- Restore validates the manifest and checksums before replacing state. Cross-server restores preserve the target server's storage paths and port by default; secrets can be restored independently.
+- Native self-update is supported on Linux and macOS. It downloads the matching GitHub Release archive, verifies it against `checksums.txt`, atomically replaces the executable, and restarts the process. Docker deployments and Windows binary replacement do not self-update.
+
+### 2.8 Firefox Extension (`extensions/podsync-firefox/`)
+- A zero-build WebExtension sends only supported YouTube, VK Video, and Rutube pages to a selected Personal Feed.
+- The popup stores the Podsync API URL and administrator credentials in Firefox extension-local storage, lets the user choose audio/video quality, and shows maximum resolution only for video.
+- The extension uses the same authenticated REST API as the Web Admin Console; it is an optional client and introduces no separate backend protocol.
 
 ---
 
@@ -149,7 +167,8 @@ sequenceDiagram
 ```
 
 ### 3.2 Concurrency Safeguards
-- **Channel Buffer**: `updates` channel has a buffer capacity (16 slots). If a burst of updates arrives, excess requests are rejected with a 503/warning without blocking the server.
+- **Persistent Job Queue**: `pkg/jobqueue` deduplicates active work, persists state across crashes, uses claim tokens to reject stale workers, applies retry backoff, and recovers abandoned running jobs through its watchdog. A buffered channel remains only as a fallback when the persistent queue is not attached.
+- **Personal Feed Jobs**: Personal work is represented as `personal://<feed_id>` and intentionally lives outside `AppFeedManager`'s regular feed map. Every claimed job must finish with `MarkDone`, `MarkFailed`, or `YieldJob`; treating it as a deleted regular feed leaves a stale active job and blocks later submissions.
 - **Thread-Safe Maps**: `AppFeedManager` guards `feeds`, `cronEntries`, and `tokens` with a `sync.RWMutex`.
 - **Database Concurrency**: BadgerDB handles concurrent readers and atomic write batches.
 

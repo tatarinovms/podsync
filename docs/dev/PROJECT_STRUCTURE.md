@@ -10,10 +10,13 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 
 ```
 .
-├── cmd/podsync/              # CLI entry point, configuration, and Feed Manager
+├── cmd/podsync/              # CLI entry point, config, backup CLI, restart, queue, and Feed Manager
+├── extensions/
+│   └── podsync-firefox/      # Firefox WebExtension source and installation guide
 ├── html/                     # Mirrored Web UI static assets (admin.css, admin.js, index.html, theme.js)
 ├── pkg/
 │   ├── builder/              # Platform builders (YouTube, VK, Rutube, Audiobooks, etc.)
+│   ├── backup/               # Portable system backup inspection, export, and restore
 │   ├── db/                   # BadgerDB key-value metadata store
 │   ├── feed/                 # RSS XML, OPML generation, API key rotation
 │   ├── fs/                   # Filesystem abstraction (Local, S3, Virtual Mounter)
@@ -21,7 +24,9 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 │   ├── logbuffer/            # In-memory circular log buffer
 │   ├── mcp/                  # Model Context Protocol server (Stdio, SSE, Proxy)
 │   ├── model/                # Core domain types (Feed, Episode, Provider constants)
+│   ├── network/              # Shared HTTP client and custom DNS resolver
 │   ├── personal/             # Personal curated feeds service (storage, reference counting, media links)
+│   ├── selfupdate/           # Verified native binary updates from GitHub Releases
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── migrate/              # Media filename migration tool
@@ -43,19 +48,25 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 ## 2. Package Breakdown
 
 ### 2.1 `cmd/podsync/` (Application Core)
-- **`main.go`**: Parses command-line flags (`--config`, `--migrate-filenames`, `--mcp`), sets up signal trapping (`SIGINT`, `SIGTERM`), initializes BadgerDB, cron scheduler, web server, and starts the update queue listener.
+- **`main.go`**: Parses command-line flags (`--config`, `--migrate-filenames`, `--mcp`, backup export/restore), sets up signal trapping (`SIGINT`, `SIGTERM`), initializes BadgerDB, cron scheduler, web server, and persistent update workers.
 - **`config.go`**: Struct definition for `Config` loaded from TOML (`pelletier/go-toml`). Resolves environment variable overrides (`PODSYNC_CONFIG_PATH`, `PODSYNC_YOUTUBE_API_KEY`, `PODSYNC_VKVIDEO_API_KEY`, `PODSYNC_ADMIN_ENABLED`, etc.).
+- **`backup_cli.go`**: Implements offline `--export-backup` and `--restore-backup` operations.
+- **`config_atomic.go`**: Persists configuration through an atomic temporary-file replacement.
 - **`feed_manager.go`**: Implements `AppFeedManager`, which acts as the central coordinator implementing `web.AdminManager`. Handles in-memory feed maps, cron rescheduling, XML generation triggers, and `config.toml` updates.
+- **`update_queue.go`**: Bridges feed-manager updates to the persistent job queue, with buffered-channel fallback.
+- **`restart_unix.go` / `restart_windows.go`**: Platform-specific process restart behavior used by native updates and restore workflows.
 - **`disk_unix.go` / `disk_windows.go`**: Platform-specific disk storage inspection (free, used, and total bytes via `sys/unix.Statfs`).
 
 ### 2.2 `pkg/builder/` (Content Ingestion)
 - **`builder.go`**: Defines the `Builder` interface (`Build(ctx, cfg) (*model.Feed, error)`) and factory constructor `New(...)`.
 - **`audiobook.go`**: Scans local directory for audio files, parses ID3 tags (`APIC` cover, album, artist, track number), applies natural alphanumeric sorting, and builds a serial podcast feed.
+- **`apple.go`**: Resolves Apple Podcasts show URLs to their source RSS feed through the iTunes Lookup API and page fallback.
+- **`rss.go`**: Parses and mirrors generic podcast RSS feeds and supplies preview metadata.
 - **`vkvideo.go`**: Interfaces with the official VK API v5.199. Resolves screen names, fetches community/user videos, handles pagination, and filters out live streams.
 - **`rutube.go`**: Scrapes and indexes Rutube channels, playlists, user videos, and single videos via `yt-dlp`.
 - **`youtube.go`**: Queries YouTube Data API v3 for channel and playlist metadata.
 - **`vimeo.go`**, **`soundcloud.go`**: Handlers for Vimeo and SoundCloud APIs.
-- **`url.go`**: URL parser determining provider (`youtube`, `vkvideo`, `rutube`, `audiobook`, `vimeo`, `soundcloud`).
+- **`url.go`**: URL parser determining provider (`youtube`, `vkvideo`, `rutube`, `audiobook`, `apple`, `rss`, `vimeo`, `soundcloud`).
 
 ### 2.3 `pkg/db/` (BadgerDB Data Layer)
 - **`badger.go`**: Manages the lifecycle of the embedded BadgerDB instance.
@@ -94,15 +105,25 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 ### 2.10 `pkg/selfupdate/` (Native Release Updates)
 - **`selfupdate.go`**: Fetches the latest GitHub Release, verifies the platform archive against `checksums.txt`, and atomically replaces a native Podsync executable.
 
-### 2.11 `services/web/` (HTTP Server & Web UI)
+### 2.11 `pkg/backup/` and `pkg/network/`
+- **`pkg/backup/backup.go`**: Creates, validates, and restores portable archives containing config, a Badger backup stream, custom covers, and optional secrets, but no downloaded episode media.
+- **`pkg/network/http_client.go`**: Builds the shared HTTP client and optional custom-DNS resolver used by provider APIs and RSS metadata requests.
+
+### 2.12 `services/web/` (HTTP Server & Web UI)
 - **`server.go`**: HTTP server initialization, route registration, rate limiting middleware, Basic Auth & session auth, and static asset embedding.
-- **`api.go`**: REST API handlers (`/api/v1/*`) including feed operations, cover art upload, log querying, and system stats.
+- **`api.go`**: REST API handlers (`/api/v1/*`) including feed preview, backup/restore, native updates, cover upload, logs, and system stats.
+- **`personal.go`**: Personal Feed REST routing, uploads, queue submission, retry, copy, move, rename, and deletion.
 - **`auth.go`**: Session cookie authentication, login rate-limiting checks, and admin credential verification.
 - **`feed_patch.go`**: Atomic partial feed configuration update handler.
 - **`rate_limiter.go`**: In-memory sliding-window IP rate limiter preventing brute-force login attempts.
 - **`admin_types.go`**: Data transfer objects (`FeedSummary`, `FeedConfigUpdate`, `AudiobookDirInfo`, `SystemStats`).
-- **`ui/`**: Modular Single Page Application (`index.html`, `admin.css`, `admin.js`, `theme.js`) embedded via `//go:embed ui/*`.
+- **`ui/`**: Modular Single Page Application and locally vendored Bootstrap, Bootstrap Icons/font, QR library, and shared custom select, embedded via `//go:embed ui/*` without CDN dependencies.
 
-### 2.12 `services/update/` (Updater Pipeline)
+### 2.13 `services/update/` (Updater Pipeline)
 - **`updater.go`**: Manages the feed synchronization lifecycle: queries builders, checks episode statuses, downloads new media, runs hooks, cleans old files, and generates RSS XML.
 - **`matcher.go`**: Regex and filter matching logic for episodes (title, description, duration, age).
+
+### 2.14 `extensions/podsync-firefox/` (Browser Integration)
+- **`manifest.json`**: Manifest V3 declaration, Firefox compatibility, permissions, icon, and Mozilla data-collection disclosure.
+- **`popup.html`, `popup.css`, `popup.js`**: Popup settings and submission flow for supported YouTube, VK Video, and Rutube pages.
+- **`README.md`**: Developer packaging and temporary-installation notes; signed `.xpi` builds are distributed as GitHub Release assets.

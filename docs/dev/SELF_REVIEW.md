@@ -14,6 +14,7 @@ Before committing changes, opening pull requests, or creating release tags, run 
   - `defer m.mu.Unlock()` or `defer m.mu.RUnlock()` is called immediately after acquiring the lock.
   - No lock is held across long-running network I/O or disk operations.
 - [ ] **Channel Buffering**: No goroutine pushes indefinitely to unbuffered or full channels; non-blocking selects (`select { case ch <- val: ... default: ... }`) are used where appropriate.
+- [ ] **Persistent Job Lifecycle**: Every claimed queue job ends in `MarkDone`, `MarkFailed`, or `YieldJob` with the current claim token. `personal://<feed_id>` jobs are not rejected merely because they are absent from the regular feed map.
 - [ ] **Error Propagation**: Errors are wrapped with context (`errors.Wrapf`, `fmt.Errorf("%w", ...)`) and not silently ignored.
 
 ---
@@ -39,6 +40,10 @@ Before committing changes, opening pull requests, or creating release tags, run 
 - [ ] **Safe Deletion**:
   - Deletion routines (`DeleteFeed`, `DeleteAudiobookDir`) never delete parent directories or root filesystem paths.
   - Linked feeds are safely unmounted and deregistered before deleting underlying directories.
+- [ ] **Backup Safety**:
+  - Export uses a transactionally consistent Badger stream and excludes downloaded media.
+  - Inspect/restore verifies manifest schema, checksums, archive paths, upload/extraction limits, and restores through temporary files.
+  - Cross-server restore preserves target storage paths and port by default; secret restore is explicit and covered by tests.
 
 ---
 
@@ -65,7 +70,8 @@ Before committing changes, opening pull requests, or creating release tags, run 
   - No direct calls to `bootstrap.Modal.getInstance(el).hide()`.
   - Uses `closeModal(modalId)` to cleanly remove backdrops and restore scrollability.
 - [ ] **File Sync**:
-  - Kept all four Web UI assets in `services/web/ui/` and `html/` byte-for-byte identical; `Local.Open` serves the root copy when web UI serving is enabled.
+  - Kept Web UI assets in `services/web/ui/` and `html/` byte-for-byte identical, including local Bootstrap, icons/fonts, QRCode.js, and `select.js`; `Local.Open` serves the root copy when web UI serving is enabled.
+- [ ] **Player & System Cards**: Sticky player does not cover content; Download Scope, System Backup, and Podsync Updates states are correct on desktop and mobile.
 
 ---
 
@@ -81,3 +87,5 @@ Before committing changes, opening pull requests, or creating release tags, run 
 - [ ] **Documentation**: Reviewed both README files, affected English/Russian guides, and skills; updated changed behavior, examples, and links.
 - [ ] **UI Tests**: Ran the dependency-free Node.js tests and, when changing browser behavior, the [Playwright suite](../../tests/e2e/README.md).
 - [ ] **Docker Metadata**: Version and commit reach Docker builds through `TAG` and `COMMIT` build arguments; `.git/` and local data stay outside the context.
+- [ ] **Release Integrity**: A release marked Latest contains `checksums.txt` and native archives expected by `pkg/selfupdate`; extension-only releases are not Latest.
+- [ ] **Firefox Extension**: Manifest version, icon, supported-host validation, Firefox minimum versions, Mozilla data-collection permissions, signed `.xpi`, and direct README download links are current.

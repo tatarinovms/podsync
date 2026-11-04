@@ -23,7 +23,7 @@ This fork extends the original `mxpv/podsync` with the features described below.
 
 ### 1. Multi-Platform Sources & RSS Mirroring
 
-- Create standard podcast RSS feeds from **YouTube, Rutube, VK Video, Vimeo, SoundCloud**, local audiobooks, and third-party Podcast RSS feeds. Rutube supports channels, playlists, user profiles, and individual videos without API keys; VK Video supports `vkvideo.ru`, `vk.com`, and `vk.ru` channels, communities, users, and playlists.
+- Create standard podcast RSS feeds from **YouTube, Rutube, VK Video, Vimeo, SoundCloud**, Apple Podcasts show pages, local audiobooks, and third-party Podcast RSS feeds. Rutube supports channels, playlists, user profiles, and individual videos without API keys; VK Video supports `vkvideo.ru`, `vk.com`, and `vk.ru` channels, communities, users, and playlists.
 - Mirror any `http://`, `https://`, or `*.xml` podcast RSS feed with a live metadata preview (artwork, episode count, and size) and direct HTTP-to-disk media streaming, without intermediate `/tmp` buffering or RAM spikes.
 - Choose a Download Scope of **All episodes**, **Last 10**, **Last 25**, or **Last 50**. It synchronizes with `page_size` and `keep_last` to clamp large archives before they exhaust storage.
 - Configure video or audio format, quality profile, maximum video height, cron updates, custom artwork with live preview, category, language, OPML export, automatic cleanup of the last *X* episodes, API-key rotation, and post-download hooks/webhooks. Podsync runs on Windows (`x86_64`), macOS (`arm64`), Linux (`x86_64`, `arm64`), and Docker.

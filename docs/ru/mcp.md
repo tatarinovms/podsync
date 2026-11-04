@@ -66,7 +66,7 @@ MCP-сервер предоставляет 34 специализированн�
 |---|---|---|
 | **`list_feeds`** | `{}` | Список всех настроенных подкаст-лент, количество эпизодов, общий объём и публичные URL. |
 | **`get_feed`** | `feed_id` *(обяз)* | Детальные метаданные ленты со списком всех эпизодов и их статусами (`downloaded`, `new`, `error`). |
-| **`add_feed`** | `url` *(обяз)*, `format`, `quality`, `page_size`, `update_period`, `language` | Добавить новый канал/плейлист (YouTube, VK Video, Rutube, Vimeo и др.) с автоматической записью в `config.toml`. |
+| **`add_feed`** | `url` *(обяз)*, `format`, `quality`, `page_size`, `update_period`, `language` | Добавить источник YouTube/VK Video/Rutube/Vimeo/SoundCloud, обычную Podcast RSS-ленту или страницу Apple Podcasts с автоматической записью в `config.toml`. |
 | **`delete_feed`** | `feed_id` *(обяз)*, `delete_files` *(опц, по умолч: false)* | Удалить ленту и опционально стереть скачанные файлы с диска. |
 | **`update_feed`** | `feed_id` *(обяз)* | Запустить немедленный цикл проверки и скачивания для указанной ленты. |
 | **`update_all_feeds`** | `{}` | Запустить немедленную проверку и скачивание для всех настроенных лент одновременно. |

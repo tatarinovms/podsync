@@ -63,7 +63,7 @@ not mean the entire library is empty.
 |---|---|---|
 | **`list_feeds`** | `{}` | List all configured podcast feeds, episode counts, total sizes, and feed URLs. |
 | **`get_feed`** | `feed_id` *(req)* | Get detailed metadata for a feed along with the list of episodes and statuses (`downloaded`, `new`, `error`). |
-| **`add_feed`** | `url` *(req)*, `format`, `quality`, `page_size`, `update_period`, `language` | Add a new podcast channel/playlist (YouTube, VK Video, Vimeo, etc.). Automatically updates `config.toml`. |
+| **`add_feed`** | `url` *(req)*, `format`, `quality`, `page_size`, `update_period`, `language` | Add a YouTube/VK Video/Rutube/Vimeo/SoundCloud source, generic podcast RSS feed, or Apple Podcasts show URL. Automatically updates `config.toml`. |
 | **`delete_feed`** | `feed_id` *(req)*, `delete_files` *(opt, def: false)* | Remove a feed and optionally delete its downloaded media files from disk. |
 | **`update_feed`** | `feed_id` *(req)* | Trigger an immediate update check and download cycle for a feed. |
 | **`update_all_feeds`** | `{}` | Trigger an immediate update check and download cycle for all configured feeds. |

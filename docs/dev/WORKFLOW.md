@@ -10,7 +10,7 @@ This guide details the standard development lifecycle, test procedures, tagging,
 
 ### 1.1 Prerequisites
 Install required binaries:
-- **Go**: 1.25+ (`go version`)
+- **Go**: 1.25.8 (`go version`)
 - **yt-dlp**: Latest release (`yt-dlp --version`)
 - **ffmpeg**: Required for audio transcoding and ID3 cover extraction (`ffmpeg -version`)
 
@@ -171,6 +171,41 @@ GoReleaser publishes native archives as
 `Podsync_<version>_<OS>_<arch>` (for example,
 `Podsync_2.23.8_Linux_x86_64.tar.gz`). Keep this exact format: the built-in
 native updater selects an archive by that name before verifying its checksum.
+
+Before marking a release as **Latest**, verify that it contains
+`checksums.txt` and the expected native archives. A Firefox-extension-only
+release must be a pre-release or non-latest release; otherwise
+`/api/v1/system/update` will resolve an asset set that cannot update Podsync.
+
+### 4.3 Firefox Extension Packaging
+
+The extension is zero-build source under `extensions/podsync-firefox/`. Before
+submission:
+
+1. Increment `manifest.json` version and keep desktop/Android Firefox minimums
+   compatible with `browser_specific_settings.gecko.data_collection_permissions`.
+2. Ensure the disclosure declares `authenticationInfo` and
+   `browsingActivity`, and verify that only YouTube, VK Video, and Rutube links
+   can be submitted.
+3. Create the ZIP with files at the archive root, submit it to AMO without a
+   separate generated-source bundle, and attach the signed `.xpi` directly to a
+   GitHub Release.
+4. Use a direct release-asset URL in README files; do not link to a moving
+   `releases/latest` page or a GitHub source/archive URL.
+
+### 4.4 Backup Operations
+
+For offline export and restore:
+
+```bash
+podsync --config config.toml --export-backup podsync-backup.tar.gz
+podsync --config config.toml --restore-backup podsync-backup.tar.gz
+```
+
+Restore preserves the target server's storage paths and port by default. Use
+`--no-preserve-paths` only when the archive's original paths are intentionally
+required. Inspect an uploaded archive before restoring it through the Web UI or
+REST API.
 
 ---
 

@@ -85,6 +85,16 @@ Creates a new podcast feed.
 }
 ```
 
+Supported sources include YouTube, VK Video, Rutube, Vimeo, SoundCloud,
+`audiobook://` directories, generic podcast RSS URLs, and Apple Podcasts show
+URLs. Apple URLs are resolved to their canonical RSS source before mirroring.
+
+#### `POST /api/v1/feeds/preview`
+Validates a source URL before creation. RSS and Apple Podcasts inputs return
+provider, title, description, author, cover art, episode count, total enclosure
+bytes, and latest publication date; other supported providers return the
+detected provider.
+
 #### `GET /api/v1/feeds/{id}`
 Returns details for a specific feed and its episodes list. Supports optional query parameters `?limit=40&offset=0` for server-side pagination.
 
@@ -138,8 +148,9 @@ Deletes the feed from memory and `config.toml`. Set `delete_files=true` to delet
 #### `POST /api/v1/feeds/{id}/update`
 Triggers an immediate update for a single feed.
 
-#### `POST /api/v1/feeds/update-all`
-Queues updates for all configured feeds.
+#### `POST /api/v1/feeds/update`
+Queues updates for all configured feeds. `/api/v1/feeds/update-all` remains a
+legacy alias.
 
 ---
 
@@ -254,6 +265,27 @@ Downloads log content as attachment (`podsync.log`).
 
 #### `DELETE /api/v1/system/logs`
 Clears in-memory log buffer.
+
+#### `GET`, `POST /api/v1/system/update`
+`GET` checks the latest GitHub Release. `POST` installs the matching verified
+native archive and restarts the process. Self-update is unavailable for Docker
+deployments and Windows binary replacement.
+
+#### `GET /api/v1/system/backup/export?include_secrets={bool}`
+Downloads a portable `.tar.gz` backup. It includes `config.toml`, a consistent
+Badger stream, custom covers, and optionally API keys, administrator password,
+proxy credentials, and `cookies.txt`. Downloaded episode media is never
+included. `include_secrets` defaults to `true`.
+
+#### `POST /api/v1/system/backup/inspect`
+Validates an uploaded backup without changing state. Send multipart field
+`file`; the maximum upload size is 512 MiB. The response contains the manifest,
+Podsync version, feed counts, cover count, creation time, and secret status.
+
+#### `POST /api/v1/system/backup/restore`
+Validates and restores multipart field `file` (maximum 512 MiB). Optional form
+fields `preserve_paths` and `restore_secrets` both default to `true`. Preserving
+paths keeps the target server's storage locations and port during migration.
 
 ### 3.6 Authentication & Security
 
@@ -451,6 +483,11 @@ Queues a new episode for downloading and ingestion into the personal feed from a
   - `quality` *(string, optional)*: Media quality preference (`"high"` or `"low"`). Defaults to `"high"`.
   - `max_height` *(integer, optional)*: Maximum video height (e.g. `480`, `720`, `1080`, `1440`, `2160`, or `0` for original). Defaults to `0` (unlimited).
 - **Response**: `202 Accepted` with episode status object.
+
+The queue feed URL is `personal://<feed_id>`. Workers must not validate it
+against the regular `AppFeedManager` feed map; every claimed Personal Feed job
+must transition through `MarkDone`, `MarkFailed`, or `YieldJob` so later
+submissions are not deduplicated behind stale running state.
 
 #### `POST /api/v1/personal-feeds/{id}/upload`
 Directly uploads a media file (up to 4 GiB) via multipart form data.

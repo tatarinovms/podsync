@@ -6,10 +6,10 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 ## 1. Project Overview & Tech Stack
 
-**Podsync** is a high-performance Go service that converts video and audio channels, playlists, communities, user profiles (YouTube, Rutube, VK Video, Vimeo, SoundCloud), and **local audiobook folder collections** into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
+**Podsync** is a high-performance Go service that converts video and audio channels, playlists, communities, user profiles (YouTube, Rutube, VK Video, Vimeo, SoundCloud), Apple Podcasts pages, existing podcast RSS feeds, **local audiobook folder collections**, and manually curated **Personal Feeds** into standards-compliant podcast RSS feeds with automatic media downloading, transcoding, disk management, and metadata storage.
 
 ### Core Technologies
-- **Language**: Go 1.25+ (`go.mod`)
+- **Language**: Go 1.25.8 (`go.mod`)
 - **Storage/DB**: BadgerDB (embedded key-value database for feed/episode metadata and state)
 - **Job Queue & Concurrency**: Persistent disk-backed job queue (`pkg/jobqueue/`) with crash recovery, state persistence, and worker concurrency limits
 - **Filesystem**: Local filesystem storage or AWS S3 (`pkg/fs/`), with dynamic Virtual Mounter (`fs.Mounter`) for zero-copy audiobook serving
@@ -19,6 +19,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 - **Security & Rate Limiting**: In-memory sliding-window IP rate limiter (`services/web/rate_limiter.go`) with brute-force lockout, session cookie authentication, and HTTP Basic Auth
 - **Web UI**: Embedded modular single-page application (`services/web/ui/` with `index.html`, `admin.css`, `admin.js`, `theme.js`, mirrored to root `html/`) styled with strict Catppuccin Mocha (dark) & Latte (light) themes
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
+- **Backup & Recovery**: Portable `.tar.gz` backups (`pkg/backup/`) containing configuration, a consistent Badger stream, custom covers, optional secrets, and Personal Feed metadata; downloaded media is intentionally excluded
+- **Browser Integration**: Signed Firefox WebExtension sources in `extensions/podsync-firefox/` for sending YouTube, VK Video, and Rutube tabs to Personal Feeds
 
 ---
 
@@ -28,14 +30,20 @@ This file provides comprehensive architecture guidance, development workflows, a
 .
 ├── cmd/podsync/              # Main application entry point & CLI commands
 │   ├── main.go               # Flags, signal handling, HTTP server & cron initialization
+│   ├── backup_cli.go         # Full-system backup export and restore CLI commands
 │   ├── config.go             # Config struct, defaults, environment variable overrides
+│   ├── config_atomic.go      # Atomic config.toml mutation helpers
 │   ├── config_test.go        # Unit tests for config loading and env vars
 │   ├── feed_manager.go       # Implementation of AppFeedManager for Web UI and MCP
 │   ├── feed_manager_test.go  # Tests for feed management, private feeds, audiobook deletion
+│   ├── update_queue.go       # Queue capacity checks and update admission helpers
+│   ├── restart_unix.go / restart_windows.go # Platform-specific self-update restart
 │   └── disk_unix.go / windows.go # Platform-specific disk space calculations
-├── html/                     # Mirrored Web UI static assets (admin.css, admin.js, index.html, theme.js)
+├── html/                     # Mirrored Web UI assets, including vendored Bootstrap, icons, fonts, and QR library
 ├── pkg/
+│   ├── backup/               # Portable backup creation, validation, checksums, and restore
 │   ├── builder/              # Platform builders fetching metadata from source APIs
+│   │   ├── apple.go          # Apple Podcasts URL resolution to the underlying RSS feed
 │   │   ├── audiobook.go      # Local audiobook builder (ID3/APIC tags, natural sorting, serial format)
 │   │   ├── audiobook_test.go # Unit tests for audiobook discovery, chapter sorting, and covers
 │   │   ├── rutube.go         # Rutube builder (channel, playlists, users via yt-dlp)
@@ -55,6 +63,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── server.go         # 34 MCP tools, resources (podsync://*), and diagnostic prompts
 │   │   └── proxy.go          # JSON-RPC relay to /mcp and web.AdminManager REST client
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
+│   ├── network/              # Custom DNS resolver configuration and validation
+│   ├── personal/             # Curated mixed-media feeds, shared media references, and processing
 │   ├── selfupdate/           # Verified native binary update from GitHub Releases
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
@@ -63,15 +73,19 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── api.go            # REST API endpoints (/api/v1/*)
 │   │   ├── auth.go           # Session cookie auth, password verification, login handlers
 │   │   ├── feed_patch.go     # Atomic partial feed configuration updates
+│   │   ├── personal.go       # Personal Feed REST handlers and uploads
 │   │   ├── rate_limiter.go   # In-memory sliding-window IP brute-force protection
 │   │   ├── server.go         # HTTP router, middleware, static asset embedding
-│   │   └── ui/               # Embedded SPA assets (admin.css, admin.js, index.html, theme.js)
+│   │   └── ui/               # Embedded SPA assets (admin.css/js, index.html, theme.js, select.js, vendored dependencies)
 │   ├── update/               # Feed update orchestrator and regex episode matcher
 │   └── migrate/              # Tooling for media filename migration
 ├── docs/                     # Guides, token setup instructions, and MCP specs
 │   ├── dev/                  # Architecture, API/design guides, workflow, and review checklist
 │   └── ru/                   # Russian user guides and developer documentation index
 ├── tests/e2e/               # Playwright browser regression tests with isolated npm dependencies
+├── extensions/
+│   ├── podsync-firefox/      # Firefox extension source, manifest, popup, icon, and setup guide
+│   └── podsync-firefox-*.zip # AMO submission source archive; signed XPI is distributed via Releases
 ├── .agents/skills/podsync/   # Standard agent skill definition for MCP
 ├── Dockerfile                # Multi-stage Docker build (Go builder + Alpine runtime with yt-dlp)
 ├── docker-compose.yml        # Docker compose configuration for running Podsync
@@ -121,6 +135,11 @@ This file provides comprehensive architecture guidance, development workflows, a
 - Requires YouTube Data API v3 key (`PODSYNC_YOUTUBE_API_KEY`).
 - Multi-key Round-Robin rotation. Downloads run through `yt-dlp` with Netscape cookies support.
 
+### Apple Podcasts (`pkg/builder/apple.go`)
+- Supports show URLs on `podcasts.apple.com` and legacy `itunes.apple.com`, including country-prefixed URLs and episode links containing a show ID.
+- Resolves the underlying RSS URL through the iTunes Lookup API, with Apple page HTML parsing as a fallback, then uses the normal RSS mirroring pipeline.
+- Apple Podcasts feeds support the same Download Scope controls as custom RSS feeds: all episodes, the last 10/25/50, or a custom numeric limit.
+
 ---
 
 ## 4. Web Admin Console & REST API (`services/web/`)
@@ -132,8 +151,13 @@ This file provides comprehensive architecture guidance, development workflows, a
   - **Dedicated Podcast View (`.feed-detail`)**:
     - **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.
     - **Episodes Tab**: Real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), duration filtering (&lt; 15 min, 15–60 min, &gt; 60 min), flexible multi-criteria sorting (date newest/oldest, duration longest/shortest, title A–Z), in-browser audio player, file download links, and individual retry buttons.
+    - **Sticky Mini-Player**: Bottom-docked playback that survives view changes, with -15/+30 second seeking, speed control, codec/bitrate details, and Podcasting 2.0 chapter navigation.
     - **Settings Tab**: Inline feed parameters adjustment (cron schedule, format, quality presets 480p/720p/1080p, retention limits, language, custom cover art URL & file upload with live preview) directly on the show page.
     - **History Tab**: Dedicated chronological timeline of synchronization events, download activity, and errors for the feed.
+  - **Download Scope**: RSS and Apple Podcasts feeds can select all episodes, the last 10/25/50, or a custom count. Changing `page_size` or `keep_last` cancels the active worker and queues a fresh update so the new limit is enforced immediately.
+  - **System Backup**: Web Admin can export, inspect, and restore portable backups. Restore preserves the destination server's storage paths and port by default.
+  - **Podsync Updates**: Native Linux/macOS installations can check GitHub Releases, verify `checksums.txt`, atomically replace the executable, and restart. Docker installations must update the image from the host.
+  - **Local UI Dependencies**: Bootstrap CSS/JS, Bootstrap Icons/fonts, and the QR library are embedded; the admin console must not depend on third-party CDNs.
 - **Button Standards & Layout Metrics**:
   - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).
   - **Mobile Touch Targets**: Under mobile viewports (`max-width: 575px`), action buttons automatically expand to `min-height: 44px` with `padding: 8px 16px` for touch accessibility.
@@ -170,12 +194,16 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
 | `GET` | `/api/v1/system` | Get system metrics, disk usage, and dependencies |
 | `GET`, `POST` | `/api/v1/system/update` | Check GitHub Releases or install the latest release and restart a native process |
+| `GET` | `/api/v1/system/backup/export` | Stream a portable `.tar.gz` backup (`include_secrets=false` omits credentials and cookies) |
+| `POST` | `/api/v1/system/backup/inspect` | Validate a multipart backup upload up to 512 MiB and return its manifest/checksums |
+| `POST` | `/api/v1/system/backup/restore` | Restore a validated multipart backup; paths/port and secrets are independently controllable |
 | `GET` | `/api/v1/system/logs` | Query in-memory server logs (level/search/feed_id filter) |
 | `GET` | `/api/v1/system/logs/download` | Download complete server log file as text |
 | `DELETE` | `/api/v1/system/logs` | Clear in-memory system log buffer |
 | `GET`, `POST` | `/api/v1/system/logs/level` | Get or change server logging level on the fly |
 | `GET` | `/api/v1/feeds` | List all active feeds (channels and audiobooks) |
 | `POST` | `/api/v1/feeds` | Create new podcast feed |
+| `POST` | `/api/v1/feeds/preview` | Resolve and preview provider/RSS metadata before feed creation, including Apple Podcasts URLs |
 | `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
 | `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
 | `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list (supports `?limit=40&offset=0` pagination) |
@@ -239,7 +267,7 @@ before serving; proxied initialization preserves the daemon's version.
 
 ## 6. Golden Rules for AI Agents
 
-1. **Never break existing platform builders**: Any modifications to `pkg/builder/` must preserve full backwards compatibility across all supported providers (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Audiobooks).
+1. **Never break existing platform builders**: Any modifications to `pkg/builder/` must preserve full backwards compatibility across all supported providers (YouTube, Rutube, VK Video, Vimeo, SoundCloud, Apple Podcasts, custom RSS, and Audiobooks).
 2. **Preserve BadgerDB integrity**: Always handle transactions cleanly and prevent corrupt keys.
 3. **Always run `-race` tests**: After modifying Go code, run `go test -race ./...` to verify there are no data races.
 4. **Instant XML Rebuild on Config Change**: Whenever feed metadata or `private_feed` is updated, ensure `m.updates <- f` is queued so the XML file on disk reflects changes immediately.
@@ -275,6 +303,26 @@ before serving; proxied initialization preserves the daemon's version.
     - Cover changes to features, API/MCP behavior, transports, configuration, defaults, deployment, and troubleshooting, including fixes that do not add or remove tools. Keep examples, commands, endpoint descriptions, and tool counts accurate.
     - When agent workflows change, update the affected skills under `.agents/skills/` and synchronize their installed copies. For the Podsync skill, use all four locations listed in Rule 9.
     - Before reporting completion, check affected local links and examples and run applicable documentation synchronization checks. If no documentation or skill changes are needed, confirm that during the review.
+13. **Personal Feed Queue Completion**:
+    - Personal Feed configs use `personal://<feed_id>` and are stored outside the regular `feedManager` config map. Never interpret a missing regular config entry as deletion for a `personal://` job.
+    - Every claimed Personal Feed job must reach `MarkDone`, `MarkFailed`, or an intentional yield/cancel path. Leaving it `running` blocks later submissions until stale-job recovery.
+14. **Backup Safety & Portability**:
+    - Backups must never include downloaded episode media. Validate archive paths, manifest checksums, size limits, and Badger stream integrity before restore.
+    - Preserve destination storage paths and server port by default. Secrets, covers, cookies, and database restoration must remain explicit options at the API/manager boundary.
+15. **GitHub Release Integrity**:
+    - `releases/latest` is consumed by native self-update. The latest production release must include `checksums.txt` and the supported native archives (`Linux_x86_64`, `Linux_arm64`, `Darwin_arm64`, `Windows_x86_64`).
+    - A Firefox-extension-only release must never be marked as the repository's Latest production release. Prefer attaching the signed `.xpi` to a normal Podsync release or publishing an extension-only entry as a pre-release.
+    - Keep archive names compatible with `pkg/selfupdate/`, and keep the release workflow on GoReleaser v2 syntax.
+16. **Firefox Extension Distribution**:
+    - Source lives in `extensions/podsync-firefox/`; increment `manifest.json` for every AMO upload and keep `browser_specific_settings.gecko.data_collection_permissions` accurate.
+    - The extension accepts only YouTube, VK Video, and Rutube pages, stores its configured API URL/credentials in Firefox extension-local storage, and exposes audio/video quality controls before submission.
+    - When the signed XPI filename or release tag changes, update direct download links in `README.md`, `README_RU.md`, `docs/personal-feeds.md`, `docs/ru/personal-feeds.md`, and the extension README together.
+17. **Mandatory Pre-Release Documentation Gate**:
+    - Before creating or pushing a release tag, publishing a GitHub Release, or marking a release as Latest, review every feature, fix, configuration change, API/MCP change, compatibility note, and operational change included since the previous release.
+    - Update all affected documentation in the same release commit: `AGENTS.md`, `README.md`, `README_RU.md`, relevant guides under `docs/` and `docs/ru/`, developer guides under `docs/dev/`, extension documentation, and agent skills. Do not postpone documentation to a follow-up release.
+    - Keep commands, defaults, endpoint and tool counts, version numbers, release asset names, signed XPI links, screenshots, migration steps, upgrade instructions, and troubleshooting guidance consistent with the code being released.
+    - Before tagging, validate affected local links and examples, synchronize English/Russian guide pairs and all required skill copies, run documentation/MCP synchronization checks, and inspect the staged release diff for stale version or `releases/latest` references.
+    - A release is not ready while any affected document or guide is known to be stale, even when the binary and tests are otherwise ready.
 
 ---
 

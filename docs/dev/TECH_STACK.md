@@ -10,7 +10,7 @@ This document provides a comprehensive inventory of the programming languages, r
 
 | Component | Technology | Version | Purpose |
 |---|---|---|---|
-| **Backend Language** | Go | 1.25+ | High-throughput, concurrent service runtime |
+| **Backend Language** | Go | 1.25.8 | High-throughput, concurrent service runtime |
 | **Frontend Language** | JavaScript (ES6+) | Modern Vanilla | Zero-build embedded SPA admin panel (`admin.js`, `theme.js`) |
 | **Markup & Styling** | HTML5 / CSS3 | Modern | Responsive UI using CSS custom properties (`admin.css`, `index.html`) |
 | **Container Engine** | Docker / Compose | Engine 20.10+ | Multi-stage image packaging on Alpine Linux |
@@ -36,6 +36,7 @@ From [`go.mod`](../../go.mod):
 ### Storage, Persistence & Job Queue
 - **`github.com/dgraph-io/badger`** (`v1.6.2`): Embedded key-value database providing ACID transactions, zero external server dependencies, and high-performance disk-backed caching.
 - **`pkg/jobqueue`**: In-house persistent disk-backed job queue with BadgerDB state tracking, crash recovery, and worker concurrency controls.
+- **`pkg/backup`**: Portable archive layer using a manifest, per-entry checksums, Badger's consistent backup stream, and bounded extraction.
 - **`github.com/aws/aws-sdk-go`**: AWS S3 client SDK for offloading podcast audio/video hosting to cloud object storage.
 
 ### Scheduling & Synchronization
@@ -59,6 +60,7 @@ From [`go.mod`](../../go.mod):
 - **`pkg/logbuffer`**: Thread-safe in-memory circular ring buffer for real-time log querying via Web UI and MCP.
 - **`google.golang.org/api`**: YouTube Data API v3 client.
 - **`github.com/silentsokolov/go-vimeo`**: Vimeo API client.
+- **Apple iTunes Lookup API + RSS parser**: Resolves Apple Podcasts pages to canonical RSS sources and mirrors existing podcast feeds without an API key.
 
 ---
 
@@ -77,6 +79,15 @@ Embedded directly within the Go binary (`//go:embed ui/*` from `services/web/ui/
 | **Color Theme** | Catppuccin | Mocha & Latte | Pastel dark and light themes implemented via CSS variables (`--ctp-*`) |
 | **QR Generator** | QRCode.js (qrcodejs) | 1.0.0 | Locally bundled MIT-licensed QR generator for smartphone subscriptions; does not delay the console on a CDN request |
 
+Bootstrap CSS/JS, Bootstrap Icons and fonts, and QRCode.js are vendored under
+`services/web/ui/` and mirrored to `html/`; the admin console must not depend on
+third-party CDNs at runtime.
+
+### Browser Extension
+- **Firefox WebExtension**: Manifest V3, zero-build HTML/CSS/JavaScript popup under `extensions/podsync-firefox/`.
+- **Distribution**: Mozilla-signed `.xpi` attached directly to a GitHub Release; source ZIPs may be used for review but are not the user installation artifact.
+- **Privacy declaration**: `browser_specific_settings.gecko.data_collection_permissions` declares required authentication and browsing-activity access for AMO validation.
+
 ### UI Design System & Button Standards
 - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).
 - **Mobile Touch Targets**: Under mobile viewports (`max-width: 575px`), action buttons automatically expand to `min-height: 44px` with `padding: 8px 16px` for touch accessibility.
@@ -90,5 +101,5 @@ Embedded directly within the Go binary (`//go:embed ui/*` from `services/web/ui/
 
 - **RSS 2.0 & iTunes Podcast Specifications**: Compliant XML schema with audio/video enclosures, artwork, categories, explicit tags, and `<itunes:block>yes</itunes:block>` for private feeds.
 - **Podcast 2.0**: Serial feed specification (`<itunes:type>serial</itunes:type>` and `<itunes:episode>N</itunes:episode>`) for episodic audiobook chapters.
-- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing 28 JSON-RPC 2.0 tools and resources over Stdio and HTTP Server-Sent Events (SSE). When a daemon is ready, stdio relays the complete exchange to its authenticated `POST /mcp` endpoint.
+- **Model Context Protocol (MCP)**: Version `2024-11-05`, exposing 34 JSON-RPC 2.0 tools and resources over Stdio, authenticated HTTP, and Server-Sent Events (SSE). When a daemon is ready, stdio relays the complete exchange to its authenticated `POST /mcp` endpoint.
 - **Netscape Cookie Format**: Standard cookies header format used by `yt-dlp` to authenticate and bypass bot challenges.

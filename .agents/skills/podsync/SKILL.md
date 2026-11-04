@@ -44,9 +44,9 @@ When connected to Podsync's MCP server (`podsync --mcp`, `POST /mcp`, or `/mcp/s
 - **When to use**: Inspecting episodes, checking if a new episode was downloaded, or viewing error details.
 
 ### 3. `add_feed`
-- **Purpose**: Subscribes to a new video or audio channel/playlist/user and generates a podcast RSS feed for it. Automatically appends the feed to `config.toml`.
+- **Purpose**: Subscribes to a video/audio channel, playlist or user, mirrors an existing podcast RSS feed, or resolves an Apple Podcasts show page and generates a local podcast RSS feed. Automatically appends the feed to `config.toml`.
 - **Arguments**:
-  - `url` *(string, required)*: Source channel or playlist URL (e.g. YouTube, Rutube, VK Video, Vimeo, SoundCloud).
+  - `url` *(string, required)*: Source URL (YouTube, Rutube, VK Video, Vimeo, SoundCloud, generic podcast RSS, or Apple Podcasts show page).
   - `format` *(string, optional)*: `"audio"` (default, MP3/M4A) or `"video"` (MP4).
   - `quality` *(string, optional)*: `"high"` (default) or `"low"`.
   - `page_size` *(integer, optional)*: How many recent episodes to fetch/keep (default: 50).

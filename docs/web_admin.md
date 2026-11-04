@@ -136,14 +136,16 @@ Latte uses semantic text colors for readable status badges and secondary text.
 Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`) instead of a modal popup:
 - **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.
 - **Sub-navigation Tabs**:
-  - **Episodes**: Full media library with real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), duration filtering (&lt; 15 min, 15–60 min, &gt; 60 min), flexible sorting by date (newest/oldest), duration (longest/shortest), and title (A–Z), in-browser audio playback, file download links, and individual retry buttons.
-  - **Settings**: Adjust feed parameters (update schedule, video/audio format, quality presets 480p/720p/1080p, retention limits, language, custom cover art URL or image file upload with live preview) directly on the show page.
+  - **Episodes**: Full media library with real-time episode search, status filtering (**Downloaded**, **Pending**, **Errors**, **Cleaned**), duration filtering (&lt; 15 min, 15–60 min, &gt; 60 min), flexible sorting by date (newest/oldest), duration (longest/shortest), and title (A–Z), file downloads, and individual retry buttons. Audio opens in a bottom-docked mini-player with -15/+30 second seeking, playback speed, codec/bitrate details, and chapter navigation.
+  - **Settings**: Adjust feed parameters (update schedule, video/audio format, quality presets 480p/720p/1080p, page size, retention limits, language, custom cover art URL or image file upload with live preview) directly on the show page. Changes to download scope cancel active work for that feed and queue a fresh update.
   - **History**: Dedicated timeline of synchronization events, download activity, and errors for this specific feed.
 - **Back to Library**: Seamless one-click return to the main library preserving active filters and scroll position.
 
 ### 4. Feed Management & Bulk Actions
-- **Add Podcast**: Modal to subscribe to channels, playlists, or users (YouTube, Rutube, VK Video, Vimeo, SoundCloud).
+- **Add Podcast**: Modal to subscribe to channels, playlists, or users (YouTube, Rutube, VK Video, Vimeo, SoundCloud), mirror a podcast RSS URL, or resolve an Apple Podcasts show page to its canonical RSS feed.
   - Auto-detection of Feed ID from source URL.
+  - RSS and Apple Podcasts preview with artwork, author, episode count, total enclosure size, and latest publication date.
+  - **Download Scope** presets for all episodes, last 10, last 25, last 50, or a custom count; these synchronize `page_size` and `keep_last` before the first download.
   - Preset video qualities (**480p**, **720p**, **1080p**) and automatic synchronization of **Page Size &rarr; Keep Last**.
   - Immediate persistence to `config.toml`, cron scheduler, and download queue.
 - **Library Actions Menu**:
@@ -161,7 +163,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Server Local Files**: Import media directly by local filesystem path (`file_path`).
   - **File Uploads**: Drag-and-drop or upload local audio/video files (up to 4 GiB) with real-time progress and automatic `ffmpeg` transcoding.
 - **Episode Operations**:
-  - In-browser playback with integrated audio/video player.
+  - In-browser playback; audio uses the shared bottom-docked mini-player.
   - **Rename**: Change episode title in a modal dialog with instant feed RSS XML rebuild.
   - **Copy**: Clone an episode into another personal feed without duplicating physical storage.
   - **Move**: Transfer an episode between feeds while preserving its GUID.
@@ -192,7 +194,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Podsync Updates**: Checks the latest GitHub Release. On a supported native Linux or macOS installation, **Update Podsync** downloads the matching release archive, verifies its SHA-256 from `checksums.txt`, replaces the executable, and restarts the process. The button is disabled for Docker deployments; follow the Compose update commands in the deployment guide instead.
   - **Backup & Restore**: Downloads a portable `podsync-backup-YYYYMMDD-HHMMSS.tar.gz` containing `config.toml`, a consistent Badger backup stream, custom covers, optional `cookies.txt`, and a checksum manifest. Downloaded episodes are never included. Selecting an archive verifies checksums and shows its feed counts before restore. Keep the target server paths and port when migrating between Docker, NAS, and bare-metal deployments.
 
-### 7. Downloader & Cookies Configuration (yt-dlp)
+### 8. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
   - **Bypassing Bot Verification**: Overcomes the `Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication` error.
   - **Netscape Cookies (`cookies.txt`)**: Paste or upload exported browser cookies directly into the web UI. Stored automatically in `data/cookies.txt`.
@@ -201,7 +203,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Engine Options**: Configure download timeouts and 24h automatic self-update.
   - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
 
-### 8. Network DNS
+### 9. Network DNS
 - The **Network DNS** card accepts comma-separated IPv4 or IPv6 resolver addresses.
 - Saved addresses apply immediately to Podsync provider API and RSS metadata requests, including VK Video. Leave the field empty to return to the operating system DNS resolver.
 - `yt-dlp` is a separate process and continues to use the operating system DNS.
@@ -245,7 +247,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/audiobooks/import` | `POST` | Import local audiobook folder into Podcast 2.0 serial feed |
 | `/api/v1/audiobooks/upload` | `POST` | Upload audiobook audio tracks and cover directly via multipart/form-data |
 | `/api/v1/covers/upload` | `POST` | Upload custom cover art image (JPEG, PNG, WebP) with live preview |
-| `/api/v1/feeds/preview` | `POST` | Inspect remote feed / RSS URL, parse metadata, episode count, and size |
+| `/api/v1/feeds/preview` | `POST` | Inspect RSS or Apple Podcasts URL; parse provider, metadata, episode count, size, and latest date |
 | `/api/v1/audiobooks/dirs` | `DELETE` | Delete audiobook folder and linked feed from disk |
 | `/api/v1/audiobooks/config` | `GET` | Get configured audiobooks directory path and status |
 | `/api/v1/system/logs` | `GET` | Query recent system logs with level/search/feed_id filtering |

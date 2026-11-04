@@ -319,3 +319,26 @@ Accent colors have different lightness levels in Latte and Mocha:
 - Avoid creating duplicate implementations of buttons, inputs, cards, or theme logic.
 - Before merging UI changes, test both themes, keyboard navigation, responsive widths, loading/empty/error states, and contrast.
 - Keep user-generated content separate from English-only interface chrome: do not translate or rewrite user content automatically.
+
+## 15. Product-Specific Interaction Patterns
+
+- **Sticky mini-player**: Episode playback stays docked at the bottom while the
+  user navigates. Preserve play/pause, seek, -15/+30 second controls, playback
+  speed, codec/bitrate metadata, chapter navigation, and an explicit close
+  action. Reserve body space while it is visible so content is not obscured.
+- **Download Scope**: Feed settings expose All, last 10/25/50, and custom scope.
+  Keep scope and retention wording distinct. When `page_size` or `keep_last`
+  changes, communicate that active work is cancelled and a fresh update is
+  queued.
+- **System Backup**: Export clearly states whether secrets are included. Restore
+  remains disabled until inspection succeeds, previews manifest counts, keeps
+  `preserve_paths` enabled by default, and requires confirmation before state is
+  replaced.
+- **Podsync Updates**: Show installed/latest versions and platform eligibility.
+  Disable installation for Docker and unsupported replacement platforms rather
+  than presenting a button that cannot succeed.
+- **Personal Feed browser submission**: The Firefox popup shows maximum video
+  resolution only when Video is selected and closes after a successful enqueue.
+  Unsupported hosts must be rejected before credentials or content are sent.
+- **Runtime independence**: Bootstrap, Bootstrap Icons/fonts, and QRCode.js are
+  served locally. Do not add CDN dependencies to the admin console.

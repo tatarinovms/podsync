@@ -26,9 +26,9 @@ Screenshots are written to a temporary `podsync-ui-*` directory whose path is
 printed by the test. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing
 Chromium executable instead of the browser installed by Playwright.
 
-CI runs this suite in the **Browser tests** job. The dependency-free UI tests
-remain in `services/web/` and run in the regular Go test job.
+Run this suite locally for browser changes. The dependency-free UI tests
+remain in `services/web/` and can be run locally as well.
 
 Theme values live in `tokens/podsync.json`. From the repository root, regenerate
 both UI copies with `python3 scripts/build_podsync_theme.py`, or check them with
-`python3 scripts/build_podsync_theme.py --check`. The browser CI job runs this check.
+`python3 scripts/build_podsync_theme.py --check`.

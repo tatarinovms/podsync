@@ -52,6 +52,8 @@ The Web Admin console will be available at `http://localhost:8080/admin`.
 
 Always verify test suites before committing changes.
 
+CI builds on Linux, Windows, and macOS; run the tests below locally before committing.
+
 ### 2.1 Running All Unit Tests
 ```bash
 # Run all tests with race detector
@@ -102,7 +104,7 @@ npm test
 ```
 
 See the [browser test guide](../../tests/e2e/README.md) for Linux dependencies,
-screenshots, and executable overrides. CI runs this suite in **Browser tests**.
+screenshots, and executable overrides. Run this suite locally for browser changes.
 
 ---
 

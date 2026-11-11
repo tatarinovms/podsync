@@ -50,7 +50,7 @@ This fork extends the original `mxpv/podsync` with the features described below.
 
 - Manage the library through a responsive console with Mocha and Latte themes, an accessible mobile navigation drawer, list and grid views, search, sorting, retry actions, cover uploads, and accurate downloaded-episode disk metrics.
 - Use the bottom-docked mini-player for codec and bitrate inspection, -15/+30 second seeking, playback-speed changes, and chapter navigation. Share a feed with QR codes, clipboard links, and Apple Podcasts, Pocket Casts, or Overcast deep links.
-- Each podcast has a dedicated detail page with chapters and episodes, status badges, playback and download links, retries, and direct deletion.
+- Each podcast has a dedicated detail page with chapters and episodes, status badges, playback and download links, retries, and deletion in the actions menu.
 - Feed IDs transliterate Cyrillic (Russian, Ukrainian, and Belarusian) and diacritics into validated Latin slugs with a live RSS URL preview. The console also provides two-second real-time log polling, log search and levels, downloadable logs, configurable brute-force protection, and SHA-256-verified native self-updates.
 
 ### 6. Anti-Blocking, Selective Proxy & Network

@@ -102,7 +102,7 @@
                 <!-- 1. Feeds Tab -->
                 <div class="tab-pane fade show active" id="tab-feeds">
                     <header class="library-heading">
-                        <div><h1>Podcasts</h1></div>
+                        <div><h1>Podcasts</h1><p class="library-description">Your library includes channels, personal feeds, and audiobooks.</p></div>
                         <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addFeedModal"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Add podcast</button>
                     </header>
                     <div class="library-toolbar">
@@ -135,7 +135,7 @@
                 <section class="tab-pane fade" id="tab-personal" aria-label="Personal feeds">
                     <div id="personal-main-view">
                         <header class="library-heading">
-                            <div><h1>Personal Feeds</h1></div>
+                            <div><h1>Personal Feeds</h1><p class="library-description">Curated feeds also appear in Podcasts under the Personal filter.</p></div>
                             <button class="btn btn-brand" type="button" onclick="personalEdit()"><i aria-hidden="true" class="bi bi-plus-lg me-2"></i>Create feed</button>
                         </header>
                         <div id="personal-error" class="alert alert-danger py-2 px-3 small d-none mb-3" role="alert"></div>
@@ -1261,7 +1261,7 @@
 
                 <section class="tab-pane feed-detail" id="episodesModal" aria-label="Podcast details">
                     <button class="btn btn-light mb-4" onclick="returnToLibrary()"><i aria-hidden="true" class="bi bi-arrow-left me-2"></i>Back to library</button>
-                    <header class="feed-detail-heading"><div id="detail-cover" class="detail-cover"></div><div class="flex-grow-1 min-w-0"><div class="eyebrow" id="detail-provider">PODCAST</div><h1 id="episodes-feed-title" tabindex="-1">Podcast</h1><p class="text-muted mb-0" id="episodes-feed-subtitle"></p></div><div class="d-flex align-items-center gap-2 flex-wrap"><button class="btn btn-outline-danger btn-sm" onclick="deleteFeed(document.getElementById('episodesModal').dataset.feedId)" title="Delete podcast / audiobook"><i aria-hidden="true" class="bi bi-trash3 me-1"></i>Delete</button><button class="btn btn-brand btn-sm" onclick="showSubscription(document.getElementById('episodesModal').dataset.feedId)"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></header>
+                    <header class="feed-detail-heading"><div id="detail-cover" class="detail-cover"></div><div class="flex-grow-1 min-w-0"><div class="eyebrow" id="detail-provider">PODCAST</div><h1 id="episodes-feed-title" tabindex="-1">Podcast</h1><p class="text-muted mb-0" id="episodes-feed-subtitle"></p></div><div class="d-flex align-items-center gap-2 flex-wrap"><button class="btn btn-brand btn-sm" onclick="showSubscription(document.getElementById('episodesModal').dataset.feedId)"><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button><div class="dropdown"><button class="btn btn-light btn-sm" data-bs-toggle="dropdown" aria-label="More podcast actions" aria-expanded="false"><i aria-hidden="true" class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item text-danger" onclick="deleteFeed(document.getElementById('episodesModal').dataset.feedId)"><i aria-hidden="true" class="bi bi-trash3 me-2"></i>Delete podcast</button></li></ul></div></div></header>
                     <nav class="detail-navigation" aria-label="Podcast sections"><button class="active" data-section="episodes" aria-current="page" onclick="showFeedSection('episodes')">Episodes</button><button data-section="settings" onclick="showFeedSection('settings')">Settings</button><button data-section="history" onclick="showFeedSection('history')">History</button></nav>
                     <div id="detail-episodes" class="card p-0 overflow-hidden">
                     <div class="d-flex flex-column flex-md-row gap-2 p-3 border-bottom sticky-top" style="background-color: var(--bg-card); z-index: 5;">
@@ -1761,7 +1761,7 @@
                             </div>
                         </div>
 
-                        <div class="px-3 pt-3"><button type="button" class="btn btn-light btn-sm" id="add-advanced-toggle" aria-expanded="false" onclick="toggleAddAdvanced(this)"><i aria-hidden="true" class="bi bi-sliders me-2"></i>Advanced options</button></div>
+                        <div class="px-3 pt-3"><button type="button" class="btn btn-light btn-sm" id="add-advanced-toggle" aria-expanded="false" aria-controls="addFeedTabs" onclick="toggleAddAdvanced(this)"><i aria-hidden="true" class="bi bi-sliders me-2"></i>Advanced options</button></div>
                         <!-- Nav tabs -->
                         <ul class="nav nav-tabs nav-fill px-3 pt-2 bg-body-tertiary d-none" id="addFeedTabs" role="tablist">
                             <li class="nav-item">

@@ -49,9 +49,7 @@ func CleanErrorMessage(output string) string {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "ERROR:") {
-			clean := strings.TrimPrefix(trimmed, "ERROR:")
-			clean = strings.TrimSpace(clean)
-			clean = regexp.MustCompile(`^\[[^\]]+\]\s*`).ReplaceAllString(clean, "")
+			clean := cleanYTDLPDiagnostic(strings.TrimPrefix(trimmed, "ERROR:"))
 			errorLines = append(errorLines, clean)
 		}
 	}
@@ -60,21 +58,52 @@ func CleanErrorMessage(output string) string {
 		return strings.Join(errorLines, "; ")
 	}
 
+	// Some yt-dlp failures (notably download/ffmpeg failures) are emitted with a
+	// component prefix instead of the conventional "ERROR:" prefix. Prefer
+	// those diagnostics over unrelated warnings printed earlier in the output.
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
-		if line == "" || strings.HasPrefix(line, "[youtube]") || strings.HasPrefix(line, "[info]") || strings.HasPrefix(line, "[download]") {
+		if line == "" || isYTDLPWarning(line) {
 			continue
 		}
-		if len(line) > 200 {
-			line = line[:197] + "..."
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "http error") ||
+			strings.Contains(lower, "unable to download") ||
+			strings.Contains(lower, "download error") ||
+			strings.Contains(lower, "failed to") ||
+			strings.Contains(lower, "error:") {
+			return truncateDiagnostic(cleanYTDLPDiagnostic(line))
 		}
-		return line
 	}
 
-	if len(raw) > 200 {
-		return raw[:197] + "..."
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line == "" || isYTDLPWarning(line) || strings.HasPrefix(line, "[youtube]") || strings.HasPrefix(line, "[info]") || strings.HasPrefix(line, "[download]") {
+			continue
+		}
+		return truncateDiagnostic(line)
 	}
-	return raw
+
+	return "download process exited with error; yt-dlp provided no error details"
+}
+
+func isYTDLPWarning(line string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(line))
+	return strings.HasPrefix(upper, "WARNING:") || strings.HasPrefix(upper, "[WARNING]")
+}
+
+func cleanYTDLPDiagnostic(line string) string {
+	clean := strings.TrimSpace(line)
+	clean = regexp.MustCompile(`^\[[^\]]+\]\s*`).ReplaceAllString(clean, "")
+	clean = strings.TrimSpace(strings.TrimPrefix(clean, "Got error:"))
+	return clean
+}
+
+func truncateDiagnostic(message string) string {
+	if len(message) > 200 {
+		return message[:197] + "..."
+	}
+	return message
 }
 
 const (

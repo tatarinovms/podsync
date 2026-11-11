@@ -178,6 +178,16 @@ ERROR: HTTP Error 429: Too Many Requests`
 ERROR: [youtube] 123: Private video. Sign in if you have been granted access to this video`
 	msgSimple := CleanErrorMessage(rawSimple)
 	assert.Equal(t, "123: Private video. Sign in if you have been granted access to this video", msgSimple)
+
+	rawWarningBeforeError := `WARNING: [youtube] Preferring "ru" translated fields. Note that some metadata extraction may fail or be incorrect.
+[youtube] 123: Downloading webpage
+[download] Got error: HTTP Error 403: Forbidden`
+	msgWarningBeforeError := CleanErrorMessage(rawWarningBeforeError)
+	assert.Equal(t, "HTTP Error 403: Forbidden", msgWarningBeforeError)
+
+	rawWarningOnly := `WARNING: [youtube] Preferring "ru" translated fields. Note that some metadata extraction may fail or be incorrect.`
+	msgWarningOnly := CleanErrorMessage(rawWarningOnly)
+	assert.Equal(t, "download process exited with error; yt-dlp provided no error details", msgWarningOnly)
 }
 
 func TestBuildArgsWithLanguage(t *testing.T) {

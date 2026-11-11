@@ -157,7 +157,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
 - **Universal Feeds (Audio + Video)**: Curate individual videos and audio files into custom podcast feeds. Both audio tracks and video clips can reside in the same feed, with dynamic `<enclosure>` MIME types.
 - **Unified Library & Dedicated Tab**:
   - Directly manage feeds, upload files, and add URLs in the dedicated **Personal feeds** tab.
-  - Personal feeds are also surfaced on the main **Podcasts** tab with a **Personal** provider badge and quick action buttons.
+  - Personal feeds are also surfaced on the main **Podcasts** tab with a **Personal** provider badge and quick action buttons; select the **Personal** type filter to find them.
 - **Multiple Ingestion Methods**:
   - **URL Links**: Add episodes by URL from YouTube, VK Video, Rutube, or direct HTTP/HTTPS links to `.mp3`, `.ogg`, `.mp4` files, with format and quality/resolution selection (Audio: High/Low, Video: 480p, 720p HD, 1080p Full HD, 1440p 2K, 2160p 4K, Original) matching feed mirroring.
   - **Server Local Files**: Import media directly by local filesystem path (`file_path`).

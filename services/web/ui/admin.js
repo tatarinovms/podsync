@@ -3338,8 +3338,7 @@
             }
             if (logsBtn) {
                 logsBtn.onclick = () => {
-                    const inst = bootstrap.Modal.getInstance(modalEl);
-                    if (inst) inst.hide();
+                    closeModal('feedErrorsModal');
                     showLogsForFeed(feedId, 'error');
                 };
             }
@@ -3424,7 +3423,7 @@
                         <div class="d-flex flex-column gap-2 mb-3">`;
 
                     errorItems.forEach(item => {
-                        const errDate = item.error_at ? formatDate(item.error_at) : (item.pub_date ? formatDate(item.pub_date) : '');
+                        const errDate = item.error_at ? formatLogTimestamp(item.error_at) : '';
                         html += `
                             <div class="card p-2.5 border-danger-subtle bg-body-tertiary">
                                 <div class="d-flex align-items-start justify-content-between gap-2">
@@ -3432,7 +3431,7 @@
                                         <div class="fw-bold text-break small">${escapeHtml(item.episode_title || item.episode_id)}</div>
                                         <div class="text-muted small d-flex flex-wrap align-items-center gap-2 mt-1">
                                             <span>ID: <code>${escapeHtml(item.episode_id)}</code></span>
-                                            ${errDate ? `<span>&bull; ${escapeHtml(errDate)}</span>` : ''}
+                                            ${errDate ? `<span>&bull; Last failure: ${escapeHtml(errDate)}</span>` : ''}
                                             ${item.video_url ? `<span>&bull; <a href="${escapeHtml(item.video_url)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Source <i aria-hidden="true" class="bi bi-box-arrow-up-right"></i></a></span>` : ''}
                                         </div>
                                     </div>

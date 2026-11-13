@@ -28,6 +28,7 @@ var (
 	filenameTemplateTokenNamePattern   = regexp.MustCompile(`^[a-z_]+$`)
 	validExtensionPattern              = regexp.MustCompile(`^[a-z0-9]+$`)
 	invalidFilenameCharsPattern        = regexp.MustCompile(`[^A-Za-z0-9._ -]+`)
+	itunesOrderPattern                 = regexp.MustCompile(`<itunes:order>(\d+)</itunes:order>`)
 	multiWhitespacePattern             = regexp.MustCompile(`\s+`)
 )
 
@@ -371,8 +372,7 @@ func FormatXML(podcast *itunes.Podcast, f *model.Feed) string {
 	raw := podcast.String()
 	if f != nil && f.Provider == model.ProviderAudiobook {
 		raw = strings.Replace(raw, "<channel>", "<channel>\n\t<itunes:type>serial</itunes:type>", 1)
-		re := regexp.MustCompile(`<itunes:order>(\d+)</itunes:order>`)
-		raw = re.ReplaceAllString(raw, "<itunes:order>$1</itunes:order>\n\t<itunes:episode>$1</itunes:episode>")
+		raw = itunesOrderPattern.ReplaceAllString(raw, "<itunes:order>$1</itunes:order>\n\t<itunes:episode>$1</itunes:episode>")
 	}
 
 	hasChapters := false

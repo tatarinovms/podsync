@@ -46,8 +46,9 @@ type itunesLookupResponse struct {
 }
 
 type ApplePodcastsBuilder struct {
-	client     *http.Client
-	rssBuilder *RSSBuilder
+	client        *http.Client
+	rssBuilder    *RSSBuilder
+	lookupBaseURL string
 }
 
 func NewApplePodcastsBuilder() *ApplePodcastsBuilder {
@@ -59,8 +60,9 @@ func NewApplePodcastsBuilderWithHTTPClient(client *http.Client) *ApplePodcastsBu
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &ApplePodcastsBuilder{
-		client:     client,
-		rssBuilder: NewRSSBuilderWithHTTPClient(client),
+		client:        client,
+		rssBuilder:    NewRSSBuilderWithHTTPClient(client),
+		lookupBaseURL: "https://itunes.apple.com",
 	}
 }
 
@@ -121,7 +123,11 @@ func (b *ApplePodcastsBuilder) lookupFromAPI(ctx context.Context, id, country st
 }
 
 func (b *ApplePodcastsBuilder) queryLookupAPI(ctx context.Context, id, country string) (string, error) {
-	lookupURL := fmt.Sprintf("https://itunes.apple.com/lookup?id=%s&entity=podcast", url.QueryEscape(id))
+	baseURL := b.lookupBaseURL
+	if baseURL == "" {
+		baseURL = "https://itunes.apple.com"
+	}
+	lookupURL := fmt.Sprintf("%s/lookup?id=%s&entity=podcast", strings.TrimRight(baseURL, "/"), url.QueryEscape(id))
 	if country != "" {
 		lookupURL += fmt.Sprintf("&country=%s", url.QueryEscape(country))
 	}

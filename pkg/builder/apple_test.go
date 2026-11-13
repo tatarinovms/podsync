@@ -93,17 +93,11 @@ func TestApplePodcastsBuilder_ResolveFeedURL_API(t *testing.T) {
 	defer ts.Close()
 
 	builder := NewApplePodcastsBuilderWithHTTPClient(ts.Client())
-	// Test queryLookupAPI directly with mock server URL
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/lookup?id=1209828744&entity=podcast", nil)
-	require.NoError(t, err)
-	resp, err := ts.Client().Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	builder.lookupBaseURL = ts.URL
 
-	feedURL, err := builder.queryLookupAPI(context.Background(), "1209828744", "")
-	// With the default iTunes host, we can also test resolving real URLs if connected, but queryLookupAPI tests the logic
-	_ = feedURL
+	feedURL, err := builder.queryLookupAPI(context.Background(), "1209828744", "ru")
+	require.NoError(t, err)
+	assert.Equal(t, "https://feeds.soundcloud.com/users/soundcloud:users:291337106/sounds.rss", feedURL)
 }
 
 func TestApplePodcastsBuilder_ResolveFeedURL_HTMLFallback(t *testing.T) {

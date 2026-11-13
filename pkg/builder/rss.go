@@ -73,6 +73,12 @@ type RSSBuilder struct {
 	client *http.Client
 }
 
+// Compiled once: RSS parsing runs for every mirrored feed and every episode.
+var (
+	unsafeGUIDPattern = regexp.MustCompile(`[^a-zA-Z0-9_\-\.]+`)
+	htmlTagPattern    = regexp.MustCompile(`<[^>]*>`)
+)
+
 func NewRSSBuilder() *RSSBuilder {
 	return NewRSSBuilderWithHTTPClient(nil)
 }
@@ -285,8 +291,7 @@ func ParseRSSStream(r io.Reader, sourceURL string) (*ParsedRSSMetadata, error) {
 func sanitizeGUID(guid string) string {
 	cleaned := strings.TrimSpace(guid)
 	// Replace URL schemes or path slashes with safe underscores
-	safeRe := regexp.MustCompile(`[^a-zA-Z0-9_\-\.]+`)
-	sanitized := safeRe.ReplaceAllString(cleaned, "_")
+	sanitized := unsafeGUIDPattern.ReplaceAllString(cleaned, "_")
 	sanitized = strings.Trim(sanitized, "_.-")
 	if len(sanitized) > 64 {
 		// If too long, hash it to ensure safe filename
@@ -305,8 +310,7 @@ func sanitizeGUID(guid string) string {
 func cleanXMLText(s string) string {
 	decoded := html.UnescapeString(s)
 	// Strip HTML tags
-	stripRe := regexp.MustCompile(`<[^>]*>`)
-	cleaned := stripRe.ReplaceAllString(decoded, "")
+	cleaned := htmlTagPattern.ReplaceAllString(decoded, "")
 	return strings.TrimSpace(cleaned)
 }
 

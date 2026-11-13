@@ -25,6 +25,9 @@ import (
 	"github.com/mxpv/podsync/services/web"
 )
 
+// serverPathPattern validates the optional reverse-proxy mount path.
+var serverPathPattern = regexp.MustCompile(model.PathRegex)
+
 type Config struct {
 	// Server is the web server configuration
 	Server web.Config `toml:"server"`
@@ -150,8 +153,7 @@ func (c *Config) validate() error {
 	}
 
 	if c.Server.Path != "" {
-		var pathReg = regexp.MustCompile(model.PathRegex)
-		if !pathReg.MatchString(c.Server.Path) {
+		if !serverPathPattern.MatchString(c.Server.Path) {
 			result = multierror.Append(result, errors.Errorf("Server handle path must be match %s or empty", model.PathRegex))
 		}
 	}

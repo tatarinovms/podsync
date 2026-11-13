@@ -221,13 +221,17 @@ func (c *vkAPIClient) doRequest(ctx context.Context, method string, params url.V
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxVKResponseBody))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
 
 	return body, nil
 }
+
+// maxVKResponseBody bounds a single API response; paginated video lists stay
+// well below this limit.
+const maxVKResponseBody = 8 << 20
 
 var vkAccessTokenPattern = regexp.MustCompile(`access_token=[^&\s"']+`)
 

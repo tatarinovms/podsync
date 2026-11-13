@@ -94,7 +94,7 @@ func isYTDLPWarning(line string) bool {
 
 func cleanYTDLPDiagnostic(line string) string {
 	clean := strings.TrimSpace(line)
-	clean = regexp.MustCompile(`^\[[^\]]+\]\s*`).ReplaceAllString(clean, "")
+	clean = ytdlPrefixPattern.ReplaceAllString(clean, "")
 	clean = strings.TrimSpace(strings.TrimPrefix(clean, "Got error:"))
 	return clean
 }
@@ -105,6 +105,8 @@ func truncateDiagnostic(message string) string {
 	}
 	return message
 }
+
+var ytdlPrefixPattern = regexp.MustCompile(`^\[[^\]]+\]\s*`)
 
 const (
 	DefaultDownloadTimeout = 10 * time.Minute

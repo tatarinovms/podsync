@@ -20,6 +20,15 @@ import (
 )
 
 const (
+	// maxRutubePageBody bounds scraping of a user page; the embedded state blob
+	// is far smaller and a larger response indicates an unexpected page.
+	maxRutubePageBody  = 4 << 20
+	maxRutubeErrorBody = 8 << 10
+)
+
+var rutubeChannelIDPattern = regexp.MustCompile(`"channel_id":\s*"?(\d+)"?`)
+
+const (
 	rutubeDefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 	rutubeDefaultBaseURL   = "https://rutube.ru/api"
 	defaultRutubePageSize  = 50
@@ -121,7 +130,7 @@ func (b *RutubeBuilder) getJSON(ctx context.Context, reqURL string, target inter
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxRutubeErrorBody))
 		return errors.Errorf("rutube API returned HTTP %d for %s: %s", resp.StatusCode, reqURL, string(body))
 	}
 
@@ -150,13 +159,12 @@ func (b *RutubeBuilder) resolveSlugToChannelID(ctx context.Context, slug string)
 		return "", errors.Errorf("failed to load rutube user page for %q: HTTP %d", slug, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxRutubePageBody))
 	if err != nil {
 		return "", err
 	}
 
-	re := regexp.MustCompile(`"channel_id":\s*"?(\d+)"?`)
-	if m := re.FindSubmatch(body); len(m) > 1 {
+	if m := rutubeChannelIDPattern.FindSubmatch(body); len(m) > 1 {
 		return string(m[1]), nil
 	}
 

@@ -1,29 +1,20 @@
 package main
 
+// Core feed manager: lifecycle, feed status, and the shared helpers that
+// load, sort and link episodes for the library and detail views.
+
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pelletier/go-toml"
-	"github.com/pkg/errors"
-	"github.com/robfig/cron/v3"
-	log "github.com/sirupsen/logrus"
-
-	"github.com/mxpv/podsync/pkg/backup"
 	"github.com/mxpv/podsync/pkg/builder"
 	"github.com/mxpv/podsync/pkg/db"
 	"github.com/mxpv/podsync/pkg/feed"
@@ -31,13 +22,19 @@ import (
 	"github.com/mxpv/podsync/pkg/jobqueue"
 	"github.com/mxpv/podsync/pkg/logbuffer"
 	"github.com/mxpv/podsync/pkg/model"
-	"github.com/mxpv/podsync/pkg/network"
 	"github.com/mxpv/podsync/pkg/personal"
 	"github.com/mxpv/podsync/pkg/selfupdate"
 	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
+	"github.com/pkg/errors"
+	"github.com/robfig/cron/v3"
+	log "github.com/sirupsen/logrus"
 )
+
+// validFeedIDPattern matches identifiers that are safe in URLs, file names and
+// BadgerDB keys. Compiled once because it is used on every feed mutation.
+var validFeedIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 type feedErrorEntry struct {
 	Error string
@@ -85,6 +82,14 @@ type AppFeedManager struct {
 	selfUpdateMu   sync.Mutex
 	selfUpdating   bool
 	personalFeeds  *personal.Service
+}
+
+var cyrillicToLatinMap = map[rune]string{
+	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "yo", 'ж': "zh",
+	'з': "z", 'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o",
+	'п': "p", 'р': "r", 'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "kh", 'ц': "ts",
+	'ч': "ch", 'ш': "sh", 'щ': "shch", 'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu",
+	'я': "ya", 'є': "ye", 'і': "i", 'ї': "yi", 'ґ': "g", 'ў': "u",
 }
 
 func NewAppFeedManager(
@@ -253,123 +258,50 @@ func (m *AppFeedManager) GetFeedsStatus(ctx context.Context) ([]web.FeedStatusIt
 func (m *AppFeedManager) GetFeedDetail(ctx context.Context, id string) (*web.FeedSummary, []*model.Episode, error) {
 	m.mu.RLock()
 	f, ok := m.feeds[id]
-	audiobooksDir := ""
-	if m.cfg != nil {
-		audiobooksDir = m.cfg.Audiobooks.Dir
-	}
 	m.mu.RUnlock()
-
 	if !ok {
 		return nil, nil, errors.Errorf("feed %q not found", id)
 	}
 
 	summary := m.buildSummary(ctx, f)
-
-	episodes := make([]*model.Episode, 0)
-	if err := m.db.WalkEpisodes(ctx, id, func(episode *model.Episode) error {
-		copy := *episode
-		episodes = append(episodes, &copy)
-		return nil
-	}); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to load episodes")
+	episodes, audiobook, fromDisk, err := m.feedEpisodes(ctx, f)
+	if err != nil {
+		return nil, nil, err
+	}
+	if fromDisk {
+		summary.EpisodeCount = len(episodes)
+		summary.DownloadedCount = len(episodes)
 	}
 
-	info, parseErr := builder.ParseURL(f.URL)
-	isAudiobook := (parseErr == nil && info.Provider == model.ProviderAudiobook) || strings.HasPrefix(f.URL, "audiobook://")
-
-	// If database has no episodes yet (e.g. prior to cron update), dynamically scan local audiobook directory
-	if len(episodes) == 0 && isAudiobook {
-		baseDir := audiobooksDir
-		abBuilder, bErr := builder.NewAudiobookBuilder(baseDir)
-		if bErr == nil {
-			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
-				episodes = builtFeed.Episodes
-				summary.EpisodeCount = len(episodes)
-				summary.DownloadedCount = len(episodes)
-			}
-		}
-	}
-
-	if isAudiobook || f.PlaylistSort == model.SortingAsc {
-		sort.Slice(episodes, func(i, j int) bool {
-			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
-				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
-			}
-			return episodes[i].PubDate.Before(episodes[j].PubDate)
-		})
+	if audiobook || f.PlaylistSort == model.SortingAsc {
+		sortEpisodes(episodes, "date-asc")
 	} else {
-		sort.Slice(episodes, func(i, j int) bool {
-			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
-				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
-			}
-			return episodes[i].PubDate.After(episodes[j].PubDate)
-		})
+		sortEpisodes(episodes, "date-desc")
 	}
-
-	for _, ep := range episodes {
-		if ep.Status != model.EpisodeDownloaded {
-			continue
-		}
-		filename := feed.EpisodeName(f, ep)
-		if isAudiobook {
-			filename = ep.ID
-		} else if m.storage != nil {
-			if _, err := m.storage.Size(ctx, id+"/"+filename); err != nil {
-				legacy := feed.LegacyEpisodeName(f, ep)
-				if _, err := m.storage.Size(ctx, id+"/"+legacy); err == nil {
-					filename = legacy
-				}
-			}
-		}
-		ep.MediaURL = strings.TrimSuffix(summary.FeedURL, id+".xml") + url.PathEscape(id) + "/" + url.PathEscape(filename)
-	}
+	m.resolveEpisodeMediaURLs(ctx, f, episodes, episodeMediaBase(summary, id), audiobook)
 	return &summary, episodes, nil
 }
 
 func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query web.EpisodeQuery) (*web.EpisodePageResult, error) {
 	m.mu.RLock()
 	f, ok := m.feeds[id]
-	audiobooksDir := ""
-	if m.cfg != nil {
-		audiobooksDir = m.cfg.Audiobooks.Dir
-	}
 	m.mu.RUnlock()
-
 	if !ok {
 		return nil, errors.Errorf("feed %q not found", id)
 	}
 
-	info, parseErr := builder.ParseURL(f.URL)
-	isAudiobook := (parseErr == nil && info.Provider == model.ProviderAudiobook) || strings.HasPrefix(f.URL, "audiobook://")
-
-	var allEpisodes []*model.Episode
-	totalCount := 0
-
-	if err := m.db.WalkEpisodes(ctx, id, func(episode *model.Episode) error {
-		totalCount++
-		copy := *episode
-		allEpisodes = append(allEpisodes, &copy)
-		return nil
-	}); err != nil {
-		return nil, errors.Wrap(err, "failed to load episodes")
+	allEpisodes, audiobook, _, err := m.feedEpisodes(ctx, f)
+	if err != nil {
+		return nil, err
 	}
-
-	if len(allEpisodes) == 0 && isAudiobook {
-		baseDir := audiobooksDir
-		if abBuilder, bErr := builder.NewAudiobookBuilder(baseDir); bErr == nil {
-			if builtFeed, bErr := abBuilder.Build(ctx, f); bErr == nil && builtFeed != nil {
-				allEpisodes = builtFeed.Episodes
-				totalCount = len(allEpisodes)
-			}
-		}
-	}
+	totalCount := len(allEpisodes)
 
 	search := strings.TrimSpace(strings.ToLower(query.Search))
 	status := strings.TrimSpace(strings.ToLower(query.Status))
 	duration := strings.TrimSpace(strings.ToLower(query.Duration))
 	statusCounts := make(map[model.EpisodeStatus]int)
 
-	var filtered []*model.Episode
+	filtered := make([]*model.Episode, 0, len(allEpisodes))
 	for _, ep := range allEpisodes {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -403,58 +335,13 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 
 	sortOrder := query.Sort
 	if sortOrder == "" || sortOrder == "default" {
-		if isAudiobook || f.PlaylistSort == model.SortingAsc {
+		if audiobook || f.PlaylistSort == model.SortingAsc {
 			sortOrder = "date-asc"
 		} else {
 			sortOrder = "date-desc"
 		}
 	}
-
-	switch sortOrder {
-	case "date-asc":
-		sort.Slice(filtered, func(i, j int) bool {
-			if filtered[i].PubDate.Equal(filtered[j].PubDate) {
-				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
-			}
-			return filtered[i].PubDate.Before(filtered[j].PubDate)
-		})
-	case "date-desc":
-		sort.Slice(filtered, func(i, j int) bool {
-			if filtered[i].PubDate.Equal(filtered[j].PubDate) {
-				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
-			}
-			return filtered[i].PubDate.After(filtered[j].PubDate)
-		})
-	case "title-asc":
-		sort.Slice(filtered, func(i, j int) bool {
-			ti := filtered[i].Title
-			if ti == "" {
-				ti = filtered[i].ID
-			}
-			tj := filtered[j].Title
-			if tj == "" {
-				tj = filtered[j].ID
-			}
-			if strings.EqualFold(ti, tj) {
-				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
-			}
-			return strings.ToLower(ti) < strings.ToLower(tj)
-		})
-	case "duration-desc":
-		sort.Slice(filtered, func(i, j int) bool {
-			if filtered[i].Duration == filtered[j].Duration {
-				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
-			}
-			return filtered[i].Duration > filtered[j].Duration
-		})
-	case "duration-asc":
-		sort.Slice(filtered, func(i, j int) bool {
-			if filtered[i].Duration == filtered[j].Duration {
-				return builder.NaturalLess(filtered[i].ID, filtered[j].ID)
-			}
-			return filtered[i].Duration < filtered[j].Duration
-		})
-	}
+	sortEpisodes(filtered, sortOrder)
 
 	limit := query.Limit
 	if limit <= 0 {
@@ -487,25 +374,7 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 	}
 
 	summary := m.buildSummary(ctx, f)
-	mediaBase := strings.TrimSuffix(summary.FeedURL, id+".xml") + url.PathEscape(id) + "/"
-
-	for _, ep := range paged {
-		if ep.Status != model.EpisodeDownloaded {
-			continue
-		}
-		filename := feed.EpisodeName(f, ep)
-		if isAudiobook {
-			filename = ep.ID
-		} else if m.storage != nil {
-			if _, err := m.storage.Size(ctx, id+"/"+filename); err != nil {
-				legacy := feed.LegacyEpisodeName(f, ep)
-				if _, err := m.storage.Size(ctx, id+"/"+legacy); err == nil {
-					filename = legacy
-				}
-			}
-		}
-		ep.MediaURL = mediaBase + url.PathEscape(filename)
-	}
+	m.resolveEpisodeMediaURLs(ctx, f, paged, episodeMediaBase(summary, id), audiobook)
 
 	return &web.EpisodePageResult{
 		Feed:         &summary,
@@ -520,48 +389,80 @@ func (m *AppFeedManager) GetFeedEpisodes(ctx context.Context, id string, query w
 	}, nil
 }
 
-// extractCoverArtFromXML reads the generated <feed_id>.xml from storage and extracts <image><url>...</url></image>
+// extractCoverArtFromXML reads the generated <feed_id>.xml from storage and
+// returns the channel cover. The feed is parsed as a stream so the cover is
+// found without loading an arbitrarily large RSS document into memory.
+
+// extractCoverArtFromXML reads the generated <feed_id>.xml from storage and
+// returns the channel cover. The feed is parsed as a stream so the cover is
+// found without loading an arbitrarily large RSS document into memory.
 func (m *AppFeedManager) extractCoverArtFromXML(feedID string) string {
 	if val, ok := m.coverCache.Load(feedID); ok {
-		if s, ok := val.(string); ok && s != "" {
-			return s
+		if cover, ok := val.(string); ok {
+			return cover
 		}
 	}
 
 	if m.storage == nil {
 		return ""
 	}
-	xmlName := fmt.Sprintf("%s.xml", feedID)
-	file, err := m.storage.Open(xmlName)
+	file, err := m.storage.Open(fmt.Sprintf("%s.xml", feedID))
 	if err != nil || file == nil {
 		return ""
 	}
 	defer file.Close()
 
-	buf := make([]byte, 32768)
-	n, _ := file.Read(buf)
-	if n <= 0 {
-		return ""
-	}
+	// Cache misses too: without a cover, every library refresh would otherwise
+	// issue another storage read (a network request on S3). The entry is
+	// invalidated whenever the feed is rebuilt.
+	cover := feedCoverFromRSS(io.LimitReader(file, 2<<20))
+	m.coverCache.Store(feedID, cover)
+	return cover
+}
 
-	xmlContent := string(buf[:n])
-	var cover string
-	// Match <image> ... <url>URL</url>
-	re := regexp.MustCompile(`(?s)<image>.*?<url>\s*([^<\s]+)\s*</url>`)
-	if match := re.FindStringSubmatch(xmlContent); len(match) > 1 {
-		cover = strings.TrimSpace(match[1])
-	} else {
-		// Fallback to <itunes:image href="URL"
-		itunesRe := regexp.MustCompile(`<itunes:image\s+href="([^"]+)"`)
-		if match := itunesRe.FindStringSubmatch(xmlContent); len(match) > 1 {
-			cover = strings.TrimSpace(match[1])
+// feedCoverFromRSS scans an RSS document for the channel image. It supports
+// both the standard <image><url> element and <itunes:image href="...">.
+
+// feedCoverFromRSS scans an RSS document for the channel image. It supports
+// both the standard <image><url> element and <itunes:image href="...">.
+func feedCoverFromRSS(r io.Reader) string {
+	decoder := xml.NewDecoder(r)
+	inImage := false
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return ""
+		}
+		switch element := token.(type) {
+		case xml.StartElement:
+			switch element.Name.Local {
+			case "image":
+				inImage = true
+				for _, attr := range element.Attr {
+					if attr.Name.Local == "href" {
+						if value := strings.TrimSpace(attr.Value); value != "" {
+							return value
+						}
+					}
+				}
+			case "url":
+				if !inImage {
+					continue
+				}
+				var value string
+				if err := decoder.DecodeElement(&value, &element); err != nil {
+					return ""
+				}
+				if value = strings.TrimSpace(value); value != "" {
+					return value
+				}
+			}
+		case xml.EndElement:
+			if element.Name.Local == "image" {
+				inImage = false
+			}
 		}
 	}
-
-	if cover != "" {
-		m.coverCache.Store(feedID, cover)
-	}
-	return cover
 }
 
 func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.FeedSummary {
@@ -656,262 +557,157 @@ func (m *AppFeedManager) buildSummary(ctx context.Context, f *feed.Config) web.F
 }
 
 // Audiobooks are refreshed on import, settings changes, and manual updates.
+
+// Audiobooks are refreshed on import, settings changes, and manual updates.
 func isAudiobookFeed(f *feed.Config) bool {
+	if strings.HasPrefix(f.URL, "audiobook://") {
+		return true
+	}
 	info, err := builder.ParseURL(f.URL)
 	return err == nil && info.Provider == model.ProviderAudiobook
 }
 
-func (m *AppFeedManager) AddFeed(ctx context.Context, newFeed *feed.Config) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
+// audiobooksDir resolves the configured audiobook root using the same defaults
+// as the audiobook builder.
 
-	if !regexp.MustCompile(`^[A-Za-z0-9_-]+$`).MatchString(newFeed.ID) {
-		return errors.New("feed ID must contain only Latin letters, digits, underscores, or hyphens")
-	}
-
-	if newFeed.ID == "personal" || strings.HasPrefix(newFeed.ID, "personal-") || newFeed.ID == "_personal" {
-		return errors.New("this feed ID is reserved for personal feeds")
-	}
-
+// audiobooksDir resolves the configured audiobook root using the same defaults
+// as the audiobook builder.
+func (m *AppFeedManager) audiobooksDir() string {
 	m.mu.RLock()
-	if _, exists := m.feeds[newFeed.ID]; exists {
-		m.mu.RUnlock()
-		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
-	}
-	if err := m.checkUpdateCapacityLocked(); err != nil {
-		m.mu.RUnlock()
-		return err
-	}
-	m.mu.RUnlock()
+	defer m.mu.RUnlock()
+	return m.audiobooksDirLocked()
+}
 
-	if isAudiobookFeed(newFeed) {
-		newFeed.CronSchedule = ""
-	} else if newFeed.CronSchedule == "" {
-		newFeed.CronSchedule = "@every 12h"
+// feedEpisodes loads persisted episodes for a feed. Audiobooks that have never
+// been synchronized are discovered from disk so the library and detail views
+// stay usable before their first update. fromDisk reports that fallback.
+
+// feedEpisodes loads persisted episodes for a feed. Audiobooks that have never
+// been synchronized are discovered from disk so the library and detail views
+// stay usable before their first update. fromDisk reports that fallback.
+func (m *AppFeedManager) feedEpisodes(ctx context.Context, f *feed.Config) (episodes []*model.Episode, audiobook bool, fromDisk bool, err error) {
+	episodes = make([]*model.Episode, 0)
+	if err := m.db.WalkEpisodes(ctx, f.ID, func(episode *model.Episode) error {
+		copy := *episode
+		episodes = append(episodes, &copy)
+		return nil
+	}); err != nil {
+		return nil, false, false, errors.Wrap(err, "failed to load episodes")
 	}
 
-	if !isAudiobookFeed(newFeed) {
-		if _, err := cron.ParseStandard(newFeed.CronSchedule); err != nil {
-			return errors.Wrap(err, "invalid update schedule")
+	audiobook = isAudiobookFeed(f)
+	if len(episodes) == 0 && audiobook {
+		if audiobookBuilder, buildErr := builder.NewAudiobookBuilder(m.audiobooksDir()); buildErr == nil {
+			if built, buildErr := audiobookBuilder.Build(ctx, f); buildErr == nil && built != nil {
+				episodes = built.Episodes
+				fromDisk = true
+			}
 		}
 	}
+	return episodes, audiobook, fromDisk, nil
+}
 
-	if err := m.saveFeedToConfig(newFeed); err != nil {
-		return errors.Wrap(err, "failed to save feed configuration")
+// episodeStats aggregates the counters shown on feed cards and detail views.
+
+// episodeStats aggregates the counters shown on feed cards and detail views.
+func episodeStats(episodes []*model.Episode) (total, downloaded, failed int, size int64) {
+	for _, episode := range episodes {
+		total++
+		switch episode.Status {
+		case model.EpisodeDownloaded:
+			downloaded++
+			size += episode.Size
+		case model.EpisodeError:
+			failed++
+		}
 	}
+	return total, downloaded, failed, size
+}
 
-	m.mu.Lock()
-	if _, exists := m.feeds[newFeed.ID]; exists {
-		m.mu.Unlock()
-		return errors.Errorf("feed with ID %q already exists", newFeed.ID)
+// episodeMediaBase is the URL prefix shared by every enclosure in a feed.
+
+// episodeMediaBase is the URL prefix shared by every enclosure in a feed.
+func episodeMediaBase(summary web.FeedSummary, feedID string) string {
+	return strings.TrimSuffix(summary.FeedURL, feedID+".xml") + url.PathEscape(feedID) + "/"
+}
+
+// resolveEpisodeMediaURLs fills inline media links for downloaded episodes.
+// Audiobook chapters are served from the virtual mount under their ID, while
+// regular feeds keep the configured filename template and its legacy fallback.
+
+// resolveEpisodeMediaURLs fills inline media links for downloaded episodes.
+// Audiobook chapters are served from the virtual mount under their ID, while
+// regular feeds keep the configured filename template and its legacy fallback.
+func (m *AppFeedManager) resolveEpisodeMediaURLs(ctx context.Context, f *feed.Config, episodes []*model.Episode, base string, audiobook bool) {
+	for _, episode := range episodes {
+		if episode.Status != model.EpisodeDownloaded {
+			continue
+		}
+		filename := feed.EpisodeName(f, episode)
+		if audiobook {
+			filename = episode.ID
+		} else if m.storage != nil {
+			if _, err := m.storage.Size(ctx, f.ID+"/"+filename); err != nil {
+				legacy := feed.LegacyEpisodeName(f, episode)
+				if _, legacyErr := m.storage.Size(ctx, f.ID+"/"+legacy); legacyErr == nil {
+					filename = legacy
+				}
+			}
+		}
+		episode.MediaURL = base + url.PathEscape(filename)
 	}
+}
 
-	// Add to in-memory map
-	m.feeds[newFeed.ID] = newFeed
-	if m.updater != nil {
-		m.updater.SetFeedConfig(newFeed.ID, newFeed)
-	}
-	if m.cfg != nil && m.cfg.Feeds != nil {
-		m.cfg.Feeds[newFeed.ID] = newFeed
-	}
+// sortEpisodes implements the ordering options exposed by the Web UI. Ties are
+// broken by natural episode-ID order so pagination remains deterministic.
 
-	// Mount if audiobook
-	m.mountAudiobookFeed(newFeed)
-
-	// Add remote feeds to cron.
-	if m.cron != nil && !isAudiobookFeed(newFeed) {
-		feedID := newFeed.ID
-		cronID, err := m.cron.AddFunc(newFeed.CronSchedule, func() {
-			m.QueueScheduledUpdate(feedID)
+// sortEpisodes implements the ordering options exposed by the Web UI. Ties are
+// broken by natural episode-ID order so pagination remains deterministic.
+func sortEpisodes(episodes []*model.Episode, order string) {
+	switch order {
+	case "date-asc":
+		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
+			return episodes[i].PubDate.Before(episodes[j].PubDate)
 		})
-		if err == nil {
-			m.cronEntries[newFeed.ID] = cronID
-		} else {
-			log.WithError(err).Warnf("failed to register cron for feed %q", newFeed.ID)
-		}
-	}
-
-	queueErr := m.queueUpdateLocked(newFeed)
-	m.mu.Unlock()
-	return queueErr
-}
-
-func (m *AppFeedManager) DeleteFeed(ctx context.Context, id string, deleteFiles bool) error {
-	// 1. Immediately cancel active update worker and wait for it to stop cleanly
-	m.CancelFeedUpdate(id)
-
-	// 2. Cancel and remove any jobs in job queue
-	if m.queue != nil {
-		_ = m.queue.CancelFeed(ctx, id)
-	}
-
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	m.mu.RLock()
-	f, exists := m.feeds[id]
-	if !exists {
-		m.mu.RUnlock()
-		return errors.Errorf("feed %q not found", id)
-	}
-	feedURL := f.URL
-	var dataDir, storageType string
-	if m.cfg != nil {
-		dataDir = m.cfg.Storage.Local.DataDir
-		storageType = m.cfg.Storage.Type
-	}
-	m.mu.RUnlock()
-
-	if err := m.deleteFeedFromConfig(id); err != nil {
-		return errors.Wrapf(err, "failed to remove feed %q from configuration", id)
-	}
-
-	m.mu.Lock()
-	// Unmount if mounted
-	if mounter, ok := m.storage.(fs.Mounter); ok {
-		mounter.Unmount(id)
-	}
-
-	// Remove from cron
-	if cronID, ok := m.cronEntries[id]; ok {
-		m.cron.Remove(cronID)
-		delete(m.cronEntries, id)
-	}
-
-	// Remove from map
-	delete(m.feeds, id)
-	delete(m.queuedUpdates, id)
-	delete(m.runningUpdates, id)
-	delete(m.updateCancels, id)
-	if doneCh, ok := m.updateWaiters[id]; ok {
-		close(doneCh)
-		delete(m.updateWaiters, id)
-	}
-	if m.cfg != nil {
-		delete(m.cfg.Feeds, id)
-	}
-	if m.updater != nil {
-		m.updater.SetFeedConfig(id, nil)
-	}
-	m.coverCache.Delete(id)
-	m.mu.Unlock()
-
-	// Clean database
-	if err := m.db.DeleteFeed(ctx, id); err != nil {
-		log.WithError(err).Warnf("failed to delete feed %q from database", id)
-	}
-
-	// Optionally delete files from disk/storage
-	if deleteFiles {
-		_ = m.storage.Delete(ctx, fmt.Sprintf("%s.xml", id))
-		info, err := builder.ParseURL(feedURL)
-		isAudiobook := (err == nil && info.Provider == model.ProviderAudiobook)
-		if storageType == "local" && !isAudiobook {
-			feedDir := filepath.Join(dataDir, id)
-			_ = os.RemoveAll(feedDir)
-			log.Infof("deleted files for feed %q at %s", id, feedDir)
-		}
-	}
-
-	return nil
-}
-
-func (m *AppFeedManager) TriggerUpdate(ctx context.Context, id string) error {
-	m.mu.RLock()
-	f, ok := m.feeds[id]
-	m.mu.RUnlock()
-	if !ok {
-		return errors.Errorf("feed %q not found", id)
-	}
-
-	if m.queue != nil {
-		job, created, err := m.queue.EnqueueManualUpdate(ctx, id)
-		if err != nil {
-			return err
-		}
-		if !created {
-			log.Infof("feed %q update already in progress (job: %s, status: %s)", id, job.ID, job.Status)
-			return nil
-		}
-		m.mu.Lock()
-		m.markQueuedLocked(id)
-		m.mu.Unlock()
-
-		log.Infof("manually triggered update for feed %q (job: %s)", id, job.ID)
-		return nil
-	}
-
-	// Legacy channel fallback (m.queue == nil)
-	m.mu.Lock()
-	m.markQueuedLocked(id)
-	m.mu.Unlock()
-
-	select {
-	case m.updates <- f:
-		log.Infof("manually triggered update for feed %q", id)
-		return nil
-	default:
-		m.mu.Lock()
-		if m.queuedUpdates[id] > 0 {
-			m.queuedUpdates[id]--
-		}
-		m.mu.Unlock()
-		return errors.New("update queue is currently full, please try again shortly")
-	}
-}
-
-func (m *AppFeedManager) TriggerUpdateAll(ctx context.Context) ([]string, error) {
-	m.mu.RLock()
-	feedList := make([]*feed.Config, 0, len(m.feeds))
-	for _, f := range m.feeds {
-		feedList = append(feedList, f)
-	}
-	m.mu.RUnlock()
-
-	if len(feedList) == 0 {
-		return []string{}, nil
-	}
-
-	var queued []string
-	for _, f := range feedList {
-		if m.queue != nil {
-			_, created, err := m.queue.EnqueueManualUpdate(ctx, f.ID)
-			if err != nil {
-				log.WithField("feed_id", f.ID).WithError(err).Warn("failed to enqueue update in jobqueue")
-				continue
+	case "title-asc":
+		sort.Slice(episodes, func(i, j int) bool {
+			ti, tj := episodes[i].Title, episodes[j].Title
+			if ti == "" {
+				ti = episodes[i].ID
 			}
-			if created {
-				m.mu.Lock()
-				m.markQueuedLocked(f.ID)
-				m.mu.Unlock()
-				queued = append(queued, f.ID)
+			if tj == "" {
+				tj = episodes[j].ID
 			}
-			continue
-		}
-
-		m.mu.Lock()
-		if m.queuedUpdates[f.ID] > 0 || (m.runningUpdates != nil && m.runningUpdates[f.ID]) {
-			m.mu.Unlock()
-			continue
-		}
-		m.markQueuedLocked(f.ID)
-		m.mu.Unlock()
-
-		select {
-		case m.updates <- f:
-			log.Infof("manually triggered update for feed %q", f.ID)
-			queued = append(queued, f.ID)
-		default:
-			m.mu.Lock()
-			if m.queuedUpdates[f.ID] > 0 {
-				m.queuedUpdates[f.ID]--
+			if strings.EqualFold(ti, tj) {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
 			}
-			m.mu.Unlock()
-			log.Warnf("failed to queue update for feed %q: queue full", f.ID)
-		}
+			return strings.ToLower(ti) < strings.ToLower(tj)
+		})
+	case "duration-desc":
+		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].Duration == episodes[j].Duration {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
+			return episodes[i].Duration > episodes[j].Duration
+		})
+	case "duration-asc":
+		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].Duration == episodes[j].Duration {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
+			return episodes[i].Duration < episodes[j].Duration
+		})
+	default: // "date-desc"
+		sort.Slice(episodes, func(i, j int) bool {
+			if episodes[i].PubDate.Equal(episodes[j].PubDate) {
+				return builder.NaturalLess(episodes[i].ID, episodes[j].ID)
+			}
+			return episodes[i].PubDate.After(episodes[j].PubDate)
+		})
 	}
-
-	return queued, nil
 }
 
 func (m *AppFeedManager) markQueuedLocked(id string) {
@@ -963,24 +759,13 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 			needsRecount = epCount == 0 || (dlCount == 0 && totalSize > 0) || totalSize < 0
 		}
 		if needsRecount {
-			walkEpCount, walkDlCount, walkErrCount := 0, 0, 0
-			var walkTotalSize int64
+			var episodes []*model.Episode
 			_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
-				walkEpCount++
-				switch ep.Status {
-				case model.EpisodeDownloaded:
-					walkDlCount++
-					walkTotalSize += ep.Size
-				case model.EpisodeError:
-					walkErrCount++
-				}
+				episodes = append(episodes, ep)
 				return nil
 			})
-			if walkEpCount > 0 {
-				epCount = walkEpCount
-				dlCount = walkDlCount
-				errCount = walkErrCount
-				totalSize = walkTotalSize
+			if len(episodes) > 0 {
+				epCount, dlCount, errCount, totalSize = episodeStats(episodes)
 			}
 		}
 	}
@@ -988,25 +773,9 @@ func (m *AppFeedManager) getFeedStats(ctx context.Context, f *feed.Config) (int,
 	// update is persisted in Badger. Keep their library card in sync with the
 	// detail view, which already discovers chapters from disk in that case.
 	if epCount == 0 && isAudiobookFeed(f) {
-		m.mu.RLock()
-		audiobooksDir := ""
-		if m.cfg != nil {
-			audiobooksDir = m.cfg.Audiobooks.Dir
-		}
-		m.mu.RUnlock()
-		if audiobookBuilder, err := builder.NewAudiobookBuilder(audiobooksDir); err == nil {
-			if book, err := audiobookBuilder.Build(ctx, f); err == nil && book != nil {
-				for _, ep := range book.Episodes {
-					epCount++
-					switch ep.Status {
-					case model.EpisodeDownloaded:
-						dlCount++
-						totalSize += ep.Size
-					case model.EpisodeError:
-						errCount++
-					}
-				}
-			}
+		episodes, _, fromDisk, _ := m.feedEpisodes(ctx, f)
+		if fromDisk {
+			epCount, dlCount, errCount, totalSize = episodeStats(episodes)
 		}
 	}
 
@@ -1183,6 +952,9 @@ func (m *AppFeedManager) JobQueue() *jobqueue.JobQueue {
 
 // SetPersonalFeeds attaches the separate personal-feed store for backup
 // manifests and the optional human-readable safety snapshot.
+
+// SetPersonalFeeds attaches the separate personal-feed store for backup
+// manifests and the optional human-readable safety snapshot.
 func (m *AppFeedManager) SetPersonalFeeds(service *personal.Service) {
 	m.mu.Lock()
 	m.personalFeeds = service
@@ -1193,2170 +965,4 @@ func (m *AppFeedManager) GetFeedConfig(id string) *feed.Config {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.feeds[id]
-}
-
-func (m *AppFeedManager) GetTokens(ctx context.Context) []web.TokenInfo {
-	m.mu.RLock()
-	tokensCopy := make(map[model.Provider]StringSlice, len(m.tokens))
-	for k, v := range m.tokens {
-		tokensCopy[k] = append([]string(nil), v...)
-	}
-	m.mu.RUnlock()
-
-	providers := []struct {
-		provider model.Provider
-		envVars  []string
-	}{
-		{model.ProviderVkVideo, []string{"PODSYNC_VKVIDEO_API_KEY", "PODSYNC_VK_API_KEY"}},
-		{model.ProviderYoutube, []string{"PODSYNC_YOUTUBE_API_KEY"}},
-		{model.ProviderVimeo, []string{"PODSYNC_VIMEO_API_KEY"}},
-		{model.ProviderSoundcloud, []string{"PODSYNC_SOUNDCLOUD_API_KEY"}},
-		{model.ProviderRutube, []string{"PODSYNC_RUTUBE_API_KEY"}},
-	}
-
-	result := make([]web.TokenInfo, 0, len(providers))
-	for _, p := range providers {
-		fromEnv := false
-		for _, v := range p.envVars {
-			if os.Getenv(v) != "" {
-				fromEnv = true
-				break
-			}
-		}
-
-		var rawTokens []string
-		if list, ok := tokensCopy[p.provider]; ok {
-			rawTokens = list
-		}
-
-		maskedTokens := make([]string, 0, len(rawTokens))
-		for _, tok := range rawTokens {
-			maskedTokens = append(maskedTokens, maskToken(tok))
-		}
-
-		result = append(result, web.TokenInfo{
-			Provider: string(p.provider),
-			Tokens:   maskedTokens,
-			FromEnv:  fromEnv,
-		})
-	}
-
-	return result
-}
-
-func maskToken(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= 8 {
-		return "••••••••"
-	}
-	return s[:4] + "••••" + s[len(s)-4:]
-}
-
-// Caller holds configWriteMu across reading, persisting and publishing tokens.
-func (m *AppFeedManager) persistTokens(providerStr string, newTokens []string) error {
-	provider := model.Provider(providerStr)
-	// Save to config.toml
-	if m.configPath != "" {
-		tree, err := toml.LoadFile(m.configPath)
-		if err == nil {
-			key := fmt.Sprintf("tokens.%s", providerStr)
-			if len(newTokens) == 0 {
-				tree.Delete(key)
-			} else if len(newTokens) == 1 {
-				tree.Set(key, newTokens[0])
-			} else {
-				tree.Set(key, newTokens)
-			}
-			if err := writeConfigTree(m.configPath, tree); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	}
-
-	m.mu.Lock()
-	if m.tokens == nil {
-		m.tokens = make(map[model.Provider]StringSlice)
-	}
-	if len(newTokens) > 0 {
-		m.tokens[provider] = newTokens
-	} else {
-		delete(m.tokens, provider)
-	}
-	m.mu.Unlock()
-
-	return nil
-}
-
-func cleanToken(providerStr, tok string) string {
-	tok = strings.TrimSpace(tok)
-	tok = strings.Trim(tok, "\"'")
-	if strings.EqualFold(providerStr, "vkvideo") || strings.EqualFold(providerStr, "vk") || strings.Contains(tok, "access_token=") {
-		if idx := strings.Index(tok, "access_token="); idx != -1 {
-			sub := tok[idx+len("access_token="):]
-			if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
-				return sub[:end]
-			}
-			return sub
-		}
-	}
-	return tok
-}
-
-func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	var newTokens []string
-	for _, tok := range tokens {
-		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "•") {
-			continue
-		}
-		newTokens = append(newTokens, tok)
-	}
-
-	return m.persistTokens(providerStr, newTokens)
-}
-
-func (m *AppFeedManager) AddTokens(ctx context.Context, providerStr string, tokens []string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	var validTokens []string
-	for _, tok := range tokens {
-		tok = cleanToken(providerStr, tok)
-		if tok == "" || strings.Contains(tok, "•") {
-			continue
-		}
-		validTokens = append(validTokens, tok)
-	}
-	if len(validTokens) == 0 {
-		return nil
-	}
-
-	provider := model.Provider(providerStr)
-	m.mu.RLock()
-	current := m.tokens[provider]
-	combined := append(append([]string(nil), current...), validTokens...)
-	m.mu.RUnlock()
-
-	return m.persistTokens(providerStr, combined)
-}
-
-func (m *AppFeedManager) DeleteToken(ctx context.Context, providerStr string, index int) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	if index < 0 {
-		return m.persistTokens(providerStr, nil)
-	}
-
-	provider := model.Provider(providerStr)
-	m.mu.RLock()
-	current := m.tokens[provider]
-	if index >= len(current) {
-		m.mu.RUnlock()
-		return fmt.Errorf("token index %d out of bounds (total tokens: %d)", index, len(current))
-	}
-
-	var remaining []string
-	for i, tok := range current {
-		if i != index {
-			remaining = append(remaining, tok)
-		}
-	}
-	m.mu.RUnlock()
-
-	return m.persistTokens(providerStr, remaining)
-}
-
-func (m *AppFeedManager) GetSystemStats(ctx context.Context) (*web.SystemStats, error) {
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
-
-	m.mu.RLock()
-	version := m.version
-	commit := m.commit
-	buildDate := m.buildDate
-	startedAt := m.startedAt
-	var dataDir, storageType string
-	if m.cfg != nil {
-		dataDir = m.cfg.Storage.Local.DataDir
-		storageType = m.cfg.Storage.Type
-	}
-	m.mu.RUnlock()
-
-	total, free, used, _ := getDiskSpace(dataDir)
-
-	_, hasYtDlp := exec.LookPath("yt-dlp")
-	_, hasFFmpeg := exec.LookPath("ffmpeg")
-
-	stats := &web.SystemStats{
-		Version:    version,
-		Commit:     commit,
-		BuildDate:  buildDate,
-		Uptime:     time.Since(startedAt).Truncate(time.Second).String(),
-		StartedAt:  startedAt,
-		Goroutines: runtime.NumGoroutine(),
-		MemoryMB:   float64(mem.Alloc) / 1024 / 1024,
-		DiskTotal:  total,
-		DiskFree:   free,
-		DiskUsed:   used,
-		HasYtDlp:   hasYtDlp == nil,
-		HasFFmpeg:  hasFFmpeg == nil,
-		DataDir:    dataDir,
-		Storage:    storageType,
-	}
-
-	return stats, nil
-}
-
-// SetSelfUpdater enables native binary updates from the official GitHub release.
-func (m *AppFeedManager) SetSelfUpdater(updater *selfupdate.Updater, restart func() error) {
-	m.mu.Lock()
-	m.selfUpdater = updater
-	m.restart = restart
-	m.mu.Unlock()
-}
-
-func (m *AppFeedManager) GetPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
-	m.mu.RLock()
-	updater := m.selfUpdater
-	m.mu.RUnlock()
-	if updater == nil {
-		return nil, errors.New("Podsync self-update is unavailable because the executable path could not be determined")
-	}
-	status, err := updater.Status(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return podsyncUpdateInfo(status), nil
-}
-
-func (m *AppFeedManager) ApplyPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
-	m.selfUpdateMu.Lock()
-	if m.selfUpdating {
-		m.selfUpdateMu.Unlock()
-		return nil, errors.New("a Podsync update is already in progress")
-	}
-	m.selfUpdating = true
-	m.selfUpdateMu.Unlock()
-	defer func() {
-		m.selfUpdateMu.Lock()
-		m.selfUpdating = false
-		m.selfUpdateMu.Unlock()
-	}()
-
-	m.mu.RLock()
-	updater := m.selfUpdater
-	restart := m.restart
-	m.mu.RUnlock()
-	if updater == nil || restart == nil {
-		return nil, errors.New("Podsync self-update is unavailable because the executable path could not be determined")
-	}
-	status, err := updater.Apply(ctx)
-	if err != nil {
-		return podsyncUpdateInfo(status), err
-	}
-	info := podsyncUpdateInfo(status)
-	info.Message = fmt.Sprintf("Podsync %s was installed and will restart now.", status.LatestVersion)
-	go func() {
-		time.Sleep(750 * time.Millisecond)
-		if err := restart(); err != nil {
-			log.WithError(err).Error("failed to restart Podsync after update")
-		}
-	}()
-	return info, nil
-}
-
-func podsyncUpdateInfo(status selfupdate.Status) *web.PodsyncUpdateInfo {
-	return &web.PodsyncUpdateInfo{
-		CurrentVersion:  status.CurrentVersion,
-		LatestVersion:   status.LatestVersion,
-		ReleaseURL:      status.ReleaseURL,
-		UpdateAvailable: status.UpdateAvailable,
-		CanUpdate:       status.CanUpdate,
-		Container:       status.Container,
-		Message:         status.Message,
-	}
-}
-
-func (m *AppFeedManager) UpdateFeed(ctx context.Context, id string, update *web.FeedConfigUpdate) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	m.mu.RLock()
-	f, exists := m.feeds[id]
-	if !exists {
-		m.mu.RUnlock()
-		return errors.Errorf("feed %q not found", id)
-	}
-	resolved, err := update.WithCurrent(f)
-	if err != nil {
-		m.mu.RUnlock()
-		return err
-	}
-	update = resolved
-	oldFeed := *f
-	updatedFeed := oldFeed
-	f = &updatedFeed
-
-	oldLang := strings.TrimSpace(f.Custom.Language)
-	newLang := strings.TrimSpace(update.Custom.Language)
-	if update.Language != "" && newLang == "" {
-		newLang = strings.TrimSpace(update.Language)
-		update.Custom.Language = newLang
-	}
-	languageChanged := (oldLang != newLang) && (oldLang != "" || newLang != "")
-	shouldRedownload := !isAudiobookFeed(f) && (update.Redownload || languageChanged)
-
-	if update.PageSize > 0 {
-		f.PageSize = update.PageSize
-	}
-	if update.Format != "" {
-		f.Format = model.Format(update.Format)
-	}
-	if update.Quality != "" {
-		f.Quality = model.Quality(update.Quality)
-	}
-	f.MaxHeight = update.MaxHeight
-	f.PlaylistSort = model.Sorting(update.PlaylistSort)
-	if update.OPML != nil {
-		f.OPML = update.OPML
-	}
-	f.PrivateFeed = update.PrivateFeed
-	if update.IgnoreLive != nil {
-		f.IgnoreLive = *update.IgnoreLive
-	}
-	if update.NormalizeAudio != nil {
-		f.NormalizeAudio = *update.NormalizeAudio
-	}
-	if update.Proxy != nil {
-		f.Proxy = strings.TrimSpace(*update.Proxy)
-	}
-
-	if update.KeepLast > 0 {
-		f.Clean = &feed.Cleanup{KeepLast: update.KeepLast}
-	} else if update.KeepLast == 0 {
-		f.Clean = nil
-	}
-
-	if update.Language != "" && update.Custom.Language == "" {
-		update.Custom.Language = strings.TrimSpace(update.Language)
-	}
-	f.Filters = update.Filters
-	f.Custom = update.Custom
-	f.YouTubeDLArgs = update.YouTubeDLArgs
-	f.FilenameTemplate = update.FilenameTemplate
-
-	info, parseErr := builder.ParseURL(f.URL)
-	if parseErr == nil && info.Provider == model.ProviderAudiobook {
-		f.Clean = nil
-		f.Format = model.FormatAudio
-		f.Quality = model.QualityHigh
-		f.MaxHeight = 0
-		f.Filters = feed.Filters{}
-		f.YouTubeDLArgs = nil
-		f.PlaylistSort = ""
-	}
-
-	if isAudiobookFeed(f) {
-		f.CronSchedule = ""
-	} else if update.CronSchedule != "" {
-		f.CronSchedule = update.CronSchedule
-	}
-	if !isAudiobookFeed(f) && f.CronSchedule != "" {
-		if _, err := cron.ParseStandard(f.CronSchedule); err != nil {
-			m.mu.RUnlock()
-			return errors.Wrap(err, "invalid update schedule")
-		}
-	}
-	if err := m.checkUpdateCapacityLocked(); err != nil {
-		m.mu.RUnlock()
-		return err
-	}
-
-	oldKeepLast := 0
-	if oldFeed.Clean != nil {
-		oldKeepLast = oldFeed.Clean.KeepLast
-	}
-	newKeepLast := 0
-	if f.Clean != nil {
-		newKeepLast = f.Clean.KeepLast
-	}
-	limitsChanged := (oldFeed.PageSize != f.PageSize) || (oldKeepLast != newKeepLast)
-
-	m.mu.RUnlock()
-
-	// If limits or redownload changed while an update is actively downloading,
-	// cancel the in-flight worker immediately so it stops downloading unwanted episodes.
-	if limitsChanged || shouldRedownload {
-		m.mu.RLock()
-		isUpdating := m.runningUpdates != nil && m.runningUpdates[id]
-		m.mu.RUnlock()
-		if isUpdating {
-			log.WithField("feed_id", id).Info("feed settings changed during active update; canceling in-flight download")
-			m.CancelFeedUpdate(id)
-		}
-	}
-
-	// Persist config to disk without holding m.mu
-	if err := m.saveFeedToConfig(f); err != nil {
-		return err
-	}
-
-	m.mu.Lock()
-	if _, exists := m.feeds[id]; !exists {
-		m.mu.Unlock()
-		return errors.Errorf("feed %q not found", id)
-	}
-	m.feeds[id] = f
-	if m.updater != nil {
-		m.updater.SetFeedConfig(id, f)
-	}
-	if m.cfg != nil && m.cfg.Feeds != nil {
-		m.cfg.Feeds[id] = f
-	}
-
-	// Reschedule cron if cron_schedule changed
-	if isAudiobookFeed(f) && m.cron != nil {
-		if oldID, ok := m.cronEntries[id]; ok {
-			m.cron.Remove(oldID)
-			delete(m.cronEntries, id)
-		}
-	}
-	if !isAudiobookFeed(f) && update.CronSchedule != "" && update.CronSchedule != oldFeed.CronSchedule {
-		if m.cron != nil {
-			if oldID, ok := m.cronEntries[id]; ok {
-				m.cron.Remove(oldID)
-				delete(m.cronEntries, id)
-			}
-			feedID := id
-			cronID, err := m.cron.AddFunc(f.CronSchedule, func() {
-				m.QueueScheduledUpdate(feedID)
-			})
-			if err == nil {
-				m.cronEntries[id] = cronID
-			} else {
-				log.WithError(err).Warnf("failed to re-register cron for feed %q", id)
-			}
-		}
-	}
-
-	m.invalidateStats(id)
-	queueErr := m.queueUpdateLocked(f)
-	m.mu.Unlock()
-
-	if m.db != nil {
-		if dbFeed, err := m.db.GetFeedMetadata(ctx, id); err == nil && dbFeed != nil {
-			dbFeed.PrivateFeed = f.PrivateFeed
-			dbFeed.Episodes = nil // Metadata-only update must not replace a concurrent chapter scan.
-			if err := m.db.AddFeed(ctx, id, dbFeed); err != nil {
-				log.WithError(err).Warnf("failed to update private feed state for %q", id)
-			}
-		}
-	}
-
-	if shouldRedownload && m.db != nil {
-		log.Infof("redownload triggered for feed %q (language changed: %v, explicit redownload: %v, old: %q, new: %q)", id, languageChanged, update.Redownload, oldLang, newLang)
-		_ = m.db.WalkEpisodes(ctx, id, func(ep *model.Episode) error {
-			if ep.Status == model.EpisodeDownloaded {
-				if m.storage != nil {
-					_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s", id, feed.EpisodeName(f, ep)))
-					_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s", id, feed.LegacyEpisodeName(f, ep)))
-					for _, ext := range []string{"mp4", "mp3", "m4a", "webm"} {
-						_ = m.storage.Delete(ctx, fmt.Sprintf("%s/%s.%s", id, ep.ID, ext))
-					}
-				}
-				_ = m.db.UpdateEpisode(id, ep.ID, func(e *model.Episode) error {
-					e.Status = model.EpisodeNew
-					e.Size = 0
-					e.Error = ""
-					e.ErrorAt = nil
-					return nil
-				})
-			}
-			return nil
-		})
-	}
-
-	return queueErr
-}
-
-func (m *AppFeedManager) saveFeedToConfig(f *feed.Config) error {
-	if m.configPath == "" {
-		return nil
-	}
-
-	tree, err := toml.LoadFile(m.configPath)
-	if err != nil {
-		return err
-	}
-
-	prefix := fmt.Sprintf("feeds.%s", f.ID)
-	tree.Set(prefix+".url", f.URL)
-	if f.Format != "" {
-		tree.Set(prefix+".format", string(f.Format))
-	}
-	if f.Quality != "" {
-		tree.Set(prefix+".quality", string(f.Quality))
-	}
-	if f.PageSize > 0 {
-		tree.Set(prefix+".page_size", int64(f.PageSize))
-	}
-	if f.CronSchedule != "" {
-		tree.Set(prefix+".cron_schedule", f.CronSchedule)
-	} else {
-		tree.Delete(prefix + ".cron_schedule")
-	}
-	if f.MaxHeight > 0 {
-		tree.Set(prefix+".max_height", int64(f.MaxHeight))
-	} else {
-		tree.Delete(prefix + ".max_height")
-	}
-	if f.PlaylistSort != "" {
-		tree.Set(prefix+".playlist_sort", string(f.PlaylistSort))
-	} else {
-		tree.Delete(prefix + ".playlist_sort")
-	}
-	if f.OPML != nil {
-		tree.Set(prefix+".opml", *f.OPML)
-	}
-	if f.PrivateFeed {
-		tree.Set(prefix+".private_feed", true)
-	} else {
-		tree.Delete(prefix + ".private_feed")
-	}
-	if f.IgnoreLive {
-		tree.Set(prefix+".ignore_live", true)
-	} else {
-		tree.Delete(prefix + ".ignore_live")
-	}
-	if f.NormalizeAudio {
-		tree.Set(prefix+".normalize_audio", true)
-	} else {
-		tree.Delete(prefix + ".normalize_audio")
-	}
-	if f.Proxy != "" {
-		tree.Set(prefix+".proxy", f.Proxy)
-	} else {
-		tree.Delete(prefix + ".proxy")
-	}
-	if f.Clean != nil && f.Clean.KeepLast > 0 {
-		tree.Set(prefix+".clean.keep_last", int64(f.Clean.KeepLast))
-	} else {
-		tree.Delete(prefix + ".clean")
-	}
-
-	// Filters
-	if f.Filters.Title != "" {
-		tree.Set(prefix+".filters.title", f.Filters.Title)
-	} else {
-		tree.Delete(prefix + ".filters.title")
-	}
-	if f.Filters.NotTitle != "" {
-		tree.Set(prefix+".filters.not_title", f.Filters.NotTitle)
-	} else {
-		tree.Delete(prefix + ".filters.not_title")
-	}
-	if f.Filters.Description != "" {
-		tree.Set(prefix+".filters.description", f.Filters.Description)
-	} else {
-		tree.Delete(prefix + ".filters.description")
-	}
-	if f.Filters.NotDescription != "" {
-		tree.Set(prefix+".filters.not_description", f.Filters.NotDescription)
-	} else {
-		tree.Delete(prefix + ".filters.not_description")
-	}
-	if f.Filters.MinDuration > 0 {
-		tree.Set(prefix+".filters.min_duration", f.Filters.MinDuration)
-	} else {
-		tree.Delete(prefix + ".filters.min_duration")
-	}
-	if f.Filters.MaxDuration > 0 {
-		tree.Set(prefix+".filters.max_duration", f.Filters.MaxDuration)
-	} else {
-		tree.Delete(prefix + ".filters.max_duration")
-	}
-	if f.Filters.MaxAge > 0 {
-		tree.Set(prefix+".filters.max_age", int64(f.Filters.MaxAge))
-	} else {
-		tree.Delete(prefix + ".filters.max_age")
-	}
-
-	// Custom
-	if f.Custom.Title != "" {
-		tree.Set(prefix+".custom.title", f.Custom.Title)
-	} else {
-		tree.Delete(prefix + ".custom.title")
-	}
-	if f.Custom.Description != "" {
-		tree.Set(prefix+".custom.description", f.Custom.Description)
-	} else {
-		tree.Delete(prefix + ".custom.description")
-	}
-	if f.Custom.Author != "" {
-		tree.Set(prefix+".custom.author", f.Custom.Author)
-	} else {
-		tree.Delete(prefix + ".custom.author")
-	}
-	if f.Custom.CoverArt != "" {
-		tree.Set(prefix+".custom.cover_art", f.Custom.CoverArt)
-	} else {
-		tree.Delete(prefix + ".custom.cover_art")
-	}
-	if f.Custom.Category != "" {
-		tree.Set(prefix+".custom.category", f.Custom.Category)
-	} else {
-		tree.Delete(prefix + ".custom.category")
-	}
-	if f.Custom.Language != "" {
-		tree.Set(prefix+".custom.lang", f.Custom.Language)
-	} else {
-		tree.Delete(prefix + ".custom.lang")
-	}
-	if f.Custom.Explicit {
-		tree.Set(prefix+".custom.explicit", true)
-	} else {
-		tree.Delete(prefix + ".custom.explicit")
-	}
-
-	// Advanced
-	if len(f.YouTubeDLArgs) > 0 {
-		tree.Set(prefix+".youtube_dl_args", f.YouTubeDLArgs)
-	} else {
-		tree.Delete(prefix + ".youtube_dl_args")
-	}
-	if f.FilenameTemplate != "" {
-		tree.Set(prefix+".filename_template", f.FilenameTemplate)
-	} else {
-		tree.Delete(prefix + ".filename_template")
-	}
-	if f.AudiobookDir != "" {
-		tree.Set(prefix+".audiobook_dir", f.AudiobookDir)
-	} else {
-		tree.Delete(prefix + ".audiobook_dir")
-	}
-
-	return writeConfigTree(m.configPath, tree)
-}
-
-func (m *AppFeedManager) deleteFeedFromConfig(id string) error {
-	if m.configPath == "" {
-		return nil
-	}
-
-	tree, err := toml.LoadFile(m.configPath)
-	if err != nil {
-		return err
-	}
-
-	_ = tree.Delete(fmt.Sprintf("feeds.%s", id))
-
-	return writeConfigTree(m.configPath, tree)
-}
-
-func getFFmpegVersion(ctx context.Context) (string, string) {
-	path, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		return "", ""
-	}
-
-	cmdCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(cmdCtx, path, "-version")
-	out, err := cmd.Output()
-	if err != nil {
-		return path, ""
-	}
-
-	lines := strings.Split(string(out), "\n")
-	if len(lines) > 0 {
-		firstLine := strings.TrimSpace(lines[0])
-		fields := strings.Fields(firstLine)
-		if len(fields) >= 3 && fields[0] == "ffmpeg" && fields[1] == "version" {
-			return path, fields[2]
-		}
-		return path, strings.TrimPrefix(firstLine, "ffmpeg version ")
-	}
-	return path, ""
-}
-
-func (m *AppFeedManager) GetDownloaderConfig(ctx context.Context) (*web.DownloaderConfigInfo, error) {
-	m.mu.RLock()
-	dl := m.downloader
-	var dlCfg ytdl.Config
-	if m.cfg != nil {
-		dlCfg = m.cfg.Downloader
-	}
-	var dataDir, storageType string
-	if m.cfg != nil {
-		dataDir = m.cfg.Storage.Local.DataDir
-		storageType = m.cfg.Storage.Type
-	}
-	m.mu.RUnlock()
-
-	var binPath, binVer string
-	ffmpegPath, ffmpegVer := getFFmpegVersion(ctx)
-
-	if dl != nil {
-		dlCfg = dl.GetConfig()
-		binPath = dl.GetBinaryPath()
-		verCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-		if ver, err := dl.GetVersion(verCtx); err == nil {
-			binVer = strings.TrimSpace(ver)
-		}
-		cancel()
-	}
-
-	cookiesPath := dlCfg.CookiesFile
-	if cookiesPath == "" && storageType == "local" && dataDir != "" {
-		defaultPath := filepath.Join(dataDir, "cookies.txt")
-		if _, err := os.Stat(defaultPath); err == nil {
-			cookiesPath = defaultPath
-		}
-	}
-
-	hasCookies := false
-	var cookiesSize int64
-	var cookiesLines int
-	var cookiesMod string
-
-	if cookiesPath != "" {
-		if fi, err := os.Stat(cookiesPath); err == nil {
-			hasCookies = true
-			cookiesSize = fi.Size()
-			cookiesMod = fi.ModTime().Format("2006-01-02 15:04:05")
-			if data, err := os.ReadFile(cookiesPath); err == nil {
-				cookiesLines = len(strings.Split(string(data), "\n"))
-			}
-		}
-	}
-
-	return &web.DownloaderConfigInfo{
-		Timeout:            dlCfg.Timeout,
-		SelfUpdate:         dlCfg.SelfUpdate,
-		CustomBinary:       dlCfg.CustomBinary,
-		CookiesFile:        dlCfg.CookiesFile,
-		CookiesFromBrowser: dlCfg.CookiesFromBrowser,
-		Proxy:              dlCfg.Proxy,
-		Proxies:            dlCfg.Proxies,
-		Language:           dlCfg.Language,
-		HasCookiesFile:     hasCookies,
-		CookiesFileSize:    cookiesSize,
-		CookiesFileLines:   cookiesLines,
-		CookiesLastMod:     cookiesMod,
-		BinaryPath:         binPath,
-		BinaryVersion:      binVer,
-		FFmpegPath:         ffmpegPath,
-		FFmpegVersion:      ffmpegVer,
-	}, nil
-}
-
-func (m *AppFeedManager) UpdateDownloaderConfig(ctx context.Context, update *web.DownloaderConfigUpdate) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	m.mu.RLock()
-	cfgCopy := m.cfg.Downloader
-	m.mu.RUnlock()
-	if update.Timeout != nil && *update.Timeout > 0 {
-		cfgCopy.Timeout = *update.Timeout
-	}
-	if update.SelfUpdate != nil {
-		cfgCopy.SelfUpdate = *update.SelfUpdate
-	}
-	if update.CustomBinary != nil {
-		cfgCopy.CustomBinary = *update.CustomBinary
-	}
-	if update.CookiesFile != nil {
-		cfgCopy.CookiesFile = *update.CookiesFile
-	}
-	if update.CookiesFromBrowser != nil {
-		cfgCopy.CookiesFromBrowser = *update.CookiesFromBrowser
-	}
-	if update.Proxy != nil {
-		cfgCopy.Proxy = *update.Proxy
-	}
-	if update.Proxies != nil {
-		cfgCopy.Proxies = *update.Proxies
-	}
-	if update.Language != nil {
-		cfgCopy.Language = strings.TrimSpace(*update.Language)
-	}
-
-	if err := m.saveDownloaderToConfig(&cfgCopy); err != nil {
-		return err
-	}
-	m.mu.Lock()
-	m.cfg.Downloader = cfgCopy
-	if m.downloader != nil {
-		m.downloader.UpdateConfig(cfgCopy)
-	}
-	m.mu.Unlock()
-	return nil
-}
-
-func (m *AppFeedManager) GetNetworkConfig(ctx context.Context) (*web.NetworkConfigInfo, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	if m.cfg == nil {
-		return &web.NetworkConfigInfo{}, nil
-	}
-	return &web.NetworkConfigInfo{DNSServers: append([]string(nil), m.cfg.Network.DNSServers...)}, nil
-}
-
-func (m *AppFeedManager) UpdateNetworkConfig(ctx context.Context, update *web.NetworkConfigUpdate) error {
-	if update == nil || update.DNSServers == nil {
-		return errors.New("dns_servers is required")
-	}
-	servers := make([]string, 0, len(*update.DNSServers))
-	for _, server := range *update.DNSServers {
-		server = strings.TrimSpace(server)
-		if server != "" {
-			servers = append(servers, server)
-		}
-	}
-	if err := network.ValidateDNSServers(servers); err != nil {
-		return err
-	}
-
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-	if err := m.saveNetworkToConfig(servers); err != nil {
-		return err
-	}
-	if m.updater != nil {
-		if err := m.updater.SetDNSServers(servers); err != nil {
-			return err
-		}
-	}
-	m.mu.Lock()
-	if m.cfg != nil {
-		m.cfg.Network.DNSServers = append([]string(nil), servers...)
-	}
-	m.mu.Unlock()
-	return nil
-}
-
-func (m *AppFeedManager) saveNetworkToConfig(servers []string) error {
-	if m.configPath == "" {
-		return nil
-	}
-	tree, err := toml.LoadFile(m.configPath)
-	if err != nil {
-		return err
-	}
-	if len(servers) == 0 {
-		tree.Delete("network.dns_servers")
-	} else {
-		tree.Set("network.dns_servers", servers)
-	}
-	return writeConfigTree(m.configPath, tree)
-}
-
-func (m *AppFeedManager) GetCookiesContent(ctx context.Context) (string, error) {
-	m.mu.RLock()
-	cookiesPath := ""
-	if m.cfg != nil {
-		cookiesPath = m.cfg.Downloader.CookiesFile
-		if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
-			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
-		}
-	}
-	m.mu.RUnlock()
-
-	if cookiesPath == "" {
-		return "", nil
-	}
-
-	data, err := os.ReadFile(cookiesPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		return "", err
-	}
-
-	return string(data), nil
-}
-
-func (m *AppFeedManager) UpdateCookiesContent(ctx context.Context, content string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	m.mu.RLock()
-	cookiesPath := ""
-	if m.cfg != nil {
-		cookiesPath = m.cfg.Downloader.CookiesFile
-		if cookiesPath == "" && m.cfg.Storage.Type == "local" && m.cfg.Storage.Local.DataDir != "" {
-			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
-		} else if cookiesPath == "" {
-			cookiesPath = "cookies.txt"
-		}
-	}
-	m.mu.RUnlock()
-
-	content = strings.TrimSpace(content)
-	if content == "" {
-		// Remove cookies file
-		_ = os.Remove(cookiesPath)
-		m.mu.Lock()
-		m.cfg.Downloader.CookiesFile = ""
-		if m.downloader != nil {
-			m.downloader.SetCookiesFile("")
-		}
-		cfgCopy := m.cfg.Downloader
-		m.mu.Unlock()
-		if err := m.syncCookiesToFeeds(""); err != nil {
-			return err
-		}
-		return m.saveDownloaderToConfig(&cfgCopy)
-	}
-
-	// Ensure parent directory exists
-	dir := filepath.Dir(cookiesPath)
-	if dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return errors.Wrap(err, "failed to create cookies directory")
-		}
-	}
-
-	if err := os.WriteFile(cookiesPath, []byte(content+"\n"), 0600); err != nil {
-		return errors.Wrap(err, "failed to save cookies file")
-	}
-
-	m.mu.Lock()
-	m.cfg.Downloader.CookiesFile = cookiesPath
-	if m.downloader != nil {
-		m.downloader.SetCookiesFile(cookiesPath)
-	}
-
-	cfgCopy := m.cfg.Downloader
-	m.mu.Unlock()
-	if err := m.syncCookiesToFeeds(cookiesPath); err != nil {
-		return err
-	}
-
-	return m.saveDownloaderToConfig(&cfgCopy)
-}
-
-func (m *AppFeedManager) syncCookiesToFeeds(newCookiesPath string) error {
-	m.mu.RLock()
-	feeds := make(map[string]*feed.Config, len(m.cfg.Feeds))
-	for id, cfg := range m.cfg.Feeds {
-		copy := *cfg
-		feeds[id] = &copy
-	}
-	m.mu.RUnlock()
-	for feedID, feedCfg := range feeds {
-		if len(feedCfg.YouTubeDLArgs) == 0 {
-			continue
-		}
-		hasCookies := false
-		newArgs := make([]string, 0, len(feedCfg.YouTubeDLArgs))
-		for i := 0; i < len(feedCfg.YouTubeDLArgs); i++ {
-			arg := feedCfg.YouTubeDLArgs[i]
-			if arg == "--cookies" {
-				if i+1 < len(feedCfg.YouTubeDLArgs) {
-					if newCookiesPath != "" {
-						newArgs = append(newArgs, "--cookies", newCookiesPath)
-					}
-					i++ // skip old path argument
-					hasCookies = true
-					continue
-				}
-			} else if strings.HasPrefix(arg, "--cookies=") {
-				if newCookiesPath != "" {
-					newArgs = append(newArgs, "--cookies="+newCookiesPath)
-				}
-				hasCookies = true
-				continue
-			}
-			newArgs = append(newArgs, arg)
-		}
-
-		if hasCookies {
-			feedCfg.YouTubeDLArgs = newArgs
-			if err := m.saveFeedToConfig(feedCfg); err != nil {
-				return err
-			}
-			m.mu.Lock()
-			m.cfg.Feeds[feedID] = feedCfg
-			if m.feeds != nil {
-				m.feeds[feedID] = feedCfg
-			}
-			if m.updater != nil {
-				m.updater.SetFeedConfig(feedID, feedCfg)
-			}
-			m.mu.Unlock()
-			log.Infof("updated --cookies path in feed %q to %q", feedID, newCookiesPath)
-		}
-	}
-	return nil
-}
-
-func (m *AppFeedManager) TestDownloader(ctx context.Context, testURL string) (*web.TestDownloaderResult, error) {
-	if m.downloader == nil {
-		return nil, errors.New("downloader not initialized")
-	}
-
-	out, err := m.downloader.TestURL(ctx, testURL)
-	if err != nil {
-		cleanErr := out
-		if cleanErr == "" {
-			cleanErr = err.Error()
-		}
-		return &web.TestDownloaderResult{
-			Success: false,
-			Error:   cleanErr,
-			Output:  out,
-		}, nil
-	}
-
-	// Try parsing JSON metadata
-	var meta struct {
-		Title    string `json:"title"`
-		Uploader string `json:"uploader"`
-		Channel  string `json:"channel"`
-	}
-	_ = json.Unmarshal([]byte(out), &meta)
-
-	channel := meta.Channel
-	if channel == "" {
-		channel = meta.Uploader
-	}
-
-	return &web.TestDownloaderResult{
-		Success: true,
-		Title:   meta.Title,
-		Channel: channel,
-		Output:  out,
-	}, nil
-}
-
-func (m *AppFeedManager) saveDownloaderToConfig(cfg *ytdl.Config) error {
-	if m.configPath == "" {
-		return nil
-	}
-
-	tree, err := toml.LoadFile(m.configPath)
-	if err != nil {
-		return err
-	}
-
-	if cfg.Timeout > 0 {
-		tree.Set("downloader.timeout", int64(cfg.Timeout))
-	}
-	tree.Set("downloader.self_update", cfg.SelfUpdate)
-	if cfg.CustomBinary != "" {
-		tree.Set("downloader.custom_binary", cfg.CustomBinary)
-	} else {
-		tree.Delete("downloader.custom_binary")
-	}
-	if cfg.CookiesFile != "" {
-		tree.Set("downloader.cookies_file", cfg.CookiesFile)
-	} else {
-		tree.Delete("downloader.cookies_file")
-	}
-	if cfg.CookiesFromBrowser != "" {
-		tree.Set("downloader.cookies_from_browser", cfg.CookiesFromBrowser)
-	} else {
-		tree.Delete("downloader.cookies_from_browser")
-	}
-	if cfg.Proxy != "" {
-		tree.Set("downloader.proxy", cfg.Proxy)
-	} else {
-		tree.Delete("downloader.proxy")
-	}
-	if len(cfg.Proxies) > 0 {
-		for k, v := range cfg.Proxies {
-			if v != "" {
-				tree.Set("downloader.proxies."+k, v)
-			} else {
-				tree.Delete("downloader.proxies." + k)
-			}
-		}
-	} else {
-		tree.Delete("downloader.proxies")
-	}
-	if cfg.Language != "" {
-		tree.Set("downloader.language", cfg.Language)
-	} else {
-		tree.Delete("downloader.language")
-	}
-
-	return writeConfigTree(m.configPath, tree)
-}
-
-func (m *AppFeedManager) GetDownloadErrors(ctx context.Context, targetFeedID string, limit int) ([]web.DownloadErrorItem, error) {
-	if limit <= 0 {
-		limit = 20
-	} else if limit > 1000 {
-		limit = 1000
-	}
-
-	m.mu.RLock()
-	feeds := make([]*feed.Config, 0, len(m.feeds))
-	if targetFeedID != "" {
-		if f, ok := m.feeds[targetFeedID]; ok {
-			feeds = append(feeds, f)
-		}
-	} else {
-		for _, f := range m.feeds {
-			feeds = append(feeds, f)
-		}
-	}
-	errorsMap := make(map[string]feedErrorEntry, len(m.feedErrors))
-	for k, v := range m.feedErrors {
-		errorsMap[k] = v
-	}
-	m.mu.RUnlock()
-
-	var items []web.DownloadErrorItem
-
-	collectFromFeed := func(feedConfig *feed.Config) {
-		feedTitle := feedConfig.ID
-		provider := ""
-		if dbFeed, err := m.db.GetFeedMetadata(ctx, feedConfig.ID); err == nil && dbFeed != nil {
-			if dbFeed.Title != "" {
-				feedTitle = dbFeed.Title
-			}
-			provider = string(dbFeed.Provider)
-		}
-		if provider == "" {
-			if info, err := builder.ParseURL(feedConfig.URL); err == nil {
-				provider = string(info.Provider)
-			}
-		}
-
-		_ = m.db.WalkEpisodes(ctx, feedConfig.ID, func(ep *model.Episode) error {
-			if ep.Status == model.EpisodeError {
-				rec := ""
-				errStr := ep.Error
-				if strings.Contains(errStr, "bot") || strings.Contains(errStr, "cookies") || strings.Contains(errStr, "Sign in") {
-					rec = "Configure Netscape cookies.txt file in Web Admin or via PODSYNC_DOWNLOADER_COOKIES_FILE to bypass bot detection"
-				} else if strings.Contains(errStr, "429") || strings.Contains(errStr, "Too Many Requests") {
-					rec = "Rate limited by source platform; use a proxy or reduce update frequency"
-				} else if strings.Contains(errStr, "Private") {
-					rec = "Video is private; authentication cookies for the video owner are required"
-				} else if strings.Contains(errStr, "timed out") {
-					rec = "Download timed out; check network bandwidth or increase downloader timeout"
-				}
-
-				item := web.DownloadErrorItem{
-					FeedID:         feedConfig.ID,
-					FeedTitle:      feedTitle,
-					FeedProvider:   provider,
-					EpisodeID:      ep.ID,
-					EpisodeTitle:   ep.Title,
-					VideoURL:       ep.VideoURL,
-					PubDate:        ep.PubDate,
-					Error:          errStr,
-					ErrorAt:        ep.ErrorAt,
-					Recommendation: rec,
-				}
-				if item.Error == "" {
-					item.Error = "Download failed (error exit status)"
-				}
-				items = append(items, item)
-			}
-			return nil
-		})
-
-		if feedErr, hasErr := errorsMap[feedConfig.ID]; hasErr {
-			rec := "Check logs or API configuration"
-			errLower := strings.ToLower(feedErr.Error)
-			if strings.Contains(errLower, "token is required") || strings.Contains(errLower, "not loaded") || strings.Contains(errLower, "api token") {
-				rec = "Add the required API token for " + provider + " in the API Tokens tab"
-			}
-			errItem := web.DownloadErrorItem{
-				FeedID:         feedConfig.ID,
-				FeedTitle:      feedTitle,
-				FeedProvider:   provider,
-				EpisodeID:      "feed_update",
-				EpisodeTitle:   "Feed Update Failure",
-				VideoURL:       feedConfig.URL,
-				Error:          feedErr.Error,
-				ErrorAt:        &feedErr.Time,
-				Recommendation: rec,
-			}
-			items = append(items, errItem)
-		}
-	}
-
-	for _, f := range feeds {
-		collectFromFeed(f)
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].ErrorAt != nil && items[j].ErrorAt != nil {
-			return items[i].ErrorAt.After(*items[j].ErrorAt)
-		}
-		return items[i].PubDate.After(items[j].PubDate)
-	})
-
-	if len(items) > limit {
-		items = items[:limit]
-	}
-
-	return items, nil
-}
-
-func (m *AppFeedManager) GetRecentDownloads(ctx context.Context, targetFeedID string, limit int) ([]web.RecentDownloadItem, error) {
-	if limit <= 0 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
-	}
-
-	m.mu.RLock()
-	feeds := make([]*feed.Config, 0, len(m.feeds))
-	if targetFeedID != "" {
-		if f, ok := m.feeds[targetFeedID]; ok {
-			feeds = append(feeds, f)
-		}
-	} else {
-		for _, f := range m.feeds {
-			feeds = append(feeds, f)
-		}
-	}
-
-	host := "http://localhost:8080"
-	mountPath := ""
-	if m.cfg != nil {
-		if m.cfg.Server.Hostname != "" {
-			host = m.cfg.Server.Hostname
-		} else if m.cfg.Server.Port != 0 {
-			host = fmt.Sprintf("http://localhost:%d", m.cfg.Server.Port)
-		}
-		if m.cfg.Server.Path != "" {
-			mountPath = "/" + strings.Trim(m.cfg.Server.Path, "/")
-		}
-	}
-	m.mu.RUnlock()
-
-	host = strings.TrimSuffix(host, "/")
-
-	var items []web.RecentDownloadItem
-
-	collectFromFeed := func(feedConfig *feed.Config) {
-		feedTitle := feedConfig.ID
-		provider := ""
-		if dbFeed, err := m.db.GetFeedMetadata(ctx, feedConfig.ID); err == nil && dbFeed != nil {
-			if dbFeed.Title != "" {
-				feedTitle = dbFeed.Title
-			}
-			provider = string(dbFeed.Provider)
-		}
-		if provider == "" {
-			if info, err := builder.ParseURL(feedConfig.URL); err == nil {
-				provider = string(info.Provider)
-			}
-		}
-
-		_ = m.db.WalkEpisodes(ctx, feedConfig.ID, func(ep *model.Episode) error {
-			if ep.Status == model.EpisodeDownloaded {
-				epName := feed.EpisodeName(feedConfig, ep)
-				mediaURL := fmt.Sprintf("%s%s/%s/%s", host, mountPath, feedConfig.ID, epName)
-				items = append(items, web.RecentDownloadItem{
-					FeedID:       feedConfig.ID,
-					FeedTitle:    feedTitle,
-					FeedProvider: provider,
-					EpisodeID:    ep.ID,
-					EpisodeTitle: ep.Title,
-					VideoURL:     ep.VideoURL,
-					PubDate:      ep.PubDate,
-					Size:         ep.Size,
-					Duration:     ep.Duration,
-					MediaURL:     mediaURL,
-				})
-			}
-			return nil
-		})
-	}
-
-	for _, f := range feeds {
-		collectFromFeed(f)
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].PubDate.After(items[j].PubDate)
-	})
-
-	if len(items) > limit {
-		items = items[:limit]
-	}
-
-	return items, nil
-}
-
-func (m *AppFeedManager) GetSyncStatus(ctx context.Context) (*web.SyncStatusInfo, error) {
-	m.mu.RLock()
-	feeds := make([]*feed.Config, 0, len(m.feeds))
-	for _, f := range m.feeds {
-		feeds = append(feeds, f)
-	}
-	hasDl := m.downloader != nil
-	cronEntries := make(map[string]cron.EntryID, len(m.cronEntries))
-	for k, v := range m.cronEntries {
-		cronEntries[k] = v
-	}
-	c := m.cron
-	m.mu.RUnlock()
-
-	info := &web.SyncStatusInfo{
-		ActiveFeeds: len(feeds),
-		Feeds:       make([]web.SyncStatusFeedInfo, 0, len(feeds)),
-	}
-
-	// Binary presence
-	info.HasDownloader = hasDl
-	if _, err := exec.LookPath("ffmpeg"); err == nil {
-		info.HasFFmpeg = true
-	}
-
-	// Disk stats
-	if stats, err := m.GetSystemStats(ctx); err == nil && stats != nil {
-		info.DiskFreeBytes = stats.DiskFree
-		info.DiskTotalBytes = stats.DiskTotal
-	}
-
-	past24h := time.Now().Add(-24 * time.Hour)
-
-	for _, f := range feeds {
-		feedTitle := f.ID
-		provider := ""
-		var lastUpdate *time.Time
-		if dbFeed, err := m.db.GetFeedMetadata(ctx, f.ID); err == nil && dbFeed != nil {
-			if dbFeed.Title != "" {
-				feedTitle = dbFeed.Title
-			}
-			provider = string(dbFeed.Provider)
-			if !dbFeed.UpdatedAt.IsZero() {
-				lastUpdate = &dbFeed.UpdatedAt
-			}
-		}
-		if provider == "" {
-			if pInfo, err := builder.ParseURL(f.URL); err == nil {
-				provider = string(pInfo.Provider)
-			}
-		}
-
-		var nextUpdate *time.Time
-		if c != nil {
-			if entryID, exists := cronEntries[f.ID]; exists {
-				nextTime := c.Entry(entryID).Next
-				if !nextTime.IsZero() {
-					nextUpdate = &nextTime
-				}
-			}
-		}
-
-		var epCount, dlCount, errCount int
-		_ = m.db.WalkEpisodes(ctx, f.ID, func(ep *model.Episode) error {
-			epCount++
-			switch ep.Status {
-			case model.EpisodeDownloaded:
-				dlCount++
-				if ep.PubDate.After(past24h) {
-					info.DownloadedPast24h++
-				}
-			case model.EpisodeError:
-				errCount++
-			}
-			return nil
-		})
-
-		info.TotalEpisodes += epCount
-		info.DownloadedEpisodes += dlCount
-		info.FailedEpisodes += errCount
-
-		info.Feeds = append(info.Feeds, web.SyncStatusFeedInfo{
-			FeedID:          f.ID,
-			FeedTitle:       feedTitle,
-			URL:             f.URL,
-			Provider:        provider,
-			CronSchedule:    f.CronSchedule,
-			LastUpdate:      lastUpdate,
-			NextUpdate:      nextUpdate,
-			EpisodeCount:    epCount,
-			DownloadedCount: dlCount,
-			ErrorCount:      errCount,
-		})
-	}
-
-	sort.Slice(info.Feeds, func(i, j int) bool {
-		return info.Feeds[i].FeedID < info.Feeds[j].FeedID
-	})
-
-	return info, nil
-}
-
-func (m *AppFeedManager) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	m.mu.RLock()
-	currentPassword := ""
-	if m.cfg != nil && m.cfg.Server.Admin.Password != "" {
-		currentPassword = m.cfg.Server.Admin.Password
-	}
-	m.mu.RUnlock()
-
-	if currentPassword != "" && currentPassword != oldPassword {
-		return errors.New("current password does not match")
-	}
-
-	if strings.TrimSpace(newPassword) == "" {
-		return errors.New("new password cannot be empty")
-	}
-	if len(newPassword) < 4 {
-		return errors.New("new password must be at least 4 characters long")
-	}
-
-	if m.configPath != "" {
-		tree, err := toml.LoadFile(m.configPath)
-		if err != nil {
-			return errors.Wrap(err, "failed to load config file")
-		}
-		tree.Set("server.admin.password", newPassword)
-
-		if err := writeConfigTree(m.configPath, tree); err != nil {
-			return errors.Wrap(err, "failed to save config file")
-		}
-	}
-
-	m.mu.Lock()
-	if m.cfg != nil {
-		m.cfg.Server.Admin.Password = newPassword
-	}
-	m.mu.Unlock()
-
-	return nil
-}
-
-func (m *AppFeedManager) UpdateAdminSecurity(ctx context.Context, maxAttempts int, window, lockout string) error {
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-
-	if m.configPath != "" {
-		tree, err := toml.LoadFile(m.configPath)
-		if err != nil {
-			return errors.Wrap(err, "failed to load config file")
-		}
-		tree.Set("server.admin.max_attempts", int64(maxAttempts))
-		tree.Set("server.admin.window", window)
-		tree.Set("server.admin.lockout", lockout)
-
-		if err := writeConfigTree(m.configPath, tree); err != nil {
-			return errors.Wrap(err, "failed to save config file")
-		}
-	}
-
-	m.mu.Lock()
-	if m.cfg != nil {
-		m.cfg.Server.Admin.MaxAttempts = maxAttempts
-		m.cfg.Server.Admin.WindowPeriod = window
-		m.cfg.Server.Admin.LockoutPeriod = lockout
-	}
-	m.mu.Unlock()
-
-	return nil
-}
-
-func (m *AppFeedManager) RecordFeedUpdateError(feedID string, err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.feedErrors == nil {
-		m.feedErrors = make(map[string]feedErrorEntry)
-	}
-	if err != nil {
-		m.feedErrors[feedID] = feedErrorEntry{
-			Error: err.Error(),
-			Time:  time.Now(),
-		}
-	} else {
-		delete(m.feedErrors, feedID)
-	}
-}
-
-func (m *AppFeedManager) ClearFeedUpdateError(feedID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.feedErrors != nil {
-		delete(m.feedErrors, feedID)
-	}
-}
-
-func (m *AppFeedManager) GetSystemLogs(ctx context.Context, filter web.LogFilter) (*web.LogResult, error) {
-	if m.logBuffer == nil {
-		return &web.LogResult{
-			CurrentLevel: log.GetLevel().String(),
-		}, nil
-	}
-
-	res := m.logBuffer.Query(logbuffer.Filter{
-		Level:   filter.Level,
-		Search:  filter.Search,
-		FeedID:  filter.FeedID,
-		Limit:   filter.Limit,
-		SinceID: filter.SinceID,
-	})
-
-	entries := make([]web.LogEntry, len(res.Entries))
-	for i, e := range res.Entries {
-		entries[i] = web.LogEntry{
-			ID:        e.ID,
-			Timestamp: e.Timestamp,
-			Level:     e.Level,
-			Message:   e.Message,
-			Fields:    e.Fields,
-			Caller:    e.Caller,
-		}
-	}
-
-	return &web.LogResult{
-		Entries:       entries,
-		Total:         res.Total,
-		FilteredTotal: res.FilteredTotal,
-		MaxID:         res.MaxID,
-		CurrentLevel:  res.CurrentLevel,
-	}, nil
-}
-
-func (m *AppFeedManager) ClearSystemLogs(ctx context.Context) error {
-	if m.logBuffer != nil {
-		m.logBuffer.Clear()
-	}
-	return nil
-}
-
-func (m *AppFeedManager) SetLogLevel(ctx context.Context, levelStr string) (string, error) {
-	lvl, err := log.ParseLevel(levelStr)
-	if err != nil {
-		return "", errors.Wrapf(err, "invalid log level %q", levelStr)
-	}
-	log.SetLevel(lvl)
-	log.Infof("system log level dynamically set to %s", lvl.String())
-	return lvl.String(), nil
-}
-
-func (m *AppFeedManager) GetLogLevel(ctx context.Context) string {
-	return log.GetLevel().String()
-}
-
-func (m *AppFeedManager) DownloadLogs(ctx context.Context) ([]byte, string, error) {
-	if m.cfg != nil && m.cfg.Log.Filename != "" {
-		if data, err := os.ReadFile(m.cfg.Log.Filename); err == nil && len(data) > 0 {
-			filename := filepath.Base(m.cfg.Log.Filename)
-			return data, filename, nil
-		}
-	}
-
-	if m.logBuffer != nil {
-		content := m.logBuffer.FormatPlainText(logbuffer.Filter{Limit: 2000})
-		return []byte(content), "podsync.log", nil
-	}
-
-	return []byte("No logs available\n"), "podsync.log", nil
-}
-
-func (m *AppFeedManager) GetAudiobooksDir() string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.audiobooksDirLocked()
-}
-
-func backupInfo(manifest *backup.Manifest) *web.BackupInfo {
-	info := &web.BackupInfo{SchemaVersion: manifest.SchemaVersion, PodsyncVersion: manifest.PodsyncVersion, CreatedAt: manifest.CreatedAt, IncludesSecrets: manifest.IncludesSecrets}
-	info.Counts.Feeds = manifest.Counts.Feeds
-	info.Counts.PersonalFeeds = manifest.Counts.PersonalFeeds
-	info.Counts.AudiobookFeeds = manifest.Counts.AudiobookFeeds
-	info.Counts.CustomCovers = manifest.Counts.CustomCovers
-	return info
-}
-
-func (m *AppFeedManager) backupLocationsLocked() (configPath, coversDir, cookiesPath string) {
-	configPath = m.configPath
-	if m.cfg == nil {
-		return
-	}
-	if m.cfg.Storage.Type == "local" {
-		// Covers may be stored in data/covers or alongside a regular or
-		// audiobook feed as cover.jpg. The backup walker includes image files
-		// only, so it never includes downloaded episode media.
-		coversDir = m.cfg.Storage.Local.DataDir
-		cookiesPath = m.cfg.Downloader.CookiesFile
-		if cookiesPath == "" {
-			cookiesPath = filepath.Join(m.cfg.Storage.Local.DataDir, "cookies.txt")
-		}
-	}
-	return
-}
-
-// CreateSystemBackup streams a portable configuration/database archive. Media
-// directories are never traversed; only the dedicated custom-covers directory
-// is included.
-func (m *AppFeedManager) CreateSystemBackup(ctx context.Context, includeSecrets bool, w io.Writer) (*web.BackupInfo, error) {
-	store, ok := m.db.(db.BackupStorage)
-	if !ok {
-		return nil, errors.New("configured database does not support backups")
-	}
-	m.mu.RLock()
-	configPath, coversDir, cookiesPath := m.backupLocationsLocked()
-	counts := backup.Counts{}
-	for _, f := range m.feeds {
-		if strings.HasPrefix(f.URL, "audiobook://") {
-			counts.AudiobookFeeds++
-		} else {
-			counts.Feeds++
-		}
-	}
-	version := m.version
-	personalFeeds := m.personalFeeds
-	m.mu.RUnlock()
-	var personalSnapshot []byte
-	if personalFeeds != nil {
-		if feeds, err := personalFeeds.List(); err == nil {
-			counts.PersonalFeeds = len(feeds)
-			personalSnapshot, _ = json.MarshalIndent(feeds, "", "  ")
-		}
-	}
-	manifest, err := backup.Create(ctx, backup.ExportOptions{ConfigPath: configPath, CoversDir: coversDir, CookiesPath: cookiesPath, Version: version, IncludeSecrets: includeSecrets, Counts: counts, PersonalSnapshot: personalSnapshot, ExportDatabase: store.ExportBackup}, w)
-	if err != nil {
-		return nil, err
-	}
-	return backupInfo(manifest), nil
-}
-
-func (m *AppFeedManager) InspectSystemBackup(_ context.Context, r io.Reader) (*web.BackupInfo, error) {
-	manifest, err := backup.Inspect(r)
-	if err != nil {
-		return nil, err
-	}
-	return backupInfo(manifest), nil
-}
-
-// RestoreSystemBackup pauses cron dispatch and refuses to overwrite a database
-// while a queue worker owns a job. This avoids interleaving a native Badger
-// Load with download-state writes. Queued work is part of the restored dump.
-func (m *AppFeedManager) RestoreSystemBackup(ctx context.Context, r io.Reader, opts web.BackupRestoreOptions) (*web.BackupInfo, error) {
-	store, ok := m.db.(db.BackupStorage)
-	if !ok {
-		return nil, errors.New("configured database does not support backups")
-	}
-	if m.queue != nil {
-		if active, err := m.queue.GetActiveJobsMap(ctx); err == nil && len(active) > 0 {
-			return nil, errors.New("wait for active downloads to finish before restoring a backup")
-		}
-	}
-	m.configWriteMu.Lock()
-	defer m.configWriteMu.Unlock()
-	if m.cron != nil {
-		stop := m.cron.Stop()
-		select {
-		case <-stop.Done():
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
-		defer m.cron.Start()
-	}
-	m.mu.RLock()
-	configPath, coversDir, cookiesPath := m.backupLocationsLocked()
-	m.mu.RUnlock()
-	result, err := backup.Restore(ctx, r, backup.RestoreOptions{ConfigPath: configPath, CoversDir: coversDir, CookiesPath: cookiesPath, PreserveStoragePaths: opts.PreservePaths, RestoreSecrets: opts.RestoreSecrets, RestoreDatabase: true, RestoreCovers: true, RestoreCookies: opts.RestoreSecrets, RestoreDatabaseStream: store.RestoreBackup})
-	if err != nil {
-		return nil, err
-	}
-	// Re-read the persisted configuration. Keep the original map allocation so
-	// the updater and cron closures see restored feed definitions immediately.
-	if restored, err := LoadConfig(configPath); err == nil {
-		m.mu.Lock()
-		m.cfg = restored
-		for id := range m.feeds {
-			delete(m.feeds, id)
-		}
-		for id, f := range restored.Feeds {
-			m.feeds[id] = f
-		}
-		for provider := range m.tokens {
-			delete(m.tokens, provider)
-		}
-		for provider, tokens := range restored.Tokens {
-			m.tokens[provider] = tokens
-		}
-		m.mu.Unlock()
-		for _, f := range restored.Feeds {
-			select {
-			case m.updates <- f:
-			default:
-			}
-		}
-	} else {
-		return nil, fmt.Errorf("restored backup but could not reload config: %w", err)
-	}
-	return backupInfo(result.Manifest), nil
-}
-
-func (m *AppFeedManager) audiobooksDirLocked() string {
-	if m.cfg != nil && m.cfg.Audiobooks.Dir != "" {
-		return m.cfg.Audiobooks.Dir
-	}
-	dir := os.Getenv("PODSYNC_AUDIOBOOKS_DIR")
-	if dir != "" {
-		return dir
-	}
-	return "./audiobooks"
-}
-
-func (m *AppFeedManager) ListAudiobookDirs(ctx context.Context) ([]web.AudiobookDirInfo, error) {
-	m.mu.RLock()
-	baseDir := m.audiobooksDirLocked()
-	exts := map[string]bool{
-		".mp3": true, ".m4b": true, ".m4a": true, ".aac": true, ".ogg": true, ".opus": true, ".flac": true,
-	}
-	if m.cfg != nil && len(m.cfg.Audiobooks.SupportedExtensions) > 0 {
-		exts = make(map[string]bool)
-		for _, e := range m.cfg.Audiobooks.SupportedExtensions {
-			exts[strings.ToLower(e)] = true
-		}
-	}
-
-	coverNames := map[string]bool{
-		"cover.jpg": true, "cover.png": true, "folder.jpg": true, "cover.jpeg": true,
-	}
-	if m.cfg != nil && len(m.cfg.Audiobooks.CoverFilenames) > 0 {
-		coverNames = make(map[string]bool)
-		for _, c := range m.cfg.Audiobooks.CoverFilenames {
-			coverNames[strings.ToLower(c)] = true
-		}
-	}
-
-	// Map existing feeds for quick lookup
-	linkedDirs := make(map[string]string)
-	for _, f := range m.feeds {
-		info, err := builder.ParseURL(f.URL)
-		if err == nil && info.Provider == model.ProviderAudiobook {
-			linkedDirs[info.ItemID] = f.ID
-			linkedDirs[filepath.Base(info.ItemID)] = f.ID
-		}
-	}
-	m.mu.RUnlock()
-
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, errors.Wrapf(err, "failed to access audiobooks directory: %s", baseDir)
-	}
-
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read audiobooks directory: %s", baseDir)
-	}
-
-	results := make([]web.AudiobookDirInfo, 0)
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		dirName := entry.Name()
-		if strings.HasPrefix(dirName, ".") {
-			continue
-		}
-
-		fullPath := filepath.Join(baseDir, dirName)
-		files, err := os.ReadDir(fullPath)
-		if err != nil {
-			continue
-		}
-
-		fileCount := 0
-		var totalSize int64
-		hasCover := false
-
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			lowerName := strings.ToLower(f.Name())
-			if coverNames[lowerName] {
-				hasCover = true
-			}
-			ext := strings.ToLower(filepath.Ext(lowerName))
-			if exts[ext] {
-				fileCount++
-				if info, err := f.Info(); err == nil {
-					totalSize += info.Size()
-				}
-			}
-		}
-
-		feedID, isLinked := linkedDirs[dirName]
-
-		var suggestedAuthor, suggestedTitle string
-		if parts := strings.SplitN(dirName, " - ", 2); len(parts) == 2 {
-			suggestedAuthor = strings.TrimSpace(parts[0])
-			suggestedTitle = strings.TrimSpace(parts[1])
-		} else {
-			suggestedTitle = dirName
-		}
-
-		results = append(results, web.AudiobookDirInfo{
-			Name:            dirName,
-			Path:            fullPath,
-			FileCount:       fileCount,
-			HasCover:        hasCover,
-			TotalSize:       totalSize,
-			Linked:          isLinked,
-			FeedID:          feedID,
-			SuggestedTitle:  suggestedTitle,
-			SuggestedAuthor: suggestedAuthor,
-		})
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return strings.ToLower(results[i].Name) < strings.ToLower(results[j].Name)
-	})
-
-	return results, nil
-}
-
-var cyrillicToLatinMap = map[rune]string{
-	'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "yo", 'ж': "zh",
-	'з': "z", 'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o",
-	'п': "p", 'р': "r", 'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "kh", 'ц': "ts",
-	'ч': "ch", 'ш': "sh", 'щ': "shch", 'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu",
-	'я': "ya", 'є': "ye", 'і': "i", 'ї': "yi", 'ґ': "g", 'ў': "u",
-}
-
-func transliterateCyrillic(s string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(s) {
-		if lat, ok := cyrillicToLatinMap[r]; ok {
-			b.WriteString(lat)
-		} else {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
-func generateAudiobookSlug(s string) string {
-	s = transliterateCyrillic(s)
-	s = strings.ToLower(strings.TrimSpace(s))
-	reg := regexp.MustCompile(`[^a-z0-9_-]+`)
-	slug := reg.ReplaceAllString(s, "-")
-	slug = strings.Trim(slug, "-")
-	if len(slug) > 50 {
-		slug = slug[:50]
-		slug = strings.Trim(slug, "-")
-	}
-	return slug
-}
-
-func (m *AppFeedManager) ImportAudiobook(ctx context.Context, req *web.ImportAudiobookRequest) (*feed.Config, error) {
-	if req == nil {
-		return nil, errors.New("empty request")
-	}
-	dirName := strings.TrimSpace(req.DirName)
-	if dirName == "" {
-		return nil, errors.New("dir_name is required")
-	}
-
-	cleanedDir := filepath.Clean(dirName)
-	if strings.HasPrefix(cleanedDir, "..") || strings.Contains(cleanedDir, string(filepath.Separator)+"..") {
-		return nil, errors.New("invalid directory path")
-	}
-
-	id := strings.TrimSpace(req.ID)
-	if id == "" {
-		base := req.Title
-		if base == "" {
-			base = dirName
-		}
-		id = generateAudiobookSlug(base)
-	}
-
-	if id == "" {
-		return nil, errors.New("could not generate valid feed ID")
-	}
-	if !regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(id) {
-		return nil, errors.New("feed id must contain only English letters (a-z, A-Z), numbers, dashes, and underscores")
-	}
-
-	m.mu.RLock()
-	_, exists := m.feeds[id]
-	m.mu.RUnlock()
-	if exists {
-		return nil, errors.Errorf("feed with ID %q already exists", id)
-	}
-
-	baseDir := m.GetAudiobooksDir()
-	if filepath.IsAbs(cleanedDir) || cleanedDir == "." || cleanedDir == ".." || strings.HasPrefix(cleanedDir, ".."+string(filepath.Separator)) {
-		return nil, errors.New("book must be a subdirectory of the audiobook library")
-	}
-	root, err := os.OpenRoot(baseDir)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot access audiobook library")
-	}
-	defer root.Close()
-
-	stat, err := root.Stat(cleanedDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, errors.Errorf("audiobook folder %q does not exist", cleanedDir)
-		}
-		return nil, errors.Wrap(err, "cannot access audiobook folder")
-	}
-	if !stat.IsDir() {
-		return nil, errors.Errorf("%q is not a directory", cleanedDir)
-	}
-	fullPath := filepath.Join(baseDir, cleanedDir)
-
-	newFeed := &feed.Config{
-		ID:           id,
-		URL:          fmt.Sprintf("audiobook://%s", cleanedDir),
-		Format:       model.FormatAudio,
-		Quality:      model.QualityHigh,
-		PlaylistSort: model.SortingAsc,
-		PageSize:     1000,
-		AudiobookDir: fullPath,
-	}
-
-	if req.Title != "" || req.Author != "" || req.Description != "" {
-		newFeed.Custom = feed.Custom{
-			Title:       req.Title,
-			Author:      req.Author,
-			Description: req.Description,
-		}
-	}
-	if req.PrivateFeed {
-		newFeed.PrivateFeed = true
-	}
-
-	abBuilder, err := builder.NewAudiobookBuilder(baseDir)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := abBuilder.Build(ctx, newFeed); err != nil {
-		return nil, errors.Wrap(err, "cannot import audiobook")
-	}
-	if err := m.AddFeed(ctx, newFeed); err != nil {
-		return nil, err
-	}
-
-	return newFeed, nil
-}
-
-func (m *AppFeedManager) SaveAudiobookFile(bookDir string, filename string, r io.Reader) error {
-	baseDir := m.GetAudiobooksDir()
-	if baseDir == "" {
-		return errors.New("audiobooks directory is not configured")
-	}
-	cleanBookDir := filepath.Clean(bookDir)
-	if cleanBookDir == "." || filepath.IsAbs(cleanBookDir) || cleanBookDir == ".." || strings.HasPrefix(cleanBookDir, ".."+string(filepath.Separator)) {
-		return errors.New("invalid book directory")
-	}
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return errors.Wrap(err, "failed to create audiobooks base directory")
-	}
-	root, err := os.OpenRoot(baseDir)
-	if err != nil {
-		return errors.Wrap(err, "failed to open audiobooks directory")
-	}
-	defer root.Close()
-	if err := root.MkdirAll(cleanBookDir, 0755); err != nil {
-		return errors.Wrap(err, "failed to create book directory")
-	}
-
-	cleanFilename := filepath.Base(filepath.Clean(filename))
-	if cleanFilename == "." || cleanFilename == "/" || cleanFilename == ".." {
-		return errors.New("invalid filename")
-	}
-
-	targetPath := filepath.Join(cleanBookDir, cleanFilename)
-	out, err := root.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if os.IsExist(err) {
-		// Retrying an interrupted multi-file upload may include completed files.
-		existing, openErr := root.Open(targetPath)
-		if openErr != nil {
-			return openErr
-		}
-		defer existing.Close()
-		oldHash, newHash := sha256.New(), sha256.New()
-		oldSize, readErr := io.Copy(oldHash, existing)
-		if readErr != nil {
-			return readErr
-		}
-		newSize, readErr := io.Copy(newHash, r)
-		if readErr != nil {
-			return readErr
-		}
-		if oldSize == newSize && bytes.Equal(oldHash.Sum(nil), newHash.Sum(nil)) {
-			return nil
-		}
-		return errors.New("file already exists with different content; choose a different filename")
-	}
-	if err != nil {
-		return errors.Wrap(err, "failed to create destination file")
-	}
-	if _, err := io.Copy(out, r); err != nil {
-		_ = out.Close()
-		_ = root.Remove(targetPath)
-		return errors.Wrap(err, "failed to write file")
-	}
-	if err := out.Close(); err != nil {
-		_ = root.Remove(targetPath)
-		return err
-	}
-	return nil
-}
-
-func (m *AppFeedManager) DeleteAudiobookDir(ctx context.Context, dirName string) error {
-	dirName = strings.TrimSpace(dirName)
-	if dirName == "" {
-		return errors.New("dir_name is required")
-	}
-
-	cleanDir := filepath.Clean(dirName)
-	if cleanDir == "." || cleanDir == "/" || cleanDir == ".." || strings.HasPrefix(cleanDir, ".."+string(filepath.Separator)) || filepath.IsAbs(cleanDir) {
-		return errors.New("invalid directory path")
-	}
-
-	baseDir := m.GetAudiobooksDir()
-	if baseDir == "" {
-		return errors.New("audiobooks directory is not configured")
-	}
-
-	root, err := os.OpenRoot(baseDir)
-	if err != nil {
-		return errors.Wrap(err, "failed to open audiobooks root directory")
-	}
-	defer root.Close()
-
-	stat, err := root.Stat(cleanDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return errors.Errorf("audiobook directory %q not found", dirName)
-		}
-		return err
-	}
-	if !stat.IsDir() {
-		return errors.Errorf("%q is not a directory", dirName)
-	}
-
-	targetPath := filepath.Join(baseDir, cleanDir)
-
-	// If this directory is linked to any active feed(s), delete the feed(s) cleanly
-	m.mu.Lock()
-	var linkedFeedIDs []string
-	for feedID, f := range m.feeds {
-		info, parseErr := builder.ParseURL(f.URL)
-		if parseErr == nil && info.Provider == model.ProviderAudiobook && (info.ItemID == cleanDir || f.AudiobookDir == targetPath) {
-			linkedFeedIDs = append(linkedFeedIDs, feedID)
-		}
-	}
-	m.mu.Unlock()
-
-	for _, feedID := range linkedFeedIDs {
-		log.Infof("deleting linked audiobook feed %q before deleting folder %q", feedID, dirName)
-		if delErr := m.DeleteFeed(ctx, feedID, true); delErr != nil {
-			log.WithError(delErr).Warnf("failed to delete linked feed %q during folder deletion", feedID)
-		}
-	}
-
-	// Remove folder from disk via root
-	if err := root.RemoveAll(cleanDir); err != nil {
-		return errors.Wrapf(err, "failed to delete audiobook directory %q", dirName)
-	}
-
-	log.Infof("successfully deleted audiobook directory from disk: %s", targetPath)
-	return nil
-}
-
-func (m *AppFeedManager) SaveCoverImage(ctx context.Context, feedID string, filename string, r io.Reader) (*web.CoverUploadResult, error) {
-	m.mu.RLock()
-	dataDir := ""
-	if m.cfg != nil {
-		dataDir = m.cfg.Storage.Local.DataDir
-	}
-	publicURL := web.Config{}.PublicURL()
-	if m.cfg != nil {
-		publicURL = m.cfg.Server.PublicURL()
-	}
-	m.mu.RUnlock()
-
-	if dataDir == "" {
-		return nil, errors.New("storage data directory is not configured")
-	}
-
-	ext := strings.ToLower(filepath.Ext(filename))
-	switch ext {
-	case ".jpg", ".jpeg", ".png", ".webp", ".gif":
-		// valid
-	default:
-		ext = ".jpg"
-	}
-
-	var targetDir, targetFilename, relURL string
-	cleanFeedID := strings.TrimSpace(feedID)
-
-	if cleanFeedID != "" {
-		baseID := filepath.Base(filepath.Clean(cleanFeedID))
-		if baseID == "." || baseID == "/" || baseID == ".." || strings.Contains(cleanFeedID, "..") {
-			return nil, errors.New("invalid feed ID")
-		}
-
-		mountedDir := ""
-		if m.storage != nil {
-			if mounter, ok := m.storage.(fs.Mounter); ok {
-				if dir, ok := mounter.GetMount(baseID); ok && dir != "" {
-					mountedDir = dir
-				}
-			}
-		}
-
-		if mountedDir != "" {
-			targetDir = mountedDir
-		} else {
-			targetDir = filepath.Join(dataDir, baseID)
-		}
-
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
-			return nil, errors.Wrap(err, "failed to create feed cover directory")
-		}
-
-		targetFilename = "cover" + ext
-		relURL = fmt.Sprintf("/%s/%s", baseID, targetFilename)
-	} else {
-		targetDir = filepath.Join(dataDir, "covers")
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
-			return nil, errors.Wrap(err, "failed to create covers directory")
-		}
-
-		targetFilename = fmt.Sprintf("cover_%d%s", time.Now().UnixNano(), ext)
-		relURL = fmt.Sprintf("/covers/%s", targetFilename)
-	}
-
-	targetPath := filepath.Join(targetDir, targetFilename)
-	out, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open cover target file")
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, r); err != nil {
-		return nil, errors.Wrap(err, "failed to write cover file")
-	}
-
-	fullURL := strings.TrimRight(publicURL, "/") + relURL
-	return &web.CoverUploadResult{
-		URL:      fullURL,
-		RelURL:   relURL,
-		FeedID:   cleanFeedID,
-		Filename: targetFilename,
-	}, nil
 }

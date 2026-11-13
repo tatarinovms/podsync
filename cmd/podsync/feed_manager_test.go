@@ -1345,3 +1345,43 @@ func TestUpdateFeed_CancelsActiveUpdateOnLimitsChange(t *testing.T) {
 	assert.Equal(t, 3, mgr.feeds["feed_limit"].Clean.KeepLast)
 	mgr.mu.RUnlock()
 }
+
+func TestFeedCoverFromRSS(t *testing.T) {
+	tests := []struct {
+		name     string
+		document string
+		want     string
+	}{
+		{
+			name:     "standard channel image",
+			document: `<?xml version="1.0"?><rss><channel><title>Show</title><image><url> https://example.com/cover.jpg </url><title>Show</title></image></channel></rss>`,
+			want:     "https://example.com/cover.jpg",
+		},
+		{
+			name:     "itunes image fallback",
+			document: `<rss><channel><itunes:image href="https://example.com/itunes.png"/><item/></channel></rss>`,
+			want:     "https://example.com/itunes.png",
+		},
+		{
+			name:     "image after a long description",
+			document: `<rss><channel><description>` + strings.Repeat("x", 200000) + `</description><image><url>https://example.com/late.jpg</url></image></channel></rss>`,
+			want:     "https://example.com/late.jpg",
+		},
+		{
+			name:     "url outside an image element is ignored",
+			document: `<rss><channel><link>https://example.com/site</link><image><url>https://example.com/cover.jpg</url></image></channel></rss>`,
+			want:     "https://example.com/cover.jpg",
+		},
+		{
+			name:     "no image",
+			document: `<rss><channel><title>Show</title></channel></rss>`,
+			want:     "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, feedCoverFromRSS(strings.NewReader(tc.document)))
+		})
+	}
+}

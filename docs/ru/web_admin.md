@@ -96,7 +96,11 @@ http://<хост-podsync>:<порт>/admin/
 ### 1. Боковая навигация и организация библиотеки
 - **Структурированный сайдбар (`.app-sidebar`)**:
   - **LIBRARY**: Быстрый доступ к разделам **Podcasts** (со счётчиком лент), **Personal feeds**, **Audiobooks** и **Activity** (с индикатором ошибок).
-  - **SETTINGS**: Централизованные настройки **API keys**, **Downloader**, **System & storage** и **MCP server**.
+  - **SETTINGS**: Три сгруппированных раздела с вложенными вкладками:
+    - **Sources & downloads** — **API keys** и **Download & network** (cookies, прокси, DNS).
+    - **System** — **Overview** (хранилище, состояние сервиса, зависимости, обновления) и **Backup & restore**.
+    - **Access & integrations** — **Security & access** (защита от брутфорса, пароль администратора) и **MCP & integrations**.
+    Прямые ссылки используют `#sources`, `#system` или `#access` с необязательной подвкладкой (`#sources/downloader`, `#system/backup`, `#access/mcp`). Старые ссылки `#tokens`, `#downloader` и `#mcp` открывают новый раздел.
 - **Два режима отображения (Cards и List View)**:
   - Переключение между наглядной сеткой карточек (**Grid**) и компактным списком (**List**) с сохранением выбора в `localStorage`.
 - **Живой поиск, фильтры типов и сортировка**:

@@ -97,7 +97,11 @@ Log in using the configured username and password.
 ### 1. Sidebar Navigation & Library Organization
 - **Structured Sidebar (`.app-sidebar`)**:
   - **LIBRARY**: Direct access to **Podcasts** (with total count badge), **Personal feeds**, **Audiobooks**, and **Activity** (with live error badge).
-  - **SETTINGS**: Centralized access to **API Keys**, **Downloader**, **System & Storage**, and **MCP Server**.
+  - **SETTINGS**: Three grouped destinations, each with nested tabs:
+    - **Sources & downloads** — **API keys** and **Download & network** (cookies, proxies, DNS).
+    - **System** — **Overview** (storage, service health, dependencies, updates) and **Backup & restore**.
+    - **Access & integrations** — **Security & access** (rate limiting, admin password) and **MCP & integrations**.
+    Deep links use `#sources`, `#system`, or `#access` with an optional sub-tab (`#sources/downloader`, `#system/backup`, `#access/mcp`). Older `#tokens`, `#downloader`, and `#mcp` links resolve to the new location.
 - **Dual View Modes (Grid & List)**:
   - Toggle between rich **Card Grid** view and high-density **List View** with view preference persisted in `localStorage`.
 - **Live Search, Type Filters & Sorting**:

@@ -324,6 +324,11 @@ Accent colors have different lightness levels in Latte and Mocha:
 
 ## 15. Product-Specific Interaction Patterns
 
+- **Grouped settings**: Keep one sidebar entry per domain (Sources &
+  downloads, System, Access & integrations) and use nested tabs for the panes
+  inside it. Each group starts with a single page heading and description; show
+  only the active nested pane, and preserve deep links for the group and its
+  sub-tab while keeping old links working.
 - **Episode toolbar**: Search, status, duration and sort controls share one
   aligned row at 768px and above, with every control at the 35px compact height.
   Below 768px the controls stack and wrap without horizontal overflow.

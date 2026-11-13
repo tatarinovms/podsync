@@ -2384,9 +2384,11 @@
                 const pct = Math.round((used / total) * 100);
 
                 document.getElementById('disk-used-text').innerText = formatBytes(used) + ' used';
-                document.getElementById('disk-total-text').innerText = formatBytes(free);
+                document.getElementById('disk-total-text').innerText = formatBytes(total);
                 const pbar = document.getElementById('disk-progress');
                 pbar.style.width = pct + '%';
+                pbar.setAttribute('aria-valuenow', String(pct));
+                pbar.setAttribute('aria-valuetext', `${pct}% of storage used`);
                 if (pct > 85) {
                     pbar.className = 'progress-bar bg-danger';
                 } else if (pct > 65) {
@@ -3899,6 +3901,36 @@
             }
         });
 
+        // Settings are grouped under three sidebar sections. Each section keeps
+        // its panes as nested Bootstrap tabs and loads only the visible one.
+        const settingsPanelIDs = {
+            sources: { tokens: 'tab-tokens', downloader: 'tab-downloader' },
+            system: { overview: 'tab-system-overview', backup: 'tab-system-backup' },
+            access: { security: 'tab-access-security', mcp: 'tab-mcp' },
+        };
+        const settingsPanelLoaders = {
+            'tab-tokens': () => loadTokens(),
+            'tab-downloader': () => loadDownloaderConfig(),
+            'tab-system-overview': () => loadSystem(),
+            'tab-access-security': () => loadAuthSecurity(),
+            'tab-mcp': () => loadMCPConfig(),
+        };
+
+        function activeSettingsPanel(parentId) {
+            const active = document.querySelector(`#${parentId} .settings-subnav .nav-link.active`);
+            return active?.getAttribute('data-bs-target')?.replace('#', '') || '';
+        }
+
+        function loadSettingsPanel(panelId) {
+            settingsPanelLoaders[panelId]?.();
+        }
+
+        function settingsRoute(parentId, panelId) {
+            const parent = parentId.replace(/^tab-/, '');
+            const child = panelId.replace(/^tab-/, '').replace(/^(system|access)-/, '');
+            return `#${parent}/${child}`;
+        }
+
         document.getElementById('mainTabs')?.addEventListener('shown.bs.tab', (e) => {
             const target = e.target.getAttribute('data-bs-target')?.replace('#', '');
             if (!target) return;
@@ -3916,18 +3948,24 @@
             } else if (target === 'tab-audiobooks') {
                 loadAudiobooksTab();
                 window.scrollTo?.(0, libraryScroll);
-            } else if (target === 'tab-tokens') {
-                loadTokens();
-            } else if (target === 'tab-downloader') {
-                loadDownloaderConfig();
-            } else if (target === 'tab-mcp') {
-                loadMCPConfig();
             } else if (target === 'tab-logs') {
                 loadLogs(true);
                 setLogsAutoRefresh(document.getElementById('logs-autorefresh-select').value);
-            } else if (target === 'tab-system') {
-                loadSystem(); loadAuthSecurity();
+            } else if (target === 'tab-sources' || target === 'tab-system' || target === 'tab-access') {
+                const panelId = activeSettingsPanel(target);
+                loadSettingsPanel(panelId);
+                if (panelId) setRoute(settingsRoute(target, panelId));
             }
+        });
+
+        document.querySelectorAll('.settings-subnav').forEach((nav) => {
+            nav.addEventListener('shown.bs.tab', (event) => {
+                const panelId = event.target.getAttribute('data-bs-target')?.replace('#', '');
+                const parentId = event.target.closest('.tab-pane')?.id;
+                if (!panelId || !parentId) return;
+                loadSettingsPanel(panelId);
+                setRoute(settingsRoute(parentId, panelId));
+            });
         });
 
         document.getElementById('securitySettingsModal')?.addEventListener('show.bs.modal', () => {
@@ -4108,10 +4146,20 @@
                     else if (currentTab === 'feed-detail' && episodeView?.feedId === feedId) showFeedSection('episodes');
                     else showEpisodes(feedId);
                 } else {
-                    const allowed = ['feeds', 'personal', 'audiobooks', 'tokens', 'system', 'downloader', 'mcp', 'logs'];
-                    const tab = allowed.includes(hash.slice(1)) ? hash.slice(1) : 'feeds';
+                    const allowed = ['feeds', 'personal', 'audiobooks', 'sources', 'system', 'access', 'logs'];
+                    // Keep old bookmarks working: #tokens, #downloader and #mcp
+                    // resolve to their new grouped location.
+                    const legacyRoutes = { tokens: 'sources/tokens', downloader: 'sources/downloader', mcp: 'access/mcp' };
+                    const rawRoute = legacyRoutes[hash.slice(1)] || hash.slice(1);
+                    const [routeName, subName] = rawRoute.split('/');
+                    const tab = allowed.includes(routeName) ? routeName : 'feeds';
                     const button = document.querySelector(`#mainTabs [data-bs-target="#tab-${tab}"]`);
                     if (button) bootstrap.Tab.getOrCreateInstance(button).show();
+                    const panelId = settingsPanelIDs[tab]?.[subName];
+                    if (panelId) {
+                        const subButton = document.querySelector(`#tab-${tab} .settings-subnav [data-bs-target="#${panelId}"]`);
+                        if (subButton) bootstrap.Tab.getOrCreateInstance(subButton).show();
+                    }
                 }
             } catch (_) { returnToLibrary(); }
             finally { restoringRoute = false; }

@@ -155,7 +155,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 
 - Accessible at `/admin` (SPA modularized across `index.html`, `admin.css`, `admin.js`, and `theme.js`, embedded via `//go:embed ui/*`).
 - **UI Architecture**:
-  - **Sidebar Navigation (`.sidebar`)**: Live podcast count badges, quick filters (All, Active, Errors, Audiobooks), and real-time disk storage gauge.
+  - **Sidebar Navigation (`.sidebar`)**: Live podcast count badges, quick filters (All, Active, Errors, Audiobooks), and real-time disk storage gauge. Settings are grouped into **Sources & downloads** (API keys, downloader/network), **System** (overview, backup & restore), and **Access & integrations** (security, password, MCP), each with nested tabs and deep links (`#sources/downloader`, `#system/backup`, `#access/mcp`); legacy `#tokens`, `#downloader`, and `#mcp` links still resolve.
   - **Dual Library Views**: Compact card grid (`#view-mode-cards`) and structured tabular list (`#view-mode-list`) with persistent view selection.
   - **Dedicated Podcast View (`.feed-detail`)**:
     - **Header**: High-resolution artwork, provider badge, show title, subtitle, and prominent **Subscribe** button.

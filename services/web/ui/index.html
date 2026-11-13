@@ -88,10 +88,9 @@
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-audiobooks"><i aria-hidden="true" class="bi bi-book"></i> Audiobooks</button></li>
                     <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-logs"><i aria-hidden="true" class="bi bi-activity"></i> Activity <span id="nav-logs-badge" class="badge rounded-pill bg-danger ms-auto d-none">0</span></button></li>
                     <li class="nav-section" role="presentation">SETTINGS</li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-tokens"><i aria-hidden="true" class="bi bi-key"></i> API keys</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-downloader"><i aria-hidden="true" class="bi bi-cloud-arrow-down"></i> Download &amp; network</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System &amp; access</button></li>
-                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-mcp"><i aria-hidden="true" class="bi bi-robot"></i> MCP &amp; integrations</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-sources"><i aria-hidden="true" class="bi bi-key"></i> Sources &amp; downloads</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-system"><i aria-hidden="true" class="bi bi-hdd-network"></i> System</button></li>
+                    <li class="nav-item"><button class="nav-link" role="tab" aria-selected="false" data-bs-toggle="tab" data-bs-target="#tab-access"><i aria-hidden="true" class="bi bi-shield-lock"></i> Access &amp; integrations</button></li>
                 </ul>
                 
             </aside>
@@ -315,8 +314,19 @@
                     </div>
                 </div>
 
-                <!-- 2. Tokens Tab -->
-                <div class="tab-pane fade" id="tab-tokens">
+                <!-- Sources & Downloads -->
+                <div class="tab-pane fade" id="tab-sources">
+                    <header class="library-heading settings-heading">
+                        <div><h1>Sources &amp; downloads</h1><p class="library-description">Provider credentials, downloader behaviour, network routing and cookies.</p></div>
+                    </header>
+
+                    <ul class="nav nav-tabs settings-subnav" role="tablist" aria-label="Sources and downloads settings">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="sources-tab-tokens" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-tokens" aria-controls="tab-tokens" aria-selected="true"><i aria-hidden="true" class="bi bi-key me-2"></i>API keys</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="sources-tab-downloader" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-downloader" aria-controls="tab-downloader" aria-selected="false"><i aria-hidden="true" class="bi bi-cloud-arrow-down me-2"></i>Download &amp; network</button></li>
+                    </ul>
+
+                    <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-tokens">
                     <div class="row g-4">
                         <div class="col-12 col-xl-8">
                             <div class="card p-4">
@@ -354,182 +364,6 @@
                     </div>
                 </div>
 
-                <!-- 3. System Tab -->
-                <div class="tab-pane fade" id="tab-system">
-                    <div class="row g-4">
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Episode Storage</h6>
-                                <h3 id="disk-used-text" class="fw-bold mb-1">-</h3>
-                                <p class="text-muted small mb-3">free of <span id="disk-total-text">-</span></p>
-                                <div class="progress mb-2" style="height: 8px;">
-                                    <div id="disk-progress" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
-                                </div>
-                                <div class="small text-muted d-flex justify-content-between">
-                                    <span>Directory: <code id="sys-datadir">/app/data</code></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Service Status</h6>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Uptime:</span>
-                                        <span id="sys-uptime" class="fw-semibold">-</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Memory (RAM):</span>
-                                        <span id="sys-ram" class="fw-semibold">-</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Goroutines:</span>
-                                        <span id="sys-goroutines" class="fw-semibold">-</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between small">
-                                        <span class="text-muted">Storage Type:</span>
-                                        <span id="sys-storage" class="fw-semibold">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Dependencies & Environment</h6>
-                                <div class="d-flex flex-column gap-3">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <span>yt-dlp</span>
-                                        <span id="badge-ytdlp" class="badge bg-secondary">Checking...</span>
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <span>ffmpeg</span>
-                                        <span id="badge-ffmpeg" class="badge bg-secondary">Checking...</span>
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <span>Podsync Version</span>
-                                        <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <div class="card p-4 h-100">
-                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Podsync Updates</h6>
-                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                                    <span class="small text-muted">Latest release</span>
-                                    <span id="sys-update-version" class="badge bg-light text-secondary border">Checking...</span>
-                                </div>
-                                <p id="sys-update-message" class="small text-muted mb-3">Checking GitHub Releases for an update.</p>
-                                <div class="d-flex align-items-center gap-2 mt-auto">
-                                    <button id="btn-podsync-update" type="button" class="btn btn-brand btn-sm" onclick="updatePodsync()" disabled>
-                                        <i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync
-                                    </button>
-                                    <a id="podsync-release-link" class="btn btn-secondary btn-sm d-none" target="_blank" rel="noopener noreferrer">
-                                        Release notes
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row g-4 mt-1">
-                        <div class="col-12">
-                            <div class="card p-4">
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-box-seam me-2 text-primary"></i>Backup &amp; Restore</h6>
-                                    <a href="/podsync.opml" download="podsync.opml" class="btn btn-secondary btn-sm"><i aria-hidden="true" class="bi bi-file-earmark-arrow-down me-1"></i>Export OPML (RSS URLs only)</a>
-                                </div>
-                                <div class="row g-4">
-                                    <div class="col-12 col-lg-6 border-end-lg">
-                                        <p class="small text-muted">Download configuration, database metadata, custom cover artwork and optional secrets. Downloaded media is never included.</p>
-                                        <div class="form-check mb-3">
-                                            <input class="form-check-input" type="checkbox" id="backup-include-secrets" checked>
-                                            <label class="form-check-label small" for="backup-include-secrets">Include API keys, passwords &amp; cookies.txt</label>
-                                        </div>
-                                        <button type="button" class="btn btn-brand btn-sm" onclick="downloadSystemBackup()"><i aria-hidden="true" class="bi bi-download me-1"></i>Download Full Backup (.tar.gz)</button>
-                                    </div>
-                                    <div class="col-12 col-lg-6">
-                                        <p class="small text-muted">Select a backup to inspect it before replacing this server's feed database.</p>
-                                        <input id="backup-restore-file" type="file" class="form-control form-control-sm mb-2" accept=".tar.gz,application/gzip" onchange="inspectSystemBackup(this)">
-                                        <div id="backup-preview" class="border rounded p-2 small d-none" aria-live="polite"></div>
-                                        <div class="form-check my-3">
-                                            <input class="form-check-input" type="checkbox" id="backup-preserve-paths" checked>
-                                            <label class="form-check-label small" for="backup-preserve-paths">Preserve current server storage paths &amp; port (recommended when migrating)</label>
-                                        </div>
-                                        <button id="btn-restore-backup" type="button" class="btn btn-brand btn-sm" onclick="restoreSystemBackup()" disabled><i aria-hidden="true" class="bi bi-arrow-counterclockwise me-1"></i>Restore Backup</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Security & Authentication -->
-                    <div class="row g-4 mt-1">
-                        <div class="col-12 col-lg-6">
-                            <div class="card p-4 h-100">
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
-                                    <div class="d-flex flex-shrink-0 align-items-center gap-2">
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
-                                        <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
-                                            <i aria-hidden="true" class="bi bi-sliders me-1"></i>Configure
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="small text-muted mb-3">
-                                    Brute-force protection automatically tracks and blocks suspicious authentication attempts across Web UI and HTTP Basic Auth:
-                                </p>
-                                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
-                                    <li class="d-flex align-items-center justify-content-between">
-                                        <span class="text-muted">Max failed attempts:</span>
-                                        <span class="fw-semibold" id="sec-max-attempts-text">5 attempts / 5m</span>
-                                    </li>
-                                    <li class="d-flex align-items-center justify-content-between">
-                                        <span class="text-muted">Tracking scope:</span>
-                                        <span class="fw-semibold">Client IP &amp; Username</span>
-                                    </li>
-                                    <li class="d-flex align-items-center justify-content-between">
-                                        <span class="text-muted">Lockout penalty:</span>
-                                        <span class="fw-semibold" id="sec-lockout-text">HTTP 429 + <code>Retry-After</code> (5m)</span>
-                                    </li>
-                                    <li class="d-flex align-items-center justify-content-between">
-                                        <span class="text-muted">Protected endpoints:</span>
-                                        <span class="fw-semibold"><code>/api/v1/auth/login</code>, Basic Auth</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-lg-6">
-                            <div class="card p-4 h-100">
-                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
-                                    <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
-                                        <i aria-hidden="true" class="bi bi-pencil-square me-1"></i>Change Password
-                                    </button>
-                                </div>
-                                <p class="small text-muted mb-3">
-                                    Manage the web console and API administrator password. Changes are immediately saved to configuration.
-                                </p>
-                                <div class="border rounded p-3 bg-body-tertiary small">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="text-muted">Username:</span>
-                                        <span id="sys-auth-username" class="fw-semibold font-monospace">admin</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span class="text-muted">Authentication:</span>
-                                        <span class="badge bg-primary-subtle text-primary">Session Cookie &amp; Basic Auth</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Downloader & Cookies Tab -->
                 <div class="tab-pane fade" id="tab-downloader">
                     <!-- Header Banner -->
                     <div class="card mb-4 shadow-sm dashboard-banner">
@@ -608,7 +442,7 @@
                                         </div>
                                         <textarea id="dl-cookies-content" class="form-control font-monospace small" rows="5" placeholder="# Netscape HTTP Cookie File&#10;# Export using 'Get cookies.txt LOCALLY' extension from your browser&#10;.youtube.com	TRUE	/	TRUE	1799999999	LOGIN_INFO	..."></textarea>
                                         <div class="form-text small">
-                                            Paste your exported cookies or upload a <code>cookies.txt</code> file. Recommended extension: <a href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies" target="_blank" class="text-decoration-none">Exporting YouTube Cookies (yt-dlp wiki)</a>.
+                                            Paste your exported cookies or upload a <code>cookies.txt</code> file. Recommended extension: <a href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies" target="_blank" class="text-decoration-underline">Exporting YouTube Cookies (yt-dlp wiki)</a>.
                                         </div>
                                     </div>
 
@@ -799,8 +633,218 @@
                         </div>
                     </div>
                 </div>
+                    </div>
+                </div>
 
-                <!-- 4. MCP Server Tab -->
+                <!-- System -->
+                <div class="tab-pane fade" id="tab-system">
+                    <header class="library-heading settings-heading">
+                        <div><h1>System</h1><p class="library-description">Storage, service health, dependencies, updates, and portable backups.</p></div>
+                    </header>
+
+                    <ul class="nav nav-tabs settings-subnav" role="tablist" aria-label="System settings">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="system-tab-overview" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-system-overview" aria-controls="tab-system-overview" aria-selected="true"><i aria-hidden="true" class="bi bi-speedometer2 me-2"></i>Overview</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="system-tab-backup" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-system-backup" aria-controls="tab-system-backup" aria-selected="false"><i aria-hidden="true" class="bi bi-box-seam me-2"></i>Backup &amp; restore</button></li>
+                    </ul>
+
+                    <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-system-overview">
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Episode Storage</h6>
+                                <h3 id="disk-used-text" class="fw-bold mb-1">-</h3>
+                                <p class="text-muted small mb-3">free of <span id="disk-total-text">-</span></p>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div id="disk-progress" class="progress-bar bg-primary" role="progressbar" aria-label="Episode storage used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0% of storage used" style="width: 0%"></div>
+                                </div>
+                                <div class="small text-muted d-flex justify-content-between">
+                                    <span>Directory: <code id="sys-datadir">/app/data</code></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Service Status</h6>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Uptime:</span>
+                                        <span id="sys-uptime" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Memory (RAM):</span>
+                                        <span id="sys-ram" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Goroutines:</span>
+                                        <span id="sys-goroutines" class="fw-semibold">-</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Storage Type:</span>
+                                        <span id="sys-storage" class="fw-semibold">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Dependencies & Environment</h6>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>yt-dlp</span>
+                                        <span id="badge-ytdlp" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>ffmpeg</span>
+                                        <span id="badge-ffmpeg" class="badge bg-secondary">Checking...</span>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span>Podsync Version</span>
+                                        <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <div class="card p-4 h-100">
+                                <h6 class="text-muted text-uppercase fw-bold small mb-3">Podsync Updates</h6>
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                    <span class="small text-muted">Latest release</span>
+                                    <span id="sys-update-version" class="badge bg-light text-secondary border">Checking...</span>
+                                </div>
+                                <p id="sys-update-message" class="small text-muted mb-3">Checking GitHub Releases for an update.</p>
+                                <div class="d-flex align-items-center gap-2 mt-auto">
+                                    <button id="btn-podsync-update" type="button" class="btn btn-brand btn-sm" onclick="updatePodsync()" disabled>
+                                        <i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync
+                                    </button>
+                                    <a id="podsync-release-link" class="btn btn-secondary btn-sm d-none" target="_blank" rel="noopener noreferrer">
+                                        Release notes
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="tab-pane fade" id="tab-system-backup">
+                    <div class="row g-4 mt-1">
+                        <div class="col-12">
+                            <div class="card p-4">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-box-seam me-2 text-primary"></i>Backup &amp; Restore</h6>
+                                    <a href="/podsync.opml" download="podsync.opml" class="btn btn-secondary btn-sm"><i aria-hidden="true" class="bi bi-file-earmark-arrow-down me-1"></i>Export OPML (RSS URLs only)</a>
+                                </div>
+                                <div class="row g-4">
+                                    <div class="col-12 col-lg-6 border-end-lg">
+                                        <p class="small text-muted">Download configuration, database metadata, custom cover artwork and optional secrets. Downloaded media is never included.</p>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="backup-include-secrets" checked>
+                                            <label class="form-check-label small" for="backup-include-secrets">Include API keys, passwords &amp; cookies.txt</label>
+                                        </div>
+                                        <button type="button" class="btn btn-brand btn-sm" onclick="downloadSystemBackup()"><i aria-hidden="true" class="bi bi-download me-1"></i>Download Full Backup (.tar.gz)</button>
+                                    </div>
+                                    <div class="col-12 col-lg-6">
+                                        <p class="small text-muted">Select a backup to inspect it before replacing this server's feed database.</p>
+                                        <label class="form-label small fw-semibold" for="backup-restore-file">Backup archive</label>
+                                        <input id="backup-restore-file" type="file" class="form-control form-control-sm mb-2" accept=".tar.gz,application/gzip" onchange="inspectSystemBackup(this)">
+                                        <div id="backup-preview" class="border rounded p-2 small d-none" aria-live="polite"></div>
+                                        <div class="form-check my-3">
+                                            <input class="form-check-input" type="checkbox" id="backup-preserve-paths" checked>
+                                            <label class="form-check-label small" for="backup-preserve-paths">Preserve current server storage paths &amp; port (recommended when migrating)</label>
+                                        </div>
+                                        <button id="btn-restore-backup" type="button" class="btn btn-brand btn-sm" onclick="restoreSystemBackup()" disabled><i aria-hidden="true" class="bi bi-arrow-counterclockwise me-1"></i>Restore Backup</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                    </div>
+                </div>
+
+                <!-- Access & Integrations -->
+                <div class="tab-pane fade" id="tab-access">
+                    <header class="library-heading settings-heading">
+                        <div><h1>Access &amp; integrations</h1><p class="library-description">Administrator security, credentials, and agent integrations.</p></div>
+                    </header>
+
+                    <ul class="nav nav-tabs settings-subnav" role="tablist" aria-label="Access and integrations settings">
+                        <li class="nav-item" role="presentation"><button class="nav-link active" id="access-tab-security" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-access-security" aria-controls="tab-access-security" aria-selected="true"><i aria-hidden="true" class="bi bi-shield-lock me-2"></i>Security &amp; access</button></li>
+                        <li class="nav-item" role="presentation"><button class="nav-link" id="access-tab-mcp" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-mcp" aria-controls="tab-mcp" aria-selected="false"><i aria-hidden="true" class="bi bi-robot me-2"></i>MCP &amp; integrations</button></li>
+                    </ul>
+
+                    <div class="tab-content">
+                <div class="tab-pane fade show active" id="tab-access-security">
+                    <!-- Security & Authentication -->
+                    <div class="row g-4 mt-1">
+                        <div class="col-12 col-lg-6">
+                            <div class="card p-4 h-100">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-shield-lock me-2 text-primary"></i>Security &amp; Rate Limiting</h6>
+                                    <div class="d-flex flex-shrink-0 align-items-center gap-2">
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                        <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#securitySettingsModal">
+                                            <i aria-hidden="true" class="bi bi-sliders me-1"></i>Configure
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="small text-muted mb-3">
+                                    Brute-force protection automatically tracks and blocks suspicious authentication attempts across Web UI and HTTP Basic Auth:
+                                </p>
+                                <ul class="list-unstyled small mb-0 d-flex flex-column gap-2">
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Max failed attempts:</span>
+                                        <span class="fw-semibold" id="sec-max-attempts-text">5 attempts / 5m</span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Tracking scope:</span>
+                                        <span class="fw-semibold">Client IP &amp; Username</span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Lockout penalty:</span>
+                                        <span class="fw-semibold" id="sec-lockout-text">HTTP 429 + <code>Retry-After</code> (5m)</span>
+                                    </li>
+                                    <li class="d-flex align-items-center justify-content-between">
+                                        <span class="text-muted">Protected endpoints:</span>
+                                        <span class="fw-semibold"><code>/api/v1/auth/login</code>, Basic Auth</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <div class="card p-4 h-100">
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                    <h6 class="text-muted text-uppercase fw-bold small mb-0"><i aria-hidden="true" class="bi bi-key me-2 text-warning"></i>Admin Password</h6>
+                                    <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0 text-nowrap" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                        <i aria-hidden="true" class="bi bi-pencil-square me-1"></i>Change Password
+                                    </button>
+                                </div>
+                                <p class="small text-muted mb-3">
+                                    Manage the web console and API administrator password. Changes are immediately saved to configuration.
+                                </p>
+                                <div class="border rounded p-3 bg-body-tertiary small">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="text-muted">Username:</span>
+                                        <span id="sys-auth-username" class="fw-semibold font-monospace">admin</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">Authentication:</span>
+                                        <span class="badge bg-primary-subtle text-primary">Session Cookie &amp; Basic Auth</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
                 <div class="tab-pane fade" id="tab-mcp">
                     <!-- Header Banner -->
                     <div class="card mb-4 shadow-sm dashboard-banner">
@@ -827,7 +871,7 @@
                                         <label class="form-label small fw-semibold text-muted" for="mcp-sse-url">SSE Stream Endpoint</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-sse-url" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-sse-url', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" aria-label="Copy SSE endpoint" onclick="copyInput('mcp-sse-url', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div class="row g-2 mb-3">
@@ -835,15 +879,15 @@
                                             <label class="form-label small fw-semibold text-muted" for="mcp-username">Admin Username</label>
                                             <div class="input-group">
                                                 <input type="text" id="mcp-username" class="form-control form-control-sm" readonly>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-username', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" aria-label="Copy admin username" onclick="copyInput('mcp-username', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
                                         <div class="col-sm-6">
                                             <label class="form-label small fw-semibold text-muted" for="mcp-password">Admin Password</label>
                                             <div class="input-group">
                                                 <input type="password" id="mcp-password" class="form-control form-control-sm" readonly>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i aria-hidden="true" class="bi bi-eye"></i></button>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-password', this)" title="Copy"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" aria-label="Show or hide admin password" onclick="togglePasswordVisibility('mcp-password', this)" title="Show/Hide"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                                                <button class="btn btn-outline-secondary btn-sm" aria-label="Copy admin password" onclick="copyInput('mcp-password', this)" title="Copy"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                             </div>
                                         </div>
                                     </div>
@@ -851,7 +895,7 @@
                                         <label class="form-label small fw-semibold text-muted" for="mcp-basic-auth">HTTP Basic Auth Header</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-basic-auth" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-basic-auth', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" aria-label="Copy Basic Auth header" onclick="copyInput('mcp-basic-auth', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                 </div>
@@ -868,21 +912,21 @@
                                         <label class="form-label small fw-semibold text-muted" for="mcp-binary-path">Executable Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-binary-path" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-binary-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" aria-label="Copy executable path" onclick="copyInput('mcp-binary-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label small fw-semibold text-muted" for="mcp-config-path">Config File Path</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-config-path" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-config-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" aria-label="Copy config file path" onclick="copyInput('mcp-config-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                     <div>
                                         <label class="form-label small fw-semibold text-muted" for="mcp-cmdline">Command Line</label>
                                         <div class="input-group">
                                             <input type="text" id="mcp-cmdline" class="form-control font-monospace form-control-sm" readonly>
-                                            <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-cmdline', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                            <button class="btn btn-outline-secondary btn-sm" aria-label="Copy command line" onclick="copyInput('mcp-cmdline', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                                         </div>
                                     </div>
                                 </div>
@@ -954,9 +998,9 @@
                                 A specialized skill file is prepared in the repository. You can feed this skill directly to autonomous operational agents (Antigravity, OpenCode, Claude Code, Gemini CLI) so they know exactly when to call Podsync MCP tools:
                             </p>
                             <div class="input-group mb-2">
-                                <span class="input-group-text small bg-light">Skill Path</span>
+                                <label class="input-group-text small bg-light" for="mcp-skill-path">Skill Path</label>
                                 <input type="text" id="mcp-skill-path" class="form-control font-monospace form-control-sm" readonly>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="copyInput('mcp-skill-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                                <button class="btn btn-outline-secondary btn-sm" aria-label="Copy skill path" onclick="copyInput('mcp-skill-path', this)"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
                             </div>
                         </div>
                     </div>
@@ -1168,6 +1212,8 @@
                     </div>
                 </div>
             </div>
+                    </div>
+                </div>
 
                 <!-- 6. Logs Tab -->
                 <div class="tab-pane fade" id="tab-logs">

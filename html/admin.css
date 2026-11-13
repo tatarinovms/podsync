@@ -329,7 +329,7 @@
             line-height: 1.5 !important;
         }
 
-        .btn-primary, .btn-brand, .btn-outline-primary {
+        .btn-primary, .btn-brand {
             background-color: var(--btn-primary-bg) !important;
             color: var(--btn-primary-text) !important;
             border: 1px solid var(--btn-primary-bg) !important;
@@ -337,12 +337,27 @@
             border-radius: 8px;
             transition: all 0.15s ease-in-out;
         }
-        .btn-primary:hover, .btn-brand:hover, .btn-outline-primary:hover,
+        .btn-primary:hover, .btn-brand:hover,
         .btn-primary:focus, .btn-brand:focus,
         .btn-primary:active, .btn-brand:active {
             background-color: var(--btn-primary-hover) !important;
             border-color: var(--btn-primary-hover) !important;
             color: var(--btn-primary-text) !important;
+        }
+        /* Outline primary stays an accent outline so repeated actions such as
+           episode playback do not compete with the primary call to action. */
+        .btn-outline-primary {
+            background-color: transparent !important;
+            color: var(--ctp-mauve) !important;
+            border: 1px solid var(--ctp-mauve) !important;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-outline-primary:hover, .btn-outline-primary:focus, .btn-outline-primary:active {
+            background-color: color-mix(in srgb, var(--ctp-mauve) 15%, transparent) !important;
+            border-color: var(--ctp-mauve) !important;
+            color: var(--ctp-mauve) !important;
         }
 
         .btn-secondary, .btn-outline-secondary, .btn-light, .btn-mcp-copy {
@@ -1152,6 +1167,25 @@ button.feed-state {
 .detail-navigation button.active { color: var(--text-accent); border-bottom-color: var(--ctp-mauve); }
 .feed-detail .card { border-radius: var(--library-radius); box-shadow: none; }
 .episode-pagination { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-top: 1px solid var(--card-border); }
+
+/* Episode toolbar: a single aligned row on desktop and stacked controls on
+   narrow screens. Keep every control at the compact 35px height. */
+.episode-toolbar {
+    display: flex; flex-direction: column; gap: 8px; padding: 12px;
+    border-bottom: 1px solid var(--card-border); background-color: var(--bg-card);
+}
+.episode-toolbar .form-control { min-height: var(--control-compact-size); }
+.episode-toolbar-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.episode-toolbar-filters > * { flex: 1 1 160px; min-width: 0; }
+@media (min-width: 768px) {
+    .episode-toolbar {
+        display: grid; grid-template-columns: minmax(180px, 1fr) auto auto auto;
+        align-items: center;
+    }
+    .episode-toolbar-filters { display: contents; }
+    .episode-toolbar-filters > * { flex: initial; }
+    .episode-toolbar .podsync-select { min-width: 160px; }
+}
 .subscription-links { display: grid; gap: 10px; margin-top: 20px; }
 .subscription-links a { text-decoration: none; padding: 12px; border: 1px solid var(--card-border); border-radius: 10px; color: var(--ctp-text); }
 .subscription-links a:hover { background: var(--ctp-surface0); }

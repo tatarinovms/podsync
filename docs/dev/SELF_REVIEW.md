@@ -71,6 +71,8 @@ Before committing changes, opening pull requests, or creating release tags, run 
   - Uses `closeModal(modalId)` to cleanly remove backdrops and restore scrollability.
 - [ ] **File Sync**:
   - Kept Web UI assets in `services/web/ui/` and `html/` byte-for-byte identical, including local Bootstrap, icons/fonts, QRCode.js, and `select.js`; `Local.Open` serves the root copy when web UI serving is enabled.
+  - `TestAdminUIAssetMirror` passes, confirming the mirrored copies are identical.
+- [ ] **Asset Delivery**: Embedded assets still respond with the correct content type, gzip only when `Accept-Encoding` allows it, and `304 Not Modified` for a matching `If-None-Match` ETag.
 - [ ] **Player & System Cards**: Sticky player does not cover content; Download Scope, System Backup, and Podsync Updates states are correct on desktop and mobile.
 
 ---

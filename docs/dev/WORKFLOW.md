@@ -123,7 +123,11 @@ cp services/web/ui/theme.js html/theme.js
 
 The embedded admin UI reads `services/web/ui/`; local storage's `Local.Open`
 serves the root `html/` assets when web UI serving is enabled. Both paths are
-currently used.
+currently used and `TestAdminUIAssetMirror` fails if they diverge.
+
+Serving notes: `services/web/ui.go` precompresses embedded text assets at
+startup, derives an ETag from each file, and revalidates HTML/JS/CSS with `304`
+responses. New UI files are picked up automatically from `//go:embed ui/*`.
 
 ### 3.2 Modal Lifecycle Rules
 - **Do not use** `bootstrap.Modal.getInstance(el).hide()`. It can evaluate to `null` if the instance was created with `getOrCreateInstance` or detached.

@@ -34,7 +34,13 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── config.go             # Config struct, defaults, environment variable overrides
 │   ├── config_atomic.go      # Atomic config.toml mutation helpers
 │   ├── config_test.go        # Unit tests for config loading and env vars
-│   ├── feed_manager.go       # Implementation of AppFeedManager for Web UI and MCP
+│   ├── feed_manager.go       # AppFeedManager core: lifecycle, status, shared episode helpers
+│   ├── feed_manager_feeds.go # Feed creation, updates, deletion, update admission
+│   ├── feed_manager_config.go # Downloader, network, cookies, self-update configuration
+│   ├── feed_manager_tokens.go # API token rotation and admin credentials
+│   ├── feed_manager_status.go # Download errors, recent downloads, sync status, logs
+│   ├── feed_manager_backup.go # Portable backup and restore
+│   ├── feed_manager_audiobooks.go # Audiobook import, chapter files and covers
 │   ├── feed_manager_test.go  # Tests for feed management, private feeds, audiobook deletion
 │   ├── update_queue.go       # Queue capacity checks and update admission helpers
 │   ├── restart_unix.go / restart_windows.go # Platform-specific self-update restart
@@ -70,7 +76,10 @@ This file provides comprehensive architecture guidance, development workflows, a
 ├── services/
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
 │   │   ├── admin_types.go    # FeedSummary, FeedConfigUpdate, AudiobookDirInfo structs
-│   │   ├── api.go            # REST API endpoints (/api/v1/*)
+│   │   ├── api.go            # REST routing, shared types and authentication handlers
+│   │   ├── api_feeds.go      # Feed, token, cover and preview handlers
+│   │   ├── api_system.go     # System, backup, logs, downloader and network handlers
+│   │   ├── api_audiobooks.go # Audiobook library handlers
 │   │   ├── auth.go           # Session cookie auth, password verification, login handlers
 │   │   ├── feed_patch.go     # Atomic partial feed configuration updates
 │   │   ├── personal.go       # Personal Feed REST handlers and uploads

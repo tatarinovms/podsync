@@ -88,12 +88,13 @@ flowchart TD
 
 ## 2. Core Components
 
-### 2.1 AppFeedManager (`cmd/podsync/feed_manager.go`)
-The central orchestrator connecting the Web UI, MCP protocol, BadgerDB, and the Update pipeline:
+### 2.1 AppFeedManager (`cmd/podsync/feed_manager*.go`)
+The central orchestrator connecting the Web UI, MCP protocol, BadgerDB, and the Update pipeline. The type is implemented across focused files: `feed_manager.go` (lifecycle, status, shared episode helpers), `feed_manager_feeds.go`, `feed_manager_tokens.go`, `feed_manager_config.go`, `feed_manager_status.go`, `feed_manager_backup.go`, and `feed_manager_audiobooks.go`. It:
 - Holds in-memory thread-safe references to all registered feed configs (`m.feeds map[string]*feed.Config`).
 - Manages dynamic additions, updates, deletions, and config persistence to `config.toml`.
 - Coordinates live reload: on any feed configuration update (`UpdateFeed`), it triggers `m.updates <- f` so the RSS XML is immediately regenerated.
 - Implements `web.AdminManager` interface consumed by both REST API and MCP proxy.
+- Loads, orders, and links episodes through one shared set of helpers so the library, detail, and paginated endpoints cannot drift apart.
 
 ### 2.2 Content Builders (`pkg/builder/`)
 Platform-specific metadata parsers implementing the `builder.Builder` interface:
@@ -130,7 +131,12 @@ Core service orchestrating manually curated, universal podcast feeds:
 - Restore validates the manifest and checksums before replacing state. Cross-server restores preserve the target server's storage paths and port by default; secrets can be restored independently.
 - Native self-update is supported on Linux and macOS. It downloads the matching GitHub Release archive, verifies it against `checksums.txt`, atomically replaces the executable, and restarts the process. Docker deployments and Windows binary replacement do not self-update.
 
-### 2.8 Firefox Extension (`extensions/podsync-firefox/`)
+### 2.8 Web Admin Console Delivery (`services/web/ui.go`)
+- The embedded SPA (`services/web/ui/`) is loaded once at startup. Each asset receives a content-derived ETag, precompressed gzip body, correct content type, and a cache policy (immutable for fonts, revalidate for HTML/JS/CSS), so repeat page loads cost a `304` instead of a full download.
+- Static requests for missing paths with an extension return `404`; extensionless routes fall back to `index.html` for client-side navigation.
+- The root `html/` mirror is kept byte-for-byte identical and verified by `TestAdminUIAssetMirror`.
+
+### 2.9 Firefox Extension (`extensions/podsync-firefox/`)
 - A zero-build WebExtension sends only supported YouTube, VK Video, and Rutube pages to a selected Personal Feed.
 - The popup stores the Podsync API URL and administrator credentials in Firefox extension-local storage, lets the user choose audio/video quality, and shows maximum resolution only for video.
 - The extension uses the same authenticated REST API as the Web Admin Console; it is an optional client and introduces no separate backend protocol.

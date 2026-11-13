@@ -213,6 +213,8 @@ Accent colors have different lightness levels in Latte and Mocha:
 
 - **Primary:** `var(--ctp-mauve)` or `var(--ctp-blue)` background; contrasting `var(--ctp-base)` foreground (subject to contrast checks); medium/semibold text. Hover: subtle opacity change (`opacity-90`) or Lavender transition and small lift (`-translate-y-0.5`).
 - **Secondary / Ghost:** `var(--ctp-surface0)` background, `var(--ctp-text)` foreground, `1px solid var(--ctp-surface1)` border; hover uses `var(--ctp-surface1)`.
+- **Outline primary:** reserved for repeated or secondary accent actions (for example episode playback). It keeps a transparent surface, Mauve border and Mauve label so it does not compete with the single filled primary action on the view.
+- **One filled primary per view:** use `.btn-brand` for the main call to action (`Add podcast`, `Subscribe`, `Save`); everything else uses secondary, outline or tertiary styling.
 
 ### 3. Inputs, Textareas & Selects
 
@@ -322,6 +324,9 @@ Accent colors have different lightness levels in Latte and Mocha:
 
 ## 15. Product-Specific Interaction Patterns
 
+- **Episode toolbar**: Search, status, duration and sort controls share one
+  aligned row at 768px and above, with every control at the 35px compact height.
+  Below 768px the controls stack and wrap without horizontal overflow.
 - **Sticky mini-player**: Episode playback stays docked at the bottom while the
   user navigates. Preserve play/pause, seek, -15/+30 second controls, playback
   speed, codec/bitrate metadata, chapter navigation, and an explicit close
@@ -342,3 +347,7 @@ Accent colors have different lightness levels in Latte and Mocha:
   Unsupported hosts must be rejected before credentials or content are sent.
 - **Runtime independence**: Bootstrap, Bootstrap Icons/fonts, and QRCode.js are
   served locally. Do not add CDN dependencies to the admin console.
+- **Asset delivery**: The embedded SPA is precompressed and served with a
+  content-derived ETag, `Vary: Accept-Encoding`, and revalidation cache headers.
+  Fonts are immutable. Keep the root `html/` mirror byte-for-byte identical;
+  `TestAdminUIAssetMirror` enforces this.

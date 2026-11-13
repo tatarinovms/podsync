@@ -52,7 +52,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`config.go`**: Struct definition for `Config` loaded from TOML (`pelletier/go-toml`). Resolves environment variable overrides (`PODSYNC_CONFIG_PATH`, `PODSYNC_YOUTUBE_API_KEY`, `PODSYNC_VKVIDEO_API_KEY`, `PODSYNC_ADMIN_ENABLED`, etc.).
 - **`backup_cli.go`**: Implements offline `--export-backup` and `--restore-backup` operations.
 - **`config_atomic.go`**: Persists configuration through an atomic temporary-file replacement.
-- **`feed_manager.go`**: Implements `AppFeedManager`, which acts as the central coordinator implementing `web.AdminManager`. Handles in-memory feed maps, cron rescheduling, XML generation triggers, and `config.toml` updates.
+- **`feed_manager.go`**: Core `AppFeedManager` coordinator implementing `web.AdminManager`. Owns in-memory feed state, update admission, feed summaries, and the shared episode helpers (load, sort, media links). The same type is split by concern across `feed_manager_feeds.go` (create/update/delete), `feed_manager_tokens.go` (API keys and credentials), `feed_manager_config.go` (downloader, network, cookies, self-update), `feed_manager_status.go` (errors, recent downloads, logs), `feed_manager_backup.go` (backup/restore), and `feed_manager_audiobooks.go` (import, chapter files, covers).
 - **`update_queue.go`**: Bridges feed-manager updates to the persistent job queue, with buffered-channel fallback.
 - **`restart_unix.go` / `restart_windows.go`**: Platform-specific process restart behavior used by native updates and restore workflows.
 - **`disk_unix.go` / `disk_windows.go`**: Platform-specific disk storage inspection (free, used, and total bytes via `sys/unix.Statfs`).
@@ -111,7 +111,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 
 ### 2.12 `services/web/` (HTTP Server & Web UI)
 - **`server.go`**: HTTP server initialization, route registration, rate limiting middleware, Basic Auth & session auth, and static asset embedding.
-- **`api.go`**: REST API handlers (`/api/v1/*`) including feed preview, backup/restore, native updates, cover upload, logs, and system stats.
+- **`api.go`**: REST routing (`/api/v1/*`), shared request/response types, and authentication handlers. Domain handlers live in `api_feeds.go` (feeds, tokens, covers, preview), `api_system.go` (system metrics, backup, updates, logs, downloader, network), and `api_audiobooks.go` (audiobook library).
 - **`personal.go`**: Personal Feed REST routing, uploads, queue submission, retry, copy, move, rename, and deletion.
 - **`auth.go`**: Session cookie authentication, login rate-limiting checks, and admin credential verification.
 - **`feed_patch.go`**: Atomic partial feed configuration update handler.

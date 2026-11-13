@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mxpv/podsync/pkg/feed"
@@ -117,18 +116,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 }
 
 func cleanToken(providerStr, tok string) string {
-	tok = strings.TrimSpace(tok)
-	tok = strings.Trim(tok, "\"'")
-	if strings.EqualFold(providerStr, "vkvideo") || strings.EqualFold(providerStr, "vk") || strings.Contains(tok, "access_token=") {
-		if idx := strings.Index(tok, "access_token="); idx != -1 {
-			sub := tok[idx+len("access_token="):]
-			if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
-				return sub[:end]
-			}
-			return sub
-		}
-	}
-	return tok
+	return feed.CleanToken(providerStr, tok)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) {

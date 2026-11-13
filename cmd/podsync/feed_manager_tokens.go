@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mxpv/podsync/pkg/feed"
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/services/web"
 	"github.com/pelletier/go-toml"
@@ -111,18 +112,7 @@ func (m *AppFeedManager) persistTokens(providerStr string, newTokens []string) e
 }
 
 func cleanToken(providerStr, tok string) string {
-	tok = strings.TrimSpace(tok)
-	tok = strings.Trim(tok, "\"'")
-	if strings.EqualFold(providerStr, "vkvideo") || strings.EqualFold(providerStr, "vk") || strings.Contains(tok, "access_token=") {
-		if idx := strings.Index(tok, "access_token="); idx != -1 {
-			sub := tok[idx+len("access_token="):]
-			if end := strings.IndexAny(sub, " &;\n\r#"); end != -1 {
-				return sub[:end]
-			}
-			return sub
-		}
-	}
-	return tok
+	return feed.CleanToken(providerStr, tok)
 }
 
 func (m *AppFeedManager) UpdateTokens(ctx context.Context, providerStr string, tokens []string) error {

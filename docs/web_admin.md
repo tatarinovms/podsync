@@ -205,6 +205,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Cookies from Browser**: On local desktop installations, select your installed browser (Chrome, Firefox, Safari, Brave, Edge) to automatically extract session cookies.
   - **HTTP/SOCKS5 Proxy**: Configure a global yt-dlp proxy or a dedicated proxy per provider. Each provider's **Direct connection** switch is on by default; turn it off to enable that provider's proxy URL field.
   - **Engine Options**: Configure download timeouts and 24h automatic self-update.
+  - **Preferred Audio Language**: The global or per-feed language selects a dubbed audio track when YouTube exposes one. If YouTube rejects that audio-only format with `HTTP Error 403`, Podsync retries the episode once with a muxed format and the language preference disabled. A per-feed `--extractor-args` override is never modified by this retry.
   - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
 
 ### 9. Network DNS

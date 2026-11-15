@@ -342,6 +342,22 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 	args := dl.buildArgs(feedConfig, episode, filePath)
 
 	output, err := dl.exec(ctx, args...)
+	retried := false
+	if err != nil && dl.canRetryRelaxed(feedConfig, episode, output) {
+		feedID := ""
+		if feedConfig != nil {
+			feedID = feedConfig.ID
+		}
+		log.WithFields(log.Fields{
+			"feed_id":    feedID,
+			"episode_id": episode.ID,
+		}).Warn("youtube-dl was rejected with HTTP 403 for the preferred language format; retrying with a muxed format")
+
+		clearDirectory(tmpDir)
+		args = dl.buildArgsWithOptions(feedConfig, episode, filePath, downloadOptions{relaxed: true})
+		output, err = dl.exec(ctx, args...)
+		retried = true
+	}
 	if err != nil {
 		cleanMsg := CleanErrorMessage(output)
 		feedID := ""
@@ -351,6 +367,7 @@ func (dl *YoutubeDl) Download(ctx context.Context, feedConfig *feed.Config, epis
 		log.WithFields(log.Fields{
 			"feed_id":    feedID,
 			"episode_id": episode.ID,
+			"relaxed":    retried,
 		}).Errorf("youtube-dl download error for %s (%s): %s", episode.Title, episode.VideoURL, cleanMsg)
 
 		if strings.Contains(output, "HTTP Error 429") {
@@ -538,26 +555,42 @@ func (dl *YoutubeDl) appendCommonArgsForURL(args []string, url string, skipProxy
 	return args
 }
 
+// downloadOptions changes format selection for recovery attempts.
+type downloadOptions struct {
+	// relaxed drops the preferred language and requests a muxed format.
+	// YouTube can return 403 for audio-only dubbed formats on the web
+	// embedded client, while a muxed format is still downloadable.
+	relaxed bool
+}
+
 func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, outputFilePath string) []string {
+	return dl.buildArgsWithOptions(feedConfig, episode, outputFilePath, downloadOptions{})
+}
+
+func (dl *YoutubeDl) buildArgsWithOptions(feedConfig *feed.Config, episode *model.Episode, outputFilePath string, options downloadOptions) []string {
 	var args []string
 
 	// Determine preferred language: feed custom.lang takes precedence over global dl.language
 	lang := ""
-	if feedConfig != nil && feedConfig.Custom.Language != "" {
-		lang = strings.TrimSpace(feedConfig.Custom.Language)
-	} else if dl != nil {
-		dl.cfgMu.RLock()
-		if dl.language != "" {
-			lang = strings.TrimSpace(dl.language)
+	if !options.relaxed {
+		if feedConfig != nil && feedConfig.Custom.Language != "" {
+			lang = strings.TrimSpace(feedConfig.Custom.Language)
+		} else if dl != nil {
+			dl.cfgMu.RLock()
+			if dl.language != "" {
+				lang = strings.TrimSpace(dl.language)
+			}
+			dl.cfgMu.RUnlock()
 		}
-		dl.cfgMu.RUnlock()
 	}
 
 	switch feedConfig.Format {
 	case model.FormatVideo:
 		// Video, mp4, high by default
 		var format string
-		if lang != "" {
+		if options.relaxed {
+			format = relaxedFormat(feedConfig)
+		} else if lang != "" {
 			format = fmt.Sprintf("bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][language^=%s]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best", lang)
 			if feedConfig.Quality == model.QualityLow {
 				format = fmt.Sprintf("worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a][language^=%s]/worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=m4a]/worst[ext=mp4][vcodec^=avc1]/worst[ext=mp4]/worst", lang)
@@ -578,7 +611,9 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 	case model.FormatAudio:
 		// Audio, mp3, high by default
 		var format string
-		if lang != "" {
+		if options.relaxed {
+			format = relaxedFormat(feedConfig)
+		} else if lang != "" {
 			format = fmt.Sprintf("bestaudio[language^=%s]/bestaudio/best", lang)
 			if feedConfig.Quality == model.QualityLow {
 				format = fmt.Sprintf("worstaudio[language^=%s]/worstaudio/worst", lang)
@@ -610,7 +645,7 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 		}
 	}
 
-	if lang != "" && !hasArg(feedConfig.YouTubeDLArgs, "--extractor-args") {
+	if lang != "" && !options.relaxed && !hasArg(feedConfig.YouTubeDLArgs, "--extractor-args") {
 		args = append(args, "--extractor-args", fmt.Sprintf("youtube:lang=%s", lang))
 	}
 
@@ -639,6 +674,83 @@ func (dl *YoutubeDl) buildArgs(feedConfig *feed.Config, episode *model.Episode, 
 
 	args = append(args, "--output", outputFilePath, episode.VideoURL)
 	return args
+}
+
+// relaxedFormat requests a muxed stream, which is more broadly available than
+// an audio-only YouTube format when the web embedded client issues 403s.
+func relaxedFormat(feedConfig *feed.Config) string {
+	low := feedConfig.Quality == model.QualityLow
+	height := feedConfig.MaxHeight
+	switch feedConfig.Format {
+	case model.FormatVideo:
+		switch {
+		case low && height > 0:
+			return fmt.Sprintf("worst[height<=%d][ext=mp4]/worst[height<=%d]/worst", height, height)
+		case low:
+			return "worst[ext=mp4][vcodec^=avc1]/worst[ext=mp4]/worst"
+		case height > 0:
+			return fmt.Sprintf("best[height<=%d][ext=mp4][vcodec^=avc1]/best[height<=%d][ext=mp4]/best[height<=%d]/best", height, height, height)
+		default:
+			return "best[ext=mp4][vcodec^=avc1]/best[ext=mp4]/best"
+		}
+	case model.FormatAudio:
+		if low {
+			return "worst[ext=mp4]/worst"
+		}
+		return "best[ext=mp4]/best"
+	default:
+		return "best"
+	}
+}
+
+// canRetryRelaxed reports whether a failed download can be retried with a
+// muxed format. The retry is limited to YouTube downloads that used Podsync's
+// own language preference: a per-feed --extractor-args value is an explicit
+// user override and is left untouched.
+func (dl *YoutubeDl) canRetryRelaxed(feedConfig *feed.Config, episode *model.Episode, output string) bool {
+	if feedConfig == nil || episode == nil || !isForbiddenDownloadError(output) {
+		return false
+	}
+	if feedConfig.Format != model.FormatAudio && feedConfig.Format != model.FormatVideo {
+		return false
+	}
+	if hasArg(feedConfig.YouTubeDLArgs, "--extractor-args") {
+		return false
+	}
+	if !strings.Contains(episode.VideoURL, "youtu.be") && !strings.Contains(episode.VideoURL, "youtube.com") {
+		return false
+	}
+
+	lang := strings.TrimSpace(feedConfig.Custom.Language)
+	if lang == "" && dl != nil {
+		dl.cfgMu.RLock()
+		lang = strings.TrimSpace(dl.language)
+		dl.cfgMu.RUnlock()
+	}
+	return lang != ""
+}
+
+// isForbiddenDownloadError matches the errors produced when YouTube rejects a
+// media URL after format selection. A 429 or bot-check error is not retried
+// here because those need a different recovery path.
+func isForbiddenDownloadError(output string) bool {
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "http error 403") ||
+		strings.Contains(lower, "403 forbidden") ||
+		strings.Contains(lower, "server returned 403") ||
+		strings.Contains(lower, "requested format is not available")
+}
+
+// clearDirectory removes leftovers from a failed attempt so a retry cannot
+// resume a partial file produced by the rejected format.
+func clearDirectory(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		_ = os.RemoveAll(filepath.Join(dir, entry.Name()))
+	}
 }
 
 func (dl *YoutubeDl) GetConfig() Config {

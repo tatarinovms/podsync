@@ -109,6 +109,7 @@ Platform-specific metadata parsers implementing the `builder.Builder` interface:
 - Encapsulates `yt-dlp` process execution with configurable timeout, proxy, and audio transcoding.
 - Injects Netscape `cookies.txt` or `--cookies-from-browser` to bypass YouTube bot detection and 429 rate limits.
 - Supports custom format selection (`bestaudio`, `bestvideo[height<=?]+bestaudio/best`).
+- When a preferred language selects a YouTube audio-only dubbed format that the CDN rejects with HTTP 403, the downloader retries once with a muxed format and the language preference disabled. Per-feed `--extractor-args` overrides are preserved.
 
 ### 2.4 Podcast XML Generator (`pkg/feed/xml.go`)
 - Builds standard iTunes Podcast XML feeds and Podcast 2.0 specifications.

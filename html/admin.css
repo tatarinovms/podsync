@@ -686,6 +686,18 @@
             color: var(--ctp-text) !important;
             border-radius: 8px;
         }
+        .form-control:disabled, .form-select:disabled {
+            background-color: var(--ctp-mantle) !important;
+            color: var(--ctp-subtext0) !important;
+            opacity: var(--control-disabled-opacity);
+            cursor: not-allowed;
+        }
+        @media (max-width: 575px) {
+            #downloader-settings-form .form-control,
+            #downloader-settings-form .form-select {
+                min-height: var(--control-touch-size);
+            }
+        }
         .form-control:focus, .form-select:focus {
             background-color: var(--input-bg) !important;
             border-color: var(--ctp-mauve) !important;
@@ -866,6 +878,9 @@
             --bs-table-hover-bg: var(--ctp-surface0);
             border-color: var(--card-border) !important;
         }
+        #audiobook-dirs-table {
+            --bs-table-hover-bg: rgba(var(--ctp-mauve-rgb), 0.12);
+        }
         .table thead th,
         .table .table-light,
         .table-light th,
@@ -885,6 +900,23 @@
         }
 
         /* Log Terminal & Badges */
+        #tab-logs > .activity-toolbar > .d-flex { display: grid !important; gap: 16px !important; }
+        #tab-logs > .activity-toolbar > .d-flex > .d-flex:first-child { display: grid !important; grid-template-columns: auto auto minmax(180px, 1fr) minmax(180px, 1fr); }
+        #tab-logs .activity-search, #tab-logs .activity-feed { width: 100%; min-width: 0; }
+        #tab-logs .activity-search { margin-left: 0 !important; }
+        #tab-logs > .activity-toolbar > .d-flex > .d-flex:last-child { padding-top: 12px; border-top: 1px solid var(--card-border); }
+        #logs-terminal { overflow-wrap: anywhere; }
+        #logs-terminal .log-msg { min-width: 0; }
+        @media (max-width: 991px) {
+            #tab-logs > .activity-toolbar > .d-flex > .d-flex:first-child { grid-template-columns: auto 1fr; }
+            #tab-logs .activity-search, #tab-logs .activity-feed { grid-column: 1 / -1; }
+        }
+        @media (max-width: 575px) {
+            #tab-logs .btn, #tab-logs .form-control { min-height: 44px; }
+            #tab-logs .log-line { flex-wrap: wrap; gap: 6px; }
+            #tab-logs .log-msg { flex-basis: 100%; }
+            #tab-logs .card > .border-bottom { flex-wrap: wrap; gap: 8px; }
+        }
         .log-terminal {
             background-color: var(--ctp-crust) !important;
             border: 1px solid var(--ctp-surface1) !important;

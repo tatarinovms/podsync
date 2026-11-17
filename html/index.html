@@ -488,10 +488,6 @@
                             <div class="card shadow-sm mb-4">
                                 <div class="card-header bg-transparent py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
                                     <h6 class="mb-0 fw-bold"><span class="settings-step" aria-hidden="true">2</span><i aria-hidden="true" class="bi bi-sliders me-2 text-primary"></i>Download routing &amp; behaviour</h6>
-                                    <div class="d-flex align-items-center gap-2 small">
-                                        <span class="badge bg-body-secondary text-body" id="dl-engine-pill">yt-dlp: -</span>
-                                        <span class="badge bg-body-secondary text-body" id="dl-ffmpeg-pill">ffmpeg: -</span>
-                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <form id="downloader-settings-form" onsubmit="saveDownloaderSettings(event)">
@@ -501,7 +497,8 @@
                                                 <div><span class="settings-subsection-title" id="dl-routing-title">Default route</span><p>Use one proxy for all downloads, or leave it empty.</p></div>
                                             </div>
                                             <label class="form-label small fw-semibold" for="dl-proxy">Default HTTP / SOCKS5 Proxy</label>
-                                            <input type="text" id="dl-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080 or http://user:pass@host:port">
+                                            <input type="text" id="dl-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080">
+                                            <div class="row g-2 mt-1"><div class="col-sm-6"><label class="form-label small" for="dl-proxy-user">Proxy username</label><input type="text" id="dl-proxy-user" class="form-control form-control-sm" autocomplete="off"></div><div class="col-sm-6"><label class="form-label small" for="dl-proxy-password">Proxy password</label><input type="password" id="dl-proxy-password" class="form-control form-control-sm" autocomplete="new-password"></div></div>
                                             <div class="form-text small">Global fallback proxy passed directly to yt-dlp via <code>--proxy</code>.</div>
                                         </section>
 
@@ -524,6 +521,7 @@
                                                         <label class="form-check-label smaller" for="dl-proxy-youtube-direct">Direct connection</label>
                                                     </div>
                                                     <input type="text" id="dl-proxy-youtube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="YouTube proxy URL" disabled>
+                                                    <input type="text" id="dl-proxy-youtube-user" class="form-control form-control-sm mt-1" placeholder="Username" aria-label="YouTube proxy username" disabled><input type="password" id="dl-proxy-youtube-password" class="form-control form-control-sm mt-1" placeholder="Password" aria-label="YouTube proxy password" autocomplete="new-password" disabled>
                                                 </div>
                                                 <div class="col-sm-6">
                                                     <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vkvideo"><i aria-hidden="true" class="bi bi-camera-video text-primary me-1"></i>VK Video</label>
@@ -532,6 +530,7 @@
                                                         <label class="form-check-label smaller" for="dl-proxy-vkvideo-direct">Direct connection</label>
                                                     </div>
                                                     <input type="text" id="dl-proxy-vkvideo" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="VK Video proxy URL" disabled>
+                                                    <input type="text" id="dl-proxy-vkvideo-user" class="form-control form-control-sm mt-1" placeholder="Username" aria-label="VK Video proxy username" disabled><input type="password" id="dl-proxy-vkvideo-password" class="form-control form-control-sm mt-1" placeholder="Password" aria-label="VK Video proxy password" autocomplete="new-password" disabled>
                                                 </div>
                                             </div>
                                             <div class="row g-2">
@@ -542,6 +541,7 @@
                                                         <label class="form-check-label smaller" for="dl-proxy-rutube-direct">Direct connection</label>
                                                     </div>
                                                     <input type="text" id="dl-proxy-rutube" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="Rutube proxy URL" disabled>
+                                                    <input type="text" id="dl-proxy-rutube-user" class="form-control form-control-sm mt-1" placeholder="Username" aria-label="Rutube proxy username" disabled><input type="password" id="dl-proxy-rutube-password" class="form-control form-control-sm mt-1" placeholder="Password" aria-label="Rutube proxy password" autocomplete="new-password" disabled>
                                                 </div>
                                                 <div class="col-sm-6">
                                                     <label class="form-label smaller fw-semibold text-muted" for="dl-proxy-vimeo"><i aria-hidden="true" class="bi bi-broadcast text-info me-1"></i>Vimeo / SoundCloud</label>
@@ -550,6 +550,7 @@
                                                         <label class="form-check-label smaller" for="dl-proxy-vimeo-direct">Direct connection</label>
                                                     </div>
                                                     <input type="text" id="dl-proxy-vimeo" class="form-control form-control-sm font-monospace" placeholder="e.g. socks5://127.0.0.1:1080" aria-label="Vimeo and SoundCloud proxy URL" disabled>
+                                                    <input type="text" id="dl-proxy-vimeo-user" class="form-control form-control-sm mt-1" placeholder="Username" aria-label="Vimeo and SoundCloud proxy username" disabled><input type="password" id="dl-proxy-vimeo-password" class="form-control form-control-sm mt-1" placeholder="Password" aria-label="Vimeo and SoundCloud proxy password" autocomplete="new-password" disabled>
                                                 </div>
                                             </div>
                                         </div>
@@ -852,9 +853,9 @@
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                                 <div>
                                     <h4 class="fw-bold mb-1"><i aria-hidden="true" class="bi bi-robot me-2"></i>Model Context Protocol (MCP) Server</h4>
-                                    <p class="mb-0 opacity-75">Connect AI assistants (OpenCode v2, Claude Desktop, Cursor, Cline, Antigravity) to manage feeds and retry episodes directly.</p>
+                                    <p class="mb-0 opacity-75">Connect OpenCode v2, Hermes Agent, or Codex to manage feeds and retry episodes directly.</p>
                                 </div>
-                                <span class="badge mcp-status-pill px-3 py-2 fs-6 shadow-sm"><i aria-hidden="true" class="bi bi-check-circle-fill text-success me-1"></i> MCP Active</span>
+                                <div class="d-flex align-items-center gap-2 flex-wrap"><span id="mcp-connection-status" class="badge mcp-status-pill px-3 py-2" role="status">MCP not checked</span><button type="button" id="mcp-check-button" class="btn btn-secondary btn-sm" onclick="checkMCPConnection()">Check connection</button></div>
                             </div>
                         </div>
                     </div>
@@ -943,14 +944,15 @@
                                     <button class="nav-link active py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-opencode">OpenCode v2</button>
                                 </li>
                                 <li class="nav-item">
-                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-claude">Claude Desktop</button>
+                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-hermes">Hermes Agent</button>
                                 </li>
                                 <li class="nav-item">
-                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-cursor">Cursor / Cline</button>
+                                    <button class="nav-link py-1 px-3 small" data-bs-toggle="pill" data-bs-target="#client-codex">Codex</button>
                                 </li>
                             </ul>
                         </div>
                         <div class="card-body">
+                            <p class="small text-muted">Local configurations start Podsync on the client machine. Binary and config paths must exist there. Remote HTTP uses the running server; verify the connection with your client.</p>
                             <div class="tab-content">
                                 <!-- OpenCode v2 -->
                                 <div class="tab-pane fade show active" id="client-opencode">
@@ -958,7 +960,7 @@
                                         <span class="small text-muted">Add to <code>opencode.json</code> (Project root or <code>~/.config/opencode/opencode.json</code>):</span>
                                         <div class="d-flex gap-2 align-items-center">
                                             <div class="btn-group btn-group-sm">
-                                                <button type="button" id="btn-opencode-remote" class="btn btn-brand btn-sm" onclick="setOpencodeMode('remote')">Remote (SSE)</button>
+                                                <button type="button" id="btn-opencode-remote" class="btn btn-brand btn-sm" onclick="setOpencodeMode('remote')">Remote (HTTP)</button>
                                                 <button type="button" id="btn-opencode-local" class="btn btn-outline-secondary btn-sm" onclick="setOpencodeMode('local')">Local (Stdio)</button>
                                             </div>
                                             <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('opencode-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy JSON</button>
@@ -967,22 +969,22 @@
                                     <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="opencode-snippet"></pre>
                                 </div>
 
-                                <!-- Claude Desktop -->
-                                <div class="tab-pane fade" id="client-claude">
+                                <!-- Hermes Agent -->
+                                <div class="tab-pane fade" id="client-hermes">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                                        <span class="small text-muted">Add to <code>claude_desktop_config.json</code> under <code>"mcpServers"</code>:</span>
-                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('claude-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy JSON</button>
+                                        <span class="small text-muted">Add to <code>~/.hermes/config.yaml</code>:</span>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('hermes-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy YAML</button>
                                     </div>
-                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="claude-snippet"></pre>
+                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="hermes-snippet"></pre>
                                 </div>
 
-                                <!-- Cursor / Cline -->
-                                <div class="tab-pane fade" id="client-cursor">
+                                <!-- Codex -->
+                                <div class="tab-pane fade" id="client-codex">
                                     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                                        <span class="small text-muted">Add under <strong>Cursor Settings &gt; Features &gt; MCP</strong>:</span>
-                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('cursor-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy Config</button>
+                                        <span class="small text-muted">Add to <code>~/.codex/config.toml</code>:</span>
+                                        <button class="btn btn-mcp-copy btn-sm shadow-sm" onclick="copyPre('codex-snippet', this)"><i aria-hidden="true" class="bi bi-clipboard me-1"></i> Copy Config</button>
                                     </div>
-                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="cursor-snippet"></pre>
+                                    <pre class="p-3 rounded mb-0 font-monospace small" style="max-height: 320px; overflow-y: auto;" id="codex-snippet"></pre>
                                 </div>
                             </div>
                         </div>
@@ -995,7 +997,7 @@
                         </div>
                         <div class="card-body">
                             <p class="small text-muted mb-3">
-                                A specialized skill file is prepared in the repository. You can feed this skill directly to autonomous operational agents (Antigravity, OpenCode, Claude Code, Gemini CLI) so they know exactly when to call Podsync MCP tools:
+                                OpenCode v2 and Codex discover <code>.agents/skills/podsync/SKILL.md</code> in this project. For Hermes, copy the skill folder to <code>~/.hermes/skills/podsync/</code>. MCP configuration and skill installation are separate. A specialized skill file is prepared in the repository. You can feed this skill directly to autonomous operational agents (OpenCode v2, Hermes Agent, Codex) so they know exactly when to call Podsync MCP tools:
                             </p>
                             <div class="input-group mb-2">
                                 <label class="input-group-text small bg-light" for="mcp-skill-path">Skill Path</label>
@@ -1017,7 +1019,7 @@
                             <h6 class="mb-0 fw-bold d-flex align-items-center gap-2">
                                 <i aria-hidden="true" class="bi bi-tools text-primary"></i>
                                 <span>Exposed MCP Tools &amp; Actions</span>
-                                <span class="badge bg-secondary-subtle text-secondary border ms-1">57 tools</span>
+                                <span class="badge bg-secondary-subtle text-secondary border ms-1">34 tools</span>
                             </h6>
                             <div class="d-flex align-items-center gap-2 text-muted small">
                                 <span class="collapse-label-show">Show</span>
@@ -1217,7 +1219,8 @@
 
                 <!-- 6. Logs Tab -->
                 <div class="tab-pane fade" id="tab-logs">
-                    <div class="card p-3 mb-3">
+                    <header class="mb-3"><h1 class="h4 mb-1">Activity</h1><p class="text-muted small mb-0">Search recent server events and follow podcast downloads.</p></header>
+                    <div class="card p-3 mb-3 activity-toolbar">
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                             <!-- Left: Filter by level buttons -->
                             <div class="d-flex flex-wrap align-items-center gap-2">
@@ -1230,15 +1233,15 @@
                                     <button type="button" class="btn btn-outline-info" onclick="setLogsLevel('debug')">Debug</button>
                                 </div>
 
-                                <div class="input-group input-group-sm ms-md-2" style="max-width: 280px;">
+                                <div class="input-group input-group-sm ms-md-2 activity-search">
                                     <span class="input-group-text"><i aria-hidden="true" class="bi bi-search"></i></span>
-                                    <input type="text" id="logs-search-input" class="form-control" placeholder="Search logs (e.g. error, vk, download)..." oninput="debounceLogsFilter()">
+                                    <input type="search" id="logs-search-input" class="form-control" aria-label="Search activity" placeholder="Search activity…" oninput="debounceLogsFilter()">
                                     <button class="btn btn-outline-secondary" type="button" onclick="clearLogsSearch()" title="Clear search"><i aria-hidden="true" class="bi bi-x-lg"></i></button>
                                 </div>
 
-                                <div class="input-group input-group-sm" style="max-width: 190px;">
+                                <div class="input-group input-group-sm activity-feed">
                                     <span class="input-group-text"><i aria-hidden="true" class="bi bi-funnel"></i> Feed:</span>
-                                    <podsync-select id="logs-feed-select" class="form-select" onchange="onLogsFeedChange()">
+                                    <podsync-select id="logs-feed-select" class="form-select" aria-label="Filter activity by feed" onchange="onLogsFeedChange()">
                                         <option value="">All Feeds</option>
                                     </podsync-select>
                                 </div>

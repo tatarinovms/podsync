@@ -167,6 +167,7 @@ This file provides comprehensive architecture guidance, development workflows, a
   - **System Backup**: Web Admin can export, inspect, and restore portable backups. Restore preserves the destination server's storage paths and port by default.
   - **Podsync Updates**: Native Linux/macOS installations can check GitHub Releases, verify `checksums.txt`, atomically replace the executable, and restart. Docker installations must update the image from the host.
   - **Local UI Dependencies**: Bootstrap CSS/JS, Bootstrap Icons/fonts, and the QR library are embedded; the admin console must not depend on third-party CDNs.
+- **MCP client setup**: Ready-to-use examples target OpenCode v2 (JSON), Hermes Agent (YAML), and Codex (TOML). The status badge runs authenticated `initialize` against `/mcp`; it verifies browser access, not another client's connection. OpenCode and Codex discover `.agents/skills/podsync/`; Hermes uses `~/.hermes/skills/podsync/`.
 - **Button Standards & Layout Metrics**:
   - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).
   - **Mobile Touch Targets**: Under mobile viewports (`max-width: 575px`), action buttons automatically expand to `min-height: 44px` with `padding: 8px 16px` for touch accessibility.

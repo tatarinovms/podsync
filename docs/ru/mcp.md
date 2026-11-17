@@ -30,7 +30,7 @@ Podsync включает встроенный сервер **MCP (Model Context 
 
 1. **Режим Stdio (`podsync --mcp`)**: Запускается локально на машине через стандартные потоки ввода/вывода (stdin/stdout).
    - **Auto-Proxy**: При запуске утилита проверяет `http://localhost:<server.port>/health/ready`. Если сервис отвечает, CLI передаёт JSON-RPC напрямую в `POST /mcp` основного экземпляра с Basic Auth из `[server.admin]`. Все 34 инструмента, включая шесть инструментов персональных лент, ресурсы, промпты и ответ инициализации обслуживает этот экземпляр. Поведение stdio и прямого HTTP MCP совпадает; отдельная реализация personal-инструментов через REST не требуется. Это также предотвращает конфликты блокировки базы BadgerDB (`resource temporarily unavailable`).
-   - **Ограничения**: Автопрокси опрашивает только локальный порт `http://localhost:<server.port>`. Он не поддерживает TLS (HTTPS), внешние доменные имена и префиксы reverse-proxy (например, `/podsync/`). Если сервис работает за обратным прокси или на удалённом сервере, используйте **Remote SSE Mode**.
+   - **Ограничения**: Автопрокси опрашивает только локальный порт `http://localhost:<server.port>`. Он не поддерживает TLS (HTTPS), внешние доменные имена и префиксы reverse-proxy (например, `/podsync/`). Если сервис работает за обратным прокси или на удалённом сервере, используйте **Remote HTTP Mode**.
    - **Автономный режим (Standalone)**: Если на `localhost:<server.port>` сервис не обнаружен, утилита открывает базу данных напрямую на чтение/запись.
 2. **Удалённый режим SSE (`/mcp/sse`)**: Встроен непосредственно в веб-сервер Podsync. Позволяет агентам на других серверах, в Docker-контейнерах или за reverse-proxy (Nginx/Traefik с HTTPS) безопасно подключаться по HTTP/HTTPS с базовой авторизацией.
 
@@ -117,7 +117,7 @@ MCP-сервер предоставляет 34 специализированн�
 
 Настройка осуществляется в файле `opencode.json` (или `opencode.jsonc`) в корне проекта или глобально в `~/.config/opencode/opencode.json`.
 
-#### Режим Remote SSE (Рекомендуется для работающего сервиса)
+#### Режим Remote HTTP (для работающего сервиса)
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
@@ -125,11 +125,12 @@ MCP-сервер предоставляет 34 специализированн�
     "servers": {
       "podsync": {
         "type": "remote",
-        "url": "http://localhost:8080/mcp/sse",
+        "oauth": false,
+        "url": "http://localhost:8080/mcp",
         "headers": {
           "Authorization": "Basic YWRtaW46c2VjcmV0cGFzc3dvcmQ=" // base64(username:password)
         },
-        "enabled": true
+        "disabled": false
       }
     }
   }
@@ -150,7 +151,7 @@ MCP-сервер предоставляет 34 специализированн�
           "/etc/podsync/config.toml",
           "--mcp"
         ],
-        "enabled": true
+        "disabled": false
       }
     }
   }
@@ -164,76 +165,28 @@ opencode mcp list
 
 ---
 
-### Вариант B: Hermes Agent (Nous Hermes)
+### Вариант B: Hermes Agent
 
-В файле `hermes.json` / `settings.json`:
+Добавьте в `~/.hermes/config.yaml`:
 
-#### Через процесс Stdio
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "command": "/opt/podsync/bin/podsync",
-      "args": [
-        "--config",
-        "/etc/podsync/config.toml",
-        "--mcp"
-      ],
-      "env": {
-        "PODSYNC_CONFIG_PATH": "/etc/podsync/config.toml"
-      }
-    }
-  }
-}
+```yaml
+mcp_servers:
+  podsync:
+    command: "/opt/podsync/bin/podsync"
+    args: ["--config", "/etc/podsync/config.toml", "--mcp"]
 ```
 
-#### Через транспорт Remote SSE
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "url": "http://127.0.0.1:8080/mcp/sse",
-      "headers": {
-        "Authorization": "Basic YWRtaW46c2VjcmV0cGFzc3dvcmQ="
-      }
-    }
-  }
-}
+### Вариант C: Codex
+
+Добавьте в `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.podsync]
+command = "/opt/podsync/bin/podsync"
+args = ["--config", "/etc/podsync/config.toml", "--mcp"]
 ```
 
----
-
-### Вариант C: Claude Desktop
-
-Добавьте секцию в конфигурационный файл Claude Desktop:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "command": "/opt/podsync/bin/podsync",
-      "args": [
-        "--config",
-        "/etc/podsync/config.toml",
-        "--mcp"
-      ]
-    }
-  }
-}
-```
-
----
-
-### Вариант D: Cursor / Cline
-
-В настройках MCP в Cursor или Cline:
-- **Name**: `podsync`
-- **Type**: `command`
-- **Command**: `/opt/podsync/bin/podsync --config /etc/podsync/config.toml --mcp`
-
----
+Пути должны существовать на компьютере клиента. OpenCode v2 и Codex обнаруживают скилл проекта в `.agents/skills/podsync/SKILL.md`. Для Hermes скопируйте папку скилла в `~/.hermes/skills/podsync/`. Скилл не заменяет настройку MCP.
 
 ## 4. Проверка работоспособности
 

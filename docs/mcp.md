@@ -19,7 +19,7 @@ The MCP server operates in two interchangeable modes:
                         │
          ┌──────────────┴──────────────┐
          │                             │
-   [1. Stdio Mode]              [2. Remote SSE Mode]
+   [1. Stdio Mode]              [2. Remote HTTP Mode]
    `podsync --mcp`             `http://<host>:8080/mcp/sse`
          │                             │
          ▼                             ▼
@@ -31,9 +31,9 @@ The MCP server operates in two interchangeable modes:
 
 1. **Stdio Mode (`podsync --mcp`)**: Runs directly on the local machine over standard input/output.
    - **Auto-Proxy**: When launched, the CLI checks `http://localhost:<server.port>/health/ready`. If reachable, it forwards the complete JSON-RPC exchange to the daemon's `POST /mcp` endpoint using `[server.admin]` Basic Auth credentials. All 34 tools, including the six personal-feed tools, resources, prompts, and initialization responses come from that daemon. This prevents BadgerDB lock conflicts (`resource temporarily unavailable`) and keeps stdio and direct HTTP MCP behavior identical.
-   - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote SSE Mode** instead.
+   - **Scope & Limitations**: The auto-proxy only probes plain HTTP on `localhost` at the configured `server.port`. It does not support TLS (HTTPS), custom external domain names, or reverse-proxy URL prefixes (e.g., `/podsync/`). If your service is behind a reverse proxy or deployed remotely, connect via **Remote HTTP Mode** instead.
    - **Standalone Mode**: If no daemon is listening on `localhost:<server.port>`, the CLI opens the database directly in standalone mode.
-2. **Remote SSE Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
+2. **Remote HTTP Mode (`/mcp/sse`)**: Built into the running web service, allowing remote agents running on other machines, in separate containers, or behind reverse proxies (Nginx/Traefik with HTTPS) to connect over HTTP/HTTPS with Basic Auth.
 
 ---
 
@@ -114,7 +114,7 @@ not mean the entire library is empty.
 
 OpenCode v2 configures MCP servers in `opencode.json` (or `opencode.jsonc`) placed in your project root or globally in `~/.config/opencode/opencode.json`.
 
-#### Option 1: Remote SSE Mode (Recommended for running services)
+#### Option 1: Remote HTTP Mode (Recommended for running services)
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
@@ -122,11 +122,12 @@ OpenCode v2 configures MCP servers in `opencode.json` (or `opencode.jsonc`) plac
     "servers": {
       "podsync": {
         "type": "remote",
-        "url": "http://localhost:8080/mcp/sse",
+        "oauth": false,
+        "url": "http://localhost:8080/mcp",
         "headers": {
           "Authorization": "Basic YWRtaW46c2VjcmV0cGFzc3dvcmQ=" // base64(username:password)
         },
-        "enabled": true
+        "disabled": false
       }
     }
   }
@@ -147,7 +148,7 @@ OpenCode v2 configures MCP servers in `opencode.json` (or `opencode.jsonc`) plac
           "/etc/podsync/config.toml",
           "--mcp"
         ],
-        "enabled": true
+        "disabled": false
       }
     }
   }
@@ -171,76 +172,28 @@ The `initialize` response reports the serving binary's build version in
 `serverInfo.version` (`dev` when no version is supplied). In proxy mode this is
 the running daemon's version, even when the stdio client has a different version.
 
-### Method B: Hermes Agent (Nous Hermes)
+### Method B: Hermes Agent
 
-For Hermes Agent or any agent supporting standard MCP configuration schemas (`hermes.json` / `settings.json`):
+Add to `~/.hermes/config.yaml`:
 
-#### Option 1: Stdio Process
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "command": "/opt/podsync/bin/podsync",
-      "args": [
-        "--config",
-        "/etc/podsync/config.toml",
-        "--mcp"
-      ],
-      "env": {
-        "PODSYNC_CONFIG_PATH": "/etc/podsync/config.toml"
-      }
-    }
-  }
-}
+```yaml
+mcp_servers:
+  podsync:
+    command: "/opt/podsync/bin/podsync"
+    args: ["--config", "/etc/podsync/config.toml", "--mcp"]
 ```
 
-#### Option 2: Remote SSE Transport
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "url": "http://127.0.0.1:8080/mcp/sse",
-      "headers": {
-        "Authorization": "Basic YWRtaW46c2VjcmV0cGFzc3dvcmQ="
-      }
-    }
-  }
-}
+### Method C: Codex
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.podsync]
+command = "/opt/podsync/bin/podsync"
+args = ["--config", "/etc/podsync/config.toml", "--mcp"]
 ```
 
----
-
-### Method C: Claude Desktop
-
-Add to your Claude Desktop configuration file:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "podsync": {
-      "command": "/opt/podsync/bin/podsync",
-      "args": [
-        "--config",
-        "/etc/podsync/config.toml",
-        "--mcp"
-      ]
-    }
-  }
-}
-```
-
----
-
-### Method D: Cursor / Cline
-
-In your Cursor or Cline MCP Settings:
-- **Name**: `podsync`
-- **Type**: `command`
-- **Command**: `/opt/podsync/bin/podsync --config /etc/podsync/config.toml --mcp`
-
----
+Paths must exist on the client machine. OpenCode v2 and Codex discover the project skill at `.agents/skills/podsync/SKILL.md`. For Hermes, copy the skill folder to `~/.hermes/skills/podsync/`. Installing the skill does not configure MCP.
 
 ## 4. Testing & Verification
 

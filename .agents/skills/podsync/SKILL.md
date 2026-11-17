@@ -1,15 +1,8 @@
 ---
 name: "podsync"
 description: "Manage Podsync podcast generator: subscribe to YouTube/Rutube/VK Video/Vimeo channels and playlists as podcasts, trigger episode updates, retry downloads, check disk space/health, rotate API keys, and check or install verified native releases."
-version: "1.0.2"
-triggers:
-  - "podsync"
-  - "podcast"
-  - "youtube podcast"
-  - "vk video podcast"
-  - "rutube podcast"
-  - "retry episode"
-  - "feed update"
+metadata:
+  version: "1.0.3"
 ---
 
 # Podsync Skill
@@ -19,6 +12,11 @@ This skill provides comprehensive instructions for AI agents on how to monitor, 
 ---
 
 ## MCP Connection and Library Scope
+
+- OpenCode v2 and Codex discover this project's `.agents/skills/podsync/SKILL.md`. For Hermes Agent, copy the `podsync` folder to `~/.hermes/skills/podsync/`. A skill supplies instructions; it does not configure or connect the MCP server.
+- OpenCode v2 uses `mcp.servers.podsync` in `opencode.json`, with `type: "local"` and a command array, or `type: "remote"`, the `/mcp` URL, Basic Auth headers, and `oauth: false`. Omit `enabled`; v2 uses `disabled` when needed.
+- Hermes uses `mcp_servers.podsync` in `~/.hermes/config.yaml`, with `command` and `args` for stdio. Codex uses `[mcp_servers.podsync]` in `~/.codex/config.toml`, also with `command` and `args`. Local executable/config paths must exist on the client machine, not only inside a remote server or Docker container.
+- Verify the client connection with `initialize` and `tools/list`. The Web Admin connection check proves browser-to-server access only; it does not prove that another client is connected. See `docs/mcp.md` for client configuration examples.
 
 - In updated builds, `podsync --mcp` probes `http://localhost:<server.port>/health/ready`. When the daemon is ready, it relays the complete JSON-RPC exchange to `POST /mcp` with Basic Auth from `[server.admin]`. All 34 tools, including the six personal-feed tools, resources, and prompts are served by that daemon. If no daemon is ready, stdio initializes a standalone instance with the local database.
 - `initialize` reports the serving binary's build version in `serverInfo.version` (`dev` if unspecified). In proxy mode this is the daemon's version, which may differ from the stdio client's version.

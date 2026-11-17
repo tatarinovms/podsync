@@ -357,7 +357,7 @@ Podsync provides a built-in management console at `/admin`. It uses browser sess
 
 Podsync includes a built-in **MCP Server** with 34 tools that allows AI coding assistants (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, and **Antigravity**) to directly inspect and manage feeds, trigger downloads, retry errors, import audiobooks, view logs, and monitor system health. The Web Admin Console provides a one-click MCP configuration generator.
 
-An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). See the [MCP Guide](./docs/mcp.md) for full details and setup instructions.
+The Web Admin generates configurations for OpenCode v2, Hermes Agent, and Codex, and checks MCP connectivity with an authenticated initialize request. An agent skill definition is provided in [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). OpenCode and Codex discover it in the project; copy it to `~/.hermes/skills/podsync/` for Hermes. See the [MCP Guide](./docs/mcp.md) for setup instructions.
 
 ### MCP Tools:
 - **Feed Management**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`

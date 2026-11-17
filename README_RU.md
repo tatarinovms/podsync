@@ -351,7 +351,7 @@ Podsync предоставляет встроенную панель управ�
 
 Podsync содержит встроенный **MCP Server** с 34 инструментами, позволяющий AI-ассистентам (**OpenCode**, **Hermes Agent**, **Claude Desktop**, **Cursor**, **Cline**, **Antigravity**) напрямую проверять и настраивать ленты, запускать загрузки, перезапускать сбойные эпизоды, импортировать аудиокниги, читать логи и отслеживать состояние системы. В Web Admin есть генератор MCP-конфигурации в один клик.
 
-Готовый навык для агентов расположен в [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). Подробности см. в [Руководстве по MCP](./docs/ru/mcp.md).
+Web Admin генерирует конфигурации для OpenCode v2, Hermes Agent и Codex и проверяет подключение MCP авторизованным запросом initialize. Готовый навык расположен в [`.agents/skills/podsync/SKILL.md`](./.agents/skills/podsync/SKILL.md). OpenCode и Codex обнаруживают его в проекте; для Hermes скопируйте его в `~/.hermes/skills/podsync/`. Подробности см. в [Руководстве по MCP](./docs/ru/mcp.md).
 
 ### Инструменты MCP:
 - **Управление лентами**: `list_feeds`, `get_feed`, `add_feed`, `delete_feed`, `update_feed`, `update_all_feeds`, `update_feed_config`, `retry_episode`

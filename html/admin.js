@@ -903,7 +903,7 @@
                     </ul></div>
                 </div>
                 <div class="feed-card-meta"><span><i aria-hidden="true" class="bi ${countIcon} me-1"></i>${feed.downloaded_count ?? 0} ${countLabel}</span><span>${formatBytes(feed.total_size)}</span><span class="feed-provider">${escapeHtml(feed.provider || '')}</span></div>
-                <div class="feed-card-bottom">${state}<div class="feed-card-actions">${isBook ? `<button class="btn btn-light feed-btn" ${actionAttrs('episodes', feed.id)}><i aria-hidden="true" class="bi bi-music-note-list me-1"></i>Chapters</button>` : ''}<button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
+                <div class="feed-card-bottom">${state}<div class="feed-card-actions">${isBook ? `<button class="btn btn-light feed-btn" ${actionAttrs('episodes', feed.id)}><i aria-hidden="true" class="bi bi-music-note-list me-1"></i>Episodes</button>` : ''}<button class="btn btn-light feed-btn" ${actionAttrs('subscribe', feed.id)}><i aria-hidden="true" class="bi bi-rss me-1"></i>Subscribe</button></div></div>
             </article>`;
         }
 
@@ -2369,7 +2369,8 @@
                 const sysVerEl = document.getElementById('sys-ver');
                 if (sysVerEl) {
                     const commit = (data.commit && data.commit !== 'none' && data.commit !== 'local') ? ` (${data.commit})` : '';
-                    sysVerEl.innerText = `${ver}${commit}`;
+                    sysVerEl.innerText = ver;
+                    sysVerEl.title = commit ? `${ver}${commit}` : ver;
                 }
                 document.getElementById('sys-uptime').innerText = data.uptime || '-';
                 document.getElementById('sys-ram').innerText = (data.memory_mb || 0).toFixed(1) + ' MB';
@@ -2581,28 +2582,28 @@
             if (!downloaderConfig) return;
 
             document.getElementById('dl-timeout').value = downloaderConfig.timeout || 10;
-            document.getElementById('dl-proxy').value = downloaderConfig.proxy || '';
+            setProxyFields('dl-proxy', downloaderConfig.proxy || '');
             const proxies = downloaderConfig.proxies || {};
             const ytProxyEl = document.getElementById('dl-proxy-youtube');
             if (ytProxyEl) {
-                ytProxyEl.value = proxies.youtube || '';
+                setProxyFields('dl-proxy-youtube', proxies.youtube || '');
                 setProviderProxyInputState('youtube', !proxies.youtube || proxies.youtube.trim().toLowerCase() === 'direct');
             }
             const vkProxyEl = document.getElementById('dl-proxy-vkvideo');
             if (vkProxyEl) {
                 const proxy = proxies.vkvideo || proxies.vk || '';
-                vkProxyEl.value = proxy;
+                setProxyFields('dl-proxy-vkvideo', proxy);
                 setProviderProxyInputState('vkvideo', !proxy || proxy.trim().toLowerCase() === 'direct');
             }
             const rtProxyEl = document.getElementById('dl-proxy-rutube');
             if (rtProxyEl) {
-                rtProxyEl.value = proxies.rutube || '';
+                setProxyFields('dl-proxy-rutube', proxies.rutube || '');
                 setProviderProxyInputState('rutube', !proxies.rutube || proxies.rutube.trim().toLowerCase() === 'direct');
             }
             const vmProxyEl = document.getElementById('dl-proxy-vimeo');
             if (vmProxyEl) {
                 const proxy = proxies.vimeo || proxies.soundcloud || '';
-                vmProxyEl.value = proxy;
+                setProxyFields('dl-proxy-vimeo', proxy);
                 setProviderProxyInputState('vimeo', !proxy || proxy.trim().toLowerCase() === 'direct');
             }
             document.getElementById('dl-language').value = downloaderConfig.language || '';
@@ -2649,14 +2650,6 @@
                 if (ffmpegBadge) ffmpegBadge.className = 'badge bg-danger px-3 py-2 fs-6 shadow-sm';
             }
 
-            const dlEnginePill = document.getElementById('dl-engine-pill');
-            if (dlEnginePill) {
-                dlEnginePill.innerText = downloaderConfig.binary_version ? `yt-dlp v${downloaderConfig.binary_version}` : (downloaderConfig.binary_path ? 'yt-dlp ready' : 'yt-dlp missing');
-            }
-            const dlFfmpegPill = document.getElementById('dl-ffmpeg-pill');
-            if (dlFfmpegPill) {
-                dlFfmpegPill.innerText = downloaderConfig.ffmpeg_version ? `ffmpeg v${downloaderConfig.ffmpeg_version}` : (downloaderConfig.ffmpeg_path ? 'ffmpeg ready' : 'ffmpeg missing');
-            }
 
             // Cookies file status
             const statusInd = document.getElementById('cookies-status-indicator');
@@ -2682,6 +2675,40 @@
             }
         }
 
+        function setProxyFields(id, value) {
+            const input = document.getElementById(id);
+            const user = document.getElementById(`${id}-user`);
+            const password = document.getElementById(`${id}-password`);
+            input.value = value;
+            user.value = '';
+            password.value = '';
+            if (!value || value.toLowerCase() === 'direct') return;
+            try {
+                const url = new URL(value);
+                if (url.username || url.password) {
+                    user.value = decodeURIComponent(url.username);
+                    password.value = decodeURIComponent(url.password);
+                    url.username = '';
+                    url.password = '';
+                    input.value = url.toString().replace(/\/$/, '');
+                }
+            } catch (_) { /* Keep legacy URL text for correction. */ }
+        }
+
+        function proxyFieldValue(id) {
+            const value = document.getElementById(id).value.trim();
+            const user = document.getElementById(`${id}-user`).value;
+            const password = document.getElementById(`${id}-password`).value;
+            if (!value || value.toLowerCase() === 'direct' || (!user && !password)) return value;
+            const url = new URL(value);
+            if (!url.hostname || !['http:', 'https:', 'socks5:', 'socks5h:', 'socks4:', 'socks4a:'].includes(url.protocol)) {
+                throw new Error('Enter a valid HTTP or SOCKS proxy URL.');
+            }
+            url.username = encodeURIComponent(user);
+            url.password = encodeURIComponent(password);
+            return url.toString().replace(/\/$/, '');
+        }
+
         function setProviderProxyInputState(provider, isDirect) {
             const input = document.getElementById(`dl-proxy-${provider}`);
             const toggle = document.getElementById(`dl-proxy-${provider}-direct`);
@@ -2689,6 +2716,7 @@
             toggle.checked = isDirect;
             input.disabled = isDirect;
             input.setAttribute('aria-disabled', String(isDirect));
+            for (const suffix of ['user', 'password']) document.getElementById(`dl-proxy-${provider}-${suffix}`).disabled = isDirect;
         }
 
         function toggleProviderProxyInput(provider, isDirect) {
@@ -2699,29 +2727,25 @@
             const input = document.getElementById(`dl-proxy-${provider}`);
             const directToggle = document.getElementById(`dl-proxy-${provider}-direct`);
             if (!input || !directToggle) return '';
-            return directToggle.checked ? 'direct' : input.value.trim();
+            return directToggle.checked ? 'direct' : proxyFieldValue(`dl-proxy-${provider}`);
         }
 
         async function saveDownloaderSettings(e) {
             e.preventDefault();
             const timeout = parseInt(document.getElementById('dl-timeout').value, 10) || 10;
-            const proxy = document.getElementById('dl-proxy').value.trim();
+            let proxy, proxies;
+            try {
+                proxy = proxyFieldValue('dl-proxy');
+                proxies = {};
+                for (const provider of ['youtube', 'vkvideo', 'rutube', 'vimeo']) {
+                    const value = providerProxyValue(provider);
+                    if (value) proxies[provider] = value;
+                }
+                if (proxies.vimeo) proxies.soundcloud = proxies.vimeo;
+            } catch (err) { alert('Error: ' + err.message); return; }
             const language = document.getElementById('dl-language').value.trim();
             const customBinary = document.getElementById('dl-custom-binary').value.trim();
             const selfUpdate = document.getElementById('dl-self-update').checked;
-
-            const proxies = {};
-            const ytProxy = providerProxyValue('youtube');
-            if (ytProxy) proxies.youtube = ytProxy;
-            const vkProxy = providerProxyValue('vkvideo');
-            if (vkProxy) proxies.vkvideo = vkProxy;
-            const rtProxy = providerProxyValue('rutube');
-            if (rtProxy) proxies.rutube = rtProxy;
-            const vmProxy = providerProxyValue('vimeo');
-            if (vmProxy) {
-                proxies.vimeo = vmProxy;
-                proxies.soundcloud = vmProxy;
-            }
 
             const browser = document.getElementById('dl-browser-select').value;
             const profile = document.getElementById('dl-browser-profile').value.trim();
@@ -2879,9 +2903,34 @@
                 if (!res.ok) throw new Error('Failed to load MCP config');
                 mcpConfigData = await res.json();
                 renderMCPConfig();
+                await checkMCPConnection();
             } catch (e) {
                 console.error('Error loading MCP config:', e);
             }
+        }
+
+        async function checkMCPConnection() {
+            const status = document.getElementById('mcp-connection-status');
+            const button = document.getElementById('mcp-check-button');
+            if (button.disabled) return;
+            button.disabled = true;
+            status.textContent = 'Checking MCP…';
+            try {
+                const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+                if (mcpConfigData?.basic_auth_header) headers.Authorization = mcpConfigData.basic_auth_header;
+                const response = await fetch('/mcp', {
+                    method: 'POST', headers, credentials: 'omit', signal: AbortSignal.timeout(10000),
+                    body: JSON.stringify({ jsonrpc: '2.0', id: 'connection-check', method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'podsync-admin-check', version: '1' } } })
+                });
+                if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'Authentication failed' : `HTTP ${response.status}`);
+                const data = await response.json();
+                if (data.error || !data.result?.serverInfo || !data.result?.protocolVersion) throw new Error(data.error?.message || 'Invalid MCP response');
+                status.textContent = `Connected · ${data.result.serverInfo.name} ${data.result.serverInfo.version}`;
+                status.title = `POST /mcp · Protocol ${data.result.protocolVersion} · Checked ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                status.textContent = `MCP unavailable · ${error.message}`;
+                status.title = 'Connection checked from this browser using the configured Basic Auth credentials.';
+            } finally { button.disabled = false; }
         }
 
         function renderMCPConfig() {
@@ -2929,8 +2978,8 @@
 
             // Render client snippets
             renderOpencodeSnippet();
-            renderClaudeSnippet();
-            renderCursorSnippet();
+            renderHermesSnippet();
+            renderCodexSnippet();
         }
 
         function setOpencodeMode(mode) {
@@ -2952,7 +3001,7 @@
         function renderOpencodeSnippet() {
             if (!mcpConfigData) return;
             const origin = window.location.origin;
-            const sseUrl = `${origin}/mcp/sse`;
+            const sseUrl = `${origin}/mcp`;
             const basicAuth = mcpConfigData.basic_auth_header || ('Basic ' + btoa((mcpConfigData.username || 'admin') + ':' + (mcpConfigData.password || '')));
             const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
             const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
@@ -2969,7 +3018,7 @@
                                 "headers": {
                                     "Authorization": basicAuth
                                 },
-                                "enabled": true
+                                "oauth": false
                             }
                         }
                     }
@@ -2981,8 +3030,7 @@
                         "servers": {
                             "podsync": {
                                 "type": "local",
-                                "command": [binPath, "--config", cfgPath, "--mcp"],
-                                "enabled": true
+                                "command": [binPath, "--config", cfgPath, "--mcp"]
                             }
                         }
                     }
@@ -2992,37 +3040,20 @@
             if (snippet) snippet.innerText = JSON.stringify(configObj, null, 2);
         }
 
-        function renderClaudeSnippet() {
+        function renderHermesSnippet() {
             if (!mcpConfigData) return;
             const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
             const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
-            const claudeObj = {
-                "mcpServers": {
-                    "podsync": {
-                        "command": binPath,
-                        "args": [
-                            "--config",
-                            cfgPath,
-                            "--mcp"
-                        ]
-                    }
-                }
-            };
-            const snippet = document.getElementById('claude-snippet');
-            if (snippet) snippet.innerText = JSON.stringify(claudeObj, null, 2);
+            const snippet = document.getElementById('hermes-snippet');
+            if (snippet) snippet.innerText = `mcp_servers:\n  podsync:\n    command: ${JSON.stringify(binPath)}\n    args: ${JSON.stringify(['--config', cfgPath, '--mcp'])}`;
         }
 
-        function renderCursorSnippet() {
+        function renderCodexSnippet() {
             if (!mcpConfigData) return;
             const binPath = mcpConfigData.binary_path || '/path/to/bin/podsync';
             const cfgPath = mcpConfigData.config_path || '/path/to/config.toml';
-            const cursorObj = {
-                "name": "podsync",
-                "type": "command",
-                "command": `${binPath} --config ${cfgPath} --mcp`
-            };
-            const snippet = document.getElementById('cursor-snippet');
-            if (snippet) snippet.innerText = JSON.stringify(cursorObj, null, 2);
+            const snippet = document.getElementById('codex-snippet');
+            if (snippet) snippet.innerText = `[mcp_servers.podsync]\ncommand = ${JSON.stringify(binPath)}\nargs = ${JSON.stringify(['--config', cfgPath, '--mcp'])}`;
         }
 
         function togglePasswordVisibility(inputId, btn) {
@@ -3652,7 +3683,7 @@
                     statusBadge = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i aria-hidden="true" class="bi bi-link-45deg me-1"></i>Linked: ${escapeHtml(d.feed_id)}</span>`;
                     actionBtn = `
                         <div class="d-inline-flex gap-1">
-                            <button class="btn btn-sm btn-outline-secondary" ${actionAttrs("episodes", d.feed_id)}><i aria-hidden="true" class="bi bi-eye me-1"></i>Chapters</button>
+                            <button class="btn btn-sm btn-outline-secondary" ${actionAttrs("episodes", d.feed_id)}><i aria-hidden="true" class="bi bi-eye me-1"></i>Episodes</button>
                             <button class="btn btn-sm btn-outline-danger" ${actionAttrs("delete-book", d.name, d.feed_id)} title="Delete folder and linked feed from disk"><i aria-hidden="true" class="bi bi-trash"></i></button>
                         </div>`;
                 } else {

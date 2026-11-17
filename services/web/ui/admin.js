@@ -2424,16 +2424,22 @@
             }
         }
 
-        async function loadPodsyncUpdate() {
+        async function loadPodsyncUpdate(force = false) {
             const version = document.getElementById('sys-update-version');
             const message = document.getElementById('sys-update-message');
             const button = document.getElementById('btn-podsync-update');
             const releaseLink = document.getElementById('podsync-release-link');
+            const checkButton = document.getElementById('btn-podsync-check');
             if (!version || !message || !button || !releaseLink) return;
+            if (checkButton?.disabled) return;
 
             button.disabled = true;
+            if (checkButton) checkButton.disabled = true;
+            version.innerText = 'Checking...';
+            message.innerText = 'Checking GitHub Releases for an update.';
+            releaseLink.classList.add('d-none');
             try {
-                const res = await fetch('/api/v1/system/update');
+                const res = await fetch(`/api/v1/system/update${force ? '?force=true' : ''}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Unable to check GitHub Releases');
 
@@ -2447,6 +2453,8 @@
             } catch (err) {
                 version.innerText = 'Unavailable';
                 message.innerText = `Unable to check updates: ${err.message}`;
+            } finally {
+                if (checkButton) checkButton.disabled = false;
             }
         }
 

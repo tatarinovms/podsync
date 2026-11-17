@@ -215,6 +215,8 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
 - `yt-dlp` is a separate process and continues to use the operating system DNS.
 
 ### 10. Activity and MCP
+In **Podsync Updates**, **Check updates** requests fresh GitHub release data, bypassing the ten-minute server cache. Automatic checks use the cache. Docker installations still require an image update from the host.
+
 
 The MCP page checks `POST /mcp` with the configured Basic Auth credentials and an `initialize` request. It displays the responding server version or a connection error; **Check connection** repeats the check from the browser.
 
@@ -238,7 +240,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/system/errors` | `GET` | List download errors with diagnostic causes and recommendations |
 | `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |
-| `/api/v1/system/update` | `GET`, `POST` | Check the latest GitHub Release or install it and restart a native Podsync process |
+| `/api/v1/system/update` | `GET`, `POST` | Check the latest GitHub Release (`GET ?force=true` bypasses the ten-minute cache), or install it and restart a native Podsync process |
 | `/api/v1/system/backup/export` | `GET` | Stream a full `.tar.gz` backup. `include_secrets=false` excludes tokens, the admin password, proxy credentials, and `cookies.txt`. |
 | `/api/v1/system/backup/inspect` | `POST` | Inspect a multipart `file` upload (maximum 512 MiB) and verify its manifest and SHA-256 checksums. |
 | `/api/v1/system/backup/restore` | `POST` | Restore a validated multipart `file`; `preserve_paths=true` is the default and retains target storage paths and port. |

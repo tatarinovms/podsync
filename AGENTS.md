@@ -165,7 +165,7 @@ This file provides comprehensive architecture guidance, development workflows, a
     - **History Tab**: Dedicated chronological timeline of synchronization events, download activity, and errors for the feed.
   - **Download Scope**: RSS and Apple Podcasts feeds can select all episodes, the last 10/25/50, or a custom count. Changing `page_size` or `keep_last` cancels the active worker and queues a fresh update so the new limit is enforced immediately.
   - **System Backup**: Web Admin can export, inspect, and restore portable backups. Restore preserves the destination server's storage paths and port by default.
-  - **Podsync Updates**: Native Linux/macOS installations can check GitHub Releases, verify `checksums.txt`, atomically replace the executable, and restart. Docker installations must update the image from the host.
+  - **Podsync Updates**: Native Linux/macOS installations can check GitHub Releases, verify `checksums.txt`, atomically replace the executable, and restart. Automatic checks cache release data for ten minutes; **Check updates** uses `GET /api/v1/system/update?force=true` to bypass that cache. Docker installations must update the image from the host.
   - **Local UI Dependencies**: Bootstrap CSS/JS, Bootstrap Icons/fonts, and the QR library are embedded; the admin console must not depend on third-party CDNs.
 - **MCP client setup**: Ready-to-use examples target OpenCode v2 (JSON), Hermes Agent (YAML), and Codex (TOML). The status badge runs authenticated `initialize` against `/mcp`; it verifies browser access, not another client's connection. OpenCode and Codex discover `.agents/skills/podsync/`; Hermes uses `~/.hermes/skills/podsync/`.
 - **Button Standards & Layout Metrics**:

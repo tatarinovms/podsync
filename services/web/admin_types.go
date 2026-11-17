@@ -363,7 +363,7 @@ type AdminManager interface {
 	AddTokens(ctx context.Context, provider string, tokens []string) error
 	DeleteToken(ctx context.Context, provider string, index int) error
 	GetSystemStats(ctx context.Context) (*SystemStats, error)
-	GetPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error)
+	GetPodsyncUpdate(ctx context.Context, force ...bool) (*PodsyncUpdateInfo, error)
 	ApplyPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error)
 	GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error)
 	UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error

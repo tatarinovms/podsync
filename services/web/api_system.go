@@ -116,7 +116,7 @@ func (s *Server) handlePodsyncUpdate(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		info, err := s.adminMgr.GetPodsyncUpdate(r.Context())
+		info, err := s.adminMgr.GetPodsyncUpdate(r.Context(), r.URL.Query().Get("force") == "true")
 		if err != nil {
 			s.writeError(w, http.StatusBadGateway, err.Error())
 			return

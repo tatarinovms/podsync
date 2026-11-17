@@ -12,10 +12,33 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestStatusForcedRefreshBypassesCache(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"tag_name":"v1.2.%d"}`, n)
+	}))
+	defer server.Close()
+	u := testUpdater(server.URL, "podsync")
+	u.latestURL = server.URL
+	first, err := u.Status(context.Background())
+	require.NoError(t, err)
+	cached, err := u.Status(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, first.LatestVersion, cached.LatestVersion)
+	require.Equal(t, int32(1), calls.Load())
+	fresh, err := u.Status(context.Background(), true)
+	require.NoError(t, err)
+	require.Equal(t, "v1.2.2", fresh.LatestVersion)
+	require.Equal(t, int32(2), calls.Load())
+}
 
 func TestApplyReplacesVerifiedExecutable(t *testing.T) {
 	archive := releaseArchive(t, []byte("new podsync binary"))

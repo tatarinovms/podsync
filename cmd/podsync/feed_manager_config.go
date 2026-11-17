@@ -75,14 +75,14 @@ func (m *AppFeedManager) SetSelfUpdater(updater *selfupdate.Updater, restart fun
 	m.mu.Unlock()
 }
 
-func (m *AppFeedManager) GetPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+func (m *AppFeedManager) GetPodsyncUpdate(ctx context.Context, force ...bool) (*web.PodsyncUpdateInfo, error) {
 	m.mu.RLock()
 	updater := m.selfUpdater
 	m.mu.RUnlock()
 	if updater == nil {
 		return nil, errors.New("Podsync self-update is unavailable because the executable path could not be determined")
 	}
-	status, err := updater.Status(ctx)
+	status, err := updater.Status(ctx, force...)
 	if err != nil {
 		return nil, err
 	}

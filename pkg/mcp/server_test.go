@@ -138,7 +138,7 @@ func (m *mockAdminManager) GetSystemStats(ctx context.Context) (*web.SystemStats
 	return m.stats, nil
 }
 
-func (m *mockAdminManager) GetPodsyncUpdate(ctx context.Context) (*web.PodsyncUpdateInfo, error) {
+func (m *mockAdminManager) GetPodsyncUpdate(ctx context.Context, force ...bool) (*web.PodsyncUpdateInfo, error) {
 	return &m.podsyncUpdate, nil
 }
 

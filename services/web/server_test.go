@@ -371,7 +371,7 @@ func (m *mockDownloaderAdminMgr) GetSystemStats(ctx context.Context) (*SystemSta
 	return nil, nil
 }
 
-func (m *mockDownloaderAdminMgr) GetPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error) {
+func (m *mockDownloaderAdminMgr) GetPodsyncUpdate(ctx context.Context, force ...bool) (*PodsyncUpdateInfo, error) {
 	return &PodsyncUpdateInfo{CurrentVersion: "v1.0.0", LatestVersion: "v1.1.0", UpdateAvailable: true, CanUpdate: true}, nil
 }
 

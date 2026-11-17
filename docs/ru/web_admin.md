@@ -216,6 +216,8 @@ http://<хост-podsync>:<порт>/admin/
 - `yt-dlp` запускается отдельным процессом и продолжает использовать системный DNS.
 
 ### 10. Activity и MCP
+В **Podsync Updates** кнопка **Check updates** запрашивает свежие данные GitHub, обходя серверный кэш на десять минут. Автоматические проверки используют кэш. В Docker образ обновляется с хоста.
+
 
 Страница MCP проверяет `POST /mcp` с настроенными данными Basic Auth и запросом `initialize`. Она показывает версию ответившего сервера или ошибку подключения; кнопка **Check connection** повторяет проверку из браузера.
 
@@ -238,7 +240,7 @@ http://<хост-podsync>:<порт>/admin/
 | `/api/v1/system/errors` | `GET` | Список ошибок загрузки с очищенными диагностическими причинами и рекомендациями |
 | `/api/v1/system/recent` | `GET` | Список последних успешно скачанных выпусков |
 | `/api/v1/system/status` | `GET` | Общий срез состояния (расписание синхронизации, загрузки за 24ч, активные ошибки) |
-| `/api/v1/system/update` | `GET`, `POST` | Проверка GitHub Release или его установка с перезапуском нативного процесса Podsync |
+| `/api/v1/system/update` | `GET`, `POST` | Проверка GitHub Release (`GET ?force=true` обходит кэш на десять минут) или установка с перезапуском нативного процесса Podsync |
 | `/api/v1/system/backup/export` | `GET` | Потоковый экспорт `.tar.gz`; `include_secrets=false` исключает токены, пароль администратора, учётные данные прокси и `cookies.txt`. |
 | `/api/v1/system/backup/inspect` | `POST` | Проверка multipart-загрузки `file` до 512 МиБ, manifest и SHA-256. |
 | `/api/v1/system/backup/restore` | `POST` | Восстановление проверенного multipart `file`; `preserve_paths=true` включён по умолчанию и сохраняет пути и порт сервера. |

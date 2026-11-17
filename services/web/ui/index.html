@@ -717,7 +717,8 @@
                                     <span id="sys-update-version" class="badge bg-light text-secondary border">Checking...</span>
                                 </div>
                                 <p id="sys-update-message" class="small text-muted mb-3">Checking GitHub Releases for an update.</p>
-                                <div class="d-flex align-items-center gap-2 mt-auto">
+                                <div class="d-flex align-items-center flex-wrap gap-2 mt-auto">
+                                    <button id="btn-podsync-check" type="button" class="btn btn-secondary btn-sm" onclick="loadPodsyncUpdate(true)">Check updates</button>
                                     <button id="btn-podsync-update" type="button" class="btn btn-brand btn-sm" onclick="updatePodsync()" disabled>
                                         <i aria-hidden="true" class="bi bi-arrow-repeat me-1"></i>Update Podsync
                                     </button>

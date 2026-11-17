@@ -82,7 +82,12 @@ func New(currentVersion, executable string) *Updater {
 }
 
 // Status returns whether a newer release is available and supported on this host.
-func (u *Updater) Status(ctx context.Context) (Status, error) {
+func (u *Updater) Status(ctx context.Context, force ...bool) (Status, error) {
+	if len(force) > 0 && force[0] {
+		u.mu.Lock()
+		u.cachedAt = time.Time{}
+		u.mu.Unlock()
+	}
 	rel, err := u.latestRelease(ctx)
 	if err != nil {
 		return Status{}, err

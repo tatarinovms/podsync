@@ -38,3 +38,4 @@ config.toml
 /data/
 
 .gemini/
+/skills/system/run-workflow/SKILL.md

@@ -1,7 +1,9 @@
 package backup
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"os"
@@ -48,13 +50,85 @@ func TestCreateInspectAndRestorePreservesTargetPaths(t *testing.T) {
 func TestCreateWithoutSecrets(t *testing.T) {
 	dir := t.TempDir()
 	config := filepath.Join(dir, "config.toml")
-	require.NoError(t, os.WriteFile(config, []byte("[tokens]\nyoutube='secret'\n[server.admin]\npassword='secret'\n"), 0600))
+	require.NoError(t, os.WriteFile(config, []byte("[tokens]\nyoutube='secret'\n[server.admin]\npassword='secret'\n[telegram]\nenabled=true\ntoken='bot-secret'\n"), 0600))
 	var out bytes.Buffer
 	_, err := Create(context.Background(), ExportOptions{ConfigPath: config, IncludeSecrets: false, ExportDatabase: func(w io.Writer) error { _, err := w.Write([]byte("db")); return err }}, &out)
 	require.NoError(t, err)
 	info, err := Inspect(bytes.NewReader(out.Bytes()))
 	require.NoError(t, err)
 	require.False(t, info.IncludesSecrets)
+	extracted := t.TempDir()
+	require.NoError(t, extract(bytes.NewReader(out.Bytes()), extracted))
+	require.NotContains(t, string(mustRead(t, filepath.Join(extracted, "config.toml"))), "bot-secret")
+}
+
+func TestRestoreRejectsUnexpectedArchiveEntries(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "source.toml")
+	require.NoError(t, os.WriteFile(config, []byte("[server]\nport = 8080\n"), 0600))
+	var original bytes.Buffer
+	_, err := Create(context.Background(), ExportOptions{
+		ConfigPath:     config,
+		ExportDatabase: func(w io.Writer) error { _, err := w.Write([]byte("db")); return err },
+	}, &original)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name   string
+		header tar.Header
+		data   []byte
+	}{
+		{"extra cover", tar.Header{Name: "covers/extra.png", Mode: 0600}, []byte("image")},
+		{"duplicate name", tar.Header{Name: "config.toml", Mode: 0600}, []byte("replacement")},
+		{"unsupported type", tar.Header{Name: "covers/link.png", Typeflag: tar.TypeSymlink, Linkname: "config.toml"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			archive := appendArchiveEntry(t, original.Bytes(), tt.header, tt.data)
+			_, err := Inspect(bytes.NewReader(archive))
+			require.Error(t, err)
+
+			target := t.TempDir()
+			targetConfig := filepath.Join(target, "config.toml")
+			require.NoError(t, os.WriteFile(targetConfig, []byte("original"), 0600))
+			_, err = Restore(context.Background(), bytes.NewReader(archive), RestoreOptions{
+				ConfigPath: targetConfig, CoversDir: filepath.Join(target, "covers"),
+				RestoreCovers: true,
+			})
+			require.Error(t, err)
+			require.Equal(t, []byte("original"), mustRead(t, targetConfig))
+			_, statErr := os.Stat(filepath.Join(target, "covers", "extra.png"))
+			require.True(t, os.IsNotExist(statErr))
+		})
+	}
+}
+
+func appendArchiveEntry(t *testing.T, original []byte, header tar.Header, data []byte) []byte {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(original))
+	require.NoError(t, err)
+	tr := tar.NewReader(gz)
+	var out bytes.Buffer
+	zw := gzip.NewWriter(&out)
+	tw := tar.NewWriter(zw)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		require.NoError(t, tw.WriteHeader(h))
+		_, err = io.Copy(tw, tr)
+		require.NoError(t, err)
+	}
+	header.Size = int64(len(data))
+	require.NoError(t, tw.WriteHeader(&header))
+	_, err = tw.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, tw.Close())
+	require.NoError(t, zw.Close())
+	require.NoError(t, gz.Close())
+	return out.Bytes()
 }
 
 func mustRead(t *testing.T, path string) []byte {

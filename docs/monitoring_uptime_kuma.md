@@ -103,7 +103,7 @@ Using Uptime Kuma's **HTTP(s) - JSON Query** monitor, you can trigger an alert a
 > When configuring this monitor in Uptime Kuma:
 > 1. Double check your username and password for typos before saving.
 > 2. Verify that successful requests return `200 OK`. Successful requests immediately reset the failure counter.
-> 3. If you run Uptime Kuma behind a reverse proxy (e.g. Nginx, Caddy, Traefik), ensure `X-Forwarded-For` or `X-Real-IP` headers are correctly passed so that your proxy IP is not locked out.
+> 3. If requests reach Podsync through a reverse proxy (e.g. Nginx, Caddy, Traefik), all clients share the proxy's IP limit. Podsync ignores `X-Forwarded-For` and `X-Real-IP` for login rate limiting, so incorrect monitor credentials can lock out the proxy IP.
 
 ---
 

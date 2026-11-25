@@ -779,6 +779,7 @@
                     <ul class="nav nav-tabs settings-subnav" role="tablist" aria-label="Access and integrations settings">
                         <li class="nav-item" role="presentation"><button class="nav-link active" id="access-tab-security" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-access-security" aria-controls="tab-access-security" aria-selected="true"><i aria-hidden="true" class="bi bi-shield-lock me-2"></i>Security &amp; access</button></li>
                         <li class="nav-item" role="presentation"><button class="nav-link" id="access-tab-mcp" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-mcp" aria-controls="tab-mcp" aria-selected="false"><i aria-hidden="true" class="bi bi-robot me-2"></i>MCP &amp; integrations</button></li>
+						<li class="nav-item" role="presentation"><button class="nav-link" id="access-tab-telegram" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#tab-access-telegram" aria-controls="tab-access-telegram" aria-selected="false"><i aria-hidden="true" class="bi bi-telegram me-2"></i>Telegram</button></li>
                     </ul>
 
                     <div class="tab-content">
@@ -846,6 +847,22 @@
                     </div>
                 </div>
 
+
+                <div class="tab-pane fade" id="tab-access-telegram">
+                    <div class="card p-4 mt-4">
+                        <h2 class="h5 mb-2">Telegram bot</h2>
+                        <p class="text-muted small">Add links to Personal Feeds and receive download failure and recovery notifications in a private chat.</p>
+                        <p class="small mb-3">Status: <strong id="telegram-status">Loading…</strong></p>
+                        <p class="small d-none" id="telegram-pair-instructions">Send <code id="telegram-pair-command"></code> to your bot in a private Telegram chat. The code expires after 10 minutes.</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-brand btn-sm" type="button" id="telegram-pair-btn" onclick="telegramAction('pair')">Connect</button>
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="loadTelegram()">Refresh status</button>
+                            <button class="btn btn-secondary btn-sm" type="button" id="telegram-test-btn" onclick="telegramAction('test')">Send test</button>
+                            <button class="btn btn-secondary btn-sm" type="button" id="telegram-disconnect-btn" onclick="telegramAction('disconnect')">Disconnect</button>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">Set <code>[telegram].enabled = true</code> and <code>PODSYNC_TELEGRAM_BOT_TOKEN</code>, then restart Podsync to enable the bot.</p>
+                    </div>
+                </div>
 
                 <div class="tab-pane fade" id="tab-mcp">
                     <!-- Header Banner -->

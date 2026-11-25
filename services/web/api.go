@@ -82,6 +82,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/logout", s.handleAuthLogout)
 	mux.Handle("/api/v1/auth/password", s.authMiddleware(http.HandlerFunc(s.handleAuthPassword)))
 	mux.Handle("/api/v1/auth/security", s.authMiddleware(http.HandlerFunc(s.handleAuthSecurity)))
+	mux.Handle("/api/v1/telegram", s.authMiddleware(http.HandlerFunc(s.handleTelegram)))
 
 	mux.Handle("/api/v1/feeds/status", s.authMiddleware(http.HandlerFunc(s.handleFeedsStatus)))
 	mux.Handle("/api/v1/feeds", s.authMiddleware(http.HandlerFunc(s.handleFeeds)))

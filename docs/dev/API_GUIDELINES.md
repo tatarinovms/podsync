@@ -274,7 +274,7 @@ deployments and Windows binary replacement.
 #### `GET /api/v1/system/backup/export?include_secrets={bool}`
 Downloads a portable `.tar.gz` backup. It includes `config.toml`, a consistent
 Badger stream, custom covers, and optionally API keys, administrator password,
-proxy credentials, and `cookies.txt`. Downloaded episode media is never
+proxy credentials, Telegram bot token, and `cookies.txt`. Downloaded episode media is never
 included. `include_secrets` defaults to `true`.
 
 #### `POST /api/v1/system/backup/inspect`
@@ -288,6 +288,13 @@ fields `preserve_paths` and `restore_secrets` both default to `true`. Preserving
 paths keeps the target server's storage locations and port during migration.
 
 ### 3.6 Authentication & Security
+
+#### `GET, POST /api/v1/telegram`
+Authenticated Web Admin integration for the single-owner Telegram bot. `GET`
+returns `enabled`, `connected`, and the linked `chat_id` when present. `POST`
+accepts `{"action":"pair"}` (returns a 10-minute one-time code), `test`, or
+`disconnect`. The pairing endpoint is web-only because it grants an external
+chat control over the instance; it is not an MCP tool.
 
 #### `GET /api/v1/auth/status`
 Returns current session authentication status, administrator username, and active brute-force rate limit configuration.

@@ -131,6 +131,35 @@ dns_servers = ["invalid-server"]
 	assert.Contains(t, err.Error(), "invalid DNS server")
 }
 
+func TestTelegramConfigRequiresAdminAndAcceptsEnvToken(t *testing.T) {
+	path := setup(t, `[server]
+data_dir = "/data"
+[telegram]
+enabled = true
+[feeds.A]
+url = "https://youtube.com/watch?v=ygIUF678y40"
+`)
+	defer os.Remove(path)
+	t.Setenv("PODSYNC_TELEGRAM_BOT_TOKEN", "env-token")
+	_, err := LoadConfig(path)
+	require.ErrorContains(t, err, "requires Web Admin")
+
+	path2 := setup(t, `[server]
+data_dir = "/data"
+[server.admin]
+enabled = true
+username = "admin"
+password = "secret"
+[telegram]
+enabled = true
+token = "file-token"
+`)
+	defer os.Remove(path2)
+	cfg, err := LoadConfig(path2)
+	require.NoError(t, err)
+	require.Equal(t, "env-token", cfg.Telegram.Token)
+}
+
 func TestFilenameTemplateValidation(t *testing.T) {
 	const file = `
 [server]

@@ -21,6 +21,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
 - **Backup & Recovery**: Portable `.tar.gz` backups (`pkg/backup/`) containing configuration, a consistent Badger stream, custom covers, optional secrets, and Personal Feed metadata; downloaded media is intentionally excluded
 - **Browser Integration**: Signed Firefox WebExtension sources in `extensions/podsync-firefox/` for sending YouTube, VK Video, and Rutube tabs to Personal Feeds
+- **Telegram Integration**: Optional single-owner bot (`pkg/telegram/`) for adding links to Personal Feeds, status and retry commands, and failure/recovery notifications via long polling
 
 ---
 
@@ -72,6 +73,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── network/              # Custom DNS resolver configuration and validation
 │   ├── personal/             # Curated mixed-media feeds, shared media references, and processing
 │   ├── selfupdate/           # Verified native binary update from GitHub Releases
+│   ├── telegram/             # Optional single-owner bot and persistent delivery state
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
@@ -199,6 +201,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/auth/logout` | Invalidate current admin session |
 | `POST` | `/api/v1/auth/password` | Change admin password (requires current password) |
 | `GET`, `POST` | `/api/v1/auth/security` | Get or update login rate-limiter & lockout settings |
+| `GET`, `POST` | `/api/v1/telegram` | Inspect bot status or pair, test, and disconnect its single owner |
 | `GET` | `/api/v1/system/errors` | List download errors with diagnostic causes and recommendations (`?feed_id=...&limit=...`) |
 | `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes (`?feed_id=...&limit=...`) |
 | `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |

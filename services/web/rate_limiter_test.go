@@ -51,6 +51,27 @@ func TestLoginRateLimiter_ByUsername(t *testing.T) {
 	assert.Greater(t, int(retryAfter.Seconds()), 0)
 }
 
+func TestGetClientIPIgnoresForwardedHeaders(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/status", nil)
+	req.RemoteAddr = "192.0.2.10:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.1, 192.0.2.10")
+	req.Header.Set("X-Real-IP", "198.51.100.2")
+	require.Equal(t, "192.0.2.10", getClientIP(req))
+
+	limiter := NewLoginRateLimiter(2, time.Minute, time.Minute)
+	limiter.RecordFailure(getClientIP(req), "")
+	req.Header.Set("X-Forwarded-For", "198.51.100.3")
+	req.Header.Set("X-Real-IP", "198.51.100.4")
+	limiter.RecordFailure(getClientIP(req), "")
+	require.Len(t, limiter.ipAttempts, 1)
+	require.Equal(t, 2, limiter.ipAttempts["192.0.2.10"].count)
+
+	req.RemoteAddr = "192.0.2.11:5678"
+	limiter.RecordFailure(getClientIP(req), "")
+	require.Len(t, limiter.ipAttempts, 2)
+	require.Equal(t, 1, limiter.ipAttempts["192.0.2.11"].count)
+}
+
 func TestLoginAPI_RateLimiting429(t *testing.T) {
 	srv := New(Config{
 		Admin: AdminConfig{

@@ -21,6 +21,7 @@ import (
 	"github.com/mxpv/podsync/pkg/fs"
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/pkg/network"
+	"github.com/mxpv/podsync/pkg/telegram"
 	"github.com/mxpv/podsync/pkg/ytdl"
 	"github.com/mxpv/podsync/services/web"
 )
@@ -52,6 +53,8 @@ type Config struct {
 	Jobs JobsConfig `toml:"jobs"`
 	// Network config controls DNS used for provider API and RSS metadata requests.
 	Network NetworkConfig `toml:"network"`
+	// Optional single-owner Telegram bot.
+	Telegram telegram.Config `toml:"telegram"`
 }
 
 type NetworkConfig struct {
@@ -138,6 +141,9 @@ func LoadConfigWithOptions(path string, adminOverride *bool) (*Config, error) {
 
 func (c *Config) validate() error {
 	var result *multierror.Error
+	if c.Telegram.Enabled && !c.Server.Admin.Enabled {
+		result = multierror.Append(result, errors.New("Telegram bot requires Web Admin to be enabled for owner pairing"))
+	}
 
 	if c.Server.DataDir != "" {
 		log.Warnf(`server.data_dir is deprecated, and will be removed in a future release. Use the following config instead:
@@ -303,6 +309,9 @@ func (c *Config) applyDefaults(configPath string) {
 }
 
 func (c *Config) applyEnv() {
+	if token := os.Getenv("PODSYNC_TELEGRAM_BOT_TOKEN"); token != "" {
+		c.Telegram.Token = token
+	}
 	envVars := map[model.Provider][]string{
 		model.ProviderYoutube:    {"PODSYNC_YOUTUBE_API_KEY"},
 		model.ProviderVimeo:      {"PODSYNC_VIMEO_API_KEY"},

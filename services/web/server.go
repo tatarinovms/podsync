@@ -25,6 +25,7 @@ type Server struct {
 	sessions      *SessionManager
 	adminMgr      AdminManager
 	personal      *personal.Service
+	telegram      TelegramControl
 	adminUpdateMu sync.Mutex
 	mcpHandler    http.Handler
 	rateLimiter   *LoginRateLimiter
@@ -94,6 +95,22 @@ func (c Config) PublicURL() string {
 func (s *Server) SetAdminManager(mgr AdminManager) {
 	s.adminMgr = mgr
 }
+
+// TelegramControl exposes only owner pairing and diagnostics to Web Admin.
+type TelegramControl interface {
+	Status() TelegramStatus
+	PairCode() (string, error)
+	Disconnect() error
+	Test(context.Context) error
+}
+
+type TelegramStatus struct {
+	Enabled   bool  `json:"enabled"`
+	Connected bool  `json:"connected"`
+	ChatID    int64 `json:"chat_id,omitempty"`
+}
+
+func (s *Server) SetTelegram(control TelegramControl) { s.telegram = control }
 
 func (s *Server) SetMCPHandler(h http.Handler) {
 	s.mcpHandler = h

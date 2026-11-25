@@ -177,6 +177,7 @@ func Inspect(r io.Reader) (*Manifest, error) {
 	defer gz.Close()
 	tr := tar.NewReader(gz)
 	hashes := map[string]string{}
+	seen := map[string]bool{}
 	var manifest *Manifest
 	for {
 		h, err := tr.Next()
@@ -189,6 +190,13 @@ func Inspect(r io.Reader) (*Manifest, error) {
 		if err := validName(h.Name); err != nil {
 			return nil, err
 		}
+		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
+			return nil, fmt.Errorf("unsupported archive entry type for %q", h.Name)
+		}
+		if seen[h.Name] {
+			return nil, fmt.Errorf("duplicate archive entry %q", h.Name)
+		}
+		seen[h.Name] = true
 		if h.Name == "manifest.json" {
 			if h.Size > maxManifestSize {
 				return nil, fmt.Errorf("manifest.json is too large")
@@ -221,6 +229,14 @@ func Inspect(r io.Reader) (*Manifest, error) {
 			return nil, fmt.Errorf("backup checksum mismatch for %s", name)
 		}
 	}
+	if len(hashes) != len(manifest.Files) {
+		return nil, fmt.Errorf("backup archive files do not match manifest")
+	}
+	for name := range hashes {
+		if _, ok := manifest.Files[name]; !ok {
+			return nil, fmt.Errorf("unlisted archive entry %q", name)
+		}
+	}
 	if _, ok := manifest.Files["config.toml"]; !ok {
 		return nil, fmt.Errorf("backup does not contain config.toml")
 	}
@@ -238,20 +254,33 @@ func Restore(ctx context.Context, r io.Reader, opts RestoreOptions) (*RestoreRes
 		return nil, err
 	}
 	defer os.RemoveAll(tmp)
-	if err := extract(r, tmp); err != nil {
-		return nil, err
-	}
-	f, err := os.Open(filepath.Join(tmp, "archive.tar.gz"))
+	f, err := os.Create(filepath.Join(tmp, "archive.tar.gz"))
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+	if _, err := io.Copy(f, r); err != nil {
+		return nil, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
 	manifest, inspectErr := Inspect(f)
-	_ = f.Close()
 	if inspectErr != nil {
 		return nil, inspectErr
 	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	contents := filepath.Join(tmp, "contents")
+	if err := os.Mkdir(contents, 0700); err != nil {
+		return nil, err
+	}
+	if err := extract(f, contents); err != nil {
+		return nil, err
+	}
 	result := &RestoreResult{Manifest: manifest}
-	config, err := os.ReadFile(filepath.Join(tmp, "config.toml"))
+	config, err := os.ReadFile(filepath.Join(contents, "config.toml"))
 	if err != nil {
 		return nil, err
 	}
@@ -269,14 +298,14 @@ func Restore(ctx context.Context, r io.Reader, opts RestoreOptions) (*RestoreRes
 	}
 	result.ConfigRestored = true
 	if opts.RestoreCovers {
-		n, err := copyCovers(filepath.Join(tmp, "covers"), opts.CoversDir)
+		n, err := copyCovers(filepath.Join(contents, "covers"), opts.CoversDir)
 		if err != nil {
 			return nil, err
 		}
 		result.CoversRestored = n
 	}
 	if opts.RestoreCookies && manifest.IncludesSecrets {
-		if b, err := os.ReadFile(filepath.Join(tmp, "cookies.txt")); err == nil {
+		if b, err := os.ReadFile(filepath.Join(contents, "cookies.txt")); err == nil {
 			if err := writeAtomic(opts.CookiesPath, b); err != nil {
 				return nil, err
 			}
@@ -289,7 +318,7 @@ func Restore(ctx context.Context, r io.Reader, opts RestoreOptions) (*RestoreRes
 		if opts.RestoreDatabaseStream == nil {
 			return nil, fmt.Errorf("database restore is not configured")
 		}
-		f, err := os.Open(filepath.Join(tmp, "badger.bak"))
+		f, err := os.Open(filepath.Join(contents, "badger.bak"))
 		if err != nil {
 			return nil, err
 		}
@@ -307,24 +336,7 @@ func Restore(ctx context.Context, r io.Reader, opts RestoreOptions) (*RestoreRes
 }
 
 func extract(r io.Reader, dir string) error {
-	archive := filepath.Join(dir, "archive.tar.gz")
-	out, err := os.Create(archive)
-	if err != nil {
-		return err
-	}
-	if _, err = io.Copy(out, r); err != nil {
-		_ = out.Close()
-		return err
-	}
-	if err = out.Close(); err != nil {
-		return err
-	}
-	f, err := os.Open(archive)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	gz, err := gzip.NewReader(f)
+	gz, err := gzip.NewReader(r)
 	if err != nil {
 		return err
 	}
@@ -342,16 +354,13 @@ func extract(r io.Reader, dir string) error {
 		if err := validName(h.Name); err != nil {
 			return err
 		}
+		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeRegA {
+			return fmt.Errorf("unsupported archive entry type for %q", h.Name)
+		}
 		if h.Size < 0 || h.Size > maxExtractedSize || extracted+h.Size > maxExtractedSize {
 			return fmt.Errorf("backup contents exceed the 1 GiB extraction limit")
 		}
 		target := filepath.Join(dir, filepath.FromSlash(h.Name))
-		if h.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0755); err != nil {
-				return err
-			}
-			continue
-		}
 		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
 			return err
 		}
@@ -373,7 +382,7 @@ func extract(r io.Reader, dir string) error {
 
 func validName(name string) error {
 	clean := filepath.ToSlash(filepath.Clean(name))
-	if clean == "." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || strings.Contains(clean, ":") {
+	if name != clean || clean == "." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || strings.Contains(clean, ":") {
 		return fmt.Errorf("unsafe archive path %q", name)
 	}
 	return nil
@@ -488,7 +497,7 @@ func withoutSecrets(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, key := range []string{"tokens", "server.admin.password", "downloader.proxy", "downloader.proxies"} {
+	for _, key := range []string{"tokens", "server.admin.password", "downloader.proxy", "downloader.proxies", "telegram.token"} {
 		tree.Delete(key)
 	}
 	return []byte(tree.String()), nil
@@ -512,7 +521,7 @@ func mergeConfig(incoming, current []byte, preserveStoragePaths, preserveSecrets
 		}
 	}
 	if preserveSecrets {
-		for _, key := range []string{"tokens", "server.admin.password", "downloader.proxy", "downloader.proxies"} {
+		for _, key := range []string{"tokens", "server.admin.password", "downloader.proxy", "downloader.proxies", "telegram.token"} {
 			if value := cur.Get(key); value != nil {
 				in.Set(key, value)
 			}

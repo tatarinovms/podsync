@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/mxpv/podsync/pkg/model"
 	"github.com/mxpv/podsync/pkg/personal"
 	"github.com/mxpv/podsync/pkg/selfupdate"
+	"github.com/mxpv/podsync/pkg/telegram"
 	"github.com/mxpv/podsync/services/migrate"
 	"github.com/mxpv/podsync/services/update"
 	"github.com/mxpv/podsync/services/web"
@@ -307,6 +309,10 @@ func main() {
 
 	feedManager.queue = personalQueue
 	feedManager.SetPersonalFeeds(personalFeeds)
+	bot, err := telegram.New(cfg.Telegram, filepath.Join(cfg.Database.Dir, "telegram-state.json"), feedManager, personalFeeds)
+	if err != nil {
+		log.WithError(err).Fatal("failed to initialize Telegram bot")
+	}
 	if executable, err := os.Executable(); err != nil {
 		log.WithError(err).Warn("Podsync self-update is unavailable")
 	} else {
@@ -416,13 +422,25 @@ func main() {
 					log.WithField("feed_id", _feed.ID).WithError(err).Errorf("failed to update feed %q: %s", _feed.ID, _feed.URL)
 					feedManager.RecordFeedUpdateError(_feed.ID, err)
 					if currentJobID != "" && feedManager.JobQueue() != nil {
-						_, _ = feedManager.JobQueue().MarkFailed(ctx, currentJobID, err, currentClaimToken)
+						failed, markErr := feedManager.JobQueue().MarkFailed(ctx, currentJobID, err, currentClaimToken)
+						if markErr == nil && failed != nil && failed.Status == model.JobStatusFailed {
+							bot.ReconcileFeed(ctx, _feed.ID, true)
+							if strings.HasPrefix(_feed.URL, "personal://") {
+								bot.NotifyJobFailure(_feed.ID, err)
+							}
+						}
+					} else {
+						bot.ReconcileFeed(ctx, _feed.ID, true)
+						if strings.HasPrefix(_feed.URL, "personal://") {
+							bot.NotifyJobFailure(_feed.ID, err)
+						}
 					}
 				} else {
 					feedManager.ClearFeedUpdateError(_feed.ID)
 					if currentJobID != "" && feedManager.JobQueue() != nil {
 						_ = feedManager.JobQueue().MarkDone(ctx, currentJobID, currentClaimToken)
 					}
+					bot.ReconcileFeed(ctx, _feed.ID, false)
 					log.WithField("feed_id", _feed.ID).Info("feed update complete")
 				}
 				feedManager.MarkFeedUpdateFinished(_feed.ID)
@@ -544,6 +562,7 @@ func main() {
 	srv := web.New(cfg.Server, storage, database)
 	srv.SetAdminManager(feedManager)
 	srv.SetPersonalFeeds(personalFeeds)
+	srv.SetTelegram(bot)
 
 	// Attach MCP handler to web server (accessible via /mcp, /mcp/sse, /mcp/messages)
 	mcpServer := mcp.NewServer(feedManager)
@@ -558,6 +577,9 @@ func main() {
 		}
 		cancel()
 		return
+	}
+	if cfg.Telegram.Enabled {
+		group.Go(func() error { return bot.Run(ctx) })
 	}
 
 	group.Go(func() error {

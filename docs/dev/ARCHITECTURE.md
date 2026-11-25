@@ -129,7 +129,8 @@ Core service orchestrating manually curated, universal podcast feeds:
 
 ### 2.7 Backup, Recovery & Native Updates (`pkg/backup/`, `pkg/selfupdate/`)
 - Portable `.tar.gz` backups contain a manifest, checksums, `config.toml`, a transactionally consistent Badger stream, custom covers, and optional secrets. Downloaded episode media is intentionally excluded.
-- Restore validates the manifest and checksums before replacing state. Cross-server restores preserve the target server's storage paths and port by default; secrets can be restored independently.
+- Restore validates the manifest, exact archive file list, entry types, and checksums before replacing state. Cross-server restores preserve the target server's storage paths and port by default; secrets can be restored independently.
+- The optional Telegram bot in `pkg/telegram/` uses long polling and a single paired private chat. It queues failure and recovery notifications after feed jobs finish, with delivery state saved beside Badger in `telegram-state.json`. This state is intentionally outside portable backups.
 - Native self-update is supported on Linux and macOS. It downloads the matching GitHub Release archive, verifies it against `checksums.txt`, atomically replaces the executable, and restarts the process. Docker deployments and Windows binary replacement do not self-update.
 
 ### 2.8 Web Admin Console Delivery (`services/web/ui.go`)

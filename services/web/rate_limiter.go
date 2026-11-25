@@ -198,18 +198,8 @@ func (l *LoginRateLimiter) RecordSuccess(ip, username string) {
 	}
 }
 
-// getClientIP extracts remote IP from Request.
+// getClientIP uses the direct peer address for login rate limiting.
 func getClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		ip := strings.TrimSpace(parts[0])
-		if ip != "" {
-			return ip
-		}
-	}
-	if xrip := strings.TrimSpace(r.Header.Get("X-Real-IP")); xrip != "" {
-		return xrip
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil && host != "" {
 		return host

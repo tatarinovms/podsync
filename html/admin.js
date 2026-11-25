@@ -609,6 +609,43 @@
             }
         }
 
+        async function loadTelegram() {
+            const status = document.getElementById('telegram-status');
+            try {
+                const res = await fetch('/api/v1/telegram');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to load Telegram status');
+                status.textContent = !data.enabled ? 'Disabled' : data.connected ? `Connected to chat ${data.chat_id}` : 'Waiting for connection';
+                document.getElementById('telegram-pair-btn').disabled = !data.enabled || data.connected;
+                document.getElementById('telegram-test-btn').disabled = !data.connected;
+                document.getElementById('telegram-disconnect-btn').disabled = !data.connected;
+            } catch (err) {
+                status.textContent = err.message;
+            }
+        }
+
+        async function telegramAction(action) {
+            try {
+                const res = await fetch('/api/v1/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Telegram request failed');
+                if (action === 'pair') {
+                    document.getElementById('telegram-pair-command').textContent = `/start ${data.code}`;
+                    document.getElementById('telegram-pair-instructions').classList.remove('d-none');
+                } else {
+                    document.getElementById('telegram-pair-instructions').classList.add('d-none');
+                    showToast(action === 'test' ? 'Test message sent' : 'Telegram disconnected');
+                }
+                await loadTelegram();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
         function ensureOptionAndSelect(selectEl, val) {
             if (!selectEl) return;
             let found = false;
@@ -3945,13 +3982,14 @@
         const settingsPanelIDs = {
             sources: { tokens: 'tab-tokens', downloader: 'tab-downloader' },
             system: { overview: 'tab-system-overview', backup: 'tab-system-backup' },
-            access: { security: 'tab-access-security', mcp: 'tab-mcp' },
+            access: { security: 'tab-access-security', mcp: 'tab-mcp', telegram: 'tab-access-telegram' },
         };
         const settingsPanelLoaders = {
             'tab-tokens': () => loadTokens(),
             'tab-downloader': () => loadDownloaderConfig(),
             'tab-system-overview': () => loadSystem(),
             'tab-access-security': () => loadAuthSecurity(),
+            'tab-access-telegram': () => loadTelegram(),
             'tab-mcp': () => loadMCPConfig(),
         };
 

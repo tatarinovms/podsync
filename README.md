@@ -22,6 +22,7 @@ This fork extends [mxpv/podsync](https://github.com/mxpv/podsync) with personal 
 - **Web Admin:** library search, playback, retries, artwork, Activity logs, and Catppuccin light/dark themes.
 - **Download settings:** cookies, HTTP/SOCKS proxies with credentials, global/per-provider routes, per-feed overrides, and URL diagnostics.
 - **Operations:** REST API, MCP tools, portable backups, health endpoints, and verified native updates on supported Linux/macOS installations.
+- **Telegram bot:** optional private-chat control for adding links to Personal Feeds, checking status, retrying episodes, and receiving failure and recovery alerts.
 
 ### Supported sources
 
@@ -107,6 +108,8 @@ Use **Subscribe** to copy the RSS URL into your podcast app. Before subscribing 
 Use Web Admin for everyday management. [config.toml.example](config.toml.example) documents advanced settings and environment overrides, including schedules, cleanup, normalization, filename templates, storage, and DNS.
 
 See [Web Admin / REST API](docs/web_admin.md) for download routing, proxy credentials, cookies, Activity, and backups. The [deployment guide](docs/deployment_guide_agents.md) covers native dependencies, reverse proxies, upgrades, and backup/restore CLI commands.
+
+See the [Telegram bot guide](docs/telegram.md) for setup, pairing, commands, and notifications.
 
 Backups include configuration, database state, custom covers, and optional secrets. Downloaded media is excluded. Restore preserves destination storage paths and port by default.
 

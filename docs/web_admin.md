@@ -186,7 +186,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
 
 ### 7. System Health & Observability
 - **Security & Rate Limiting**:
-  - Brute-force protection tracking failed login attempts per client IP and username.
+  - Brute-force protection tracking failed login attempts per direct peer IP (`RemoteAddr`) and username. Behind a reverse proxy, all clients share the proxy's IP limit; `X-Forwarded-For` and `X-Real-IP` do not affect it.
   - Dynamically configurable via Web UI modal or API (`max_attempts`, `window`, `lockout`).
   - Returns `429 Too Many Requests` with standard `Retry-After` header when thresholds are exceeded.
 
@@ -196,7 +196,9 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Server Uptime**: How long the Podsync daemon has been running.
   - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
   - **Podsync Updates**: Checks the latest GitHub Release. On a supported native Linux or macOS installation, **Update Podsync** downloads the matching release archive, verifies its SHA-256 from `checksums.txt`, replaces the executable, and restarts the process. The button is disabled for Docker deployments; follow the Compose update commands in the deployment guide instead.
-  - **Backup & Restore**: Downloads a portable `podsync-backup-YYYYMMDD-HHMMSS.tar.gz` containing `config.toml`, a consistent Badger backup stream, custom covers, optional `cookies.txt`, and a checksum manifest. Downloaded episodes are never included. Selecting an archive verifies checksums and shows its feed counts before restore. Keep the target server paths and port when migrating between Docker, NAS, and bare-metal deployments.
+  - **Backup & Restore**: Downloads a portable `podsync-backup-YYYYMMDD-HHMMSS.tar.gz` containing `config.toml`, a consistent Badger backup stream, custom covers, optional `cookies.txt`, and a checksum manifest. Downloaded episodes are never included. Selecting an archive verifies checksums and requires its files to match the manifest exactly before restore. Keep the target server paths and port when migrating between Docker, NAS, and bare-metal deployments.
+
+- **Telegram** under **Access & integrations** pairs one private chat with the optional bot, sends a test message, or disconnects it. See the [Telegram bot guide](telegram.md).
 
 ### 8. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
@@ -237,6 +239,7 @@ Endpoints under `/api/v1/` require authentication (Session Cookie or HTTP Basic 
 | `/api/v1/auth/logout` | `POST` | Invalidate session |
 | `/api/v1/auth/password` | `POST` | Change admin password (requires current password) |
 | `/api/v1/auth/security` | `GET`, `POST` | Get or update brute-force rate limiting settings (max attempts, window, lockout) |
+| `/api/v1/telegram` | `GET`, `POST` | Inspect bot status; `POST` actions `pair`, `test`, and `disconnect` require admin authentication. |
 | `/api/v1/system/errors` | `GET` | List download errors with diagnostic causes and recommendations |
 | `/api/v1/system/recent` | `GET` | List recent successfully downloaded episodes |
 | `/api/v1/system/status` | `GET` | High-level status snapshot (sync schedules, 24h count, active errors) |

@@ -84,9 +84,10 @@ Bootstrap CSS/JS, Bootstrap Icons and fonts, and QRCode.js are vendored under
 third-party CDNs at runtime.
 
 ### Browser Extension
-- **Firefox WebExtension**: Manifest V3, zero-build HTML/CSS/JavaScript popup under `extensions/podsync-firefox/`.
+- **Firefox WebExtension**: Manifest V3, zero-build HTML/CSS/JavaScript popup under `extensions/podsync-firefox/`; `activeTab` and `storage` are the only install-time permissions, and Podsync server access is requested as an optional host permission for the configured origin.
 - **Distribution**: Mozilla-signed `.xpi` attached directly to a GitHub Release; source ZIPs may be used for review but are not the user installation artifact.
 - **Privacy declaration**: `browser_specific_settings.gecko.data_collection_permissions` declares required authentication and browsing-activity access for AMO validation.
+- **Tests**: `extensions/podsync-firefox/tests/popup_test.js` covers URL validation, UTF-8 credentials, API errors, format selection, manifest permissions, and popup confirmation without external dependencies.
 
 ### UI Design System & Button Standards
 - **Modal & Card Action Pairs**: Every action pair (Cancel / Close on the left, Save / Update / Confirm on the right) uses standard `btn-sm` with `min-width: 105px` and 35px height on desktop (`padding: 6px 16px`, `font-size: 0.875rem`, `line-height: 1.5`).

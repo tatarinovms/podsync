@@ -328,7 +328,9 @@ before serving; proxied initialization preserves the daemon's version.
     - Keep archive names compatible with `pkg/selfupdate/`, and keep the release workflow on GoReleaser v2 syntax.
 16. **Firefox Extension Distribution**:
     - Source lives in `extensions/podsync-firefox/`; increment `manifest.json` for every AMO upload and keep `browser_specific_settings.gecko.data_collection_permissions` accurate.
-    - The extension accepts only YouTube, VK Video, and Rutube pages, stores its configured API URL/credentials in Firefox extension-local storage, and exposes audio/video quality controls before submission.
+    - Keep install-time permissions minimal: `activeTab` (current tab URL/title) and `storage`; request Podsync server access as an optional host permission for the configured origin and never reintroduce `<all_urls>`.
+    - The extension accepts only YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube pages, stores its configured API URL/credentials in Firefox extension-local storage, and exposes audio/video quality controls before submission.
+    - Run `node extensions/podsync-firefox/tests/popup_test.js` after changing extension code; keep coverage for provider URLs, UTF-8 Basic Auth, API errors, format selection, and the queued confirmation flow.
     - When the signed XPI filename or release tag changes, update direct download links in `README.md`, `README_RU.md`, `docs/personal-feeds.md`, `docs/ru/personal-feeds.md`, and the extension README together.
 17. **Mandatory Pre-Release Documentation Gate**:
     - Before creating or pushing a release tag, publishing a GitHub Release, or marking a release as Latest, review every feature, fix, configuration change, API/MCP change, compatibility note, and operational change included since the previous release.
@@ -364,4 +366,4 @@ before serving; proxied initialization preserves the daemon's version.
 
 - Internal architecture, API, design, stack, workflow, and review guides live in [`docs/dev/`](docs/dev/README.md). Keep the root focused on `AGENTS.md` and the two README files.
 - Browser regression tests live in `tests/e2e/`; install their pinned dependencies with `npm ci`, install Chromium with `npx playwright install chromium`, and run `npm test` from that directory. CI runs them in the **Browser tests** job.
-- Dependency-free Node.js UI tests remain in `services/web/`.
+- Dependency-free Node.js UI tests remain in `services/web/`. The Firefox extension suite runs with `node extensions/podsync-firefox/tests/popup_test.js`.

@@ -1,10 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Podsync Share",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Add the current tab to a Podsync personal feed.",
-  "permissions": ["activeTab", "storage", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["activeTab", "storage"],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "action": {
     "default_title": "Add to Podsync",
     "default_popup": "popup.html"

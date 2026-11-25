@@ -47,6 +47,16 @@
     </form>
     <p id="status" role="status" aria-live="polite"></p>
 
+    <section id="send-result" class="hidden" aria-live="polite">
+      <h2>Queued in Podsync</h2>
+      <dl>
+        <div><dt>Feed</dt><dd id="result-feed"></dd></div>
+        <div><dt>Episode ID</dt><dd id="result-episode"></dd></div>
+        <div id="result-title-row" class="hidden"><dt>Episode</dt><dd id="result-title"></dd></div>
+      </dl>
+      <button id="close-popup" type="button" class="secondary">Close window</button>
+    </section>
+
     <details>
       <summary>Connection settings</summary>
       <form id="settings-form">
@@ -60,6 +70,7 @@
       </form>
     </details>
   </main>
+  <script src="lib.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

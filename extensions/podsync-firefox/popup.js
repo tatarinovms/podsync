@@ -1,3 +1,11 @@
+const {
+  episodePayload,
+  isSupportedURL,
+  queuedDetails,
+  request,
+  serverOrigin
+} = globalThis.PodsyncShare;
+
 const settingsForm = document.getElementById('settings-form');
 const shareForm = document.getElementById('share-form');
 const apiURLInput = document.getElementById('api-url');
@@ -13,36 +21,35 @@ const maxHeightSelect = document.getElementById('max-height');
 const videoResolution = document.getElementById('video-resolution');
 const shareButton = document.getElementById('share');
 const status = document.getElementById('status');
+const sendResult = document.getElementById('send-result');
+const resultFeed = document.getElementById('result-feed');
+const resultEpisode = document.getElementById('result-episode');
+const resultTitleRow = document.getElementById('result-title-row');
+const resultTitle = document.getElementById('result-title');
+const closePopupButton = document.getElementById('close-popup');
 
 function setStatus(message, type = '') {
   status.textContent = message;
   status.className = type;
 }
 
-function apiBase(value) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(url.hostname)) {
-    throw new Error('Use HTTPS for a remote Podsync server.');
-  }
-  return url.toString().replace(/\/$/, '').replace(/\/api\/v1$/, '') + '/api/v1';
-}
-
-function authorization(config) {
-  return `Basic ${btoa(`${config.username}:${config.password}`)}`;
-}
-
 async function getConfig() {
   return browser.storage.local.get({ apiURL: '', username: '', password: '', feedID: '', format: 'audio', quality: 'high', maxHeight: 0 });
 }
 
-async function request(config, path, options = {}) {
-  const response = await fetch(`${apiBase(config.apiURL)}${path}`, {
-    ...options,
-    headers: { Authorization: authorization(config), ...(options.headers || {}) }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Podsync returned HTTP ${response.status}`);
-  return data;
+function originPattern(value) {
+  return `${serverOrigin(value)}/*`;
+}
+
+async function hasServerAccess(apiURL) {
+  return browser.permissions.contains({ origins: [originPattern(apiURL)] });
+}
+
+async function requestServerAccess(apiURL) {
+  // Called directly from the settings submit handler: Firefox requires
+  // permissions.request() to run inside the user gesture, so no contains()
+  // check is awaited before it.
+  return browser.permissions.request({ origins: [originPattern(apiURL)] });
 }
 
 async function loadFeeds(config, selectedFeedID = '') {
@@ -59,6 +66,36 @@ async function loadFeeds(config, selectedFeedID = '') {
   if (!hasFeeds) setStatus('No personal feeds found. Create one in Podsync first.', 'error');
 }
 
+async function currentTab() {
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  return tab;
+}
+
+function validateTabURL(tab) {
+  if (!tab?.url || !/^https?:/i.test(tab.url)) {
+    return 'Open a regular HTTP or HTTPS page first.';
+  }
+  if (!isSupportedURL(tab.url)) {
+    return 'Only YouTube, VK Video, and Rutube links are supported.';
+  }
+  return '';
+}
+
+function showQueued(details) {
+  resultFeed.textContent = details.feed;
+  resultEpisode.textContent = details.episode || 'Unknown';
+  resultTitle.textContent = details.title;
+  resultTitleRow.classList.toggle('hidden', !details.title);
+  shareForm.classList.add('hidden');
+  sendResult.classList.remove('hidden');
+  closePopupButton.focus();
+}
+
+function selectedFeedTitle() {
+  const option = feedSelect.options?.[feedSelect.selectedIndex];
+  return option?.textContent || option?.text || feedSelect.value;
+}
+
 async function initialise() {
   const config = await getConfig();
   apiURLInput.value = config.apiURL;
@@ -70,6 +107,10 @@ async function initialise() {
   updateFormatControls();
   if (!config.apiURL || !config.username || !config.password) return;
   try {
+    if (!(await hasServerAccess(config.apiURL))) {
+      setStatus('Podsync server access was not granted. Save the connection settings again.', 'error');
+      return;
+    }
     await loadFeeds(config, config.feedID);
   } catch (error) {
     setStatus(error.message, 'error');
@@ -80,10 +121,18 @@ settingsForm.addEventListener('submit', async event => {
   event.preventDefault();
   const config = { apiURL: apiURLInput.value.trim(), username: usernameInput.value.trim(), password: passwordInput.value };
   try {
-    apiBase(config.apiURL);
+    const origin = serverOrigin(config.apiURL);
+    if (!(await requestServerAccess(config.apiURL))) {
+      setStatus(`Server access for ${origin} was not granted.`, 'error');
+      return;
+    }
     await loadFeeds(config);
     config.feedID = feedSelect.value;
     await browser.storage.local.set(config);
+    sendResult.classList.add('hidden');
+    sendSettings.classList.add('hidden');
+    shareForm.classList.remove('hidden');
+    openSendSettingsButton.classList.remove('hidden');
     setStatus('Saved. Choose a feed and add the current tab.', 'success');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -100,11 +149,13 @@ for (const control of [formatSelect, qualitySelect, maxHeightSelect]) {
 }
 
 openSendSettingsButton.addEventListener('click', async () => {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url || !/^https?:/.test(tab.url) || !isSupportedURL(tab.url)) {
-    setStatus('Only YouTube, VK Video, and Rutube links are supported.', 'error');
+  const tab = await currentTab();
+  const problem = validateTabURL(tab);
+  if (problem) {
+    setStatus(problem, 'error');
     return;
   }
+  sendResult.classList.add('hidden');
   sendSettings.classList.remove('hidden');
   openSendSettingsButton.classList.add('hidden');
   formatSelect.focus();
@@ -115,46 +166,48 @@ cancelSendButton.addEventListener('click', () => {
   openSendSettingsButton.classList.remove('hidden');
 });
 
-function isSupportedURL(value) {
-  const host = new URL(value).hostname.toLowerCase().replace(/^www\./, '');
-  return host === 'youtu.be' || host.endsWith('.youtube.com') || host === 'youtube.com' ||
-    host === 'vkvideo.ru' || host.endsWith('.vkvideo.ru') || host === 'rutube.ru' || host.endsWith('.rutube.ru');
-}
-
 function updateFormatControls() {
   videoResolution.classList.toggle('hidden', formatSelect.value !== 'video');
 }
 
 formatSelect.addEventListener('change', updateFormatControls);
 
+closePopupButton.addEventListener('click', () => window.close());
+
 shareForm.addEventListener('submit', async event => {
   event.preventDefault();
   const config = await getConfig();
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url || !/^https?:/.test(tab.url)) {
-    setStatus('Open a regular HTTP or HTTPS page first.', 'error');
+  const tab = await currentTab();
+  const problem = validateTabURL(tab);
+  if (problem) {
+    setStatus(problem, 'error');
     return;
   }
-  if (!isSupportedURL(tab.url)) {
-    setStatus('Only YouTube, VK Video, and Rutube links are supported.', 'error');
+  if (!(await hasServerAccess(config.apiURL))) {
+    setStatus('Podsync server access was not granted. Save the connection settings again.', 'error');
+    return;
+  }
+  let payload;
+  try {
+    payload = episodePayload(tab, {
+      format: formatSelect.value,
+      quality: qualitySelect.value,
+      maxHeight: maxHeightSelect.value
+    });
+  } catch (error) {
+    setStatus(error.message, 'error');
     return;
   }
   shareButton.disabled = true;
   setStatus('Adding to Podsync…');
   try {
-    await request(config, `/personal-feeds/${encodeURIComponent(feedSelect.value)}/episodes`, {
+    const data = await request(config, `/personal-feeds/${encodeURIComponent(feedSelect.value)}/episodes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: tab.url,
-        title: tab.title || '',
-        format: formatSelect.value,
-        quality: qualitySelect.value,
-        max_height: Number(maxHeightSelect.value)
-      })
+      body: JSON.stringify(payload)
     });
-    setStatus('Queued in Podsync.', 'success');
-    setTimeout(() => window.close(), 500);
+    setStatus('');
+    showQueued(queuedDetails(selectedFeedTitle(), data));
   } catch (error) {
     setStatus(error.message, 'error');
   } finally {

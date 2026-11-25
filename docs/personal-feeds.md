@@ -60,9 +60,9 @@ Clicking **Subscribe** opens the unified subscription modal:
 ---
 
 ### Firefox Podsync Share Extension
-Install the [signed `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi) and approve the Firefox prompt. Open **Connection settings**, enter the public Podsync URL ending in `/api/v1` and the same administrator credentials used for Web Admin, then click **Save and load feeds**.
+Install the [signed `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.27.0/924c9395d5e947a39fac-1.0.5.xpi) and approve the Firefox prompt. Open **Connection settings**, enter the public Podsync URL ending in `/api/v1` and the same administrator credentials used for Web Admin, then click **Save and load feeds** and approve Firefox's request for access to that server.
 
-The extension accepts only YouTube, VK Video, and Rutube pages. Select the target Personal Feed, choose MP3 Audio or MP4 Video and quality; maximum resolution appears only for Video. The popup closes after Podsync accepts the link. Credentials remain in Firefox extension-local storage and are sent only to the configured Podsync server. For development, load the unpacked source from `about:debugging#/runtime/this-firefox`. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
+The extension accepts only YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube pages. It uses `activeTab` for the current tab and asks for an optional host permission only for your Podsync server, so it has no permanent access to all sites. Select the target Personal Feed, choose MP3 Audio or MP4 Video and quality; maximum resolution appears only for Video. After Podsync accepts the link, the popup shows the feed name and queued episode ID and stays open until you close it. Credentials remain in Firefox extension-local storage and are sent only to the configured Podsync server. For development, load the unpacked source from `about:debugging#/runtime/this-firefox`. See [`extensions/podsync-firefox/README.md`](../extensions/podsync-firefox/README.md).
 
 ---
 

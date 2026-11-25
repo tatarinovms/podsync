@@ -61,9 +61,9 @@
 ---
 
 ### Расширение Firefox Podsync Share
-Установите [подписанный `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi) и подтвердите установку в Firefox. Откройте **Connection settings**, укажите публичный URL Podsync с `/api/v1` и те же учётные данные администратора, что используются в Web Admin, затем нажмите **Save and load feeds**.
+Установите [подписанный `.xpi`](https://github.com/tatarinovms/podsync/releases/download/v2.27.0/924c9395d5e947a39fac-1.0.5.xpi) и подтвердите установку в Firefox. Откройте **Connection settings**, укажите публичный URL Podsync с `/api/v1` и те же учётные данные администратора, что используются в Web Admin, затем нажмите **Save and load feeds** и подтвердите запрос Firefox на доступ к этому серверу.
 
-Расширение принимает только страницы YouTube, VK Video и Rutube. Выберите Personal Feed, MP3 Audio или MP4 Video и качество; максимальное разрешение появляется только для Video. После принятия ссылки сервером окно расширения закрывается. Учётные данные хранятся в локальном хранилище расширения Firefox и отправляются только на настроенный сервер Podsync. Для разработки загрузите исходники через `about:debugging#/runtime/this-firefox`. См. [`extensions/podsync-firefox/README.md`](../../extensions/podsync-firefox/README.md).
+Расширение принимает только страницы YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`) и Rutube. Для текущей вкладки используется `activeTab`, а необязательное разрешение на адрес запрашивается только для вашего сервера Podsync, поэтому постоянного доступа ко всем сайтам нет. Выберите Personal Feed, MP3 Audio или MP4 Video и качество; максимальное разрешение появляется только для Video. После принятия ссылки сервером окно расширения покажет название ленты и ID поставленного в очередь эпизода и останется открытым, пока вы его не закроете. Учётные данные хранятся в локальном хранилище расширения Firefox и отправляются только на настроенный сервер Podsync. Для разработки загрузите исходники через `about:debugging#/runtime/this-firefox`. См. [`extensions/podsync-firefox/README.md`](../../extensions/podsync-firefox/README.md).
 
 ---
 

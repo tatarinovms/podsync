@@ -124,9 +124,9 @@ Public `/health/live` and `/health/ready` endpoints report process liveness and 
 
 ## Firefox extension
 
-[Download the signed Podsync Share extension (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), open it in Firefox, and approve installation.
+[Download the signed Podsync Share extension (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.27.0/924c9395d5e947a39fac-1.0.5.xpi), open it in Firefox, and approve installation.
 
-In **Connection settings**, enter your Podsync API URL (for example `https://podcast.example.com/api/v1`) and admin credentials. Load your personal feeds, choose one, and send a YouTube, VK Video, or Rutube tab as audio or video. See the [extension guide](extensions/podsync-firefox/README.md).
+In **Connection settings**, enter your Podsync API URL (for example `https://podcast.example.com/api/v1`) and admin credentials, then approve Firefox's request for access to that server. Load your personal feeds, choose one, and send a YouTube, VK Video, or Rutube tab as audio or video. The popup stays open and confirms the feed and queued episode ID. See the [extension guide](extensions/podsync-firefox/README.md).
 
 ## AI clients and MCP
 

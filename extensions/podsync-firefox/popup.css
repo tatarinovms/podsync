@@ -16,5 +16,10 @@ button.secondary { background: #6c7086; }
 #status { min-height: 20px; margin: 12px 0; }
 #status.error { color: #d20f39; }
 #status.success { color: #40a02b; }
+#send-result h2 { margin-top: 0; }
+#send-result dl { display: grid; gap: 6px; margin: 0 0 12px; }
+#send-result dl > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
+#send-result dt { font-weight: 600; }
+#send-result dd { margin: 0; overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
 details { border-top: 1px solid #ccc; padding-top: 12px; }
 summary { cursor: pointer; font-weight: 600; margin-bottom: 12px; }

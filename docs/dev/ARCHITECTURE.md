@@ -139,8 +139,10 @@ Core service orchestrating manually curated, universal podcast feeds:
 - The root `html/` mirror is kept byte-for-byte identical and verified by `TestAdminUIAssetMirror`.
 
 ### 2.9 Firefox Extension (`extensions/podsync-firefox/`)
-- A zero-build WebExtension sends only supported YouTube, VK Video, and Rutube pages to a selected Personal Feed.
-- The popup stores the Podsync API URL and administrator credentials in Firefox extension-local storage, lets the user choose audio/video quality, and shows maximum resolution only for video.
+- A zero-build WebExtension sends only supported YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube pages to a selected Personal Feed.
+- Install-time permissions are limited to `activeTab` and `storage`; host access to the configured Podsync server is an optional permission requested for that origin, and the extension has no permanent `<all_urls>` access.
+- The popup stores the Podsync API URL and administrator credentials in Firefox extension-local storage, lets the user choose audio/video quality, and shows maximum resolution only for video. After enqueue it displays the feed name and episode ID until the user closes the window.
+- Shared URL normalisation, UTF-8 Basic Auth, request, and payload logic lives in `lib.js`; `tests/popup_test.js` verifies it without external dependencies.
 - The extension uses the same authenticated REST API as the Web Admin Console; it is an optional client and introduces no separate backend protocol.
 
 ---

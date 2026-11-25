@@ -92,6 +92,7 @@ Run the dependency-free Node.js suites from the repository root:
 node services/web/admin_ui_test.js
 node services/web/admin_security_test.js
 node services/web/episodes_ui_test.js
+node extensions/podsync-firefox/tests/popup_test.js
 ```
 
 Run the browser regression suite separately:
@@ -191,12 +192,18 @@ submission:
 1. Increment `manifest.json` version and keep desktop/Android Firefox minimums
    compatible with `browser_specific_settings.gecko.data_collection_permissions`.
 2. Ensure the disclosure declares `authenticationInfo` and
-   `browsingActivity`, and verify that only YouTube, VK Video, and Rutube links
-   can be submitted.
-3. Create the ZIP with files at the archive root, submit it to AMO without a
+   `browsingActivity`, and verify that only YouTube, VK Video (`vkvideo.ru`,
+   `vk.com`, `vk.ru`), and Rutube links can be submitted.
+3. Keep the permission model minimal: `activeTab` and `storage` are enough to
+   read the current tab, Podsync server access is an optional host permission
+   requested for the configured origin, and `<all_urls>` must not return.
+4. Run `node extensions/podsync-firefox/tests/popup_test.js`; it covers URL
+   normalisation, UTF-8 Basic Auth encoding, API errors, format/resolution
+   selection, and the queued confirmation flow.
+5. Create the ZIP with files at the archive root, submit it to AMO without a
    separate generated-source bundle, and attach the signed `.xpi` directly to a
    GitHub Release.
-4. Use a direct release-asset URL in README files; do not link to a moving
+6. Use a direct release-asset URL in README files; do not link to a moving
    `releases/latest` page or a GitHub source/archive URL.
 
 ### 4.4 Backup Operations

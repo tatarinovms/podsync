@@ -347,9 +347,7 @@ Accent colors have different lightness levels in Latte and Mocha:
 - **Podsync Updates**: Show installed/latest versions and platform eligibility.
   Disable installation for Docker and unsupported replacement platforms rather
   than presenting a button that cannot succeed.
-- **Personal Feed browser submission**: The Firefox popup shows maximum video
-  resolution only when Video is selected and closes after a successful enqueue.
-  Unsupported hosts must be rejected before credentials or content are sent.
+- **Personal Feed browser submission**: The Firefox popup uses `activeTab` for the current tab, requests optional host access only for the configured Podsync origin, shows maximum video resolution only when Video is selected, and keeps the window open after a successful enqueue with the feed name and episode ID until the user closes it. Unsupported hosts, including look-alike domains, must be rejected before credentials or content are sent.
 - **Runtime independence**: Bootstrap, Bootstrap Icons/fonts, and QRCode.js are
   served locally. Do not add CDN dependencies to the admin console.
 - **Asset delivery**: The embedded SPA is precompressed and served with a

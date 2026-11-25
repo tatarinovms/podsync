@@ -124,6 +124,8 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`matcher.go`**: Regex and filter matching logic for episodes (title, description, duration, age).
 
 ### 2.14 `extensions/podsync-firefox/` (Browser Integration)
-- **`manifest.json`**: Manifest V3 declaration, Firefox compatibility, permissions, icon, and Mozilla data-collection disclosure.
-- **`popup.html`, `popup.css`, `popup.js`**: Popup settings and submission flow for supported YouTube, VK Video, and Rutube pages.
-- **`README.md`**: Developer packaging and temporary-installation notes; signed `.xpi` builds are distributed as GitHub Release assets.
+- **`manifest.json`**: Manifest V3 declaration, Firefox compatibility, `activeTab`/`storage` permissions, optional host permissions for the configured Podsync origin, icon, and Mozilla data-collection disclosure.
+- **`lib.js`**: Shared URL normalisation, provider detection, UTF-8 Basic Auth, API request, and audio/video payload helpers used by the popup.
+- **`popup.html`, `popup.css`, `popup.js`**: Popup settings, submission flow, and queued-episode confirmation for supported YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube pages.
+- **`tests/popup_test.js`**: Dependency-free Node.js suite for URL validation, non-ASCII credentials, API errors, format selection, manifest permissions, and popup behaviour with a mocked browser.
+- **`README.md`**: Developer packaging, permission, test, and temporary-installation notes; signed `.xpi` builds are distributed as GitHub Release assets.

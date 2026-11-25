@@ -90,4 +90,4 @@ Before committing changes, opening pull requests, or creating release tags, run 
 - [ ] **UI Tests**: Ran the dependency-free Node.js tests and, when changing browser behavior, the [Playwright suite](../../tests/e2e/README.md).
 - [ ] **Docker Metadata**: Version and commit reach Docker builds through `TAG` and `COMMIT` build arguments; `.git/` and local data stay outside the context.
 - [ ] **Release Integrity**: A release marked Latest contains `checksums.txt` and native archives expected by `pkg/selfupdate`; extension-only releases are not Latest.
-- [ ] **Firefox Extension**: Manifest version, icon, supported-host validation, Firefox minimum versions, Mozilla data-collection permissions, signed `.xpi`, and direct README download links are current.
+- [ ] **Firefox Extension**: Manifest version, icon, supported-host validation (`vkvideo.ru`, `vk.com`, `vk.ru`), Firefox minimum versions, Mozilla data-collection permissions, minimal `activeTab` + optional host permissions, passing `extensions/podsync-firefox/tests/popup_test.js`, signed `.xpi`, and direct README download links are current.

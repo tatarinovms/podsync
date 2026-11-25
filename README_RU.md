@@ -124,9 +124,9 @@ docker compose up -d
 
 ## Расширение Firefox
 
-[Скачайте подписанное расширение Podsync Share (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.26.6/924c9395d5e947a39fac-1.0.4.xpi), откройте его в Firefox и подтвердите установку.
+[Скачайте подписанное расширение Podsync Share (`.xpi`)](https://github.com/tatarinovms/podsync/releases/download/v2.27.0/924c9395d5e947a39fac-1.0.5.xpi), откройте его в Firefox и подтвердите установку.
 
-В **Connection settings** укажите API URL Podsync (например, `https://podcast.example.com/api/v1`) и данные администратора. Загрузите список персональных лент, выберите одну и отправьте вкладку YouTube, VK Video или Rutube как аудио или видео. Подробнее — в [руководстве расширения](extensions/podsync-firefox/README.md).
+В **Connection settings** укажите API URL Podsync (например, `https://podcast.example.com/api/v1`) и данные администратора, затем подтвердите запрос Firefox на доступ к этому серверу. Загрузите список персональных лент, выберите одну и отправьте вкладку YouTube, VK Video или Rutube как аудио или видео. Окно останется открытым и покажет название ленты и ID поставленного в очередь эпизода. Подробнее — в [руководстве расширения](extensions/podsync-firefox/README.md).
 
 ## AI-клиенты и MCP
 

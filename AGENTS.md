@@ -20,7 +20,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 - **Web UI**: Embedded modular single-page application (`services/web/ui/` with `index.html`, `admin.css`, `admin.js`, `theme.js`, mirrored to root `html/`) styled with strict Catppuccin Mocha (dark) & Latte (light) themes
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
 - **Backup & Recovery**: Portable `.tar.gz` backups (`pkg/backup/`) containing configuration, a consistent Badger stream, custom covers, optional secrets, and Personal Feed metadata; downloaded media is intentionally excluded
-- **Browser Integration**: Signed Firefox WebExtension sources in `extensions/podsync-firefox/` for sending YouTube, VK Video, and Rutube tabs to Personal Feeds
+- **Browser Integration**: Signed Firefox WebExtension sources in `extensions/podsync-firefox/` for sending YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube tabs to Personal Feeds; install-time permissions are limited to `activeTab` and `storage`, with Podsync server access requested as an optional per-origin host permission
 - **Telegram Integration**: Optional single-owner bot (`pkg/telegram/`) for adding links to Personal Feeds, status and retry commands, and failure/recovery notifications via long polling
 
 ---
@@ -53,6 +53,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── apple.go          # Apple Podcasts URL resolution to the underlying RSS feed
 │   │   ├── audiobook.go      # Local audiobook builder (ID3/APIC tags, natural sorting, serial format)
 │   │   ├── audiobook_test.go # Unit tests for audiobook discovery, chapter sorting, and covers
+│   │   ├── natural_sort.go   # Natural ordering for audiobook chapter filenames
+│   │   ├── rss.go            # Custom RSS feed mirroring builder
 │   │   ├── rutube.go         # Rutube builder (channel, playlists, users via yt-dlp)
 │   │   ├── vkvideo.go        # VK Video builder (official VK API client, handle resolution)
 │   │   ├── youtube.go        # YouTube Data API v3 builder
@@ -68,6 +70,9 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── logbuffer/            # Thread-safe in-memory circular ring buffer for real-time logs
 │   ├── mcp/                  # Model Context Protocol server (stdio & HTTP/SSE)
 │   │   ├── server.go         # 34 MCP tools, resources (podsync://*), and diagnostic prompts
+│   │   ├── http.go           # HTTP JSON-RPC and SSE transports
+│   │   ├── stdio.go          # stdio transport
+│   │   ├── types.go          # JSON-RPC request/response types
 │   │   └── proxy.go          # JSON-RPC relay to /mcp and web.AdminManager REST client
 │   ├── model/                # Domain models (Feed, Episode, Provider constants)
 │   ├── network/              # Custom DNS resolver configuration and validation
@@ -82,6 +87,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── api_feeds.go      # Feed, token, cover and preview handlers
 │   │   ├── api_system.go     # System, backup, logs, downloader and network handlers
 │   │   ├── api_audiobooks.go # Audiobook library handlers
+│   │   ├── api_telegram.go   # Telegram pairing, status, and disconnect handlers
 │   │   ├── auth.go           # Session cookie auth, password verification, login handlers
 │   │   ├── feed_patch.go     # Atomic partial feed configuration updates
 │   │   ├── personal.go       # Personal Feed REST handlers and uploads
@@ -95,7 +101,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   └── ru/                   # Russian user guides and developer documentation index
 ├── tests/e2e/               # Playwright browser regression tests with isolated npm dependencies
 ├── extensions/
-│   ├── podsync-firefox/      # Firefox extension source, manifest, popup, icon, and setup guide
+│   ├── podsync-firefox/      # Firefox extension source (manifest, lib.js, popup, icon, tests, guide)
 │   └── podsync-firefox-*.zip # AMO submission source archive; signed XPI is distributed via Releases
 ├── .agents/skills/podsync/   # Standard agent skill definition for MCP
 ├── Dockerfile                # Multi-stage Docker build (Go builder + Alpine runtime with yt-dlp)
@@ -150,6 +156,13 @@ This file provides comprehensive architecture guidance, development workflows, a
 - Supports show URLs on `podcasts.apple.com` and legacy `itunes.apple.com`, including country-prefixed URLs and episode links containing a show ID.
 - Resolves the underlying RSS URL through the iTunes Lookup API, with Apple page HTML parsing as a fallback, then uses the normal RSS mirroring pipeline.
 - Apple Podcasts feeds support the same Download Scope controls as custom RSS feeds: all episodes, the last 10/25/50, or a custom numeric limit.
+
+### Firefox extension (`extensions/podsync-firefox/`)
+- Zero-build Manifest V3 add-on. `lib.js` contains pure helpers for provider detection, URL normalisation, UTF-8 Basic Auth, API requests, and episode payloads; `popup.js` only wires them to the DOM and `browser.*` APIs.
+- Install-time permissions are `activeTab` and `storage`. Access to the configured Podsync server is an optional host permission requested for that exact origin when connection settings are saved; `<all_urls>` must never be declared. `permissions.request` must run in the settings submit handler before awaiting other work.
+- Accepts only `youtube.com`/`youtu.be`, `vkvideo.ru`, `vk.com`, `vk.ru`, and `rutube.ru` hosts using exact or subdomain-suffix matching that rejects look-alike domains. Submitted links drop fragments; the API URL is normalised through `origin` and `pathname`.
+- After a successful enqueue the popup shows the feed title and queued episode ID with a **Close window** button and does not close itself; API errors are shown verbatim.
+- Verification: `node extensions/podsync-firefox/tests/popup_test.js` and `npx --yes web-ext@8 lint --source-dir extensions/podsync-firefox`. The signed XPI is distributed as a GitHub Release asset, not from an AMO direct file URL.
 
 ---
 
@@ -218,7 +231,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/feeds` | Create new podcast feed |
 | `POST` | `/api/v1/feeds/preview` | Resolve and preview provider/RSS metadata before feed creation, including Apple Podcasts URLs |
 | `GET` | `/api/v1/feeds/status` | Lightweight in-memory feed states (idle, queued, running) |
-| `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once |
+| `POST` | `/api/v1/feeds/update` | Trigger bulk update for all configured feeds at once (`/api/v1/feeds/update-all` alias) |
 | `GET` | `/api/v1/feeds/{id}` | Get feed details and episode list (supports `?limit=40&offset=0` pagination) |
 | `GET` | `/api/v1/feeds/{id}/episodes` | Paginated episode query (`limit`, `offset`, `status`, `q`, `sort`, `duration`) |
 | `PUT` | `/api/v1/feeds/{id}` | Update feed configuration and trigger XML rebuild |
@@ -248,6 +261,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `DELETE` | `/api/v1/personal-feeds/{id}` | Delete personal feed (optional `?delete_files=true`) |
 | `GET` | `/api/v1/personal-feeds/{id}/episodes` | List all episodes in a personal feed |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes` | Add episode via `url`, `file_path`, `title`, `format`, `quality`, `max_height` |
+| `GET`, `POST` | `/api/v1/personal-feeds/{id}/quick-add` | Token-scoped public add for automations (`token`, `url`, `title`, `format`, `quality`); also accepts `Authorization: Bearer` or `X-Quick-Add-Token` |
 | `POST` | `/api/v1/personal-feeds/{id}/upload` | Multipart file upload with `file`, `title`, `format`, `quality`, `max_height` |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/copy` | Copy episode to another personal feed (`target_feed_id`) |
 | `POST` | `/api/v1/personal-feeds/{id}/episodes/{ep_id}/move` | Move episode to another personal feed (`target_feed_id`) |
@@ -330,6 +344,8 @@ before serving; proxied initialization preserves the daemon's version.
     - Source lives in `extensions/podsync-firefox/`; increment `manifest.json` for every AMO upload and keep `browser_specific_settings.gecko.data_collection_permissions` accurate.
     - Keep install-time permissions minimal: `activeTab` (current tab URL/title) and `storage`; request Podsync server access as an optional host permission for the configured origin and never reintroduce `<all_urls>`.
     - The extension accepts only YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube pages, stores its configured API URL/credentials in Firefox extension-local storage, and exposes audio/video quality controls before submission.
+    - Before an AMO upload, run the tests and `npx --yes web-ext@8 lint --source-dir extensions/podsync-firefox`, then rebuild `extensions/podsync-firefox-<version>.zip` with files at the archive root and upload that ZIP.
+    - Unlisted AMO file URLs are not anonymously downloadable. After signing, download the XPI from the AMO developer hub, attach it to a normal Podsync GitHub Release, and link that release asset rather than the AMO file URL.
     - Run `node extensions/podsync-firefox/tests/popup_test.js` after changing extension code; keep coverage for provider URLs, UTF-8 Basic Auth, API errors, format selection, and the queued confirmation flow.
     - When the signed XPI filename or release tag changes, update direct download links in `README.md`, `README_RU.md`, `docs/personal-feeds.md`, `docs/ru/personal-feeds.md`, and the extension README together.
 17. **Mandatory Pre-Release Documentation Gate**:
@@ -365,5 +381,5 @@ before serving; proxied initialization preserves the daemon's version.
 ## 8. Developer Guides & Browser Tests
 
 - Internal architecture, API, design, stack, workflow, and review guides live in [`docs/dev/`](docs/dev/README.md). Keep the root focused on `AGENTS.md` and the two README files.
-- Browser regression tests live in `tests/e2e/`; install their pinned dependencies with `npm ci`, install Chromium with `npx playwright install chromium`, and run `npm test` from that directory. CI runs them in the **Browser tests** job.
-- Dependency-free Node.js UI tests remain in `services/web/`. The Firefox extension suite runs with `node extensions/podsync-firefox/tests/popup_test.js`.
+- Browser regression tests live in `tests/e2e/`; install their pinned dependencies with `npm ci`, install Chromium with `npx playwright install chromium`, and run `npm test` from that directory. Run this suite locally for browser changes; `ci.yml` currently builds the binary only.
+- Dependency-free Node.js UI tests remain in `services/web/`. The Firefox extension suite runs with `node extensions/podsync-firefox/tests/popup_test.js`, and its manifest is linted with `npx --yes web-ext@8 lint --source-dir extensions/podsync-firefox`.

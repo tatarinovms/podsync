@@ -103,6 +103,7 @@ func (s *Server) registerAPIRoutes(mux *http.ServeMux) {
 
 	mux.Handle("/api/v1/downloader", s.authMiddleware(http.HandlerFunc(s.handleDownloader)))
 	mux.Handle("/api/v1/downloader/cookies", s.authMiddleware(http.HandlerFunc(s.handleCookies)))
+	mux.Handle("/api/v1/downloader/check", s.authMiddleware(http.HandlerFunc(s.handleDownloaderCheck)))
 	mux.Handle("/api/v1/downloader/test", s.authMiddleware(http.HandlerFunc(s.handleDownloaderTest)))
 	mux.Handle("/api/v1/network", s.authMiddleware(http.HandlerFunc(s.handleNetwork)))
 	mux.Handle("/api/v1/mcp/config", s.authMiddleware(http.HandlerFunc(s.handleMCPConfig)))

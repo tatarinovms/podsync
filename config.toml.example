@@ -56,11 +56,14 @@ username = "admin"
 password = "password"
 
 # Optional single-owner Telegram bot. Requires Web Admin for pairing.
-# Create a bot with BotFather, set PODSYNC_TELEGRAM_BOT_TOKEN, then connect
-# your private chat from Access & integrations > Telegram in Web Admin.
+# Create a bot with BotFather, then configure the token and enabled state in
+# Web Admin > Access & integrations > Telegram. Changes apply without restart.
+# PODSYNC_TELEGRAM_BOT_TOKEN overrides token and requires a process restart.
 [telegram]
 enabled = false
-# token = "" # Prefer PODSYNC_TELEGRAM_BOT_TOKEN.
+# token = "" # Stored automatically by Web Admin; environment takes precedence.
+# allowed_user_id = 0 # Telegram user ID; 0 allows any user with a pairing code.
+# proxy = "" # Optional HTTP/HTTPS/SOCKS5 proxy for api.telegram.org.
 
 # Configure where to store the episode data
 [storage]

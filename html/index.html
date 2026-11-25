@@ -576,7 +576,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="form-check form-switch mb-3">
+                                        <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" id="dl-self-update">
                                             <label class="form-check-label small fw-semibold" for="dl-self-update">Enable 24h Automatic Self-Update (yt-dlp)</label>
                                         </div>
@@ -704,6 +704,12 @@
                                     <div class="d-flex align-items-center justify-content-between">
                                         <span>Podsync Version</span>
                                         <span id="sys-ver" class="badge bg-light text-secondary border">-</span>
+                                    </div>
+                                    <div class="border-top pt-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm w-100" id="btn-check-ytdlp" onclick="checkYtdlpVersion()">
+                                            <i aria-hidden="true" class="bi bi-cloud-check me-1"></i>Check yt-dlp version
+                                        </button>
+                                        <div class="small text-muted mt-2" id="ytdlp-version-result" aria-live="polite">Compare the installed binary with the latest GitHub release.</div>
                                     </div>
                                 </div>
                             </div>
@@ -850,17 +856,65 @@
 
                 <div class="tab-pane fade" id="tab-access-telegram">
                     <div class="card p-4 mt-4">
-                        <h2 class="h5 mb-2">Telegram bot</h2>
-                        <p class="text-muted small">Add links to Personal Feeds and receive download failure and recovery notifications in a private chat.</p>
-                        <p class="small mb-3">Status: <strong id="telegram-status">Loading…</strong></p>
-                        <p class="small d-none" id="telegram-pair-instructions">Send <code id="telegram-pair-command"></code> to your bot in a private Telegram chat. The code expires after 10 minutes.</p>
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+                            <div>
+                                <h2 class="h5 mb-1">Telegram bot</h2>
+                                <p class="text-muted small mb-0">Add links to Personal Feeds and receive download failure and recovery notifications in a private chat.</p>
+                            </div>
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" id="telegram-status-badge">Loading…</span>
+                        </div>
+
+                        <ol class="small text-muted ps-3 mb-4">
+                            <li>Create a bot with <a href="https://t.me/BotFather" target="_blank" rel="noopener">BotFather</a> and copy its token.</li>
+                            <li>Paste the token below, enable the bot, and select <strong>Save</strong>.</li>
+                            <li>Select <strong>Connect</strong>, then send the displayed <code>/start &lt;code&gt;</code> to the bot in a private chat within 10 minutes.</li>
+                            <li>Use <strong>Send test</strong> to verify delivery.</li>
+                        </ol>
+
+                        <form id="telegram-config-form" onsubmit="saveTelegram(event)">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="telegram-enabled">
+                                <label class="form-check-label small fw-semibold" for="telegram-enabled">Enable Telegram bot</label>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold" for="telegram-token">Bot token</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="password" id="telegram-token" class="form-control font-monospace" autocomplete="off" placeholder="Paste the token from BotFather">
+                                    <button type="button" class="btn btn-outline-secondary" id="telegram-token-toggle" onclick="togglePasswordVisibility('telegram-token', this)" aria-label="Show or hide bot token" title="Show/Hide"><i aria-hidden="true" class="bi bi-eye"></i></button>
+                                </div>
+                                <div class="form-text" id="telegram-token-hint">Paste the token from BotFather.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold" for="telegram-allowed-user-id">Allowed Telegram user ID</label>
+                                <input type="number" min="0" step="1" inputmode="numeric" id="telegram-allowed-user-id" class="form-control form-control-sm" placeholder="Optional, e.g. 123456789">
+                                <div class="form-text" id="telegram-allowed-hint">Telegram user ID, not @username or chat ID. 0 allows any user with the pairing code.</div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small fw-semibold" for="telegram-proxy">HTTP / SOCKS5 proxy</label>
+                                <input type="text" id="telegram-proxy" class="form-control form-control-sm font-monospace" placeholder="socks5://127.0.0.1:1080">
+                                <div class="form-text">Optional proxy for Telegram Bot API polling, token checks, and test messages.</div>
+                            </div>
+                            <div class="small d-none mb-2" id="telegram-owner-row">
+                                <span class="text-muted">Connected owner user ID:</span>
+                                <code id="telegram-owner-user-id"></code>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="copyTelegramOwnerID()" title="Copy owner user ID" aria-label="Copy owner user ID"><i aria-hidden="true" class="bi bi-clipboard"></i></button>
+                            </div>
+                            <p class="small text-warning-emphasis mb-3" id="telegram-impact">Disabling stops polling and notifications. Saving a different token disconnects the current owner and requires a new <code>/start</code> code.</p>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button type="submit" class="btn btn-brand btn-sm" id="telegram-save-btn"><i aria-hidden="true" class="bi bi-save me-1"></i>Save</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="telegram-remove-token-btn" onclick="clearTelegramToken()">Remove token</button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="loadTelegram()">Refresh status</button>
+                            </div>
+                        </form>
+
+                        <p class="small mb-2" id="telegram-status" aria-live="polite">Loading…</p>
+                        <p class="small text-danger d-none mb-2" id="telegram-error" role="alert"></p>
+                        <p class="small d-none mb-3" id="telegram-pair-instructions">Send <code id="telegram-pair-command"></code> to your bot in a private Telegram chat. The code expires after 10 minutes.</p>
                         <div class="d-flex flex-wrap gap-2">
                             <button class="btn btn-brand btn-sm" type="button" id="telegram-pair-btn" onclick="telegramAction('pair')">Connect</button>
-                            <button class="btn btn-secondary btn-sm" type="button" onclick="loadTelegram()">Refresh status</button>
                             <button class="btn btn-secondary btn-sm" type="button" id="telegram-test-btn" onclick="telegramAction('test')">Send test</button>
                             <button class="btn btn-secondary btn-sm" type="button" id="telegram-disconnect-btn" onclick="telegramAction('disconnect')">Disconnect</button>
                         </div>
-                        <p class="text-muted small mt-3 mb-0">Set <code>[telegram].enabled = true</code> and <code>PODSYNC_TELEGRAM_BOT_TOKEN</code>, then restart Podsync to enable the bot.</p>
                     </div>
                 </div>
 

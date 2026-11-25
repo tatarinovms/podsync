@@ -159,6 +159,17 @@ type TokenInfo struct {
 	FromEnv  bool     `json:"from_env"`
 }
 
+// YtDlpVersionInfo compares the installed downloader with the latest GitHub release.
+type YtDlpVersionInfo struct {
+	CurrentVersion  string `json:"current_version"`
+	LatestVersion   string `json:"latest_version"`
+	UpdateAvailable bool   `json:"update_available"`
+	ReleaseURL      string `json:"release_url"`
+	BinaryPath      string `json:"binary_path"`
+	SelfUpdate      bool   `json:"self_update"`
+	Message         string `json:"message"`
+}
+
 // DownloaderConfigInfo contains current yt-dlp / downloader settings and cookie status
 type DownloaderConfigInfo struct {
 	Timeout            int               `json:"timeout"`
@@ -366,6 +377,7 @@ type AdminManager interface {
 	GetPodsyncUpdate(ctx context.Context, force ...bool) (*PodsyncUpdateInfo, error)
 	ApplyPodsyncUpdate(ctx context.Context) (*PodsyncUpdateInfo, error)
 	GetDownloaderConfig(ctx context.Context) (*DownloaderConfigInfo, error)
+	CheckYtDlpUpdate(ctx context.Context) (*YtDlpVersionInfo, error)
 	UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error
 	GetNetworkConfig(ctx context.Context) (*NetworkConfigInfo, error)
 	UpdateNetworkConfig(ctx context.Context, cfg *NetworkConfigUpdate) error

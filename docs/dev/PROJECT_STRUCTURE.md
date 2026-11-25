@@ -27,6 +27,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 │   ├── network/              # Shared HTTP client and custom DNS resolver
 │   ├── personal/             # Personal curated feeds service (storage, reference counting, media links)
 │   ├── selfupdate/           # Verified native binary updates from GitHub Releases
+│   ├── telegram/             # Optional single-owner bot, polling controller, and delivery state
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── migrate/              # Media filename migration tool
@@ -52,7 +53,7 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 - **`config.go`**: Struct definition for `Config` loaded from TOML (`pelletier/go-toml`). Resolves environment variable overrides (`PODSYNC_CONFIG_PATH`, `PODSYNC_YOUTUBE_API_KEY`, `PODSYNC_VKVIDEO_API_KEY`, `PODSYNC_ADMIN_ENABLED`, etc.).
 - **`backup_cli.go`**: Implements offline `--export-backup` and `--restore-backup` operations.
 - **`config_atomic.go`**: Persists configuration through an atomic temporary-file replacement.
-- **`feed_manager.go`**: Core `AppFeedManager` coordinator implementing `web.AdminManager`. Owns in-memory feed state, update admission, feed summaries, and the shared episode helpers (load, sort, media links). The same type is split by concern across `feed_manager_feeds.go` (create/update/delete), `feed_manager_tokens.go` (API keys and credentials), `feed_manager_config.go` (downloader, network, cookies, self-update), `feed_manager_status.go` (errors, recent downloads, logs), `feed_manager_backup.go` (backup/restore), and `feed_manager_audiobooks.go` (import, chapter files, covers).
+- **`feed_manager.go`**: Core `AppFeedManager` coordinator implementing `web.AdminManager`. Owns in-memory feed state, update admission, feed summaries, and the shared episode helpers (load, sort, media links). The same type is split by concern across `feed_manager_feeds.go` (create/update/delete), `feed_manager_tokens.go` (API keys and credentials), `feed_manager_config.go` (downloader, network, cookies, self-update), `feed_manager_status.go` (errors, recent downloads, logs), `feed_manager_backup.go` (backup/restore), `feed_manager_audiobooks.go` (import, chapter files, covers), `telegram_manager.go` (validated token, proxy, allowed-user, and enable changes with runtime polling control), and `ytdlp_version.go` (installed vs latest release diagnostics).
 - **`update_queue.go`**: Bridges feed-manager updates to the persistent job queue, with buffered-channel fallback.
 - **`restart_unix.go` / `restart_windows.go`**: Platform-specific process restart behavior used by native updates and restore workflows.
 - **`disk_unix.go` / `disk_windows.go`**: Platform-specific disk storage inspection (free, used, and total bytes via `sys/unix.Statfs`).
@@ -105,9 +106,12 @@ This document outlines the directory structure of **Podsync**, mapping each pack
 ### 2.10 `pkg/selfupdate/` (Native Release Updates)
 - **`selfupdate.go`**: Fetches the latest GitHub Release, verifies the platform archive against `checksums.txt`, and atomically replaces a native Podsync executable.
 
-### 2.11 `pkg/backup/` and `pkg/network/`
+### 2.11 `pkg/backup/`, `pkg/network/`, and `pkg/telegram/`
 - **`pkg/backup/backup.go`**: Creates, validates, and restores portable archives containing config, a Badger backup stream, custom covers, and optional secrets, but no downloaded episode media.
 - **`pkg/network/http_client.go`**: Builds the shared HTTP client and optional custom-DNS resolver used by provider APIs and RSS metadata requests.
+- **`pkg/telegram/bot.go`**: Long-polling single-owner bot, command handling, notification queue, and persisted `telegram-state.json`.
+- **`pkg/telegram/client.go`**: Builds the Bot API HTTP client with optional HTTP/HTTPS/SOCKS5 proxy routing.
+- **`pkg/telegram/controller.go`**: Owns the polling lifecycle, validates tokens with `getMe`, applies enable/token/proxy/allowed-user changes without duplicate `getUpdates` loops, and supports rollback of pairing state. Called by the Web Admin Telegram manager in `cmd/podsync/telegram_manager.go`.
 
 ### 2.12 `services/web/` (HTTP Server & Web UI)
 - **`server.go`**: HTTP server initialization, route registration, rate limiting middleware, Basic Auth & session auth, and static asset embedding.

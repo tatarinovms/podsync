@@ -25,3 +25,19 @@ func TestWriteConfigTreePreservesModeAndValidTOML(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 }
+
+func TestWriteConfigTreeModeForcesSecretPermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte("[telegram]\nenabled = false\n"), 0644))
+	require.NoError(t, os.Chmod(path, 0644))
+	tree, err := toml.LoadFile(path)
+	require.NoError(t, err)
+	tree.Set("telegram.token", "secret-token")
+	require.NoError(t, writeConfigTreeMode(path, tree, 0600))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+	loaded, err := toml.LoadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "secret-token", loaded.Get("telegram.token"))
+}

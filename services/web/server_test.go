@@ -383,6 +383,17 @@ func (m *mockDownloaderAdminMgr) GetDownloaderConfig(ctx context.Context) (*Down
 	return &m.dlCfg, nil
 }
 
+func (m *mockDownloaderAdminMgr) CheckYtDlpUpdate(context.Context) (*YtDlpVersionInfo, error) {
+	return &YtDlpVersionInfo{
+		CurrentVersion:  "2026.10.26",
+		LatestVersion:   "2026.11.23",
+		UpdateAvailable: true,
+		ReleaseURL:      "https://github.com/yt-dlp/yt-dlp/releases/tag/2026.11.23",
+		SelfUpdate:      false,
+		Message:         "yt-dlp 2026.11.23 is available; installed 2026.10.26.",
+	}, nil
+}
+
 func (m *mockDownloaderAdminMgr) UpdateDownloaderConfig(ctx context.Context, cfg *DownloaderConfigUpdate) error {
 	if cfg.Timeout != nil {
 		m.dlCfg.Timeout = *cfg.Timeout
@@ -543,7 +554,16 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "http://proxy:8080")
 	assert.Contains(t, rec.Body.String(), "7.1")
 
-	// 2. POST /api/v1/downloader
+	// 2. GET /api/v1/downloader/check
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/downloader/check", nil)
+	req.SetBasicAuth("admin", "password")
+	rec = httptest.NewRecorder()
+	srv.Handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"latest_version":"2026.11.23"`)
+	assert.Contains(t, rec.Body.String(), `"update_available":true`)
+
+	// 3. POST /api/v1/downloader
 	updateJSON := `{"timeout": 25, "proxy": "http://newproxy:8080", "language": "ru"}`
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader", strings.NewReader(updateJSON))
 	req.SetBasicAuth("admin", "password")
@@ -554,7 +574,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Equal(t, "http://newproxy:8080", mgr.dlCfg.Proxy)
 	assert.Equal(t, "ru", mgr.dlCfg.Language)
 
-	// 3. GET /api/v1/downloader/cookies
+	// 4. GET /api/v1/downloader/cookies
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/downloader/cookies", nil)
 	req.SetBasicAuth("admin", "password")
 	rec = httptest.NewRecorder()
@@ -562,7 +582,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "Netscape HTTP Cookie File")
 
-	// 4. POST /api/v1/downloader/cookies
+	// 5. POST /api/v1/downloader/cookies
 	cookiesJSON := `{"content": "# Updated cookies"}`
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader/cookies", strings.NewReader(cookiesJSON))
 	req.SetBasicAuth("admin", "password")
@@ -571,7 +591,7 @@ func TestDownloaderEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "# Updated cookies", mgr.cookies)
 
-	// 5. POST /api/v1/downloader/test
+	// 6. POST /api/v1/downloader/test
 	testJSON := `{"url": "https://youtube.com/watch?v=123"}`
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/downloader/test", strings.NewReader(testJSON))
 	req.SetBasicAuth("admin", "password")

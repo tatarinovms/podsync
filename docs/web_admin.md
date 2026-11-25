@@ -194,11 +194,11 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Disk Storage**: Total, Used, and Free disk space on the storage volume (`data_dir`) with a visual capacity bar.
   - **Memory Usage**: Real-time RAM allocated by the Podsync process.
   - **Server Uptime**: How long the Podsync daemon has been running.
-  - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`.
+  - **External Dependencies Check**: Verifies that `yt-dlp` and `ffmpeg` are detected and accessible in the system `$PATH`. **Check yt-dlp version** compares the installed binary with the latest GitHub release and reports the installed and latest versions, whether an update is available, whether automatic updates are enabled, and a release link.
   - **Podsync Updates**: Checks the latest GitHub Release. On a supported native Linux or macOS installation, **Update Podsync** downloads the matching release archive, verifies its SHA-256 from `checksums.txt`, replaces the executable, and restarts the process. The button is disabled for Docker deployments; follow the Compose update commands in the deployment guide instead.
   - **Backup & Restore**: Downloads a portable `podsync-backup-YYYYMMDD-HHMMSS.tar.gz` containing `config.toml`, a consistent Badger backup stream, custom covers, optional `cookies.txt`, and a checksum manifest. Downloaded episodes are never included. Selecting an archive verifies checksums and requires its files to match the manifest exactly before restore. Keep the target server paths and port when migrating between Docker, NAS, and bare-metal deployments.
 
-- **Telegram** under **Access & integrations** pairs one private chat with the optional bot, sends a test message, or disconnects it. See the [Telegram bot guide](telegram.md).
+- **Telegram** under **Access & integrations** configures the optional bot without editing `config.toml` or restarting Podsync: paste the BotFather token, toggle **Enable Telegram bot**, and select **Save**. The token is validated with Telegram `getMe`, stored in `config.toml` with `0600` permissions, and polling starts or stops immediately. The panel shows the token source (`config.toml` or `PODSYNC_TELEGRAM_BOT_TOKEN`), running state, and the last safe error. An environment token is read-only and must be changed in the environment followed by a restart. Disabling stops polling and notifications but keeps the owner pairing; changing the token disconnects the owner and requires a new `/start` code. The panel also accepts an optional HTTP/HTTPS/SOCKS5 proxy for `api.telegram.org`, used for polling, token checks, and test messages. It sets an optional numeric **Allowed Telegram user ID** (`from.id`, not `@username` or chat ID); `0` allows any user with a pairing code, a different ID disconnects the current owner after confirmation, and the connected owner ID is shown with a copy button. It pairs one private chat, sends a test message, disconnects the owner, and removes a stored token while the bot is disabled. See the [Telegram bot guide](telegram.md).
 
 ### 8. Downloader & Cookies Configuration (yt-dlp)
 - The **Downloader & Cookies** tab addresses YouTube bot detection restrictions:
@@ -209,6 +209,7 @@ Clicking any podcast card opens a full-width dedicated show view (`.feed-detail`
   - **Engine Options**: Configure download timeouts and 24h automatic self-update.
   - **Preferred Audio Language**: The global or per-feed language selects a dubbed audio track when YouTube exposes one. If YouTube rejects that audio-only format with `HTTP Error 403`, Podsync retries the episode once with a muxed format and the language preference disabled. A per-feed `--extractor-args` override is never modified by this retry.
   - **Live URL Verification Tool**: Test yt-dlp and cookies against any video URL on-demand to verify that metadata extraction succeeds.
+  - **Outdated yt-dlp builds**: Errors such as `The page needs to be reloaded` or `Requested format is not available` on YouTube usually mean the yt-dlp build is too old for a protocol change. Custom binaries are not self-updated by Podsync; replace the binary with the latest release (or run `yt-dlp -U`) and retry the failed episodes. Refreshing cookies does not fix this by itself.
 
 ### 9. Network DNS
 

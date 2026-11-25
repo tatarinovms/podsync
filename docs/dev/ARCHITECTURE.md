@@ -108,6 +108,7 @@ Platform-specific metadata parsers implementing the `builder.Builder` interface:
 ### 2.3 Downloader Engine (`pkg/ytdl/`)
 - Encapsulates `yt-dlp` process execution with configurable timeout, proxy, and audio transcoding.
 - Injects Netscape `cookies.txt` or `--cookies-from-browser` to bypass YouTube bot detection and 429 rate limits.
+- Web Admin can compare the installed yt-dlp version with the latest GitHub release; custom binaries remain manually managed because Podsync disables self-update for them.
 - Supports custom format selection (`bestaudio`, `bestvideo[height<=?]+bestaudio/best`).
 - When a preferred language selects a YouTube audio-only dubbed format that the CDN rejects with HTTP 403, the downloader retries once with a muxed format and the language preference disabled. Per-feed `--extractor-args` overrides are preserved.
 
@@ -131,6 +132,7 @@ Core service orchestrating manually curated, universal podcast feeds:
 - Portable `.tar.gz` backups contain a manifest, checksums, `config.toml`, a transactionally consistent Badger stream, custom covers, and optional secrets. Downloaded episode media is intentionally excluded.
 - Restore validates the manifest, exact archive file list, entry types, and checksums before replacing state. Cross-server restores preserve the target server's storage paths and port by default; secrets can be restored independently.
 - The optional Telegram bot in `pkg/telegram/` uses long polling and a single paired private chat. It queues failure and recovery notifications after feed jobs finish, with delivery state saved beside Badger in `telegram-state.json`. This state is intentionally outside portable backups.
+- `telegram.Controller` owns the polling lifecycle. Web Admin validates token changes with Telegram `getMe`, applies the token/enabled/allowed-ID state to the controller (stopping and awaiting the old poller first, so `getUpdates` is never duplicated), then persists the fields atomically to `config.toml` with `0600` permissions. If the write fails, the controller, pairing state, and in-memory config roll back to the previous settings. Disabling stops polling without clearing the paired owner or queued notifications; changing the token clears the owner and update offset. `PODSYNC_TELEGRAM_BOT_TOKEN` overrides the stored token and makes it read-only in the UI. An optional HTTP/HTTPS/SOCKS5 `telegram.proxy` routes Bot API polling, `getMe`, and test messages without affecting feed downloads. `allowed_user_id` filters `message.from.id` and `callback_query.from.id` before pairing, commands, or callbacks; changing it disconnects a different owner while preserving a matching owner, and `0` removes the restriction.
 - Native self-update is supported on Linux and macOS. It downloads the matching GitHub Release archive, verifies it against `checksums.txt`, atomically replaces the executable, and restarts the process. Docker deployments and Windows binary replacement do not self-update.
 
 ### 2.8 Web Admin Console Delivery (`services/web/ui.go`)

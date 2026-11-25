@@ -22,7 +22,7 @@ This fork extends [mxpv/podsync](https://github.com/mxpv/podsync) with personal 
 - **Web Admin:** library search, playback, retries, artwork, Activity logs, and Catppuccin light/dark themes.
 - **Download settings:** cookies, HTTP/SOCKS proxies with credentials, global/per-provider routes, per-feed overrides, and URL diagnostics.
 - **Operations:** REST API, MCP tools, portable backups, health endpoints, and verified native updates on supported Linux/macOS installations.
-- **Telegram bot:** optional private-chat control for adding links to Personal Feeds, checking status, retrying episodes, and receiving failure and recovery alerts.
+- **Telegram bot:** optional private-chat control for adding links to Personal Feeds, checking status, retrying episodes, and receiving failure and recovery alerts. Configure and enable it from Web Admin without editing `config.toml` or restarting, optionally restrict access to one Telegram user ID, and route Bot API traffic through an HTTP/SOCKS5 proxy.
 
 ### Supported sources
 

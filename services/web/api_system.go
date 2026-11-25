@@ -280,6 +280,23 @@ func (s *Server) handleCookies(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleDownloaderCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.adminMgr == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")
+		return
+	}
+	info, err := s.adminMgr.CheckYtDlpUpdate(r.Context())
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeJSON(w, http.StatusOK, info)
+}
+
 func (s *Server) handleDownloaderTest(w http.ResponseWriter, r *http.Request) {
 	if s.adminMgr == nil {
 		s.writeError(w, http.StatusServiceUnavailable, "admin manager not initialized")

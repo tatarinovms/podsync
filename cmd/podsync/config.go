@@ -144,6 +144,12 @@ func (c *Config) validate() error {
 	if c.Telegram.Enabled && !c.Server.Admin.Enabled {
 		result = multierror.Append(result, errors.New("Telegram bot requires Web Admin to be enabled for owner pairing"))
 	}
+	if c.Telegram.Enabled && strings.TrimSpace(c.Telegram.Token) == "" {
+		result = multierror.Append(result, errors.New("Telegram bot requires a token when enabled"))
+	}
+	if err := telegram.ValidateProxy(c.Telegram.Proxy); err != nil {
+		result = multierror.Append(result, err)
+	}
 
 	if c.Server.DataDir != "" {
 		log.Warnf(`server.data_dir is deprecated, and will be removed in a future release. Use the following config instead:
@@ -311,6 +317,7 @@ func (c *Config) applyDefaults(configPath string) {
 func (c *Config) applyEnv() {
 	if token := os.Getenv("PODSYNC_TELEGRAM_BOT_TOKEN"); token != "" {
 		c.Telegram.Token = token
+		c.Telegram.TokenFromEnv = true
 	}
 	envVars := map[model.Provider][]string{
 		model.ProviderYoutube:    {"PODSYNC_YOUTUBE_API_KEY"},

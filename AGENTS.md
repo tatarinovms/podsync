@@ -21,7 +21,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 - **Agent Protocols**: Built-in Model Context Protocol (MCP) server (`pkg/mcp/`) supporting Stdio and SSE/HTTP
 - **Backup & Recovery**: Portable `.tar.gz` backups (`pkg/backup/`) containing configuration, a consistent Badger stream, custom covers, optional secrets, and Personal Feed metadata; downloaded media is intentionally excluded
 - **Browser Integration**: Signed Firefox WebExtension sources in `extensions/podsync-firefox/` for sending YouTube, VK Video (`vkvideo.ru`, `vk.com`, `vk.ru`), and Rutube tabs to Personal Feeds; install-time permissions are limited to `activeTab` and `storage`, with Podsync server access requested as an optional per-origin host permission
-- **Telegram Integration**: Optional single-owner bot (`pkg/telegram/`) for adding links to Personal Feeds, status and retry commands, and failure/recovery notifications via long polling
+- **Telegram Integration**: Optional single-owner bot (`pkg/telegram/`) for adding links to Personal Feeds, status and retry commands, and failure/recovery notifications via long polling; configured and enabled from Web Admin at runtime, with optional `allowed_user_id` access restriction and `PODSYNC_TELEGRAM_BOT_TOKEN` taking precedence over `config.toml`
 
 ---
 
@@ -42,6 +42,8 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── feed_manager_status.go # Download errors, recent downloads, sync status, logs
 │   ├── feed_manager_backup.go # Portable backup and restore
 │   ├── feed_manager_audiobooks.go # Audiobook import, chapter files and covers
+│   ├── telegram_manager.go   # Validated, atomic Telegram config and runtime lifecycle
+│   ├── ytdlp_version.go      # Installed vs latest yt-dlp release check
 │   ├── feed_manager_test.go  # Tests for feed management, private feeds, audiobook deletion
 │   ├── update_queue.go       # Queue capacity checks and update admission helpers
 │   ├── restart_unix.go / restart_windows.go # Platform-specific self-update restart
@@ -78,7 +80,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   ├── network/              # Custom DNS resolver configuration and validation
 │   ├── personal/             # Curated mixed-media feeds, shared media references, and processing
 │   ├── selfupdate/           # Verified native binary update from GitHub Releases
-│   ├── telegram/             # Optional single-owner bot and persistent delivery state
+│   ├── telegram/             # Bot, proxy-aware HTTP client, polling controller, and persistent state
 │   └── ytdl/                 # Wrapper around yt-dlp / youtube-dl CLI
 ├── services/
 │   ├── web/                  # HTTP Server, Web Admin Console (/admin), REST API (/api/v1)
@@ -87,7 +89,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 │   │   ├── api_feeds.go      # Feed, token, cover and preview handlers
 │   │   ├── api_system.go     # System, backup, logs, downloader and network handlers
 │   │   ├── api_audiobooks.go # Audiobook library handlers
-│   │   ├── api_telegram.go   # Telegram pairing, status, and disconnect handlers
+│   │   ├── api_telegram.go   # Telegram status, token/enable configuration, pairing, and disconnect handlers
 │   │   ├── auth.go           # Session cookie auth, password verification, login handlers
 │   │   ├── feed_patch.go     # Atomic partial feed configuration updates
 │   │   ├── personal.go       # Personal Feed REST handlers and uploads
@@ -157,6 +159,13 @@ This file provides comprehensive architecture guidance, development workflows, a
 - Resolves the underlying RSS URL through the iTunes Lookup API, with Apple page HTML parsing as a fallback, then uses the normal RSS mirroring pipeline.
 - Apple Podcasts feeds support the same Download Scope controls as custom RSS feeds: all episodes, the last 10/25/50, or a custom numeric limit.
 
+### Telegram bot (`pkg/telegram/`)
+- Optional single-owner long-polling bot. `allowed_user_id` is a non-negative Telegram user ID (`from.id`), never an `@username` or `chat_id`; `0` preserves the legacy mode where any user with a valid pairing code may connect.
+- The allowed-ID check runs before pairing codes, commands, and callback actions. Mismatches are ignored silently, callbacks receive only an empty acknowledgement, and group chats remain unsupported.
+- `GET /api/v1/telegram` exposes `allowed_user_id`, the configured Telegram proxy, and the connected owner `user_id` but never the token. The proxy supports HTTP/HTTPS/SOCKS5 and affects Bot API polling, `getMe`, and test messages only. `PUT` validates token changes with `getMe` and applies enabled/token/allowed-ID changes without a restart.
+- Config changes apply through `telegram.Controller`, which waits for the old poller before starting a new one. `cmd/podsync/telegram_manager.go` writes `enabled`, `token`, and `allowed_user_id` atomically with `writeConfigTreeMode(..., 0600)` and rolls the controller and pairing state back if the config write fails. A crash between the state and config writes leaves the previous owner disconnected, which is the safe direction.
+- A different non-zero allowed ID clears the owner, active code, drafts, and notifications while preserving the update offset; a matching ID preserves the owner; returning to `0` must not restore a disconnected owner.
+
 ### Firefox extension (`extensions/podsync-firefox/`)
 - Zero-build Manifest V3 add-on. `lib.js` contains pure helpers for provider detection, URL normalisation, UTF-8 Basic Auth, API requests, and episode payloads; `popup.js` only wires them to the DOM and `browser.*` APIs.
 - Install-time permissions are `activeTab` and `storage`. Access to the configured Podsync server is an optional host permission requested for that exact origin when connection settings are saved; `<all_urls>` must never be declared. `permissions.request` must run in the settings submit handler before awaiting other work.
@@ -214,7 +223,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/auth/logout` | Invalidate current admin session |
 | `POST` | `/api/v1/auth/password` | Change admin password (requires current password) |
 | `GET`, `POST` | `/api/v1/auth/security` | Get or update login rate-limiter & lockout settings |
-| `GET`, `POST` | `/api/v1/telegram` | Inspect bot status or pair, test, and disconnect its single owner |
+| `GET`, `PUT`, `POST` | `/api/v1/telegram` | Inspect status; `PUT` saves `enabled`/`token`/`allowed_user_id`/`proxy` with `getMe` validation and rollback; `POST` pairs, tests, disconnects, or clears the token |
 | `GET` | `/api/v1/system/errors` | List download errors with diagnostic causes and recommendations (`?feed_id=...&limit=...`) |
 | `GET` | `/api/v1/system/recent` | List recent successfully downloaded episodes (`?feed_id=...&limit=...`) |
 | `GET` | `/api/v1/system/status` | High-level status snapshot (sync schedules, 24h count, active errors) |
@@ -249,6 +258,7 @@ This file provides comprehensive architecture guidance, development workflows, a
 | `POST` | `/api/v1/audiobooks/upload` | Multipart file upload for audiobook chapters/cover |
 | `GET` | `/api/v1/audiobooks/config` | Read configured audiobooks directory |
 | `GET` | `/api/v1/downloader` | Inspect yt-dlp binary, ffmpeg version, timeout, cookies stats |
+| `GET` | `/api/v1/downloader/check` | Compare the installed yt-dlp binary with the latest GitHub release |
 | `POST` | `/api/v1/downloader` | Update downloader timeout, proxy, language, browser cookies |
 | `GET`/`POST`/`DELETE` | `/api/v1/downloader/cookies` | Manage Netscape `cookies.txt` content |
 | `POST` | `/api/v1/downloader/test` | Test yt-dlp metadata extraction against URL |
@@ -284,6 +294,8 @@ Podsync exposes 34 MCP tools. `update_feed_config` applies only supplied fields,
 - `create_system_backup`, `get_backup_info`
 
 Available over **Stdio** (`podsync --config config.toml --mcp`) and **HTTP/SSE** (`/mcp` and `/mcp/sse`).
+
+Telegram pairing and bot configuration remain web-only: they grant an external chat control over the instance and are not exposed as MCP tools.
 
 When a local daemon is ready, stdio relays JSON-RPC directly to `POST /mcp` with
 Basic Auth. All 34 tools, including personal feeds, resources and prompts are

@@ -96,18 +96,36 @@ func (s *Server) SetAdminManager(mgr AdminManager) {
 	s.adminMgr = mgr
 }
 
-// TelegramControl exposes only owner pairing and diagnostics to Web Admin.
+// TelegramControl exposes owner pairing and runtime configuration to Web Admin.
+// Pairing stays web-only because it grants an external chat control over the
+// instance; it is deliberately not exposed as an MCP tool.
 type TelegramControl interface {
 	Status() TelegramStatus
+	Configure(ctx context.Context, update TelegramConfigUpdate) (TelegramStatus, error)
+	ClearToken(ctx context.Context) (TelegramStatus, error)
 	PairCode() (string, error)
 	Disconnect() error
 	Test(context.Context) error
 }
 
+type TelegramConfigUpdate struct {
+	Enabled       *bool   `json:"enabled,omitempty"`
+	Token         *string `json:"token,omitempty"`
+	AllowedUserID *int64  `json:"allowed_user_id,omitempty"`
+	Proxy         *string `json:"proxy,omitempty"`
+}
+
 type TelegramStatus struct {
-	Enabled   bool  `json:"enabled"`
-	Connected bool  `json:"connected"`
-	ChatID    int64 `json:"chat_id,omitempty"`
+	Enabled         bool   `json:"enabled"`
+	Connected       bool   `json:"connected"`
+	ChatID          int64  `json:"chat_id,omitempty"`
+	UserID          int64  `json:"user_id,omitempty"`
+	AllowedUserID   int64  `json:"allowed_user_id"`
+	Proxy           string `json:"proxy,omitempty"`
+	TokenConfigured bool   `json:"token_configured"`
+	TokenSource     string `json:"token_source"`
+	Running         bool   `json:"running"`
+	LastError       string `json:"last_error,omitempty"`
 }
 
 func (s *Server) SetTelegram(control TelegramControl) { s.telegram = control }

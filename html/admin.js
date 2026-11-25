@@ -609,18 +609,201 @@
             }
         }
 
+        let telegramStatus = null;
+
+        function telegramBadge(text, tone) {
+            const badge = document.getElementById('telegram-status-badge');
+            if (!badge) return;
+            badge.className = `badge bg-${tone}-subtle text-${tone} border border-${tone}-subtle`;
+            badge.textContent = text;
+        }
+
+        function telegramErrorMessage(message) {
+            const el = document.getElementById('telegram-error');
+            if (!el) return;
+            if (message) {
+                el.textContent = message;
+                el.classList.remove('d-none');
+            } else {
+                el.textContent = '';
+                el.classList.add('d-none');
+            }
+        }
+
+        function renderTelegramStatus(data) {
+            telegramStatus = data;
+            const envToken = data.token_source === 'env';
+            const enabledEl = document.getElementById('telegram-enabled');
+            const tokenEl = document.getElementById('telegram-token');
+            const tokenToggle = document.getElementById('telegram-token-toggle');
+            const hint = document.getElementById('telegram-token-hint');
+            const allowedEl = document.getElementById('telegram-allowed-user-id');
+            const allowedHint = document.getElementById('telegram-allowed-hint');
+            const proxyEl = document.getElementById('telegram-proxy');
+            const ownerRow = document.getElementById('telegram-owner-row');
+            const ownerID = document.getElementById('telegram-owner-user-id');
+            const saveBtn = document.getElementById('telegram-save-btn');
+            const removeBtn = document.getElementById('telegram-remove-token-btn');
+            const pairBtn = document.getElementById('telegram-pair-btn');
+            const testBtn = document.getElementById('telegram-test-btn');
+            const disconnectBtn = document.getElementById('telegram-disconnect-btn');
+
+            if (enabledEl) enabledEl.checked = Boolean(data.enabled);
+            if (tokenEl) {
+                tokenEl.disabled = envToken;
+                tokenEl.placeholder = envToken ? 'Supplied by environment' : 'Paste the token from BotFather';
+            }
+            if (tokenToggle) tokenToggle.disabled = envToken;
+            if (hint) {
+                if (envToken) hint.textContent = 'Token supplied by environment. Change PODSYNC_TELEGRAM_BOT_TOKEN and restart Podsync to replace or remove it.';
+                else if (data.token_configured) hint.textContent = 'A token is configured. Leave this field blank to keep it.';
+                else hint.textContent = 'Paste the token from BotFather.';
+            }
+            const allowedUserID = Number(data.allowed_user_id) || 0;
+            if (allowedEl && document.activeElement !== allowedEl) allowedEl.value = String(allowedUserID);
+            if (allowedHint) {
+                allowedHint.textContent = allowedUserID > 0
+                    ? `Only Telegram user ID ${allowedUserID} can pair and use the bot.`
+                    : 'No user restriction: any Telegram user with a valid pairing code can connect.';
+            }
+            if (proxyEl && document.activeElement !== proxyEl) proxyEl.value = data.proxy || '';
+            if (ownerRow) ownerRow.classList.toggle('d-none', !data.user_id);
+            if (ownerID) ownerID.textContent = data.user_id ? String(data.user_id) : '';
+            if (saveBtn) saveBtn.disabled = false;
+            if (removeBtn) removeBtn.disabled = envToken || data.enabled || !data.token_configured;
+            if (pairBtn) pairBtn.disabled = !data.enabled || data.connected;
+            if (testBtn) testBtn.disabled = !data.connected;
+            if (disconnectBtn) disconnectBtn.disabled = !data.connected;
+
+            let state = 'Disabled';
+            let tone = 'secondary';
+            if (data.last_error) {
+                state = /token (check failed|is required)/i.test(data.last_error) ? 'Invalid token' : 'Cannot save';
+                tone = 'danger';
+            } else if (!data.enabled) {
+                state = 'Disabled';
+            } else if (data.connected) {
+                state = 'Connected';
+                tone = 'success';
+            } else if (!data.token_configured) {
+                state = 'Token required';
+                tone = 'warning';
+            } else if (data.running) {
+                state = 'Ready to connect';
+                tone = 'info';
+            } else {
+                state = 'Starting…';
+                tone = 'info';
+            }
+            telegramBadge(state, tone);
+
+            const details = [state];
+            if (data.connected && data.chat_id) details.push(`chat ${data.chat_id}`);
+            if (data.token_configured) details.push(envToken ? 'token from environment' : 'token configured');
+            if (data.proxy) details.push('proxy configured');
+            details.push(allowedUserID > 0 ? `user ${allowedUserID} only` : 'any user with code');
+            if (data.enabled && data.running) details.push('polling active');
+            const statusEl = document.getElementById('telegram-status');
+            if (statusEl) statusEl.textContent = details.join(' · ');
+            telegramErrorMessage(data.last_error || '');
+        }
+
         async function loadTelegram() {
-            const status = document.getElementById('telegram-status');
             try {
                 const res = await fetch('/api/v1/telegram');
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Unable to load Telegram status');
-                status.textContent = !data.enabled ? 'Disabled' : data.connected ? `Connected to chat ${data.chat_id}` : 'Waiting for connection';
-                document.getElementById('telegram-pair-btn').disabled = !data.enabled || data.connected;
-                document.getElementById('telegram-test-btn').disabled = !data.connected;
-                document.getElementById('telegram-disconnect-btn').disabled = !data.connected;
+                renderTelegramStatus(data);
             } catch (err) {
-                status.textContent = err.message;
+                telegramBadge('Unavailable', 'danger');
+                telegramErrorMessage(err.message);
+                const statusEl = document.getElementById('telegram-status');
+                if (statusEl) statusEl.textContent = err.message;
+            }
+        }
+
+        async function saveTelegram(event) {
+            if (event) event.preventDefault();
+            const enabledEl = document.getElementById('telegram-enabled');
+            const tokenEl = document.getElementById('telegram-token');
+            const allowedEl = document.getElementById('telegram-allowed-user-id');
+            const proxyEl = document.getElementById('telegram-proxy');
+            const saveBtn = document.getElementById('telegram-save-btn');
+            const enabled = Boolean(enabledEl && enabledEl.checked);
+            const token = tokenEl ? tokenEl.value.trim() : '';
+            const allowedRaw = allowedEl ? allowedEl.value.trim() : '';
+            if (enabled && !token && !(telegramStatus && telegramStatus.token_configured)) {
+                telegramBadge('Cannot save', 'danger');
+                telegramErrorMessage('Enter a bot token before enabling Telegram.');
+                return;
+            }
+            let allowed = null;
+            if (allowedRaw !== '') {
+                allowed = Number(allowedRaw);
+                if (!Number.isSafeInteger(allowed) || allowed < 0) {
+                    telegramBadge('Cannot save', 'danger');
+                    telegramErrorMessage('Allowed user ID must be a non-negative whole number.');
+                    return;
+                }
+                if (telegramStatus && telegramStatus.connected && allowed !== 0 && allowed !== Number(telegramStatus.user_id)) {
+                    if (!confirm(`Saving user ID ${allowed} will disconnect the current owner. Continue?`)) return;
+                }
+            }
+            const body = { enabled, proxy: proxyEl ? proxyEl.value.trim() : '' };
+            if (token) body.token = token;
+            if (allowed !== null) body.allowed_user_id = allowed;
+            if (saveBtn) saveBtn.disabled = true;
+            try {
+                const res = await fetch('/api/v1/telegram', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to save Telegram settings');
+                if (tokenEl) tokenEl.value = '';
+                renderTelegramStatus(data);
+                document.getElementById('telegram-pair-instructions')?.classList.add('d-none');
+                showToast(data.enabled ? 'Telegram settings saved' : 'Telegram bot disabled');
+            } catch (err) {
+                telegramBadge('Cannot save', 'danger');
+                telegramErrorMessage(err.message);
+                showToast(err.message, 'error');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        }
+
+        async function clearTelegramToken() {
+            if (!confirm('Remove the Telegram bot token? The current owner will be disconnected.')) return;
+            try {
+                const res = await fetch('/api/v1/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'clear_token' })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to remove the Telegram token');
+                const tokenEl = document.getElementById('telegram-token');
+                if (tokenEl) tokenEl.value = '';
+                document.getElementById('telegram-pair-instructions')?.classList.add('d-none');
+                renderTelegramStatus(data);
+                showToast('Telegram token removed');
+            } catch (err) {
+                telegramBadge('Cannot save', 'danger');
+                telegramErrorMessage(err.message);
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function copyTelegramOwnerID() {
+            const userID = telegramStatus && telegramStatus.user_id;
+            if (!userID) return;
+            try {
+                await navigator.clipboard.writeText(String(userID));
+                showToast('Owner user ID copied');
+            } catch (_) {
+                showToast('Unable to copy owner user ID', 'error');
             }
         }
 
@@ -637,11 +820,13 @@
                     document.getElementById('telegram-pair-command').textContent = `/start ${data.code}`;
                     document.getElementById('telegram-pair-instructions').classList.remove('d-none');
                 } else {
-                    document.getElementById('telegram-pair-instructions').classList.add('d-none');
+                    document.getElementById('telegram-pair-instructions')?.classList.add('d-none');
                     showToast(action === 'test' ? 'Test message sent' : 'Telegram disconnected');
                 }
                 await loadTelegram();
             } catch (err) {
+                telegramBadge('Cannot save', 'danger');
+                telegramErrorMessage(err.message);
                 showToast(err.message, 'error');
             }
         }
@@ -2458,6 +2643,31 @@
 
             } catch (err) {
                 console.error("System load error:", err);
+            }
+        }
+
+        async function checkYtdlpVersion() {
+            const button = document.getElementById('btn-check-ytdlp');
+            const result = document.getElementById('ytdlp-version-result');
+            if (!button || !result) return;
+            button.disabled = true;
+            result.className = 'small text-muted';
+            result.textContent = 'Checking GitHub Releases…';
+            try {
+                const res = await fetch('/api/v1/downloader/check', { cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Unable to check the yt-dlp version');
+                result.className = `small ${data.update_available ? 'text-warning' : 'text-success'}`;
+                const release = data.release_url ? ` · <a href="${safeUrl(data.release_url)}" target="_blank" rel="noopener">Release notes</a>` : '';
+                const automatic = data.self_update ? 'on (24h check)' : 'off (custom binary or disabled)';
+                result.innerHTML = `Installed <code>${escapeHtml(data.current_version || 'unknown')}</code> · Latest <code>${escapeHtml(data.latest_version || 'unknown')}</code><br>`
+                    + `Automatic updates: <strong>${automatic}</strong><br>`
+                    + `${escapeHtml(data.message || 'Version check completed.')}${release}`;
+            } catch (err) {
+                result.className = 'small text-danger';
+                result.textContent = err.message;
+            } finally {
+                button.disabled = false;
             }
         }
 

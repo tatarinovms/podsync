@@ -230,6 +230,13 @@ Runs non-downloading test of yt-dlp against a URL:
 }
 ```
 
+#### `GET /api/v1/downloader/check`
+Authenticated downloader diagnostic. Reads the installed yt-dlp version from the
+configured binary and compares it with the latest GitHub release. Returns
+`current_version`, `latest_version`, `update_available`, `release_url`,
+`binary_path`, `self_update`, and a safe `message`. It never installs or modifies
+the binary.
+
 ---
 
 ### 3.4 API Tokens & Rotation
@@ -289,12 +296,35 @@ paths keeps the target server's storage locations and port during migration.
 
 ### 3.6 Authentication & Security
 
-#### `GET, POST /api/v1/telegram`
+#### `GET, PUT, POST /api/v1/telegram`
 Authenticated Web Admin integration for the single-owner Telegram bot. `GET`
-returns `enabled`, `connected`, and the linked `chat_id` when present. `POST`
-accepts `{"action":"pair"}` (returns a 10-minute one-time code), `test`, or
-`disconnect`. The pairing endpoint is web-only because it grants an external
-chat control over the instance; it is not an MCP tool.
+returns `enabled`, `connected`, the linked `chat_id` and owner `user_id` when
+present, `allowed_user_id`, `proxy` when configured, `token_configured`,
+`token_source` (`env`, `config`, or `none`), `running`, and the last safe
+`last_error`. The token itself is never
+returned, including in masked form.
+
+`PUT` accepts `{"enabled":true,"token":"...","allowed_user_id":123}`. The token
+is optional and an empty or omitted value keeps the stored token; an empty value
+never clears it. `allowed_user_id` is an optional non-negative integer Telegram
+`from.id`, not an `@username` or chat ID; `null` or an omitted field keeps the
+current value, `0` removes the restriction, and values above `2^53-1` or
+non-integers are rejected. `proxy` is an optional `http`, `https`, `socks5`, or
+`socks5h` URL; an empty string clears it, and invalid URLs are rejected. A different non-zero ID disconnects the current
+owner and requires a new pairing code; a matching ID preserves the owner.
+When enabling or supplying a token, Podsync validates it with Telegram `getMe`
+before writing `telegram.enabled` and `telegram.token` to `config.toml` with
+`0600` permissions, then starts or stops polling without a restart. Failed
+validation, application, or writes roll the running bot and pairing state back
+to the previous settings. The
+body is limited to 4 KiB and the token to 512 characters.
+
+`POST` accepts `{"action":"pair"}` (returns a 10-minute one-time code), `test`,
+`disconnect`, or `clear_token`. `clear_token` requires a disabled bot and a
+token sourced from `config.toml`; an environment token cannot be replaced or
+removed through the API. The pairing and configuration endpoints are web-only
+because they grant an external chat control over the instance; they are not MCP
+tools.
 
 #### `GET /api/v1/auth/status`
 Returns current session authentication status, administrator username, and active brute-force rate limit configuration.

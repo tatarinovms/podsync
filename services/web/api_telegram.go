@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // Telegram pairing is deliberately web-only: it grants an external chat
@@ -15,12 +16,28 @@ func (s *Server) handleTelegram(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.writeJSON(w, http.StatusOK, s.telegram.Status())
+	case http.MethodPut:
+		var req TelegramConfigUpdate
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&req); err != nil {
+			s.writeError(w, http.StatusBadRequest, "invalid Telegram configuration")
+			return
+		}
+		if req.Token != nil && len(strings.TrimSpace(*req.Token)) > 512 {
+			s.writeError(w, http.StatusBadRequest, "telegram token is too long")
+			return
+		}
+		status, err := s.telegram.Configure(r.Context(), req)
+		if err != nil {
+			s.writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		s.writeJSON(w, http.StatusOK, status)
 	case http.MethodPost:
 		var req struct {
 			Action string `json:"action"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&req); err != nil {
-			s.writeError(w, http.StatusBadRequest, err.Error())
+			s.writeError(w, http.StatusBadRequest, "invalid Telegram action")
 			return
 		}
 		switch req.Action {
@@ -43,6 +60,13 @@ func (s *Server) handleTelegram(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			s.writeJSON(w, http.StatusOK, map[string]string{"message": "Test message sent"})
+		case "clear_token":
+			status, err := s.telegram.ClearToken(r.Context())
+			if err != nil {
+				s.writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			s.writeJSON(w, http.StatusOK, status)
 		default:
 			s.writeError(w, http.StatusBadRequest, "Unknown Telegram action")
 		}

@@ -53,13 +53,13 @@ func TestPairingAndPersonalURLFlow(t *testing.T) {
 	bot, err := New(Config{Enabled: true, Token: "test"}, path, nil, feeds)
 	require.NoError(t, err)
 	var sent []string
-	bot.client = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+	bot.SetHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if strings.HasSuffix(r.URL.Path, "/sendMessage") {
 			data, _ := io.ReadAll(r.Body)
 			sent = append(sent, string(data))
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":true}`)), Header: make(http.Header)}, nil
-	})}
+	})})
 	code, err := bot.PairCode()
 	require.NoError(t, err)
 	bot.handle(ctx, incoming(10, 10, "/start wrong"))
@@ -105,7 +105,7 @@ func TestTelegramDeliveryFailureKeepsOutbox(t *testing.T) {
 	require.NoError(t, err)
 	bot.state.ChatID = 10
 	bot.state.Outbox = []notice{{Text: "failure"}}
-	bot.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") })}
+	bot.SetHTTPClient(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("offline") })})
 	bot.flush(context.Background())
 	require.Len(t, bot.state.Outbox, 1)
 }
@@ -136,4 +136,60 @@ func TestJobFailureIsDeduplicatedAndRecovered(t *testing.T) {
 	require.Contains(t, bot.state.Outbox[1].Text, "recovered")
 	bot.ReconcileFeed(ctx, "personal", false)
 	require.Len(t, bot.state.Outbox, 2)
+}
+
+func TestAllowedUserIDFiltersMessagesAndCallbacks(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "state.json")
+	bot, err := New(Config{Enabled: true, Token: "test", AllowedUserID: 10}, path, nil, nil)
+	require.NoError(t, err)
+	var sent, answered int
+	bot.SetHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/sendMessage"):
+			sent++
+		case strings.HasSuffix(r.URL.Path, "/answerCallbackQuery"):
+			answered++
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":true}`)), Header: make(http.Header)}, nil
+	})})
+
+	code, err := bot.PairCode()
+	require.NoError(t, err)
+	bot.handle(ctx, incoming(20, 20, "/start "+code))
+	require.False(t, bot.Status().Connected, "a different Telegram user must not pair")
+	require.Zero(t, sent)
+
+	bot.handle(ctx, incoming(10, 10, "/start "+code))
+	require.True(t, bot.Status().Connected)
+	require.Equal(t, int64(10), bot.Status().UserID)
+
+	before := sent
+	bot.handle(ctx, incoming(20, 20, "/help"))
+	require.Equal(t, before, sent, "a different user must not receive replies")
+	bot.handle(ctx, incoming(10, 10, "/help"))
+	require.Equal(t, before+1, sent, "the allowed owner still receives replies")
+
+	// The allowed user check runs before the saved owner check: a stale owner
+	// cannot keep using the bot after the restriction changes.
+	bot.mu.Lock()
+	bot.state.ChatID, bot.state.UserID = 20, 20
+	bot.draft = draft{URL: "https://example.org/old.mp3"}
+	bot.mu.Unlock()
+	bot.handle(ctx, incoming(20, 20, "/cancel"))
+	bot.mu.Lock()
+	require.NotEmpty(t, bot.draft.URL, "stale owner command must be ignored")
+	bot.mu.Unlock()
+
+	beforeCallback := sent
+	bot.handle(ctx, pressed(20, 20, "feed:personal:nonce"))
+	require.Equal(t, beforeCallback, sent, "stale owner callback must not execute a command")
+	require.Equal(t, 1, answered, "callback acknowledgement is safe but empty")
+
+	// Group chats remain unsupported even for the allowed user.
+	group := incoming(10, 10, "/cancel")
+	group.Message.Chat.Type = "group"
+	beforeGroup := sent
+	bot.handle(ctx, group)
+	require.Equal(t, beforeGroup, sent)
 }

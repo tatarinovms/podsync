@@ -153,6 +153,10 @@ func (m *mockAdminManager) GetDownloaderConfig(ctx context.Context) (*web.Downlo
 	}, nil
 }
 
+func (m *mockAdminManager) CheckYtDlpUpdate(context.Context) (*web.YtDlpVersionInfo, error) {
+	return &web.YtDlpVersionInfo{CurrentVersion: "2026.10.26", LatestVersion: "2026.11.23", UpdateAvailable: true}, nil
+}
+
 func (m *mockAdminManager) UpdateDownloaderConfig(ctx context.Context, cfg *web.DownloaderConfigUpdate) error {
 	return nil
 }
@@ -816,6 +820,7 @@ var adminManagerMCPExposure = map[string]struct {
 	"GetPodsyncUpdate":       {Tool: "get_podsync_update"},
 	"ApplyPodsyncUpdate":     {Tool: "update_podsync"},
 	"GetDownloaderConfig":    {Tool: "get_downloader_config"},
+	"CheckYtDlpUpdate":       {Reason: "yt-dlp release checks are part of the authenticated downloader diagnostics; get_downloader_config returns the installed version."},
 	"UpdateDownloaderConfig": {Tool: "update_downloader_config"},
 	"GetNetworkConfig":       {Tool: "get_network_config"},
 	"UpdateNetworkConfig":    {Tool: "update_network_config"},

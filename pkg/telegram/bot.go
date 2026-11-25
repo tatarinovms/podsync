@@ -26,8 +26,11 @@ import (
 )
 
 type Config struct {
-	Enabled bool   `toml:"enabled"`
-	Token   string `toml:"token"`
+	Enabled       bool   `toml:"enabled"`
+	Token         string `toml:"token"`
+	AllowedUserID int64  `toml:"allowed_user_id"`
+	Proxy         string `toml:"proxy"`
+	TokenFromEnv  bool   `toml:"-" json:"-"`
 }
 
 type notice struct {
@@ -49,6 +52,8 @@ type draft struct {
 }
 
 type Bot struct {
+	configMu sync.RWMutex
+	clientMu sync.RWMutex
 	mu       sync.Mutex
 	cfg      Config
 	path     string
@@ -63,7 +68,11 @@ type Bot struct {
 }
 
 func New(cfg Config, path string, mgr web.AdminManager, personalFeeds *personal.Service) (*Bot, error) {
-	b := &Bot{cfg: cfg, path: path, client: &http.Client{Timeout: 40 * time.Second}, baseURL: "https://api.telegram.org", mgr: mgr, personal: personalFeeds}
+	client, err := NewHTTPClient(cfg.Proxy, 40*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	b := &Bot{cfg: cfg, path: path, client: client, baseURL: "https://api.telegram.org", mgr: mgr, personal: personalFeeds}
 	if cfg.Enabled && strings.TrimSpace(cfg.Token) == "" {
 		return nil, errors.New("telegram token is required when enabled")
 	}
@@ -117,14 +126,163 @@ func (b *Bot) queueLocked(text string) {
 	}
 }
 
+func (b *Bot) Enabled() bool {
+	b.configMu.RLock()
+	defer b.configMu.RUnlock()
+	return b.cfg.Enabled
+}
+
+func (b *Bot) Token() string {
+	b.configMu.RLock()
+	defer b.configMu.RUnlock()
+	return b.cfg.Token
+}
+
+// SetConfig replaces the runtime configuration. The caller must stop polling
+// before changing the token so only one getUpdates loop can exist per token.
+func (b *Bot) SetConfig(cfg Config) {
+	b.configMu.Lock()
+	b.cfg = cfg
+	b.configMu.Unlock()
+}
+
+func (b *Bot) Config() Config {
+	b.configMu.RLock()
+	defer b.configMu.RUnlock()
+	return b.cfg
+}
+
+func (b *Bot) httpClient() *http.Client {
+	b.clientMu.RLock()
+	defer b.clientMu.RUnlock()
+	return b.client
+}
+
+func (b *Bot) SetHTTPClient(client *http.Client) {
+	b.clientMu.Lock()
+	b.client = client
+	b.clientMu.Unlock()
+}
+
+// SetProxy rebuilds the Bot API client when the proxy changes. The poller is
+// stopped by the controller before this method is called.
+func (b *Bot) SetProxy(rawProxy string) error {
+	b.configMu.RLock()
+	current := b.cfg.Proxy
+	b.configMu.RUnlock()
+	if strings.TrimSpace(rawProxy) == strings.TrimSpace(current) {
+		return nil
+	}
+	client, err := NewHTTPClient(rawProxy, 40*time.Second)
+	if err != nil {
+		return err
+	}
+	b.SetHTTPClient(client)
+	return nil
+}
+
+func (b *Bot) AllowedUserID() int64 {
+	b.configMu.RLock()
+	defer b.configMu.RUnlock()
+	return b.cfg.AllowedUserID
+}
+
+func (b *Bot) OwnerUserID() int64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.state.UserID
+}
+
+// ResetForTokenChange clears the paired owner, pending drafts, notifications,
+// and update offset. A new bot token must never inherit the old owner's chat.
+func (b *Bot) ResetForTokenChange() error {
+	return b.resetState(true)
+}
+
+// ResetOwner clears the paired owner and everything addressed to that owner
+// while keeping the update offset for the same bot token.
+func (b *Bot) ResetOwner() error {
+	return b.resetState(false)
+}
+
+func (b *Bot) resetState(resetOffset bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	previous := b.snapshotLocked()
+	next := state{Errors: map[string]string{}, Awaiting: map[string]bool{}}
+	if !resetOffset {
+		next.Offset = b.state.Offset
+	}
+	b.state = next
+	b.code, b.codeTill, b.draft = "", time.Time{}, draft{}
+	if err := b.saveLocked(); err != nil {
+		b.state, b.code, b.codeTill, b.draft = previous.state, previous.code, previous.codeTill, previous.draft
+		return err
+	}
+	return nil
+}
+
+type stateSnapshot struct {
+	state    state
+	code     string
+	codeTill time.Time
+	draft    draft
+}
+
+func cloneState(src state) state {
+	dst := state{ChatID: src.ChatID, UserID: src.UserID, Offset: src.Offset}
+	if src.Errors != nil {
+		dst.Errors = make(map[string]string, len(src.Errors))
+		for key, value := range src.Errors {
+			dst.Errors[key] = value
+		}
+	}
+	if src.Awaiting != nil {
+		dst.Awaiting = make(map[string]bool, len(src.Awaiting))
+		for key, value := range src.Awaiting {
+			dst.Awaiting[key] = value
+		}
+	}
+	if src.Outbox != nil {
+		dst.Outbox = append([]notice(nil), src.Outbox...)
+	}
+	return dst
+}
+
+func (b *Bot) snapshotLocked() stateSnapshot {
+	return stateSnapshot{state: cloneState(b.state), code: b.code, codeTill: b.codeTill, draft: b.draft}
+}
+
+// Snapshot captures pairing, notification, and draft state so a failed config
+// write can be rolled back without losing the previous owner.
+func (b *Bot) Snapshot() stateSnapshot {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.snapshotLocked()
+}
+
+// Restore rewrites the captured state. It returns an error if the state file
+// cannot be saved, in which case the in-memory state is left unchanged.
+func (b *Bot) Restore(snapshot stateSnapshot) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	previous := b.snapshotLocked()
+	b.state, b.code, b.codeTill, b.draft = cloneState(snapshot.state), snapshot.code, snapshot.codeTill, snapshot.draft
+	if err := b.saveLocked(); err != nil {
+		b.state, b.code, b.codeTill, b.draft = previous.state, previous.code, previous.codeTill, previous.draft
+		return err
+	}
+	return nil
+}
+
 func (b *Bot) Status() web.TelegramStatus {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return web.TelegramStatus{Enabled: b.cfg.Enabled, Connected: b.state.ChatID != 0, ChatID: b.state.ChatID}
+	return web.TelegramStatus{Enabled: b.Enabled(), Connected: b.state.ChatID != 0, ChatID: b.state.ChatID, UserID: b.state.UserID}
 }
 
 func (b *Bot) PairCode() (string, error) {
-	if !b.cfg.Enabled {
+	if !b.Enabled() {
 		return "", errors.New("telegram bot is disabled")
 	}
 	var random [5]byte
@@ -202,12 +360,12 @@ func (b *Bot) api(ctx context.Context, method string, payload any, result any) e
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.baseURL+"/bot"+b.cfg.Token+"/"+method, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, b.baseURL+"/bot"+b.Token()+"/"+method, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	res, err := b.client.Do(req)
+	res, err := b.httpClient().Do(req)
 	if err != nil {
 		return fmt.Errorf("telegram %s request failed", method)
 	}
@@ -244,7 +402,7 @@ func button(label, data string) map[string]string {
 }
 
 func (b *Bot) Run(ctx context.Context) error {
-	if !b.cfg.Enabled {
+	if !b.Enabled() || strings.TrimSpace(b.Token()) == "" {
 		return nil
 	}
 	if err := b.api(ctx, "deleteWebhook", map[string]any{"drop_pending_updates": false}, nil); err != nil {
@@ -293,10 +451,20 @@ func (b *Bot) handle(ctx context.Context, u update) {
 	}
 	if u.Callback != nil && u.Callback.Message != nil {
 		chat, user, action, private = u.Callback.Message.Chat.ID, u.Callback.From.ID, u.Callback.Data, u.Callback.Message.Chat.Type == "private"
-		_ = b.api(ctx, "answerCallbackQuery", map[string]string{"callback_query_id": u.Callback.ID}, nil)
+	}
+	// The allowed user check runs before pairing codes, commands, and callbacks.
+	// A mismatch is ignored without revealing whether a code or owner exists.
+	if allowed := b.AllowedUserID(); allowed != 0 && user != allowed {
+		if u.Callback != nil {
+			_ = b.api(ctx, "answerCallbackQuery", map[string]string{"callback_query_id": u.Callback.ID}, nil)
+		}
+		return
 	}
 	if !private || chat == 0 || user == 0 {
 		return
+	}
+	if u.Callback != nil {
+		_ = b.api(ctx, "answerCallbackQuery", map[string]string{"callback_query_id": u.Callback.ID}, nil)
 	}
 	b.mu.Lock()
 	owner := b.state.ChatID == chat && b.state.UserID == user
@@ -435,7 +603,7 @@ func (b *Bot) sendFeeds(ctx context.Context, chat int64, page int, nonce string)
 // NotifyJobFailure records a Personal Feed update failure, which is not part
 // of the regular feed error list. ReconcileFeed clears it after a good update.
 func (b *Bot) NotifyJobFailure(feedID string, jobErr error) {
-	if !b.cfg.Enabled || jobErr == nil {
+	if !b.Enabled() || jobErr == nil {
 		return
 	}
 	b.mu.Lock()
@@ -566,7 +734,7 @@ func (b *Bot) add(ctx context.Context, chat int64, d draft, quality string, heig
 // ReconcileFeed is called after an update job reaches a final result. It queues
 // only state changes and never blocks a download on Telegram's availability.
 func (b *Bot) ReconcileFeed(ctx context.Context, feedID string, updateFailed bool) {
-	if !b.cfg.Enabled {
+	if !b.Enabled() {
 		return
 	}
 	current := map[string]string{}
